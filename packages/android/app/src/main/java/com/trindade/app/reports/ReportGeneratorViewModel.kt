@@ -96,6 +96,14 @@ class ReportGeneratorViewModel @Inject constructor(
         val isSyncingErp: Boolean = false,
         /** What the last ERP sync answered, shown next to the card's action. */
         val syncMessage: String? = null,
+        /**
+         * The day this report belongs to.
+         *
+         * The generator writes today's report and nothing else -- the screen has no date field, and the server
+         * stamps the record with the day it arrives. It is in the state because the day decides how the form is
+         * drawn: Recebimento stopped being a checklist on a date, and a report of that day must not ask for it.
+         */
+        val date: String = MassasLaunchViewModel.saopauloToday(),
     ) {
         val stage: Stage
             get() = when {
@@ -109,6 +117,10 @@ class ReportGeneratorViewModel @Inject constructor(
 
         val ready: Boolean get() = stage == Stage.READY && categories.isNotEmpty()
 
+        /** The categories the form is drawn from, validated and submitted, which the day can shorten. */
+        val formCategories: List<CategoriesResponseCategoriesInner>
+            get() = reportFormCategories(categories, date)
+
         /**
          * The readings the form still owes, one slot per declared reading it has no number for.
          *
@@ -119,7 +131,7 @@ class ReportGeneratorViewModel @Inject constructor(
          * here is only the question, asked of this state's own categories and answers.
          */
         val missingReadings: Set<TemperatureSlot>
-            get() = missingTemperatureReadings(categories.flatMap { it.tasks }, temperatures, String::toReading)
+            get() = missingTemperatureReadings(formCategories.flatMap { it.tasks }, temperatures, String::toReading)
 
         /**
          * Whether the report may be sent, which now includes whether it can be built at all.
@@ -195,7 +207,7 @@ class ReportGeneratorViewModel @Inject constructor(
                 createdReportId = null,
                 notes = "",
                 checks = emptyMap(),
-                temperatures = initialReadings(current.categories),
+                temperatures = initialReadings(current.formCategories),
                 selectedProducts = emptyMap(),
                 showValidation = false,
                 message = null,
@@ -323,7 +335,7 @@ class ReportGeneratorViewModel @Inject constructor(
         _state.update { it.copy(submitting = true, message = null) }
 
         viewModelScope.launch {
-            val tasksById = current.categories.flatMap { it.tasks }.associateBy { it.id }
+            val tasksById = current.formCategories.flatMap { it.tasks }.associateBy { it.id }
 
             val result = repository.create(
                 CreateReportRequest(

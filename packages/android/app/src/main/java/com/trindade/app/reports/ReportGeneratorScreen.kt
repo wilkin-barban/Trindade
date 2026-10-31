@@ -224,10 +224,10 @@ fun ReportGeneratorScreen(
                 // the field the operator was typing in with it. With the key, Compose moves the item
                 // rather than reusing the slot, which is what keeps a half-filled form in place while
                 // the operator reads it.
-                items(state.categories.filter { it.parentCategoryId == null }, key = { it.id }) { category ->
+                items(state.formCategories.filter { it.parentCategoryId == null }, key = { it.id }) { category ->
                     CategoryForm(
                         category = category,
-                        children = state.categories.filter { it.parentCategoryId == category.id },
+                        children = state.formCategories.filter { it.parentCategoryId == category.id },
                         form = form,
                         onCheckChange = onCheckChange,
                         onProductToggle = onProductToggle,

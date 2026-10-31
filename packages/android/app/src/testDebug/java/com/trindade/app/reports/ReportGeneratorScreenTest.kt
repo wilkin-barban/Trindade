@@ -2,6 +2,7 @@ package com.trindade.app.reports
 
 import android.content.Context
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -193,6 +194,36 @@ class ReportGeneratorScreenTest {
         render(state(listOf(category(1, "Cozinha"))).copy(syncMessage = "Movimentações do ERP atualizadas."))
 
         displayed("Movimentações do ERP atualizadas.")
+    }
+
+    /**
+     * The two halves of one day, on the two days the rule has.
+     *
+     * Recebimento stopped being a checklist the day the mirror started covering it, and the report of that day
+     * has to say so: the operator cannot tick supplies the ERP already booked, because the report would then
+     * carry two records of the same delivery. A day before that keeps its checklist, because the plant's
+     * history is not rewritten by a later feature.
+     */
+    @Test
+    fun `a day the ERP mirror covers draws no Recebimento checklist`() {
+        render(
+            state(listOf(category(4, "Recebimento"), category(8, "Higiene"))).copy(date = "2026-10-31"),
+        )
+
+        composeRule.onAllNodesWithText("Recebimento").assertCountEquals(0)
+        displayed("Higiene")
+        // The mirror is what replaced it, and it is on the same screen.
+        displayed(context.getString(R.string.report_receipts_title))
+    }
+
+    @Test
+    fun `a day before the mirror keeps its Recebimento checklist`() {
+        render(
+            state(listOf(category(4, "Recebimento"), category(8, "Higiene"))).copy(date = "2026-10-28"),
+        )
+
+        displayed("Recebimento")
+        displayed("Higiene")
     }
 
     /**
