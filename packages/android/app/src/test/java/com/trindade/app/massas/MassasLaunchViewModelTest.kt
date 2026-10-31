@@ -727,7 +727,13 @@ class MassasLaunchViewModelTest {
         }
     }
 
-    private fun launch(id: Int, boxes: Int = 3, units: Int = 30) = MassaIndividualLaunch(
+    private fun launch(
+        id: Int,
+        boxes: Int = 3,
+        units: Int = 30,
+        username: String = "wilkin",
+        displayName: String = "Wilkin",
+    ) = MassaIndividualLaunch(
         id = id,
         launchDate = MassasLaunchViewModel.saopauloToday(),
         productCode = "1045",
@@ -735,8 +741,8 @@ class MassasLaunchViewModelTest {
         boxes = boxes,
         units = units,
         userId = 1,
-        username = "wilkin",
-        displayName = "Wilkin",
+        username = username,
+        displayName = displayName,
         createdAt = "2025-05-18T10:00:00Z",
         updatedAt = "2025-05-18T10:00:00Z",
     )
@@ -813,6 +819,91 @@ class MassasLaunchViewModelTest {
         assertEquals(JsonPrimitive("JAIME"), erpPort.payloads.single().userCode)
         // The launch travelled, not the phone's configured user code.
         assertTrue(erpPort.payloads.single().observation.contains("#89"))
+    }
+
+    /**
+     * A batch is several people's work sent by one press.
+     *
+     * The seat the plant receives is the only record of who typed the boxes, so every item of the batch is
+     * signed with its own operator rather than with whatever user the phone was configured with: a batch
+     * credited entirely to the device's owner is wrong in the ERP and impossible to notice afterwards.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun confirmLaunch_signsEverySeatOfTheBatchWithItsOwnOperator() = runTest {
+        val repo = DayRepository(
+            massasApi,
+            dayWith(
+                launch(7, username = "jonas", displayName = "Jonas"),
+                launch(8, username = "jaime", displayName = "Jaime"),
+                // A worker with no display name is still that worker: the username is what is left to sign with.
+                launch(9, username = "viviane", displayName = ""),
+            ),
+        )
+        repo.created = listOf(
+            launch(7, username = "jonas", displayName = "Jonas"),
+            launch(8, username = "jaime", displayName = "Jaime"),
+            launch(9, username = "viviane", displayName = ""),
+        )
+        val testVm = newViewModel(repo)
+
+        testVm.onQuantityChange("1045", "3")
+        testVm.requestLaunchConfirmation()
+        testVm.confirmLaunch()
+        testScheduler.runCurrent()
+
+        assertEquals(3, erpPort.payloads.size)
+        assertEquals(
+            listOf(JsonPrimitive("JONAS"), JsonPrimitive("JAIME"), JsonPrimitive("VIVIANE")),
+            erpPort.payloads.map { it.userCode },
+        )
+        // And the whole batch is reported as one outcome, in the dialog the operator is already reading.
+        assertEquals(R.string.massas_aero_batch_sent, testVm.state.value.resultDialogMessage?.resId)
+        assertEquals(3, testVm.state.value.resultDialogMessage?.args?.single())
+        assertTrue(testVm.state.value.resultDialogIsSuccess)
+    }
+
+    /**
+     * A batch that only half arrives says so instead of choosing one of its two truths.
+     *
+     * "Lançamento registrado" would hide that two rows are still pending, and "não foi possível" would deny
+     * the one that did reach the plant.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun confirmLaunch_whenPartOfTheBatchFails_reportsTheWholeBatch() = runTest {
+        val repo = DayRepository(
+            massasApi,
+            dayWith(
+                launch(7, username = "jonas", displayName = "Jonas"),
+                launch(8, username = "jaime", displayName = "Jaime"),
+                launch(9, username = "viviane", displayName = "Viviane"),
+            ),
+        )
+        repo.created = listOf(
+            launch(7, username = "jonas", displayName = "Jonas"),
+            launch(8, username = "jaime", displayName = "Jaime"),
+            launch(9, username = "viviane", displayName = "Viviane"),
+        )
+        erpPort.writeResults.addAll(
+            listOf(
+                AeroWriteResult.Ok(null),
+                AeroWriteResult.Failed("saldo insuficiente"),
+                AeroWriteResult.Failed("sem permissão"),
+            ),
+        )
+        val testVm = newViewModel(repo)
+
+        testVm.onQuantityChange("1045", "3")
+        testVm.requestLaunchConfirmation()
+        testVm.confirmLaunch()
+        testScheduler.runCurrent()
+
+        // Every item was attempted: a refusal of one row is not an excuse to skip the others.
+        assertEquals(3, erpPort.payloads.size)
+        assertEquals(R.string.massas_aero_batch_partial, testVm.state.value.resultDialogMessage?.resId)
+        assertEquals(listOf(1, 3, 2), testVm.state.value.resultDialogMessage?.args)
+        assertFalse(testVm.state.value.resultDialogIsSuccess)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)

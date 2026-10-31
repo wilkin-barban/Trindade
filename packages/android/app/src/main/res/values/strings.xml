@@ -554,6 +554,8 @@
     <string name="massas_aero_sent">Enviado ao ERP.</string>
     <string name="massas_aero_imported">Importado do ERP.</string>
     <string name="massas_aero_dispatch_unreachable">%1$d lançamento(s) salvo(s), sem conexão com o ERP da fábrica. Ficaram pendentes na tabela.</string>
+    <string name="massas_aero_batch_sent">%1$d massas sincronizadas com sucesso</string>
+    <string name="massas_aero_batch_partial">%1$d de %2$d massas sincronizadas; %3$d continuam pendentes.</string>
     <string name="massas_aero_dispatch_refused">O ERP recusou %1$d lançamento(s). Confira o produto e envie de novo pela tabela.</string>
     <string name="massas_aero_pending_hint">%1$d pendente(s): envie pela tabela quando a rede da fábrica voltar.</string>
     <string name="massas_aero_not_configured">Configure a integração com o ERP em Administração antes de sincronizar.</string>

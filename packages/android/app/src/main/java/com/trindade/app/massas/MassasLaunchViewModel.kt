@@ -397,8 +397,8 @@ class MassasLaunchViewModel @Inject constructor(
      *
      * Called after the local write has already succeeded and never instead of it: a phone that loses the
      * factory Wi-Fi still records the launch, and the row stays `pending` until someone sends it again from
-     * the table. The dialog is the one already on screen, so the outcome is appended to the success message
-     * instead of covering it with a second one.
+     * the table. The dialog is already on screen for the save, so this replaces its sentence with the one the
+     * whole batch earned rather than opening a second window over it.
      */
     private suspend fun dispatchToErp(created: List<MassaIndividualLaunch>, items: List<MassaConfirmItem>) {
         val settings = state.value.aeroSettings
@@ -406,6 +406,7 @@ class MassasLaunchViewModel @Inject constructor(
 
         val unitsByCode = items.associate { it.productCode to it.units }
         val namesByCode = items.associate { it.productCode to it.productName }
+        var sent = 0
         var refused = 0
         var unreachable = 0
 
@@ -418,23 +419,35 @@ class MassasLaunchViewModel @Inject constructor(
                 // a row whose product vanished from the catalogue from dividing by an unknown box size.
                 units = (unitsByCode[launch.productCode] ?: launch.units).toDouble(),
                 date = state.value.date,
+                // Each row of the batch is signed by the worker who typed it, from the row the server just
+                // created. Without this the whole batch leaves as the phone's configured user, and the plant
+                // credits one person for everybody's work.
+                operatorName = launch.displayName.ifBlank { launch.username },
             )
             when (aeroDispatcher.dispatch(settings, request)) {
-                is AeroDispatchOutcome.Sent -> Unit
+                is AeroDispatchOutcome.Sent -> sent++
                 is AeroDispatchOutcome.Refused -> refused++
                 is AeroDispatchOutcome.Unreachable -> unreachable++
             }
         }
 
-        if (refused + unreachable > 0) {
-            _state.value = _state.value.copy(
-                resultDialogMessage = UiText.of(
-                    if (unreachable > 0) R.string.massas_aero_dispatch_unreachable else R.string.massas_aero_dispatch_refused,
-                    refused + unreachable,
-                ),
-                resultDialogIsSuccess = false,
-                noticeMessage = UiText.of(R.string.massas_aero_pending_hint, refused + unreachable),
+        // One answer for the batch, not one per row: the dialog is already open, and three outcomes replacing
+        // each other would leave the operator reading whichever arrived last.
+        val failed = refused + unreachable
+        val answer = when {
+            failed == 0 -> UiText.of(R.string.massas_aero_batch_sent, sent)
+            sent == 0 -> UiText.of(
+                if (unreachable > 0) R.string.massas_aero_dispatch_unreachable else R.string.massas_aero_dispatch_refused,
+                failed,
             )
+            else -> UiText.of(R.string.massas_aero_batch_partial, sent, created.size, failed)
+        }
+        _state.value = _state.value.copy(
+            resultDialogMessage = answer,
+            resultDialogIsSuccess = failed == 0,
+        )
+        if (failed > 0) {
+            _state.value = _state.value.copy(noticeMessage = UiText.of(R.string.massas_aero_pending_hint, failed))
         }
         val refreshed = repository.day(state.value.date)
         if (refreshed != null) _state.value = _state.value.copy(dayView = refreshed)

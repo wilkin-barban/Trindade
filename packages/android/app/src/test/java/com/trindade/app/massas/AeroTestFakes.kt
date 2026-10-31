@@ -58,13 +58,21 @@ class FakeAckPort(initial: Set<Int> = emptySet()) : TabletAckPort {
  */
 class FakeErpPort : AeroErpPort {
     var writeResult: AeroWriteResult = AeroWriteResult.Ok(null)
+
+    /**
+     * What the plant answers, one per call, when a test needs a batch that does not succeed as a block.
+     *
+     * Empty falls back to [writeResult]; a batch of three that answers two different ways is the only way to
+     * reach the sentence that reports a partial batch.
+     */
+    val writeResults = ArrayDeque<AeroWriteResult>()
     var movementsResult: AeroMovementsResult = AeroMovementsResult.Ok(emptyList(), skipped = 0)
     val payloads = mutableListOf<AeroEntryPayload>()
     var readDates = mutableListOf<String>()
 
     override suspend fun postEntry(settings: AeroSettings, payload: AeroEntryPayload): AeroWriteResult {
         payloads += payload
-        return writeResult
+        return writeResults.removeFirstOrNull() ?: writeResult
     }
 
     override suspend fun readMovements(settings: AeroSettings, date: String): AeroMovementsResult {
