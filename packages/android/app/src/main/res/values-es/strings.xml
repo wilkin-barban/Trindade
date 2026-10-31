@@ -932,7 +932,6 @@
     <string name="admin_integration_ws_url">Dirección del WebService</string>
     <string name="admin_integration_username">Usuario del ERP</string>
     <string name="admin_integration_password">Contraseña del ERP</string>
-    <string name="admin_integration_user_code">Código del usuario (opcional)</string>
     <string name="admin_integration_test">Probar conexión</string>
     <string name="admin_integration_save">Guardar</string>
     <string name="admin_integration_locked">Sólo el propietario cambia la dirección.</string>

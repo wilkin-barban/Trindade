@@ -90,8 +90,6 @@ class IntegrationSettingsViewModel @Inject constructor(
 
     fun setPassword(value: String) = _state.update { it.copy(password = value) }
 
-    fun setUserCode(value: String) = _state.update { it.copy(userCode = value) }
-
     fun clearMessage() = _state.update { it.copy(message = null, messageIsError = false) }
 
     /**

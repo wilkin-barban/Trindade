@@ -111,14 +111,6 @@ fun AdminIntegrationCard(
                 },
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
-                value = state.userCode,
-                onValueChange = viewModel::setUserCode,
-                label = { Text(stringResource(R.string.admin_integration_user_code)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-
             state.message?.let { message ->
                 Text(
                     text = message,
