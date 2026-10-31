@@ -7,15 +7,16 @@ import com.trindade.app.network.AeroAuditLogRequest
  * One integration attempt, as the shared log will read it.
  *
  * The web reports what it does through the same route, and the plant's log is read over SSH by a person
- * looking at several clients at once. `client=android · via=native` is the whole point of the prefix: it says
- * which of them produced the line without the reader having to guess from the shape of the event.
+ * looking at several clients at once. The prefix is the whole point of it: `Android App / ERP` is what a reader
+ * recognizes at a glance, and `client=android · via=native` is the same fact in the shape a filter can be
+ * written against. Both are there so neither the person nor the grep has to guess from the event name.
  *
  * The note is trimmed from the **end** when it does not fit: the prefix is the part that identifies the client,
  * and a log line that loses it is a line that cannot be attributed. It is never trimmed from the front.
  */
 object AeroAudit {
 
-    const val PREFIX = "client=android · via=native"
+    const val PREFIX = "Android App / ERP · client=android · via=native"
 
     /** The backend column holds 256 characters; the prefix and its separator take part of them. */
     const val NOTE_MAX = 256
@@ -55,6 +56,33 @@ object AeroAudit {
         httpStatus = httpStatus,
         durationMs = durationMs,
         note = note(detail),
+    )
+
+    /**
+     * The line the panel's connection test leaves.
+     *
+     * A probe is a query to the ERP with the operator's own credentials, and it was the one query this app made
+     * that the log never saw: a launch and a day's read were written down, and the answer to "can this phone
+     * talk to the plant, and with which user" was only on the screen that asked. It points at the login route
+     * because that is what it calls, and it carries an [outcome] rather than a sentence: this file holds no copy,
+     * and the log is read by whoever is diagnosing the plant, not only by a Portuguese-speaking operator.
+     *
+     * There is deliberately no parameter for the password or the authorization header. The line cannot leak what
+     * it was never given.
+     */
+    fun testRequest(
+        normalizedWsUrl: String,
+        elapsedMs: Long,
+        httpStatus: Int?,
+        outcome: String,
+        detail: String? = null,
+    ): AeroAuditLogRequest = request(
+        event = Event.TEST,
+        destinationUrl = aeroEndpoint(normalizedWsUrl, "usuarios"),
+        phase = "response",
+        httpStatus = httpStatus,
+        durationMs = elapsedMs,
+        detail = listOfNotNull(outcome, detail?.trim()?.takeIf { it.isNotEmpty() }).joinToString(SEPARATOR),
     )
 
     private const val SEPARATOR = " · "

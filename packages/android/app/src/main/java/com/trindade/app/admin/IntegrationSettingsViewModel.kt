@@ -3,11 +3,14 @@ package com.trindade.app.admin
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trindade.app.aero.AeroErpClient
+import com.trindade.app.aero.AeroMirrorPort
 import com.trindade.app.aero.AeroReachability
 import com.trindade.app.aero.AeroSettings
 import com.trindade.app.aero.AeroSettingsPort
 import com.trindade.app.aero.AeroSettingsPermissions
+import com.trindade.app.aero.AeroTestResult
 import com.trindade.app.aero.aeroSettingsEditable
+import com.trindade.app.aero.AeroAudit
 import com.trindade.app.auth.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -30,6 +33,14 @@ class IntegrationSettingsViewModel @Inject constructor(
     private val client: AeroErpClient,
     private val reachability: AeroReachability,
     private val authRepository: AuthRepository,
+    /**
+     * The shared audit log, because a probe is a query to the ERP like a launch is.
+     *
+     * The same port the dispatcher writes through, so the test of the connection lands in the same file, with the
+     * same prefix, as the launch it is testing the way for. A second mechanism would be a second thing to keep
+     * true.
+     */
+    private val audit: AeroMirrorPort,
 ) : ViewModel() {
 
     data class UiState(
@@ -141,15 +152,59 @@ class IntegrationSettingsViewModel @Inject constructor(
             // The network is asked first, and only a reachable plant is probed: an address that does not
             // answer costs the operator 2.5 seconds either way, but the sentence they get is different and
             // only one of them tells them to go look at the Wi-Fi.
+            val startedAt = System.currentTimeMillis()
             val answer = if (normalized == null || !settings.ready || !diagnosis.plantReachable) {
                 null
             } else {
                 client.testConnection(normalized, settings.username, settings.password)
             }
+            val elapsed = System.currentTimeMillis() - startedAt
+            recordProbe(settings, normalized, diagnosis, answer, elapsed)
             _state.value = _state.value.copy(
                 isTesting = false,
                 message = describe(diagnosis, answer),
                 messageIsError = answer !is AeroErpClient.Probe.Answered,
+            )
+        }
+    }
+
+    /**
+     * Writes the probe to the plant's log, once per attempt, and never blocks the answer on it.
+     *
+     * An attempt with no address to call is not written: the operator was told the form is incomplete, and a line
+     * saying "a probe happened" about a probe that never left the phone is evidence of nothing. Every other
+     * outcome is, including the ones where the network stopped it -- that line is what explains, later, why a
+     * shift's launches found an unreachable plant while the phone said it had Wi-Fi.
+     */
+    private fun recordProbe(
+        settings: AeroSettings,
+        normalized: String?,
+        diagnosis: AeroReachability.Diagnosis,
+        answer: AeroErpClient.Probe?,
+        elapsedMs: Long,
+    ) {
+        val address = normalized ?: return
+        val (outcome, status, detail) = when {
+            !settings.ready -> Triple("nao-configurado", null, null)
+            !diagnosis.plantReachable ->
+                Triple("sem-rede", null, "wifi=${diagnosis.wifiConnected} host=${diagnosis.hostReachable}")
+            answer is AeroErpClient.Probe.Unreachable -> Triple("sem-resposta", null, answer.reason.name)
+            answer is AeroErpClient.Probe.Answered -> when (val test = answer.test) {
+                is AeroTestResult.Ok -> Triple("ok", 200, "user=${test.userName.ifBlank { test.userCode.toString() }}")
+                is AeroTestResult.Failed -> Triple("recusado", 200, test.message)
+            }
+            else -> Triple("sem-resposta", null, null)
+        }
+
+        viewModelScope.launch {
+            audit.log(
+                AeroAudit.testRequest(
+                    normalizedWsUrl = address,
+                    elapsedMs = elapsedMs,
+                    httpStatus = status,
+                    outcome = outcome,
+                    detail = detail,
+                ),
             )
         }
     }

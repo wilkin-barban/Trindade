@@ -125,7 +125,7 @@ class AeroDispatcherTest {
         val log = recorder.logs.single()
         assertEquals("dispatch", log.event)
         assertNull("A transport failure has no status to report", log.httpStatus)
-        assertTrue(log.note!!.startsWith("client=android · via=native"))
+        assertTrue(log.note!!.startsWith(AeroAudit.PREFIX))
         assertTrue(log.note!!.contains("launch #42"))
     }
 
@@ -211,14 +211,14 @@ class AeroAuditTest {
 
     @Test
     fun `the prefix names the client and the transport`() {
-        assertEquals("client=android · via=native", AeroAudit.PREFIX)
-        assertEquals("client=android · via=native", AeroAudit.note(null))
-        assertEquals("client=android · via=native", AeroAudit.note("   "))
+        assertEquals("Android App / ERP · client=android · via=native", AeroAudit.PREFIX)
+        assertEquals(AeroAudit.PREFIX, AeroAudit.note(null))
+        assertEquals(AeroAudit.PREFIX, AeroAudit.note("   "))
     }
 
     @Test
     fun `a detail follows the prefix`() {
-        assertEquals("client=android · via=native · launch #7", AeroAudit.note("launch #7"))
+        assertEquals("${AeroAudit.PREFIX} · launch #7", AeroAudit.note("launch #7"))
     }
 
     @Test
@@ -244,6 +244,6 @@ class AeroAuditTest {
         assertEquals("dispatch", request.event)
         assertEquals("response", request.phase)
         assertEquals(200, request.httpStatus)
-        assertEquals("client=android · via=native · launch #7", request.note)
+        assertEquals("${AeroAudit.PREFIX} · launch #7", request.note)
     }
 }
