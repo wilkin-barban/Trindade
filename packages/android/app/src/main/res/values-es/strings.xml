@@ -57,6 +57,9 @@
 
     <string name="report_submit">Guardar reporte</string>
     <string name="report_created">Reporte %1$d guardado.</string>
+    <string name="action_result_success">Todo listo</string>
+    <string name="action_result_error">No se pudo</string>
+    <string name="action_result_close">Cerrar</string>
     <!--
       What the generator says when a read did not supply a piece the form is made of, and the way back.
       Each missing piece is named rather than left as a blank form, because an operator who sees an empty
@@ -575,8 +578,6 @@
     <string name="massas_total_to_launch">Total General a Lanzar</string>
     <string name="massas_all_workers">Todos los trabajadores</string>
     <string name="massas_worker_subtotal">Subtotal de %1$s</string>
-    <string name="massas_success_title">Lanzamiento Completado</string>
-    <string name="massas_error_title">Error en el Lanzamiento</string>
     <string name="massas_close">Cerrar</string>
     <string name="massas_history_select_date">Seleccione la Fecha</string>
     <string name="massas_history_days_count">%1$d días registrados</string>

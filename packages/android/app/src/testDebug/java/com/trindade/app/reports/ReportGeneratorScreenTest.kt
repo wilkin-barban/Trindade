@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
@@ -150,7 +151,10 @@ class ReportGeneratorScreenTest {
     // ---- Rendering ----
 
     /** The screen as the route draws it, with every callback a no-op: nothing here taps anything. */
-    private fun render(state: ReportGeneratorViewModel.UiState) {
+    private fun render(
+        state: ReportGeneratorViewModel.UiState,
+        onDismissResult: () -> Unit = {},
+    ) {
         composeRule.setContent {
             TrindadeTheme {
                 ReportGeneratorScreen(
@@ -163,6 +167,7 @@ class ReportGeneratorScreenTest {
                     onOpenHistory = {},
                     onRetry = {},
                     onSyncErp = {},
+                    onDismissResult = onDismissResult,
                 )
             }
         }
@@ -188,12 +193,48 @@ class ReportGeneratorScreenTest {
         displayed(context.getString(R.string.report_receipts_title))
     }
 
-    /** The answer to the card's action is drawn under it, where the action is. */
+    /** The dialog's way out is the operator's, and it is what returns the form to them. */
     @Test
-    fun `the card reports what the last sync answered`() {
-        render(state(listOf(category(1, "Cozinha"))).copy(syncMessage = "Movimentações do ERP atualizadas."))
+    fun `closing the answer returns to the form`() {
+        var dismissed = 0
+        render(
+            state(listOf(category(8, "Higiene"))).copy(message = "Movimentações do ERP atualizadas."),
+            onDismissResult = { dismissed++ },
+        )
 
-        displayed("Movimentações do ERP atualizadas.")
+        composeRule.onNodeWithText(context.getString(R.string.action_result_close)).performClick()
+
+        assertEquals(1, dismissed)
+    }
+
+    /** A refusal and an answer are told apart before the sentence is read. */
+    @Test
+    fun `a refusal is titled as one`() {
+        render(
+            state(listOf(category(8, "Higiene"))).copy(
+                message = "Servidor recusou o relatório.",
+                messageIsError = true,
+            ),
+        )
+
+        // The title lives in the dialog window, outside the list, so it is asserted where it is drawn.
+        composeRule.onNodeWithText(context.getString(R.string.action_result_error)).assertIsDisplayed()
+    }
+
+    /**
+     * What a button answered is a dialog, not a line the form grows.
+     *
+     * The generator painted the answer into the list, so a refusal pushed the fields down and a success looked
+     * like part of the form. The action's answer belongs to a window the operator dismisses, which is also what
+     * the same screen does in the browser.
+     */
+    @Test
+    fun `the answer to an action is drawn in a dialog`() {
+        render(state(listOf(category(8, "Higiene"))).copy(message = "Servidor recusou o relatório."))
+
+        composeRule.onNode(isDialog()).assertExists()
+        // And exactly once: the dialog replaced the inline line rather than joining it.
+        composeRule.onAllNodesWithText("Servidor recusou o relatório.").assertCountEquals(1)
     }
 
     /**

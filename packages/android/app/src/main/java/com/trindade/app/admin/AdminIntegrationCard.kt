@@ -26,6 +26,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trindade.app.R
+import com.trindade.app.ui.components.ActionResultDialog
 import com.trindade.app.ui.components.AdminPrimaryButton
 import com.trindade.app.ui.components.AdminSecondaryButton
 
@@ -39,15 +40,58 @@ import com.trindade.app.ui.components.AdminSecondaryButton
  * The address is shown to everyone and editable only by the owner; the credentials are editable by whoever is
  * holding the phone, because they are theirs.
  */
+/** The card with its ViewModel attached. */
 @Composable
 fun AdminIntegrationCard(
     modifier: Modifier = Modifier,
     viewModel: IntegrationSettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
-    var passwordVisible by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { viewModel.load() }
+
+    AdminIntegrationCard(
+        state = state,
+        onWsUrlChange = viewModel::setWsUrl,
+        onUsernameChange = viewModel::setUsername,
+        onPasswordChange = viewModel::setPassword,
+        onTest = viewModel::test,
+        onSave = viewModel::save,
+        onDismissMessage = viewModel::clearMessage,
+        modifier = modifier,
+    )
+}
+
+/**
+ * The card itself, drawn from what the form holds.
+ *
+ * The state is a parameter rather than read from the view model so the two answers this card owes can be
+ * asserted without a network: the three fields it asks for, and the dialog that reports what the last action
+ * said.
+ */
+@Composable
+fun AdminIntegrationCard(
+    state: IntegrationSettingsViewModel.UiState,
+    onWsUrlChange: (String) -> Unit,
+    onUsernameChange: (String) -> Unit,
+    onPasswordChange: (String) -> Unit,
+    onTest: () -> Unit,
+    onSave: () -> Unit,
+    onDismissMessage: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var passwordVisible by remember { mutableStateOf(false) }
+
+    // The answer to a test or a save, in a window rather than under the buttons: the card is the one screen
+    // that explains an integration failure, and a sentence that grows the card moves the fields the operator
+    // is about to correct.
+    state.message?.let { message ->
+        ActionResultDialog(
+            message = message,
+            isSuccess = !state.messageIsError,
+            onDismiss = onDismissMessage,
+        )
+    }
 
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
@@ -69,7 +113,7 @@ fun AdminIntegrationCard(
             )
             OutlinedTextField(
                 value = state.wsUrl,
-                onValueChange = viewModel::setWsUrl,
+                onValueChange = onWsUrlChange,
                 singleLine = true,
                 enabled = state.permissions.canEditWsUrl,
                 modifier = Modifier.fillMaxWidth(),
@@ -84,7 +128,7 @@ fun AdminIntegrationCard(
 
             OutlinedTextField(
                 value = state.username,
-                onValueChange = viewModel::setUsername,
+                onValueChange = onUsernameChange,
                 label = { Text(stringResource(R.string.admin_integration_username)) },
                 singleLine = true,
                 enabled = state.permissions.canEditCredentials,
@@ -92,7 +136,7 @@ fun AdminIntegrationCard(
             )
             OutlinedTextField(
                 value = state.password,
-                onValueChange = viewModel::setPassword,
+                onValueChange = onPasswordChange,
                 label = { Text(stringResource(R.string.admin_integration_password)) },
                 singleLine = true,
                 enabled = state.permissions.canEditCredentials,
@@ -111,18 +155,6 @@ fun AdminIntegrationCard(
                 },
                 modifier = Modifier.fillMaxWidth(),
             )
-            state.message?.let { message ->
-                Text(
-                    text = message,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (state.messageIsError) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                )
-            }
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -130,12 +162,12 @@ fun AdminIntegrationCard(
             ) {
                 AdminSecondaryButton(
                     text = stringResource(R.string.admin_integration_test),
-                    onClick = viewModel::test,
+                    onClick = onTest,
                     enabled = !state.isTesting && state.ready,
                 )
                 AdminPrimaryButton(
                     text = stringResource(R.string.admin_integration_save),
-                    onClick = viewModel::save,
+                    onClick = onSave,
                     enabled = state.ready,
                 )
             }

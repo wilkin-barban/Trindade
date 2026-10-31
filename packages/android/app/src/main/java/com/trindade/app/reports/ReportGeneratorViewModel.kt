@@ -86,7 +86,10 @@ class ReportGeneratorViewModel @Inject constructor(
         val submitting: Boolean = false,
         /** The report the server created, which is what the next screen needs. */
         val createdReportId: Int? = null,
+        /** What the last action answered, shown in a dialog; null when nothing has been answered yet. */
         val message: String? = null,
+        /** Whether that answer is a refusal, which is what the dialog's tone is drawn from. */
+        val messageIsError: Boolean = false,
         val showValidation: Boolean = false,
         /** The day's massas, under the temperatures the operator has just read. */
         val massasDay: MassasReportDayView? = null,
@@ -94,8 +97,6 @@ class ReportGeneratorViewModel @Inject constructor(
         val receipts: ReportReceipts? = null,
         /** Whether an ERP sync via bridge is currently in progress. */
         val isSyncingErp: Boolean = false,
-        /** What the last ERP sync answered, shown next to the card's action. */
-        val syncMessage: String? = null,
         /**
          * The day this report belongs to.
          *
@@ -152,7 +153,7 @@ class ReportGeneratorViewModel @Inject constructor(
     }
 
     fun load() {
-        _state.update { it.copy(loading = true, message = null) }
+        _state.update { it.copy(loading = true, message = null, messageIsError = false) }
         loadMassasDay()
         loadReceipts()
         viewModelScope.launch {
@@ -215,6 +216,21 @@ class ReportGeneratorViewModel @Inject constructor(
         }
     }
 
+    /**
+     * The way out of a dialog the operator has read.
+     *
+     * A dialog that answered a save also carries the id of the report it created: acknowledging it is what
+     * closes the form and lets the next screen open, so the record is read before the screen moves on.
+     */
+    fun dismissResult() {
+        val created = state.value.createdReportId
+        if (created != null) {
+            onReportCreatedHandled()
+        } else {
+            _state.update { it.copy(message = null, messageIsError = false) }
+        }
+    }
+
     fun onNotesChange(notes: String) = _state.update { it.copy(notes = notes) }
 
     /**
@@ -256,7 +272,7 @@ class ReportGeneratorViewModel @Inject constructor(
         val dispatcher = aeroDispatcher
         val store = aeroSettingsStore
         if (dispatcher == null || store == null) {
-            _state.update { it.copy(syncMessage = ERP_NOT_CONFIGURED) }
+            _state.update { it.copy(message = ERP_NOT_CONFIGURED, messageIsError = true) }
             return
         }
         val date = MassasLaunchViewModel.saopauloToday()
@@ -264,10 +280,10 @@ class ReportGeneratorViewModel @Inject constructor(
         viewModelScope.launch {
             val settings = store.load()
             if (!settings.ready) {
-                _state.update { it.copy(syncMessage = ERP_NOT_CONFIGURED) }
+                _state.update { it.copy(message = ERP_NOT_CONFIGURED, messageIsError = true) }
                 return@launch
             }
-            _state.update { it.copy(isSyncingErp = true, syncMessage = null) }
+            _state.update { it.copy(isSyncingErp = true, message = null, messageIsError = false) }
             when (val outcome = dispatcher.syncDay(settings, date)) {
                 is AeroSyncOutcome.Synced -> {
                     store.markSynced(date, MassasLaunchViewModel.nowLabel())
@@ -278,15 +294,22 @@ class ReportGeneratorViewModel @Inject constructor(
                             isSyncingErp = false,
                             massasDay = massas ?: it.massasDay,
                             receipts = receipts ?: it.receipts,
-                            syncMessage = ERP_SYNC_DONE,
+                            message = ERP_SYNC_DONE,
+                            messageIsError = false,
                         )
                     }
                 }
                 is AeroSyncOutcome.Unreachable ->
-                    _state.update { it.copy(isSyncingErp = false, syncMessage = ERP_UNREACHABLE) }
+                    _state.update {
+                        it.copy(isSyncingErp = false, message = ERP_UNREACHABLE, messageIsError = true)
+                    }
                 is AeroSyncOutcome.Failed ->
                     _state.update {
-                        it.copy(isSyncingErp = false, syncMessage = ERP_SYNC_FAILED.format(outcome.reason ?: "-"))
+                        it.copy(
+                            isSyncingErp = false,
+                            message = ERP_SYNC_FAILED.format(outcome.reason ?: "-"),
+                            messageIsError = true,
+                        )
                     }
             }
         }
@@ -355,9 +378,13 @@ class ReportGeneratorViewModel @Inject constructor(
             _state.update { previous ->
                 when (result) {
                     is ReportWriteResult.Saved -> previous.copy(submitting = false, createdReportId = result.report.id)
-                    is ReportWriteResult.Refused ->
-                        previous.copy(submitting = false, message = refusalMessage(result.statusCode, result.serverMessage))
-                    ReportWriteResult.Unreachable -> previous.copy(submitting = false, message = UNREACHABLE)
+                    is ReportWriteResult.Refused -> previous.copy(
+                        submitting = false,
+                        message = refusalMessage(result.statusCode, result.serverMessage),
+                        messageIsError = true,
+                    )
+                    ReportWriteResult.Unreachable ->
+                        previous.copy(submitting = false, message = UNREACHABLE, messageIsError = true)
                 }
             }
         }

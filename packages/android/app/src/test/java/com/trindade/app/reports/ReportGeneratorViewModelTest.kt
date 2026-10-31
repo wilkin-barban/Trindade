@@ -98,8 +98,10 @@ class ReportGeneratorViewModelTest {
 
         assertEquals(
             "Configure a integração com o ERP em Administração antes de sincronizar.",
-            model.state.value.syncMessage,
+            model.state.value.message,
         )
+        // A press that could not even reach the plant is a refusal, not an answer.
+        assertTrue(model.state.value.messageIsError)
         assertFalse(model.state.value.isSyncingErp)
     }
 
@@ -130,7 +132,8 @@ class ReportGeneratorViewModelTest {
         model.syncErp()
 
         assertEquals(1, mirror.snapshots.size)
-        assertEquals("Movimentações do ERP atualizadas.", model.state.value.syncMessage)
+        assertEquals("Movimentações do ERP atualizadas.", model.state.value.message)
+        assertFalse(model.state.value.messageIsError)
         assertNotNull(model.state.value.receipts)
         assertFalse(model.state.value.isSyncingErp)
     }
@@ -148,7 +151,8 @@ class ReportGeneratorViewModelTest {
 
         model.syncErp()
 
-        assertEquals("Falha ao sincronizar com o ERP: sem permissão", model.state.value.syncMessage)
+        assertEquals("Falha ao sincronizar com o ERP: sem permissão", model.state.value.message)
+        assertTrue(model.state.value.messageIsError)
         assertFalse(model.state.value.isSyncingErp)
     }
 

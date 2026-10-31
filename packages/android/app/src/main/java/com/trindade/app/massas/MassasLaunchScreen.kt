@@ -63,6 +63,7 @@ import com.trindade.app.ui.BrazilianPhoneVisualTransformation
 import com.trindade.app.ui.components.AdminSecondaryButton
 import com.trindade.app.ui.components.HelpSection
 import com.trindade.app.ui.components.ModuleHelpButton
+import com.trindade.app.ui.components.ActionResultDialog
 import com.trindade.app.ui.components.ModuleHelpDialog
 import com.trindade.app.ui.components.ModuleHistoryButton
 import com.trindade.app.ui.components.NavigationActionButton
@@ -905,48 +906,13 @@ fun MassasLaunchScreen(
         )
     }
 
-    // Diálogo Modal de Notificação de Resultado
+    // Lo que respondió la última acción, en una ventana que el operario cierra: la misma frase, el mismo
+    // tono y la misma salida que el relatório y el panel, para que la respuesta se reconozca antes de leerse.
     if (state.resultDialogMessage != null) {
-        val isSuccess = state.resultDialogIsSuccess
-        AlertDialog(
-            onDismissRequest = { viewModel.dismissResultDialog() },
-            title = {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(text = if (isSuccess) "✅" else "❌")
-                    Text(
-                        text = stringResource(
-                            if (isSuccess) R.string.massas_success_title else R.string.massas_error_title
-                        ),
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-            },
-            text = {
-                Text(
-                    text = state.resultDialogMessage?.resolve() ?: "",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = { viewModel.dismissResultDialog() },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isSuccess) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                        contentColor = if (isSuccess) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onError,
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .defaultMinSize(minHeight = 48.dp),
-                ) {
-                    Text(
-                        text = stringResource(R.string.massas_close),
-                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                    )
-                }
-            },
+        ActionResultDialog(
+            message = state.resultDialogMessage?.resolve() ?: "",
+            isSuccess = state.resultDialogIsSuccess,
+            onDismiss = { viewModel.dismissResultDialog() },
         )
     }
 }

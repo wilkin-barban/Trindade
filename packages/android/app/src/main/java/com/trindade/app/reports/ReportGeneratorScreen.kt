@@ -31,6 +31,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trindade.app.R
+import com.trindade.app.ui.components.ActionResultDialog
 import com.trindade.app.ui.components.AdminPrimaryButton
 import com.trindade.app.ui.components.HelpSection
 import com.trindade.app.ui.components.ModuleHelpButton
@@ -62,9 +63,23 @@ fun ReportGeneratorScreen(
     onRetry: () -> Unit,
     onTurnoChange: (String) -> Unit = {},
     onSyncErp: () -> Unit = {},
+    onDismissResult: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var showHelpDialog by remember { mutableStateOf(false) }
+
+    // Every action that answers speaks here: an ERP sync, a saved report, a refusal. A dialog floats over the
+    // list rather than growing it, which is the whole point -- a form taller than the phone cannot be pushed
+    // down by the sentence that explains what just happened.
+    val answer = state.message
+        ?: state.createdReportId?.let { stringResource(R.string.report_created, it) }
+    if (answer != null) {
+        ActionResultDialog(
+            message = answer,
+            isSuccess = !state.messageIsError,
+            onDismiss = onDismissResult,
+        )
+    }
 
     LazyColumn(
         modifier = modifier.fillMaxSize().padding(16.dp),
@@ -89,16 +104,6 @@ fun ReportGeneratorScreen(
             }
         }
 
-        state.message?.let { message ->
-            item {
-                Text(
-                    text = message,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-        }
-
         // A read that could not supply a piece the form is made of says which piece, and offers the way to
         // try again. The reason is what separates this screen from one that drew an empty form: the
         // operator reads a fact about the read instead of guessing what a blank page means.
@@ -116,18 +121,6 @@ fun ReportGeneratorScreen(
                 NavigationActionButton(
                     onClick = onRetry,
                     text = stringResource(R.string.report_retry),
-                )
-            }
-        }
-
-        // Shown once the server has answered with an id, because that id is the one thing the next
-        // screen needs and a form that just stops being submittable would look like a failure.
-        state.createdReportId?.let { id ->
-            item {
-                Text(
-                    text = stringResource(R.string.report_created, id),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary,
                 )
             }
         }
@@ -246,17 +239,6 @@ fun ReportGeneratorScreen(
                         isSyncing = state.isSyncingErp,
                         onSync = onSyncErp,
                     )
-                    // The answer to the action, drawn under the card that owns it rather than at the top of a
-                    // form taller than the screen: the operator pressed a button here, so the sentence they
-                    // read has to be here too.
-                    state.syncMessage?.let { message ->
-                        Text(
-                            text = message,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(top = 6.dp),
-                        )
-                    }
                 }
 
                 item {
@@ -337,15 +319,6 @@ fun ReportGeneratorRoute(
 ) {
     val state by viewModel.state.collectAsState()
 
-    // Fired once per id rather than on every recomposition, so navigating away and back does not
-    // re-enter the detail screen from a result that was already acted on.
-    androidx.compose.runtime.LaunchedEffect(state.createdReportId) {
-        state.createdReportId?.let { id ->
-            viewModel.onReportCreatedHandled()
-            onCreated(id)
-        }
-    }
-
     ReportGeneratorScreen(
         state = state,
         onCheckChange = viewModel::onCheckChange,
@@ -357,5 +330,12 @@ fun ReportGeneratorRoute(
         onRetry = viewModel::retry,
         onTurnoChange = viewModel::selectTurno,
         onSyncErp = viewModel::syncErp,
+        // The dialog's way out is also the way to the record a save produced: the operator reads the answer
+        // first, and the screen moves once they have.
+        onDismissResult = {
+            val created = state.createdReportId
+            viewModel.dismissResult()
+            created?.let(onCreated)
+        },
     )
 }

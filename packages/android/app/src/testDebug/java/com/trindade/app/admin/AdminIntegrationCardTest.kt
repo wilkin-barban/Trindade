@@ -1,54 +1,36 @@
 package com.trindade.app.admin
 
 import android.content.Context
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.trindade.app.R
-import com.trindade.app.aero.AeroErpClient
-import com.trindade.app.aero.AeroReachability
-import com.trindade.app.aero.AeroSettings
-import com.trindade.app.auth.AuthRepository
-import com.trindade.app.auth.TokenStore
-import com.trindade.app.contract.models.ChangePasswordRequest
-import com.trindade.app.contract.models.LoginRequest
-import com.trindade.app.contract.models.LoginResponse
-import com.trindade.app.contract.models.LogoutRequest
-import com.trindade.app.contract.models.ProfileResponse
-import com.trindade.app.contract.models.RefreshRequest
-import com.trindade.app.contract.models.RefreshResponse
-import com.trindade.app.contract.models.RegisterRequest
-import com.trindade.app.contract.models.RegisterResponse
-import com.trindade.app.contract.models.SetupStatusResponse
-import com.trindade.app.contract.models.SuccessResponse
-import com.trindade.app.contract.models.UpdateProfileRequest
-import com.trindade.app.massas.FakeSettingsPort
-import com.trindade.app.network.AuthApi
 import com.trindade.app.ui.theme.TrindadeTheme
-import kotlinx.serialization.json.Json
-import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import retrofit2.Response
 
 /**
- * The integration the panel asks for, and only that.
+ * The integration the panel asks for, what it answers, and only that.
  *
  * The web has always asked for the address, the user and the password; the phone also asked for an "operator
  * code" the ERP uses as a seat fallback. Two screens describing one integration have to describe the same one,
- * so these tests pin the three fields, the absence of the fourth and the rule that made the fourth optional in
- * the first place: the action is ready without it.
+ * so these tests pin the three fields and the absence of the fourth. The second one pins where an answer goes:
+ * the card is the one screen that explains an integration failure, and a sentence that grows it moves the
+ * fields the operator is about to correct.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [28], qualifiers = "w375dp-h800dp")
+@Config(qualifiers = "w375dp-h800dp")
 class AdminIntegrationCardTest {
 
     @get:Rule
@@ -57,45 +39,33 @@ class AdminIntegrationCardTest {
     private val context: Context
         get() = ApplicationProvider.getApplicationContext()
 
-    private class FakeTokenStore : TokenStore {
-        override fun accessToken(): String? = "token"
-        override fun refreshToken(): String? = "refresh"
-        override fun role(): String? = "admin"
-        override fun save(accessToken: String, refreshToken: String) {}
-        override fun saveRole(role: String) {}
-        override fun clear() {}
-    }
+    private fun state(
+        message: String? = null,
+        messageIsError: Boolean = false,
+    ) = IntegrationSettingsViewModel.UiState(
+        wsUrl = "http://10.0.0.10:8080",
+        username = "WILKIN",
+        password = "pw",
+        userCode = "1",
+        message = message,
+        messageIsError = messageIsError,
+    )
 
-    private class FakeAuthApi : AuthApi {
-        override suspend fun login(body: LoginRequest) = Response.error<LoginResponse>(500, "".toResponseBody())
-        override suspend fun refresh(body: RefreshRequest) = Response.error<RefreshResponse>(500, "".toResponseBody())
-        override suspend fun logout(body: LogoutRequest) =
-            Response.success(SuccessResponse(SuccessResponse.Success.`true`))
-        override suspend fun me() = Response.error<ProfileResponse>(500, "".toResponseBody())
-        override suspend fun profile() = Response.error<ProfileResponse>(500, "".toResponseBody())
-        override suspend fun updateProfile(body: UpdateProfileRequest) =
-            Response.error<ProfileResponse>(500, "".toResponseBody())
-        override suspend fun changePassword(body: ChangePasswordRequest) =
-            Response.success(SuccessResponse(SuccessResponse.Success.`true`))
-        override suspend fun setupStatus() = Response.error<SetupStatusResponse>(500, "".toResponseBody())
-        override suspend fun register(body: RegisterRequest) =
-            Response.error<RegisterResponse>(500, "".toResponseBody())
-    }
-
-    private fun render() {
-        val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
-        val store = FakeSettingsPort(
-            AeroSettings(wsUrl = "http://10.0.0.10:8080", username = "WILKIN", password = "pw", userCode = "1"),
-        )
-        val viewModel = IntegrationSettingsViewModel(
-            store = store,
-            client = AeroErpClient(json),
-            reachability = AeroReachability(context),
-            authRepository = AuthRepository(FakeAuthApi(), FakeTokenStore(), json),
-        )
+    private fun render(
+        state: IntegrationSettingsViewModel.UiState = state(),
+        onDismissMessage: () -> Unit = {},
+    ) {
         composeRule.setContent {
             TrindadeTheme {
-                AdminIntegrationCard(viewModel = viewModel)
+                AdminIntegrationCard(
+                    state = state,
+                    onWsUrlChange = {},
+                    onUsernameChange = {},
+                    onPasswordChange = {},
+                    onTest = {},
+                    onSave = {},
+                    onDismissMessage = onDismissMessage,
+                )
             }
         }
     }
@@ -113,6 +83,27 @@ class AdminIntegrationCardTest {
             0,
             composeRule.onAllNodesWithText("Código d", substring = true).fetchSemanticsNodes().size,
         )
+    }
+
+    @Test
+    fun `an answer from the plant is a dialog with a way out`() {
+        var dismissed = 0
+        render(state(message = "Conectado ao ERP: WILKIN.", messageIsError = false), onDismissMessage = { dismissed++ })
+
+        composeRule.onNode(isDialog()).assertExists()
+        composeRule.onNodeWithText("Conectado ao ERP: WILKIN.").assertIsDisplayed()
+        // And exactly once: the dialog replaced the line under the buttons rather than joining it.
+        composeRule.onAllNodesWithText("Conectado ao ERP: WILKIN.").assertCountEquals(1)
+
+        composeRule.onNodeWithText(string(R.string.action_result_close)).performClick()
+        assertEquals(1, dismissed)
+    }
+
+    @Test
+    fun `a refusal is told apart from an answer`() {
+        render(state(message = "Wi-Fi desconectado.", messageIsError = true))
+
+        composeRule.onNodeWithText(string(R.string.action_result_error)).assertIsDisplayed()
     }
 
     private fun string(resId: Int, vararg args: Any): String = context.getString(resId, *args)
