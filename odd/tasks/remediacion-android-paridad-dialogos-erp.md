@@ -152,8 +152,8 @@ Criterios de aceptación:
 - T4 | S4 | inline | Relatório: categoría 4 oculta cuando el espejo ERP cubre insumos, `ErpMovementsCard` tras Temperaturas — commit: _pendiente_
 - T5 | S5 | inline | botón "Sincronizar com ERP" rediseñado en Material 3, 48dp, sin emoji — commit: _pendiente_
 - T6 | S6 | inline | diálogo de resultado compartido y las cuatro acciones reportando en él (sincronización ERP, guardado de reporte, lanzamiento de masas, test de integración) — commit: 44dcf70
-- T7 | S7 | inline, después de T6 | `dispatchToErp` pasa `operatorName` por ítem y reporta el acumulado del lote en el diálogo — commit: pendiente de registrar
-- T8 | S1–S7 | inline | suite Android completa (unidad + Robolectric) en el contenedor fijado — commit: _pendiente_
+- T7 | S7 | inline, después de T6 | `dispatchToErp` pasa `operatorName` por ítem y reporta el acumulado del lote en el diálogo — commit: 3974734
+- T8 | S1–S7 | inline | suite Android completa (unidad + Robolectric) en el contenedor fijado — commit: pendiente
 - T9 | S8 | inline | verificación en `emulator-5554` por `ssh ubuntu` con capturas de los 7 puntos — commit: _pendiente_
 - T10 | S9 | inline | `versionCode 7002`, APK firmado, sha256, `gh release upload v0.7.0 --clobber` — commit: _pendiente_
 - T11 | S9 | inline | producción en VPS + copia en `~/Desktop` — commit: _pendiente_

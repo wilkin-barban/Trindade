@@ -28,7 +28,7 @@ import org.robolectric.annotation.GraphicsMode
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [28], qualifiers = "w375dp-h800dp")
+@Config(qualifiers = "w375dp-h800dp")
 class MassasDayHeaderTest {
 
     @get:Rule
