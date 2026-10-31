@@ -215,79 +215,14 @@ fun MassasLaunchScreen(
             }
         }
 
-        // Fila de Fecha y Sincronización
-        Card(
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = stringResource(R.string.massas_production_date, brazilianDate(state.date)),
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                Box(
-                    modifier = Modifier
-                        .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable(
-                            enabled = !state.isLoading,
-                            onClick = { viewModel.refresh() },
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = Color.Transparent,
-                        border = BorderStroke(
-                            1.dp,
-                            if (!state.isLoading) MaterialTheme.colorScheme.outline
-                            else MaterialTheme.colorScheme.outline.copy(alpha = 0.38f),
-                        ),
-                        contentColor = if (!state.isLoading) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .heightIn(min = 32.dp)
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            if (state.isLoading) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(14.dp),
-                                    strokeWidth = 2.dp,
-                                    color = MaterialTheme.colorScheme.primary,
-                                )
-                            } else {
-                                Text(
-                                    text = stringResource(R.string.massas_sync_now),
-                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Sincronización con el ERP: el día de la planta, leído en un viaje y guardado en el backend.
-        // Se dibuja dentro de la misma tarjeta de la fecha porque es la fecha lo que se sincroniza, y con
-        // la hora del último intento al lado para que "ya lo hice" sea verificable y no un recuerdo.
-        MassasErpSyncCard(
+        // La fecha y su única acción: el día de la planta se lee desde el ERP y se guarda en el backend.
+        // La cabecera se lleva la acción y la hora del último intento, en el mismo alto que la fila de la
+        // fecha: antes había un botón aquí y una tarjeta entera debajo, los dos refrescando lo mismo.
+        MassasDayHeader(
+            date = state.date,
             syncedAt = state.aeroSyncedAt,
-            aeroReady = state.aeroReady,
             isSyncing = state.isSyncingAero,
             onSync = viewModel::syncAeroDay,
-            result = state.aeroSyncMessage,
-            resultIsError = state.aeroSyncFailed,
         )
 
         // La tabla unificada: lo lanzado aquí, lo que el ERP ya tiene y lo que sólo está en el ERP.

@@ -99,15 +99,6 @@ class MassasLaunchViewModel @Inject constructor(
         /** Local time of the last successful sync, or null when this day was never synced. */
         val aeroSyncedAt: String? = null,
         val isSyncingAero: Boolean = false,
-        /**
-         * Lo que la última sincronización con el ERP respondió, sostenido aparte de los banners del módulo.
-         *
-         * El banner vive arriba de una columna más alta que la pantalla del teléfono, así que la respuesta a
-         * un botón que está más abajo quedaba fuera de la vista. El card de sincronización dibuja esto debajo
-         * de su propia acción, que es donde el operador está mirando cuando la aprieta.
-         */
-        val aeroSyncMessage: UiText? = null,
-        val aeroSyncFailed: Boolean = false,
         /** The universal filter over the unified table: an operator key, empty for everyone. */
         val operatorFilter: String = "",
         /** The search box: a product code, a name or an operator, matched on both sides. */
@@ -458,8 +449,8 @@ class MassasLaunchViewModel @Inject constructor(
             // The bridge has no settings yet: the press is what says so, because a disabled button over a
             // sentence nobody has read is the same experience as a button that does nothing.
             _state.value = _state.value.copy(
-                aeroSyncMessage = UiText.of(R.string.massas_aero_not_configured),
-                aeroSyncFailed = true,
+                resultDialogMessage = UiText.of(R.string.massas_aero_not_configured),
+                resultDialogIsSuccess = false,
             )
             return
         }
@@ -467,8 +458,10 @@ class MassasLaunchViewModel @Inject constructor(
         viewModelScope.launch {
             _state.value = _state.value.copy(
                 isSyncingAero = true,
-                aeroSyncMessage = null,
-                aeroSyncFailed = false,
+                // The answer of the last press is a dialog the operator has already closed or is about to:
+                // a new press replaces it instead of leaving the previous outcome behind the running spinner.
+                resultDialogMessage = null,
+                resultDialogIsSuccess = false,
                 errorMessage = null,
                 noticeMessage = null,
             )
@@ -478,8 +471,8 @@ class MassasLaunchViewModel @Inject constructor(
                     _state.value = _state.value.copy(
                         isSyncingAero = false,
                         aeroSyncedAt = nowLabel(),
-                        aeroSyncMessage = UiText.of(R.string.massas_aero_sync_done, outcome.saved.saved),
-                        aeroSyncFailed = false,
+                        resultDialogMessage = UiText.of(R.string.massas_aero_sync_done, outcome.saved.saved),
+                        resultDialogIsSuccess = true,
                     )
                     refreshMirror(current.date)
                 }
@@ -487,15 +480,15 @@ class MassasLaunchViewModel @Inject constructor(
                     // The previous snapshot stands: saying "sem conexão" is the whole message.
                     _state.value = _state.value.copy(
                         isSyncingAero = false,
-                        aeroSyncMessage = UiText.of(R.string.massas_aero_unreachable),
-                        aeroSyncFailed = true,
+                        resultDialogMessage = UiText.of(R.string.massas_aero_unreachable),
+                        resultDialogIsSuccess = false,
                     )
                 }
                 is AeroSyncOutcome.Failed -> {
                     _state.value = _state.value.copy(
                         isSyncingAero = false,
-                        aeroSyncMessage = UiText.of(R.string.massas_aero_sync_failed, outcome.reason ?: "-"),
-                        aeroSyncFailed = true,
+                        resultDialogMessage = UiText.of(R.string.massas_aero_sync_failed, outcome.reason ?: "-"),
+                        resultDialogIsSuccess = false,
                     )
                 }
             }

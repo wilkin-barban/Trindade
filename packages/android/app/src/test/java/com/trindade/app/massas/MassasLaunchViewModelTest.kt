@@ -888,8 +888,8 @@ class MassasLaunchViewModelTest {
         testVm.syncAeroDay()
         testScheduler.runCurrent()
 
-        assertEquals(R.string.massas_aero_unreachable, testVm.state.value.aeroSyncMessage?.resId)
-        assertTrue(testVm.state.value.aeroSyncFailed)
+        assertEquals(R.string.massas_aero_unreachable, testVm.state.value.resultDialogMessage?.resId)
+        assertFalse(testVm.state.value.resultDialogIsSuccess)
         // Nothing was stored: an empty snapshot reads as "the plant produced nothing today".
         assertTrue(mirrorPort.snapshots.isEmpty())
         assertNull(settingsPort.syncedAt(testVm.state.value.date))
@@ -907,9 +907,10 @@ class MassasLaunchViewModelTest {
         testScheduler.runCurrent()
 
         assertEquals(1, mirrorPort.snapshots.size)
-        // The answer is drawn under the card's own button now, not in the module's banner.
-        assertEquals(R.string.massas_aero_sync_done, testVm.state.value.aeroSyncMessage?.resId)
-        assertFalse(testVm.state.value.aeroSyncFailed)
+        // The answer is the dialog the operator closes, not a sentence under a card: the module's banners sit
+        // above a column taller than a phone screen, and the header's action is at the top of it.
+        assertEquals(R.string.massas_aero_sync_done, testVm.state.value.resultDialogMessage?.resId)
+        assertTrue(testVm.state.value.resultDialogIsSuccess)
         assertNotNull(settingsPort.syncedAt(testVm.state.value.date))
     }
 
@@ -921,7 +922,7 @@ class MassasLaunchViewModelTest {
      */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun syncAeroDay_whenTheBridgeHasNoSettings_saysSoWhereTheCardDrawsIt() = runTest {
+    fun syncAeroDay_whenTheBridgeHasNoSettings_saysSoInTheResultDialog() = runTest {
         val repo = DayRepository(massasApi, dayWith())
         settingsPort.settings = com.trindade.app.aero.AeroSettings()
         val testVm = newViewModel(repo)
@@ -930,8 +931,8 @@ class MassasLaunchViewModelTest {
         testVm.syncAeroDay()
         testScheduler.runCurrent()
 
-        assertEquals(R.string.massas_aero_not_configured, testVm.state.value.aeroSyncMessage?.resId)
-        assertTrue(testVm.state.value.aeroSyncFailed)
+        assertEquals(R.string.massas_aero_not_configured, testVm.state.value.resultDialogMessage?.resId)
+        assertFalse(testVm.state.value.resultDialogIsSuccess)
         assertNull(testVm.state.value.errorMessage)
     }
 

@@ -578,7 +578,6 @@
     <string name="massas_success_title">Lanzamiento Completado</string>
     <string name="massas_error_title">Error en el Lanzamiento</string>
     <string name="massas_close">Cerrar</string>
-    <string name="massas_sync_now">Actualizar ahora</string>
     <string name="massas_history_select_date">Seleccione la Fecha</string>
     <string name="massas_history_days_count">%1$d días registrados</string>
     <string name="massas_back_to_history">Volver al Historial</string>

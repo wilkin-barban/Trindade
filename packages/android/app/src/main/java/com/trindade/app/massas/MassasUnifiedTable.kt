@@ -294,6 +294,3 @@ private fun StateBadge(state: MassasRowState) {
         )
     }
 }
-
-/** The tag the sync tests look for, kept next to the composable that draws it. */
-const val MASSAS_SYNC_TAG: String = "massas-sync-erp"
