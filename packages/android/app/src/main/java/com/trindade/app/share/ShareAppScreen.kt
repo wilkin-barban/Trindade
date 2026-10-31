@@ -14,8 +14,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
@@ -48,6 +46,7 @@ import com.trindade.app.ui.BrazilianPhoneVisualTransformation
 import com.trindade.app.ui.components.HelpSection
 import com.trindade.app.ui.components.ModuleHelpButton
 import com.trindade.app.ui.components.ModuleHelpDialog
+import com.trindade.app.ui.components.SectionCard
 import com.trindade.app.ui.filterPhoneDigits
 import kotlinx.coroutines.launch
 
@@ -86,236 +85,228 @@ fun ShareAppScreen(
         )
 
         // Platform selection card
-        Card(
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        ) {
-            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.share_platform_label), style = MaterialTheme.typography.titleSmall)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    FilterChip(
-                        selected = state.platform == SharePlatform.ANDROID,
-                        onClick = { viewModel.onPlatformSelect(SharePlatform.ANDROID) },
-                        label = { Text(stringResource(R.string.share_platform_android)) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.primary,
-                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        ),
-                        modifier = Modifier.weight(1f).defaultMinSize(minHeight = 48.dp),
-                    )
-                    FilterChip(
-                        selected = state.platform == SharePlatform.IOS,
-                        onClick = { viewModel.onPlatformSelect(SharePlatform.IOS) },
-                        label = { Text(stringResource(R.string.share_platform_iphone)) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.primary,
-                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        ),
-                        modifier = Modifier.weight(1f).defaultMinSize(minHeight = 48.dp),
-                    )
-                    FilterChip(
-                        selected = state.platform == SharePlatform.BOTH,
-                        onClick = { viewModel.onPlatformSelect(SharePlatform.BOTH) },
-                        label = { Text(stringResource(R.string.share_platform_both)) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.primary,
-                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        ),
-                        modifier = Modifier.weight(1f).defaultMinSize(minHeight = 48.dp),
-                    )
-                }
+        SectionCard {
+            Text(stringResource(R.string.share_platform_label), style = MaterialTheme.typography.titleSmall)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                FilterChip(
+                    selected = state.platform == SharePlatform.ANDROID,
+                    onClick = { viewModel.onPlatformSelect(SharePlatform.ANDROID) },
+                    label = { Text(stringResource(R.string.share_platform_android)) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
+                    modifier = Modifier.weight(1f).defaultMinSize(minHeight = 48.dp),
+                )
+                FilterChip(
+                    selected = state.platform == SharePlatform.IOS,
+                    onClick = { viewModel.onPlatformSelect(SharePlatform.IOS) },
+                    label = { Text(stringResource(R.string.share_platform_iphone)) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
+                    modifier = Modifier.weight(1f).defaultMinSize(minHeight = 48.dp),
+                )
+                FilterChip(
+                    selected = state.platform == SharePlatform.BOTH,
+                    onClick = { viewModel.onPlatformSelect(SharePlatform.BOTH) },
+                    label = { Text(stringResource(R.string.share_platform_both)) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
+                    modifier = Modifier.weight(1f).defaultMinSize(minHeight = 48.dp),
+                )
             }
         }
 
         // Credentials card (Administrator only)
         if (state.isAdmin) {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-            ) {
-                Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            SectionCard {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(stringResource(R.string.share_credentials_title), style = MaterialTheme.typography.titleSmall)
+                    Switch(
+                        checked = state.includeCredentials,
+                        onCheckedChange = { viewModel.onIncludeCredentialsToggle(it) },
+                    )
+                }
+
+                if (state.includeCredentials) {
+                    // Two ways to hand over an account, never both: a new worker, or one that already exists.
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        Text(stringResource(R.string.share_credentials_title), style = MaterialTheme.typography.titleSmall)
-                        Switch(
-                            checked = state.includeCredentials,
-                            onCheckedChange = { viewModel.onIncludeCredentialsToggle(it) },
+                        FilterChip(
+                            selected = state.credentialMode == ShareCredentialMode.CREATE,
+                            onClick = { viewModel.onCredentialModeSelect(ShareCredentialMode.CREATE) },
+                            label = { Text(stringResource(R.string.share_mode_create)) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
+                            modifier = Modifier.weight(1f).defaultMinSize(minHeight = 48.dp),
+                        )
+                        FilterChip(
+                            selected = state.credentialMode == ShareCredentialMode.EXISTING,
+                            onClick = { viewModel.onCredentialModeSelect(ShareCredentialMode.EXISTING) },
+                            label = { Text(stringResource(R.string.share_mode_existing)) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
+                            modifier = Modifier.weight(1f).defaultMinSize(minHeight = 48.dp),
                         )
                     }
 
-                    if (state.includeCredentials) {
-                        // Two ways to hand over an account, never both: a new worker, or one that already exists.
-                        Row(
+                    if (state.credentialMode == ShareCredentialMode.CREATE) {
+                        OutlinedTextField(
+                            value = state.quickName,
+                            onValueChange = { viewModel.onQuickNameChange(it) },
+                            label = { Text(stringResource(R.string.share_display_name)) },
+                            singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        )
+
+                        OutlinedTextField(
+                            value = state.quickUsername,
+                            onValueChange = { viewModel.onQuickUsernameChange(it) },
+                            label = { Text(stringResource(R.string.profile_username)) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Text(
+                            stringResource(R.string.share_quick_username_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+
+                        // Read-only on purpose: this screen creates workers, and a control here would be a
+                        // quiet way to hand out an admin account.
+                        OutlinedTextField(
+                            value = stringResource(R.string.share_role_worker),
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text(stringResource(R.string.share_role)) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+
+                        OutlinedTextField(
+                            value = viewModel.quickPassword(),
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text(stringResource(R.string.share_initial_password)) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+
+                        Button(
+                            onClick = { viewModel.createWorker() },
+                            enabled = !state.creating,
+                            modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp),
                         ) {
-                            FilterChip(
-                                selected = state.credentialMode == ShareCredentialMode.CREATE,
-                                onClick = { viewModel.onCredentialModeSelect(ShareCredentialMode.CREATE) },
-                                label = { Text(stringResource(R.string.share_mode_create)) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                ),
-                                modifier = Modifier.weight(1f).defaultMinSize(minHeight = 48.dp),
-                            )
-                            FilterChip(
-                                selected = state.credentialMode == ShareCredentialMode.EXISTING,
-                                onClick = { viewModel.onCredentialModeSelect(ShareCredentialMode.EXISTING) },
-                                label = { Text(stringResource(R.string.share_mode_existing)) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                ),
-                                modifier = Modifier.weight(1f).defaultMinSize(minHeight = 48.dp),
+                            if (state.creating) {
+                                androidx.compose.material3.CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                )
+                            } else {
+                                Text(
+                                    text = stringResource(R.string.share_create_button),
+                                    style = MaterialTheme.typography.labelLarge,
+                                )
+                            }
+                        }
+
+                        if (state.createSuccess) {
+                            Text(
+                                text = stringResource(R.string.share_create_success),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = SuccessGreen,
                             )
                         }
 
-                        if (state.credentialMode == ShareCredentialMode.CREATE) {
-                            OutlinedTextField(
-                                value = state.quickName,
-                                onValueChange = { viewModel.onQuickNameChange(it) },
-                                label = { Text(stringResource(R.string.share_display_name)) },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-
-                            OutlinedTextField(
-                                value = state.quickUsername,
-                                onValueChange = { viewModel.onQuickUsernameChange(it) },
-                                label = { Text(stringResource(R.string.profile_username)) },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
+                        state.createError?.let { error ->
                             Text(
-                                stringResource(R.string.share_quick_username_hint),
+                                text = when (error) {
+                                    ShareCreateError.NAME_REQUIRED -> stringResource(R.string.share_create_name_required)
+                                    ShareCreateError.USERNAME_REQUIRED -> stringResource(R.string.share_create_username_required)
+                                    ShareCreateError.DUPLICATED -> stringResource(R.string.share_create_duplicated)
+                                    ShareCreateError.REFUSED -> stringResource(R.string.share_create_refused)
+                                    ShareCreateError.UNREACHABLE -> stringResource(R.string.share_create_unreachable)
+                                    ShareCreateError.CREATION_REQUIRED -> stringResource(R.string.share_create_required)
+                                },
                                 style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
                             )
-
-                            // Read-only on purpose: this screen creates workers, and a control here would be a
-                            // quiet way to hand out an admin account.
-                            OutlinedTextField(
-                                value = stringResource(R.string.share_role_worker),
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text(stringResource(R.string.share_role)) },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-
-                            OutlinedTextField(
-                                value = viewModel.quickPassword(),
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text(stringResource(R.string.share_initial_password)) },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-
-                            Button(
-                                onClick = { viewModel.createWorker() },
-                                enabled = !state.creating,
+                        }
+                    } else {
+                        // User selection
+                        Text(stringResource(R.string.share_select_user), style = MaterialTheme.typography.bodySmall)
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            OutlinedButton(
+                                onClick = { usersMenuExpanded = true },
                                 modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp),
                             ) {
-                                if (state.creating) {
-                                    androidx.compose.material3.CircularProgressIndicator(
-                                        modifier = Modifier.size(18.dp),
-                                        strokeWidth = 2.dp,
-                                    )
+                                val label = if (state.displayName.isNotBlank()) {
+                                    state.displayName
                                 } else {
-                                    Text(
-                                        text = stringResource(R.string.share_create_button),
-                                        style = MaterialTheme.typography.labelLarge,
+                                    stringResource(R.string.share_select_user_placeholder)
+                                }
+                                Text(label)
+                            }
+                            DropdownMenu(
+                                expanded = usersMenuExpanded,
+                                onDismissRequest = { usersMenuExpanded = false },
+                            ) {
+                                state.users.forEach { user ->
+                                    DropdownMenuItem(
+                                        text = { Text("${user.displayName} (${user.username})") },
+                                        onClick = {
+                                            viewModel.onUserSelect(user.id)
+                                            usersMenuExpanded = false
+                                        },
                                     )
                                 }
                             }
-
-                            if (state.createSuccess) {
-                                Text(
-                                    text = stringResource(R.string.share_create_success),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = SuccessGreen,
-                                )
-                            }
-
-                            state.createError?.let { error ->
-                                Text(
-                                    text = when (error) {
-                                        ShareCreateError.NAME_REQUIRED -> stringResource(R.string.share_create_name_required)
-                                        ShareCreateError.USERNAME_REQUIRED -> stringResource(R.string.share_create_username_required)
-                                        ShareCreateError.DUPLICATED -> stringResource(R.string.share_create_duplicated)
-                                        ShareCreateError.REFUSED -> stringResource(R.string.share_create_refused)
-                                        ShareCreateError.UNREACHABLE -> stringResource(R.string.share_create_unreachable)
-                                        ShareCreateError.CREATION_REQUIRED -> stringResource(R.string.share_create_required)
-                                    },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.error,
-                                )
-                            }
-                        } else {
-                            // User selection
-                            Text(stringResource(R.string.share_select_user), style = MaterialTheme.typography.bodySmall)
-                            Box(modifier = Modifier.fillMaxWidth()) {
-                                OutlinedButton(
-                                    onClick = { usersMenuExpanded = true },
-                                    modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp),
-                                ) {
-                                    val label = if (state.displayName.isNotBlank()) {
-                                        state.displayName
-                                    } else {
-                                        stringResource(R.string.share_select_user_placeholder)
-                                    }
-                                    Text(label)
-                                }
-                                DropdownMenu(
-                                    expanded = usersMenuExpanded,
-                                    onDismissRequest = { usersMenuExpanded = false },
-                                ) {
-                                    state.users.forEach { user ->
-                                        DropdownMenuItem(
-                                            text = { Text("${user.displayName} (${user.username})") },
-                                            onClick = {
-                                                viewModel.onUserSelect(user.id)
-                                                usersMenuExpanded = false
-                                            },
-                                        )
-                                    }
-                                }
-                            }
-
-                            // Read-only username
-                            OutlinedTextField(
-                                value = state.username,
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text(stringResource(R.string.profile_username)) },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-
-                            // Editable password with initial value 123456789
-                            OutlinedTextField(
-                                value = state.password,
-                                onValueChange = { viewModel.onPasswordChange(it) },
-                                label = { Text(stringResource(R.string.share_initial_password)) },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
                         }
+
+                        // Read-only username
+                        OutlinedTextField(
+                            value = state.username,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text(stringResource(R.string.profile_username)) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+
+                        // Editable password with initial value 123456789
+                        OutlinedTextField(
+                            value = state.password,
+                            onValueChange = { viewModel.onPasswordChange(it) },
+                            label = { Text(stringResource(R.string.share_initial_password)) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
                 }
             }
@@ -334,13 +325,9 @@ fun ShareAppScreen(
         )
 
         // Preview of the message
-        Card(
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        ) {
-            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(stringResource(R.string.share_preview_label), style = MaterialTheme.typography.titleSmall)
-                Text(viewModel.message(), style = MaterialTheme.typography.bodySmall)
-            }
+        SectionCard {
+            Text(stringResource(R.string.share_preview_label), style = MaterialTheme.typography.titleSmall)
+            Text(viewModel.message(), style = MaterialTheme.typography.bodySmall)
         }
 
         HorizontalDivider()
