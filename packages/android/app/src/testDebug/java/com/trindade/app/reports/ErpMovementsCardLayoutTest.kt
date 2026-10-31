@@ -31,7 +31,7 @@ import org.robolectric.annotation.GraphicsMode
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [28], qualifiers = "w800dp-h1000dp")
+@Config(qualifiers = "w800dp-h1000dp")
 class ErpMovementsCardLayoutTest {
 
     @get:Rule

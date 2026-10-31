@@ -5,17 +5,20 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,19 +77,28 @@ fun ErpMovementsCard(
                 }
 
                 val action: @Composable (Modifier) -> Unit = { actionModifier ->
-                    OutlinedButton(
+                    // A tonal button, which is the role the card's refresh has: it reloads what the card shows
+                    // and changes nothing else, so it is neither the filled primary of a commit nor the outline
+                    // of a dismissal. 48dp is the target the rest of the app keeps, and it is written here
+                    // rather than left to the theme because a handset is where this is pressed.
+                    FilledTonalButton(
                         onClick = onSync,
                         enabled = !isSyncing,
-                        modifier = actionModifier.defaultMinSize(minHeight = 44.dp),
+                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                        modifier = actionModifier.heightIn(min = 48.dp),
                     ) {
                         if (isSyncing) {
-                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                        } else {
-                            Text(
-                                text = "🔄 " + stringResource(R.string.report_erp_sync),
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
                             )
+                            Spacer(modifier = Modifier.width(8.dp))
                         }
+                        Text(
+                            text = stringResource(R.string.report_erp_sync),
+                            style = MaterialTheme.typography.labelLarge,
+                        )
                     }
                 }
 
