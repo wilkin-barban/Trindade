@@ -14,6 +14,8 @@ import com.trindade.app.contract.models.AdminUserResponse
 import com.trindade.app.contract.models.AdminUserResponseUser
 import com.trindade.app.contract.models.AdminUsersResponse
 import com.trindade.app.network.AdminApi
+import com.trindade.app.network.AeroMovementsStoredDay
+import com.trindade.app.network.AeroStoredMovement
 import com.trindade.app.network.AuthApi
 import com.trindade.app.network.MassaIndividualLaunch
 import com.trindade.app.network.MassasApi
@@ -598,6 +600,97 @@ class MassasLaunchViewModelTest {
         testVm.loadDay(MassasLaunchViewModel.saopauloToday())
         testScheduler.runCurrent()
         assertFalse(testVm.state.value.isReadOnly)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `a past day is read with the stored erp seats even when the phone has no erp credentials`() = runTest {
+        // The 30th of October, as the plant lived it: seats the ERP already had and the phone in the
+        // operator's hand knew nothing about. The mirror lives in Trindade's database, so opening the day has
+        // to read it there -- not wait for someone to press sync, and not ask this phone for ERP credentials.
+        val past = "2025-10-30"
+        val repo = DayRepository(
+            massasApi,
+            view = dayWith(),
+            stored = AeroMovementsStoredDay(
+                date = past,
+                movements = listOf(
+                    AeroStoredMovement(
+                        entLan = 35947,
+                        productCode = "1045",
+                        productDesc = "MASSA CASEIRA",
+                        quantity = 2800.0,
+                        entryDate = past,
+                        operatorName = "JOAO H",
+                        movementType = "M",
+                        ownerUserId = 20,
+                    ),
+                    AeroStoredMovement(
+                        entLan = 35952,
+                        productCode = "1045",
+                        productDesc = "MASSA CASEIRA",
+                        quantity = 2450.0,
+                        entryDate = past,
+                        operatorName = "JEFFERSON",
+                        movementType = "M",
+                        ownerUserId = 21,
+                    ),
+                ),
+                syncedAt = "2025-10-30 18:12",
+            ),
+        )
+        settingsPort = FakeSettingsPort(AeroSettings())
+        val testVm = newViewModel(repo)
+
+        testVm.loadDay(past)
+        testScheduler.runCurrent()
+
+        assertEquals(listOf(35947, 35952), testVm.state.value.aeroMirror.map { it.entLan })
+        assertEquals("2025-10-30 18:12", testVm.state.value.aeroSyncedAt)
+        assertTrue(testVm.state.value.isReadOnly)
+        // The backend already has the day: opening it is a read of Trindade, not a trip to the plant's ERP.
+        assertEquals(0, erpPort.readDates.size)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `switching to a day with no snapshot does not keep the previous day's erp seats`() = runTest {
+        // A seat from the 29th drawn over the 30th is worse than no seat at all: the operator reads a row that
+        // belongs to another morning and credits it to the wrong day. The mirror is day-scoped like everything
+        // else loadDay resets -- boxes, edit state and delete prompt -- so a day with nothing stored shows nothing.
+        val monday = "2025-10-29"
+        val tuesday = "2025-10-30"
+        val repo = DayRepository(
+            massasApi,
+            view = dayWith(),
+            stored = AeroMovementsStoredDay(
+                date = monday,
+                movements = listOf(
+                    AeroStoredMovement(
+                        entLan = 35900,
+                        productCode = "1045",
+                        productDesc = "MASSA CASEIRA",
+                        quantity = 900.0,
+                        entryDate = monday,
+                        operatorName = "VICTOR",
+                        movementType = "M",
+                        ownerUserId = 2,
+                    ),
+                ),
+                syncedAt = "2025-10-29 17:40",
+            ),
+        )
+        val testVm = newViewModel(repo)
+
+        testVm.loadDay(monday)
+        testScheduler.runCurrent()
+        assertEquals(listOf(35900), testVm.state.value.aeroMirror.map { it.entLan })
+
+        repo.stored = null
+        testVm.loadDay(tuesday)
+        testScheduler.runCurrent()
+
+        assertTrue(testVm.state.value.aeroMirror.isEmpty())
     }
 
     /** A day already loaded, so a test about what happens next does not also depend on the network. */

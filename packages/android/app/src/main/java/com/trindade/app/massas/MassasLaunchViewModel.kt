@@ -169,10 +169,11 @@ class MassasLaunchViewModel @Inject constructor(
                 aeroSyncedAt = aeroSettingsStore.syncedAt(state.value.date),
                 ackedLaunchIds = tabletAckStore.ackedIds(),
             )
-            if (settings.ready) refreshMirror(state.value.date)
+            // The stored mirror is Trindade's, not this phone's: it is read whether or not the device holds
+            // ERP credentials, because a tablet someone else configured still has to see the plant's seats.
+            refreshMirror(state.value.date)
         }
     }
-
     private suspend fun refreshMirror(date: String) {
         val stored = repository.storedAeroMovements(date) ?: return
         _state.value = _state.value.copy(
@@ -239,6 +240,11 @@ class MassasLaunchViewModel @Inject constructor(
                 // closed day look launchable, and an open one launch what the operator meant for yesterday.
                 quantities = emptyMap(),
                 showConfirmLaunchDialog = false,
+                // The mirror belongs to the day like the boxes do. A seat left over from yesterday drawn over
+                // today is worse than no seat: the operator reads it as this morning's and credits it to the
+                // wrong shift. `refreshMirror` then fills it with whatever Trindade stored for this date.
+                aeroMirror = emptyList(),
+                aeroSyncedAt = aeroSettingsStore.syncedAt(date),
             )
             val result = repository.day(date)
             _state.value = _state.value.copy(
@@ -246,6 +252,9 @@ class MassasLaunchViewModel @Inject constructor(
                 dayView = result,
                 errorMessage = if (result == null) UiText.of(R.string.massas_error_load) else null,
             )
+            // Always, and regardless of this phone's ERP credentials: the day the plant lived is already in
+            // Trindade's database, and opening it is a read of that, not a trip to the factory.
+            refreshMirror(date)
         }
     }
 
