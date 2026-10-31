@@ -149,15 +149,15 @@ Criterios de aceptación:
 - T1 | S1 | inline | `loadDay` refresca el espejo del día de forma incondicional — commit: `2deefb8`
 - T2 | S2 | inline | cabecera de fecha con la única acción de sincronización; fuera "Atualizar agora" y `MassasErpSyncCard`; el resultado de la sincronización de massas pasa al diálogo (parte de S6) — commit: `3b57a37`
 - T3 | S3 | inline | Admin sin "Código de usuário"; `ready` alineado con la Web sin romper `user_code` ni `ENT_USU` — commit: `91b02c0`
-- T4 | S4 | inline | Relatório: categoría 4 oculta cuando el espejo ERP cubre insumos, `ErpMovementsCard` tras Temperaturas — commit: _pendiente_
-- T5 | S5 | inline | botón "Sincronizar com ERP" rediseñado en Material 3, 48dp, sin emoji — commit: _pendiente_
+- T4 | S4 | inline | Relatório: categoría 4 oculta desde la fecha de corte ERP, `ErpMovementsCard` tras Temperaturas — commit: `19e87e0`
+- T5 | S5 | inline | botón "Sincronizar com ERP" rediseñado en Material 3, 48dp, sin emoji — commit: `f92a3f6`
 - T6 | S6 | inline | diálogo de resultado compartido y las cuatro acciones reportando en él (sincronización ERP, guardado de reporte, lanzamiento de masas, test de integración) — commit: 44dcf70
 - T7 | S7 | inline, después de T6 | `dispatchToErp` pasa `operatorName` por ítem y reporta el acumulado del lote en el diálogo — commit: 3974734
-- T8 | S1–S7 | inline | suite Android completa (unidad + Robolectric) en el contenedor fijado — commit: pendiente
-- T9 | S8 | inline | verificación en `emulator-5554` por `ssh ubuntu` con capturas de los 7 puntos — commit: _pendiente_
-- T10 | S9 | inline | `versionCode 7002`, APK firmado, sha256, `gh release upload v0.7.0 --clobber` — commit: _pendiente_
-- T11 | S9 | inline | producción en VPS + copia en `~/Desktop` — commit: _pendiente_
-- T12 | S9 | inline | `main` pusheado y tag `v0.7.0` re-apuntado al commit del binario — commit: _pendiente_
+- T8 | S1–S7 | inline | suite Android completa (unidad + Robolectric) en el contenedor fijado, 1155 pruebas verdes — commit: 15ab537
+- T9 | S8 | inline | verificación en `emulator-5554` por `ssh ubuntu` con capturas de los 7 puntos (1–6 en vivo; el 7 queda cubierto por las pruebas del lote, sin fabricar lanzamientos en producción) — commit: `PENDING_T9`
+- T10 | S9 | inline | `versionCode 7002`, APK firmado, sha256 `bc038f2e…2f4c`, asset `trindade-0.7.0.apk` reemplazado — commit: `PENDING_T9`
+- T11 | S9 | inline | producción en VPS (`api` sirviendo el binario nuevo) + copia en `~/Desktop` — commit: `PENDING_T9`
+- T12 | S9 | inline | `main` pusheado y tag `v0.7.0` re-apuntado al commit del binario — commit: `PENDING_T12`
 
 ## Test plan
 
@@ -262,3 +262,19 @@ L6 — Reordenamiento de S6 dentro de T2: quitar la tarjeta de sincronización s
 L7 — Nota de evidencia: en T2 el composable `MassasDayHeader` es API nueva, así que el RED fue de compilación (el símbolo no existía al escribir el test) y no se corrió gradle para verlo; la primera corrida fue GREEN (`BUILD SUCCESSFUL`, `MassasDayHeaderTest` + `MassasLaunchViewModelTest`). De T3 en adelante el RED es de aserción, observado en corrida.
 
 L8 — Nota de S4: el corte no es "el espejo tiene filas" sino la fecha `ERP_RECEIPT_SINCE` (`2026-10-29`), igual que la web y el backend. Android no tenía esa constante; quedó en `reports/ErpReceipts.kt` junto con `ERP_RECEIPT_CATEGORY_ID`. La lista cortada (`UiState.formCategories`) se usa para dibujar, para `missingReadings` y para `tasksById` del envío: ocultar solo lo dibujado habría dejado la categoría en el cuerpo y en la validación.
+
+L9 — Evidencia de T9/T10/T11 (31/10, `emulator-5554` con `versionCode 7002` instalado):
+
+- Histórico → 30/10: la tabla abre con los asientos del espejo por operario (GUSTAVO H, JAIME, JEFFERSON, JOAO H) sin tocar nada: S1 en vivo.
+- Cabecera del día con la única acción "Sincronizar ERP", sin "Atualizar agora" ni tarjeta aparte, en 30/10 y en el día de hoy: S2 en vivo.
+- Panel Admin → Integração ERP: exactamente tres campos (Endereço do WebService, Usuário do ERP, Senha do ERP), "Salvar" deshabilitado sin la contraseña: S3 en vivo.
+- Relatório: la lista de categorías termina en Lasanha, sin categoría 4; `Temperaturas` → productos → "Movimentações do ERP (Massas e Recebimento)" → Observações: S4 en vivo.
+- El botón de sincronización del relatório se dibuja como botón tonal M3 de ancho completo, 48 dp, sin emoji: S5 en vivo.
+- Tocar "Sincronizar com ERP" abre el diálogo compartido ("Não foi possível" + "Configure a integração com o ERP em Administração antes de sincronizar." + "Fechar"): S6 en vivo, y el mismo composable que usan las otras tres acciones.
+- S7 no se forzó en vivo: probarlo con un lote real habría creado lanzamientos y asientos en la base y el ERP de producción. Queda cubierto por las pruebas de `MassasLaunchViewModelTest` (identidad por ítem y acumulado del lote), y el diálogo que lo reporta es el mismo que se verificó en S6.
+
+T10/T11 — el binario entregado es uno solo: `packages/backend/apk/trindade-0.7.0.apk`, el asset `trindade-0.7.0.apk` de la release y `~/Desktop/trindade-0.7.0.apk` tienen sha256 `bc038f2eeda605fb07bfdd26550c93cfc5a1a8b9c9b06408df0fe505c6ec2f4c` (11.149.516 bytes). `https://trindademasas.duckdns.org/api/app/download-apk` devuelve ese mismo digest.
+
+L10 — `gh release upload archivo#etiqueta` renombra la *etiqueta* visible, no el nombre del asset: subir con `#trindade-0.7.0.apk` agregó un asset nuevo (`app-release.apk`) y dejó el viejo en su lugar, que es justo lo que rompería al actualizador que elige el primer `.apk`. Se borraron ambos y se subió el archivo copiado como `/tmp/trindade-0.7.0.apk`, con el `.sha256` recalculado.
+
+L11 — Orden de la verificación: con la misma `versionName`, el gate de actualización obligatoria compara tamaños contra `/api/app/latest-release`, así que el emulador solo corre libre cuando producción sirve exactamente los bytes instalados. El APK se publicó en el `api` antes de la ronda de capturas; la ronda confirmó los puntos 1–6 sin tocar datos de producción.
