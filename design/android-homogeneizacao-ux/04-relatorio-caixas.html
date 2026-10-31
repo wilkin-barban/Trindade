@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=390" />
+<title>04 · Relatório — interruptores das caixas</title>
+<style>
+  :root{
+    --primary:#B42025; --on-primary:#fff; --primary-container:#FFDAD6; --on-primary-container:#410005;
+    --secondary:#855400; --secondary-container:#FFDDB3; --on-secondary-container:#2B1700;
+    --bg:#FFF8F6; --on-surface:#221919; --surface-container:#FBEBE8; --surface-container-high:#F5E5E2;
+    --on-surface-variant:#534341; --outline:#857371; --outline-variant:#D8C2BF;
+    --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  }
+  *{box-sizing:border-box} body{margin:0;width:390px;background:var(--bg);color:var(--on-surface);font-family:var(--font)}
+  .screen{padding:16px;display:flex;flex-direction:column;gap:16px}
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  h1{margin:0;font-size:22px;line-height:28px;font-weight:700}
+  .sub{margin:0;font-size:12px;line-height:16px;color:var(--on-surface-variant)}
+  .navbtn{height:36px;padding:0 12px;border-radius:999px;border:1px solid var(--outline);background:transparent;color:var(--primary);font:500 12px/16px var(--font)}
+  .card{background:var(--surface-container);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
+  .cat{font-size:16px;line-height:24px;font-weight:500;margin:0}
+  .divider{height:1px;background:var(--outline-variant)}
+  .switch{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:4px 0}
+  .switch .txt{display:flex;flex-direction:column;gap:2px}
+  .switch .txt b{font-size:14px;line-height:20px;font-weight:500}
+  .switch .txt span{font-size:12px;line-height:16px;color:var(--on-surface-variant)}
+  .track{width:52px;height:32px;border-radius:999px;background:var(--surface-container-high);border:2px solid var(--outline);position:relative;flex:none}
+  .track i{position:absolute;top:50%;left:6px;width:16px;height:16px;border-radius:50%;background:var(--outline);transform:translateY(-50%)}
+  .track.on{background:var(--primary);border-color:var(--primary)}
+  .track.on i{left:26px;background:#fff}
+  .group{display:flex;flex-direction:column;gap:8px;padding-left:12px}
+  .group .row{display:flex;align-items:center;gap:10px;min-height:40px}
+  .cbox{width:18px;height:18px;border-radius:2px;border:2px solid var(--outline);flex:none}
+  .cbox.on{background:var(--primary);border-color:var(--primary);background-image:linear-gradient(var(--primary),var(--primary))}
+  .rowlabel{font-size:16px;line-height:24px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;padding-left:28px}
+  .chip{height:28px;padding:0 10px;border-radius:8px;border:1px solid var(--outline);font:500 12px/26px var(--font);color:var(--on-surface)}
+  .chip.on{background:var(--secondary-container);border-color:transparent;color:var(--on-secondary-container)}
+  .offmsg{font-size:12px;line-height:16px;color:var(--on-surface-variant);padding:6px 0 2px 12px;font-style:italic}
+  .foot{display:flex;justify-content:flex-end;gap:8px;padding-top:4px}
+  .btn{height:48px;padding:0 20px;border-radius:999px;border:1px solid transparent;font:500 14px/20px var(--font)}
+  .btn.outlined{background:transparent;color:var(--primary);border-color:var(--outline)}
+  .btn.primary{background:var(--primary);color:var(--on-primary)}
+  .caption{margin:0 16px 24px;font-size:11px;line-height:15px;color:var(--on-surface-variant);border-top:1px dashed var(--outline-variant);padding-top:8px}
+</style>
+</head>
+<body>
+<div class="screen">
+  <div class="topbar">
+    <div>
+      <h1>Relatório</h1>
+      <p class="sub">31/10/2026 · turno manhã</p>
+    </div>
+    <button class="navbtn">‹ Voltar</button>
+  </div>
+
+  <div class="card">
+    <p class="cat">Montagem das Caixas</p>
+    <div class="divider"></div>
+
+    <div class="switch">
+      <div class="txt"><b>Caixas Pequenas</b><span>Ativado · 3 opções</span></div>
+      <div class="track on"><i></i></div>
+    </div>
+    <div class="group">
+      <div class="row"><span class="cbox on"></span><span class="rowlabel">Caixa 500 g</span></div>
+      <div class="chips"><span class="chip on">Assaí 500 g</span><span class="chip">Normal 500 g</span></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="switch">
+      <div class="txt"><b>Caixas Assaí</b><span>Desativado · não entra neste relatório</span></div>
+      <div class="track"><i></i></div>
+    </div>
+    <p class="offmsg">Nada de Caixas Assaí será lançado hoje. Você pode ativar a qualquer momento.</p>
+  </div>
+
+  <div class="card">
+    <p class="cat">Recebimento</p>
+    <div class="divider"></div>
+    <div class="row"><span class="cbox on"></span><span class="rowlabel">Conferência de notas</span></div>
+    <div class="row"><span class="cbox"></span><span class="rowlabel">Pesagem de entrada</span></div>
+  </div>
+
+  <div class="foot">
+    <button class="btn outlined">Cancelar</button>
+    <button class="btn primary">Salvar relatório</button>
+  </div>
+</div>
+
+<div class="caption">
+  El interruptor vive en el nivel <b>Montagem das Caixas</b> y gobierna el grupo entero: apagado, el grupo no dibuja sus opciones y avisa en una línea por qué; encendido, se comporta como hoy. Un grupo con algo ya marcado arranca encendido, así que reabrir un relatório guardado nunca esconde lo que se registró. Apagar un grupo no envía sus tareas al servidor, y volver a encenderlo devuelve lo que estaba marcado.
+</div>
+</body>
+</html>

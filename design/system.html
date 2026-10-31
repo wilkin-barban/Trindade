@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1440" />
+<title>Trindade — Design system</title>
+<style>
+  :root {
+    --primary:#B42025; --on-primary:#FFFFFF; --primary-container:#FFDAD6; --on-primary-container:#410005;
+    --secondary:#855400; --on-secondary:#FFFFFF; --secondary-container:#FFDDB3; --on-secondary-container:#2B1700;
+    --tertiary:#775653; --on-tertiary:#FFFFFF; --tertiary-container:#FFDAD6; --on-tertiary-container:#2D1513;
+    --error:#BA1A1A; --on-error:#FFFFFF; --error-container:#FFDAD6; --on-error-container:#410002;
+    --background:#FFF8F6; --on-background:#221919; --surface:#FFF8F6; --on-surface:#221919;
+    --surface-variant:#F4DDDA; --on-surface-variant:#534341; --outline:#857371; --outline-variant:#D8C2BF;
+    --surface-container:#FBEBE8; --surface-container-high:#F5E5E2; --surface-container-highest:#EFE0DC;
+    --help:#D97706; --success:#2E7D32;
+    --radius:12px;
+    --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; width:1440px; background:var(--background); color:var(--on-surface); font-family:var(--font); }
+  header.page { padding:32px 40px 16px; border-bottom:1px solid var(--outline-variant); }
+  header.page h1 { margin:0 0 4px; font-size:28px; font-weight:500; }
+  header.page p { margin:0; font-size:14px; color:var(--on-surface-variant); }
+  section { padding:24px 40px; border-bottom:1px solid var(--outline-variant); }
+  section > h2 { margin:0 0 16px; font-size:18px; font-weight:500; }
+  .grid { display:flex; flex-wrap:wrap; gap:12px; }
+  .swatch { width:150px; border:1px solid var(--outline-variant); border-radius:8px; overflow:hidden; background:var(--surface); }
+  .swatch .chip { height:56px; }
+  .swatch .meta { padding:8px; font-size:11px; line-height:14px; }
+  .swatch .meta b { display:block; font-size:12px; font-weight:500; }
+  .row { display:flex; gap:24px; align-items:baseline; padding:6px 0; border-bottom:1px dashed var(--outline-variant); }
+  .row .name { width:180px; font-size:12px; color:var(--on-surface-variant); }
+  .row .spec { width:120px; font-size:12px; color:var(--on-surface-variant); }
+  .ramp { display:flex; gap:8px; align-items:flex-end; }
+  .ramp div { background:var(--surface-variant); border:1px solid var(--outline-variant); border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:11px; color:var(--on-surface-variant); }
+  .cards { display:flex; gap:16px; flex-wrap:wrap; }
+  .card { background:var(--surface-container); border-radius:var(--radius); padding:12px; width:320px; }
+  .card h3 { margin:0 0 6px; font-size:16px; font-weight:500; }
+  .card p { margin:0 0 10px; font-size:12px; line-height:16px; color:var(--on-surface-variant); }
+  .card .foot { display:flex; justify-content:flex-end; gap:8px; }
+  .btn { height:40px; padding:0 20px; border-radius:999px; border:1px solid transparent; font-size:14px; font-weight:500; font-family:var(--font); cursor:pointer; }
+  .btn.primary { background:var(--primary); color:var(--on-primary); }
+  .btn.outlined { background:transparent; color:var(--primary); border-color:var(--outline); }
+  .btn.destructive { background:transparent; color:var(--error); border-color:var(--error); }
+  .btn.small { height:32px; padding:0 14px; font-size:12px; }
+  .iconbtn { width:40px; height:40px; border-radius:50%; border:none; background:transparent; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; color:var(--error); }
+  .iconbtn:hover { background:var(--surface-container-high); }
+  .chip { height:32px; padding:0 12px; border-radius:8px; border:1px solid var(--outline); background:transparent; font-size:12px; font-weight:500; color:var(--on-surface); cursor:pointer; }
+  .chip.on { background:var(--secondary-container); border-color:transparent; color:var(--on-secondary-container); }
+  .tabs { display:flex; gap:8px; border-bottom:1px solid var(--outline-variant); width:360px; }
+  .tab { padding:10px 16px; font-size:14px; font-weight:500; color:var(--on-surface-variant); border-bottom:3px solid transparent; cursor:pointer; }
+  .tab.on { color:var(--primary); border-bottom-color:var(--primary); }
+  .switch { display:flex; align-items:center; justify-content:space-between; gap:16px; width:360px; padding:8px 0; }
+  .switch span { font-size:16px; font-weight:500; }
+  .track { width:52px; height:32px; border-radius:999px; background:var(--surface-container-highest); border:2px solid var(--outline); position:relative; }
+  .track.on { background:var(--primary); border-color:var(--primary); }
+  .track i { position:absolute; top:50%; left:6px; width:16px; height:16px; border-radius:50%; background:var(--outline); transform:translateY(-50%); }
+  .track.on i { left:26px; background:#fff; }
+  table { border-collapse:collapse; width:640px; background:var(--surface-container); border-radius:var(--radius); overflow:hidden; }
+  th { text-align:left; font-size:12px; font-weight:500; color:var(--on-surface-variant); padding:10px 12px; border-bottom:1px solid var(--outline-variant); }
+  td { font-size:14px; padding:12px; border-bottom:1px solid var(--outline-variant); }
+  tr:last-child td { border-bottom:none; }
+  .dialog { width:360px; border-radius:var(--radius); background:var(--surface-container-highest); padding:20px; box-shadow:0 6px 12px rgba(0,0,0,.10); }
+  .dialog h3 { margin:0 0 8px; font-size:22px; font-weight:400; }
+  .dialog p { margin:0 0 16px; font-size:14px; line-height:20px; color:var(--on-surface-variant); }
+  .dialog .actions { display:flex; justify-content:flex-end; gap:8px; }
+  .field { width:360px; }
+  .field label { display:block; font-size:12px; color:var(--on-surface-variant); margin-bottom:4px; }
+  .field input { width:100%; height:52px; border-radius:4px; border:1px solid var(--outline); background:transparent; padding:0 16px; font-family:var(--font); font-size:16px; color:var(--on-surface); }
+  .field small { display:block; margin-top:4px; font-size:12px; color:var(--on-surface-variant); }
+  .field.err input { border-color:var(--error); }
+  .field.err small { color:var(--error); }
+  .shadow { width:200px; height:80px; border-radius:var(--radius); background:var(--surface-container); display:flex; align-items:center; justify-content:center; font-size:12px; color:var(--on-surface-variant); }
+  .note { font-size:12px; color:var(--on-surface-variant); margin-top:12px; }
+</style>
+</head>
+<body>
+<header class="page">
+  <h1>Trindade — Design system</h1>
+  <p>Tokens del tema Compose. Fuente: packages/android/app/src/main/java/com/trindade/app/ui/theme/Theme.kt · res/values/colors.xml · tipografía base Material 3.</p>
+</header>
+
+<section>
+  <h2>Color</h2>
+  <div class="grid">
+    <div class="swatch"><div class="chip" style="background:#B42025"></div><div class="meta"><b>primary</b>#B42025</div></div>
+    <div class="swatch"><div class="chip" style="background:#FFFFFF;border-bottom:1px solid #D8C2BF"></div><div class="meta"><b>onPrimary</b>#FFFFFF</div></div>
+    <div class="swatch"><div class="chip" style="background:#FFDAD6"></div><div class="meta"><b>primaryContainer</b>#FFDAD6</div></div>
+    <div class="swatch"><div class="chip" style="background:#410005"></div><div class="meta"><b>onPrimaryContainer</b>#410005</div></div>
+    <div class="swatch"><div class="chip" style="background:#855400"></div><div class="meta"><b>secondary</b>#855400</div></div>
+    <div class="swatch"><div class="chip" style="background:#FFDDB3"></div><div class="meta"><b>secondaryContainer</b>#FFDDB3</div></div>
+    <div class="swatch"><div class="chip" style="background:#2B1700"></div><div class="meta"><b>onSecondaryContainer</b>#2B1700</div></div>
+    <div class="swatch"><div class="chip" style="background:#775653"></div><div class="meta"><b>tertiary</b>#775653</div></div>
+    <div class="swatch"><div class="chip" style="background:#FFDAD6"></div><div class="meta"><b>tertiaryContainer</b>#FFDAD6</div></div>
+    <div class="swatch"><div class="chip" style="background:#BA1A1A"></div><div class="meta"><b>error</b>#BA1A1A</div></div>
+    <div class="swatch"><div class="chip" style="background:#FFDAD6"></div><div class="meta"><b>errorContainer</b>#FFDAD6</div></div>
+    <div class="swatch"><div class="chip" style="background:#FFF8F6"></div><div class="meta"><b>background</b>#FFF8F6</div></div>
+    <div class="swatch"><div class="chip" style="background:#221919"></div><div class="meta"><b>onSurface</b>#221919</div></div>
+    <div class="swatch"><div class="chip" style="background:#F4DDDA"></div><div class="meta"><b>surfaceVariant</b>#F4DDDA</div></div>
+    <div class="swatch"><div class="chip" style="background:#534341"></div><div class="meta"><b>onSurfaceVariant</b>#534341</div></div>
+    <div class="swatch"><div class="chip" style="background:#857371"></div><div class="meta"><b>outline</b>#857371</div></div>
+    <div class="swatch"><div class="chip" style="background:#D8C2BF"></div><div class="meta"><b>outlineVariant</b>#D8C2BF</div></div>
+    <div class="swatch"><div class="chip" style="background:#FBEBE8"></div><div class="meta"><b>surfaceContainer</b>#FBEBE8</div></div>
+    <div class="swatch"><div class="chip" style="background:#F5E5E2"></div><div class="meta"><b>surfaceContainerHigh</b>#F5E5E2</div></div>
+    <div class="swatch"><div class="chip" style="background:#EFE0DC"></div><div class="meta"><b>surfaceContainerHighest</b>#EFE0DC</div></div>
+    <div class="swatch"><div class="chip" style="background:#D97706"></div><div class="meta"><b>HelpAmber</b>#D97706</div></div>
+    <div class="swatch"><div class="chip" style="background:#2E7D32"></div><div class="meta"><b>SuccessGreen</b>#2E7D32</div></div>
+  </div>
+</section>
+
+<section>
+  <h2>Tipografía (Material 3 base)</h2>
+  <div class="row"><div class="name">headlineSmall</div><div class="spec">24 / 32 · 400</div><div style="font-size:24px;line-height:32px">Histórico de Massas</div></div>
+  <div class="row"><div class="name">titleLarge</div><div class="spec">22 / 28 · 400</div><div style="font-size:22px;line-height:28px">Montagem das Caixas</div></div>
+  <div class="row"><div class="name">titleMedium</div><div class="spec">16 / 24 · 500</div><div style="font-size:16px;line-height:24px;font-weight:500">Caixas Assaí</div></div>
+  <div class="row"><div class="name">titleSmall</div><div class="spec">14 / 20 · 500</div><div style="font-size:14px;line-height:20px;font-weight:500">Data de referência</div></div>
+  <div class="row"><div class="name">bodyLarge</div><div class="spec">16 / 24 · 400</div><div style="font-size:16px;line-height:24px">Operador: wilkin · Turno: manhã</div></div>
+  <div class="row"><div class="name">bodyMedium</div><div class="spec">14 / 20 · 400</div><div style="font-size:14px;line-height:20px">19 assentos conferidos no dia.</div></div>
+  <div class="row"><div class="name">bodySmall</div><div class="spec">12 / 16 · 400</div><div style="font-size:12px;line-height:16px;color:#534341">Atualizado em 31/10 às 10:35</div></div>
+  <div class="row"><div class="name">labelLarge</div><div class="spec">14 / 20 · 500</div><div style="font-size:14px;line-height:20px;font-weight:500">Salvar relatório</div></div>
+  <div class="row"><div class="name">labelMedium</div><div class="spec">12 / 16 · 500</div><div style="font-size:12px;line-height:16px;font-weight:500">ENCERRADO</div></div>
+</section>
+
+<section>
+  <h2>Espaciado y radio</h2>
+  <div class="ramp">
+    <div style="width:4px;height:32px">4</div><div style="width:6px;height:32px">6</div><div style="width:8px;height:32px">8</div>
+    <div style="width:10px;height:32px">10</div><div style="width:12px;height:32px">12</div><div style="width:16px;height:32px">16</div>
+    <div style="width:20px;height:32px">20</div><div style="width:24px;height:32px">24</div>
+  </div>
+  <p class="note">Padding de pantalla: 12 dp en históricos y carga, 16 dp en formularios. Separación entre tarjetas: 12 dp. Radio de tarjeta y diálogo: 12 dp (shapes.medium).</p>
+</section>
+
+<section>
+  <h2>Elevación</h2>
+  <div class="cards">
+    <div class="shadow" style="box-shadow:0 1px 2px rgba(0,0,0,.06)">tarjeta · 1 dp</div>
+    <div class="shadow" style="box-shadow:0 3px 6px rgba(0,0,0,.08)">tarjeta elevada · 3 dp</div>
+    <div class="shadow" style="box-shadow:0 6px 12px rgba(0,0,0,.10)">diálogo · 6 dp</div>
+  </div>
+</section>
+
+<section>
+  <h2>Botones</h2>
+  <div class="cards" style="align-items:center">
+    <button class="btn primary">Aceptar</button>
+    <button class="btn outlined">Cancelar</button>
+    <button class="btn destructive">Excluir</button>
+    <button class="btn primary small">Salvar</button>
+    <button class="iconbtn" aria-label="Eliminar">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
+    </button>
+  </div>
+  <p class="note">Altura 40 dp en filas y diálogos, 48 dp mínimo en el pie de un formulario. La acción destructiva de una fila es un icono de 40 dp con papelera, nunca un botón con texto.</p>
+</section>
+
+<section>
+  <h2>Chips, pestañas e interruptor</h2>
+  <div class="cards" style="flex-direction:column;align-items:flex-start;gap:20px">
+    <div style="display:flex;gap:8px"><button class="chip on">Caixa pequena</button><button class="chip">Caixa grande</button><button class="chip">Assaí</button></div>
+    <div class="tabs"><div class="tab on">Fleteros</div><div class="tab">Motoristas da Casa</div></div>
+    <div class="switch"><span>Caixas Pequenas</span><div class="track on"><i></i></div></div>
+    <div class="switch"><span>Caixas Assaí</span><div class="track"><i></i></div></div>
+  </div>
+</section>
+
+<section>
+  <h2>Tarjeta de registro y tabla</h2>
+  <div class="cards">
+    <div class="card">
+      <h3>31/10/2026 — Dia encerrado</h3>
+      <p>Operador wilkin · 19 assentos · enviado ao ERP às 10:35</p>
+      <div class="foot">
+        <button class="btn outlined small">Ver</button>
+        <button class="btn primary small">Exportar</button>
+      </div>
+    </div>
+    <table>
+      <tr><th>Motorista</th><th>Tipo</th><th>Chapa</th><th></th></tr>
+      <tr><td>Carlos Souza</td><td>Fletero</td><td>—</td><td style="text-align:right"><button class="iconbtn" aria-label="Eliminar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button></td></tr>
+      <tr><td>Marcos Lima</td><td>Da casa</td><td>ABC1D23</td><td style="text-align:right"><button class="iconbtn" aria-label="Eliminar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button></td></tr>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>Diálogo y campo</h2>
+  <div class="cards">
+    <div class="dialog">
+      <h3>Selecionar motoristas</h3>
+      <p>Escolha um ou mais motoristas para o horário das 07:30.</p>
+      <div class="actions"><button class="btn outlined">Cancelar</button><button class="btn primary">Aceptar</button></div>
+    </div>
+    <div class="field"><label>Destino WhatsApp</label><input value="(11) 99999-0000" /><small>Com DDD, sem o +55.</small></div>
+    <div class="field err"><label>Leitura 2</label><input value="" /><small>Falta colocar as temperaturas obrigatórias.</small></div>
+  </div>
+</section>
+</body>
+</html>

@@ -1,0 +1,35 @@
+{
+  "title": "Homogeneización UX/UI Android",
+  "brief": "Unificar el lenguaje visual de la app tomando como referencia el Histórico de Lanzamento de Massas, rediseñar los históricos de Relatório y Horário, reemplazar el alta de motorista por un modal de dos pestañas con chapa, ordenar los motoristas del horario en tabla con papelera y agregar interruptores por tipo de caja en Montagem das Caixas.",
+  "feature": "odd/tasks/homogeneizacion-ux-android.md",
+  "artboards": [
+    {
+      "file": "01-historico-unificado.html",
+      "title": "Histórico unificado (Relatório, Horário, Estoque)",
+      "tradeoff": "Una sola gramática de tarjeta sirve a los tres históricos; los días con pocos datos se ven más vacíos que en un diseño específico por módulo.",
+      "width": 390,
+      "height": 1500
+    },
+    {
+      "file": "02-modal-fleteros.html",
+      "title": "Modal de motoristas — pestaña Fleteros",
+      "tradeoff": "Selección múltiple en una sola ventana: se gana velocidad por horario y se pierde el flujo de un motorista por vez, que era explícito paso a paso.",
+      "width": 390,
+      "height": 1600
+    },
+    {
+      "file": "03-casa-y-tabla.html",
+      "title": "Modal — pestaña Motoristas da Casa y tabla del horario",
+      "tradeoff": "La chapa se elige por motorista, no por horario: correcto cuando dos de la casa comparten franja, pero agrega un control por fila dentro del modal.",
+      "width": 390,
+      "height": 1500
+    },
+    {
+      "file": "04-relatorio-caixas.html",
+      "title": "Relatório — interruptores por tipo de caja",
+      "tradeoff": "El interruptor gobierna el grupo y esconde sus opciones: el formulario se vuelve más corto, a costa de un paso extra para quien sí monta ambos tipos.",
+      "width": 390,
+      "height": 1600
+    }
+  ]
+}

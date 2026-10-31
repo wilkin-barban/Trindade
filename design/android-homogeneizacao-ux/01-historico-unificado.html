@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=390" />
+<title>01 · Histórico unificado</title>
+<style>
+  :root{
+    --primary:#B42025; --on-primary:#fff; --primary-container:#FFDAD6; --on-primary-container:#410005;
+    --secondary:#855400; --secondary-container:#FFDDB3; --on-secondary-container:#2B1700;
+    --error:#BA1A1A; --error-container:#FFDAD6; --on-error-container:#410002;
+    --bg:#FFF8F6; --on-surface:#221919; --surface-container:#FBEBE8; --surface-container-high:#F5E5E2;
+    --on-surface-variant:#534341; --outline:#857371; --outline-variant:#D8C2BF;
+    --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  }
+  *{box-sizing:border-box} body{margin:0;width:390px;background:var(--bg);color:var(--on-surface);font-family:var(--font)}
+  .screen{padding:16px;display:flex;flex-direction:column;gap:16px}
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .topbar .left{display:flex;align-items:center;gap:8px;min-width:0}
+  .navbtn{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 12px;border-radius:999px;border:1px solid var(--outline);background:transparent;font:500 12px/16px var(--font);color:var(--primary);cursor:pointer}
+  h1{margin:0;font-size:22px;line-height:28px;font-weight:700}
+  .sub{margin:0;font-size:12px;line-height:16px;color:var(--on-surface-variant)}
+  .help{width:40px;height:40px;border-radius:50%;border:none;background:transparent;color:var(--outline);display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .filter{background:var(--surface-container);border-radius:12px;padding:12px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .filter .label{font-size:12px;line-height:16px;color:var(--on-surface-variant)}
+  .filter .value{font-size:16px;line-height:24px;font-weight:500}
+  .filter button{height:32px;padding:0 14px;border-radius:999px;border:1px solid var(--outline);background:transparent;color:var(--primary);font:500 12px/16px var(--font);cursor:pointer}
+  .list{display:flex;flex-direction:column;gap:10px}
+  .rec{background:var(--surface-container);border-radius:12px;padding:14px;display:flex;justify-content:space-between;gap:12px;align-items:center}
+  .rec .date{font-size:16px;line-height:24px;font-weight:700}
+  .rec .headline{font-size:14px;line-height:20px;font-weight:600;color:var(--primary);margin-top:4px}
+  .rec .meta{font-size:12px;line-height:16px;color:var(--on-surface-variant);margin-top:4px}
+  .rec .open{font-size:14px;line-height:20px;font-weight:700;color:var(--primary);white-space:nowrap}
+  .chips{display:flex;gap:6px;margin-top:8px}
+  .chip{height:24px;padding:0 8px;border-radius:8px;background:var(--secondary-container);color:var(--on-secondary-container);font:500 11px/24px var(--font)}
+  .chip.err{background:var(--error-container);color:var(--on-error-container)}
+  .pager{display:flex;align-items:center;justify-content:center;gap:12px;padding:8px 0 4px}
+  .pager button{height:32px;padding:0 14px;border-radius:999px;border:1px solid var(--outline);background:transparent;color:var(--primary);font:500 12px/16px var(--font);cursor:pointer}
+  .pager span{font-size:12px;line-height:16px;color:var(--on-surface-variant)}
+  .caption{margin:0 16px 24px;font-size:11px;line-height:15px;color:var(--on-surface-variant);border-top:1px dashed var(--outline-variant);padding-top:8px}
+  .legend{margin:0 16px 8px;font:500 11px/16px var(--font);color:var(--outline);text-transform:uppercase;letter-spacing:.04em}
+</style>
+</head>
+<body>
+<div class="screen">
+  <div class="topbar">
+    <div class="left">
+      <button class="navbtn">‹ Voltar</button>
+      <div>
+        <h1>Histórico de relatórios</h1>
+        <p class="sub">19 relatórios registrados</p>
+      </div>
+    </div>
+    <button class="help" aria-label="Ajuda">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 1-1 1.7v.5"/><circle cx="12" cy="17" r=".8" fill="currentColor" stroke="none"/></svg>
+    </button>
+  </div>
+
+  <div class="filter">
+    <div>
+      <div class="label">Filtrar por data</div>
+      <div class="value">31/10/2026</div>
+    </div>
+    <button>Hoje</button>
+  </div>
+
+  <div class="list">
+    <div class="rec">
+      <div>
+        <div class="date">📅 31/10/2026</div>
+        <div class="headline">Dia encerrado · enviado ao ERP</div>
+        <div class="meta">Turno manhã · wilkin · 4 categorias</div>
+        <div class="chips"><span class="chip">23 itens</span><span class="chip">2 temperaturas</span></div>
+      </div>
+      <div class="open">Abrir ›</div>
+    </div>
+
+    <div class="rec">
+      <div>
+        <div class="date">📅 30/10/2026</div>
+        <div class="headline">Dia encerrado · não enviado</div>
+        <div class="meta">Turno manhã · wilkin · 4 categorias</div>
+        <div class="chips"><span class="chip">19 itens</span><span class="chip err">1 pendência</span></div>
+      </div>
+      <div class="open">Abrir ›</div>
+    </div>
+
+    <div class="rec">
+      <div>
+        <div class="date">📅 29/10/2026</div>
+        <div class="headline">Dia encerrado</div>
+        <div class="meta">Turno manhã · wilkin · 3 categorias</div>
+        <div class="chips"><span class="chip">31 itens</span></div>
+      </div>
+      <div class="open">Abrir ›</div>
+    </div>
+  </div>
+
+  <div class="pager">
+    <button>‹ Anterior</button>
+    <span>Página 1 de 2</span>
+    <button>Seguinte ›</button>
+  </div>
+</div>
+
+<div class="caption">
+  Gramática única del histórico (tomada de <b>Histórico de Massas</b>): encabezado «Voltar + título + conteo + ajuda», tarjeta <i>surfaceContainer</i> de 12 dp con padding 14, fecha en <i>titleMedium bold</i> con «📅», dato principal en <i>primary semibold</i>, metadatos en <i>labelSmall</i>, chips de resumen y «Abrir ›» a la derecha. La misma tarjeta sirve a Relatório, Horário y Estoque cambiando solo sus dos líneas de contenido.
+</div>
+</body>
+</html>
