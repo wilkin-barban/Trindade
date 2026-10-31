@@ -21,6 +21,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithText
@@ -46,6 +47,7 @@ import com.trindade.app.ui.components.NavigationActionButton
 import com.trindade.app.ui.theme.TrindadeTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -861,5 +863,46 @@ class MainActivityNavigationTest {
 
         assertEquals(MainActivity.Tab.ADMIN, selectedDestination)
         composeRule.onNodeWithTag("navigation_drawer_sheet").assertDoesNotExist()
+    }
+
+    @Test
+    fun `the stock history belongs to the counter and is not a tab of its own`() {
+        // The row is the module, and a history is the module's surface in another state -- the rule the
+        // massas, reports and loading histories already followed. A ninth tab made the row claim the app was
+        // somewhere else for a screen that only belongs to the counter.
+        assertFalse(MainActivity.Tab.values().any { it.name == "STOCK_HISTORY" })
+
+        val stockHistory = MainActivity.DRAWER_ENTRIES
+            .filterIsInstance<MainActivity.DrawerEntry.Link>()
+            .map { it.destination }
+            .single { it.label == R.string.nav_stock_history }
+
+        assertEquals(
+            MainActivity.NavTarget(MainActivity.Tab.STOCK_COUNTER, MainActivity.Overlay.STOCK_HISTORY),
+            stockHistory.target,
+        )
+    }
+
+    @Test
+    fun `a tab the row does not carry is never drawn as the dashboard`() {
+        MainActivity.TAB_DESTINATIONS.forEachIndexed { index, destination ->
+            assertEquals(
+                index,
+                MainActivity.selectedTabIndex(MainActivity.TAB_DESTINATIONS, destination.target.tab) ?: -1,
+            )
+        }
+
+        // And when a row really does not carry the current tab, the answer is "none selected", not the first
+        // item: the fallback to index 0 is what turned opening the stock history into a jump to the dashboard.
+        val withoutShare = MainActivity.TAB_DESTINATIONS.filterNot { it.target.tab == MainActivity.Tab.SHARE }
+        assertNull(MainActivity.selectedTabIndex(withoutShare, MainActivity.Tab.SHARE))
+    }
+
+    @Test
+    fun `the counter keeps the row selection while its history is open`() {
+        render(role = RolePolicy.WORKER, currentTab = MainActivity.Tab.STOCK_COUNTER)
+
+        composeRule.onNodeWithText(copy(R.string.nav_stock_counter)).performScrollTo().assertIsSelected()
+        composeRule.onNodeWithText(copy(R.string.nav_dashboard)).assertIsNotSelected()
     }
 }

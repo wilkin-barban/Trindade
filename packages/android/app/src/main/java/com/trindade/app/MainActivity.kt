@@ -105,21 +105,23 @@ class MainActivity : ComponentActivity() {
         ADMIN(R.string.admin_panel_title),
         ASSAI(R.string.nav_assai),
         STOCK_COUNTER(R.string.nav_stock_counter),
-        STOCK_HISTORY(R.string.nav_stock_history),
         SHARE(R.string.nav_share),
     }
 
     /**
      * The screens that live *inside* a tab rather than beside it.
      *
-     * The three histories of massas, reports and loading are the same tab's surface in another state, so a
-     * drawer entry that opens one says so with an overlay instead of pretending the history is a tab of its
-     * own -- which is exactly how the row filled up with destinations nobody navigates to from a row.
+     * The four histories -- massas, reports, loading and stock -- are the same tab's surface in another state,
+     * so a drawer entry that opens one says so with an overlay instead of pretending the history is a tab of
+     * its own. The stock history was the last one still drawn as a tab, and the row, which does not carry it,
+     * answered every visit by falling back to its first item: opening the history moved the selection to the
+     * Dashboard while the screen under it was the counter's.
      */
     enum class Overlay {
         MASSAS_HISTORY,
         REPORTS_HISTORY,
         LOADING_HISTORY,
+        STOCK_HISTORY,
         ADMIN_AUDIT,
     }
 
@@ -142,6 +144,17 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
+        /**
+         * Which row tab draws the current one, or null when the row does not carry it.
+         *
+         * The row is drawn from [TAB_DESTINATIONS] and the app has more surfaces than that, so the answer has to
+         * admit "none selected". The old expression coerced a missing tab to index 0, which is the Dashboard: every
+         * surface the row did not carry -- the stock history, before it became the counter's overlay -- was drawn
+         * as a jump to the Dashboard while the screen under it was something else entirely.
+         */
+        fun selectedTabIndex(tabs: List<Destination>, current: Tab): Int? =
+            tabs.indexOfFirst { it.target.tab == current }.takeIf { it >= 0 }
+
         /**
          * The tab row, in the order it shows them.
          *
@@ -184,7 +197,14 @@ class MainActivity : ComponentActivity() {
                     NavTarget(Tab.MASSAS_LAUNCH, Overlay.MASSAS_HISTORY),
                 ),
             ),
-            DrawerEntry.Link(Destination(RolePolicy.EntryPoint.STOCK_HISTORY, R.string.nav_stock_history, R.drawable.ic_archive, NavTarget(Tab.STOCK_HISTORY))),
+            DrawerEntry.Link(
+                Destination(
+                    RolePolicy.EntryPoint.STOCK_HISTORY,
+                    R.string.nav_stock_history,
+                    R.drawable.ic_archive,
+                    NavTarget(Tab.STOCK_COUNTER, Overlay.STOCK_HISTORY),
+                ),
+            ),
             DrawerEntry.Link(
                 Destination(
                     RolePolicy.EntryPoint.REPORTS,
@@ -240,6 +260,7 @@ class MainActivity : ComponentActivity() {
                     var historyOpen by remember { mutableStateOf(false) }
                     var loadingHistoryOpen by remember { mutableStateOf(false) }
                     var massasHistoryOpen by remember { mutableStateOf(false) }
+                    var stockHistoryOpen by remember { mutableStateOf(false) }
                     var massasLaunchDay by remember { mutableStateOf<String?>(null) }
                     var massasDayFromHistory by remember { mutableStateOf(false) }
                     var loadingDay by remember { mutableStateOf<String?>(null) }
@@ -487,6 +508,7 @@ class MainActivity : ComponentActivity() {
                                 massasHistoryOpen = false
                                 historyOpen = false
                                 loadingHistoryOpen = false
+                                stockHistoryOpen = false
                                 adminRequestedSection = null
                                 if (target.tab != Tab.LOADING) {
                                     loadingDay = null
@@ -500,6 +522,7 @@ class MainActivity : ComponentActivity() {
                                     Overlay.MASSAS_HISTORY -> massasHistoryOpen = true
                                     Overlay.REPORTS_HISTORY -> historyOpen = true
                                     Overlay.LOADING_HISTORY -> loadingHistoryOpen = true
+                                    Overlay.STOCK_HISTORY -> stockHistoryOpen = true
                                     Overlay.ADMIN_AUDIT -> adminRequestedSection =
                                         com.trindade.app.admin.AdminSection.AUDIT
                                     null -> Unit
@@ -534,20 +557,22 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
                                 // O histórico mostra o que o dia produziu; a correção acontece na
-                                // calculadora, que é onde a contagem é feita.
-                                Tab.STOCK_HISTORY -> {
-                                    val onBackStockHistory = { tab = Tab.STOCK_COUNTER }
-                                    BackHandler(enabled = !drawerState.isOpen, onBack = onBackStockHistory)
-                                    StockHistoryScreen(
-                                        onBack = onBackStockHistory,
-                                    )
-                                }
+                                // calculadora, que é onde a contagem é feita. É uma superfície do módulo, não
+                                // uma pestaña: a fila continua apontando para a calculadora enquanto se lê um
+                                // dia passado, como já fazem os históricos de massas, relatório e horário.
                                 Tab.STOCK_COUNTER -> {
-                                    BackHandler(enabled = !drawerState.isOpen) { tab = Tab.DASHBOARD }
-                                    StockCalculatorScreen(
-                                        role = role,
-                                        onOpenHistory = { tab = Tab.STOCK_HISTORY },
-                                    )
+                                    val stockHistoryOn = stockHistoryOpen
+                                    val onBackStockHistory = { stockHistoryOpen = false }
+                                    if (stockHistoryOn) {
+                                        BackHandler(enabled = !drawerState.isOpen, onBack = onBackStockHistory)
+                                        StockHistoryScreen(onBack = onBackStockHistory)
+                                    } else {
+                                        BackHandler(enabled = !drawerState.isOpen) { tab = Tab.DASHBOARD }
+                                        StockCalculatorScreen(
+                                            role = role,
+                                            onOpenHistory = { stockHistoryOpen = true },
+                                        )
+                                    }
                                 }
                                 Tab.DASHBOARD -> DashboardRoute(
                                     sessionKey = sessionKey,
@@ -564,7 +589,10 @@ class MainActivity : ComponentActivity() {
                                     // Las tres calculadoras ya son pestañas: el acceso directo solo cambia de
                                     // pestaña, igual que el menú.
                                     onOpenStock = { tab = Tab.STOCK_COUNTER },
-                                    onOpenStockHistory = { tab = Tab.STOCK_HISTORY },
+                                    onOpenStockHistory = {
+                                        tab = Tab.STOCK_COUNTER
+                                        stockHistoryOpen = true
+                                    },
                                     onOpenAssai = { tab = Tab.ASSAI },
                                     onOpenMassas = {
                                         tab = Tab.MASSAS_LAUNCH
@@ -801,7 +829,7 @@ fun MainAppShell(
         }
         shown
     }
-    val selectedIndex = visibleTabs.indexOfFirst { it.target.tab == currentTab }.coerceAtLeast(0)
+    val selectedIndex = MainActivity.selectedTabIndex(visibleTabs, currentTab)
     val activeTarget = MainActivity.NavTarget(currentTab, currentOverlay)
     val scope = rememberCoroutineScope()
 
@@ -936,7 +964,7 @@ fun MainAppShell(
 
                     if (visibleTabs.isNotEmpty()) {
                         PrimaryScrollableTabRow(
-                            selectedTabIndex = selectedIndex,
+                            selectedTabIndex = selectedIndex ?: 0,
                             modifier = Modifier.fillMaxWidth(),
                             edgePadding = 0.dp,
                             minTabWidth = 120.dp,
