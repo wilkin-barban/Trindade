@@ -167,7 +167,7 @@ S11 — Emulador como verificación, verbatim:
 
 ## Tasks
 
-- T1 | S9 | inline | logs ERP: evento `test` de la integración y prefijo de procedencia `Android App / ERP` en el log compartido — commit: _pendiente_
+- T1 | S9 | inline | logs ERP: evento `test` de la integración y prefijo de procedencia `Android App / ERP` en el log compartido — commit: `507d5ad` (tests `AeroTestAuditTest` + `AeroDispatcherTest` verdes)
 - T2 | S6 | inline | histórico de estoque como superposición del módulo (el foco deja de caer en Dashboard) — commit: _pendiente_
 - T3 | S7 | inline | tarjetas de Compartir App a ancho completo — commit: _pendiente_
 - T4 | S8 | inline | componentes compartidos de histórico (`HistoryHeader`, `HistoryRecordCard`, `HistoryPagination`) y Massas como referencia migrada — commit: _pendiente_
@@ -184,3 +184,4 @@ S11 — Emulador como verificación, verbatim:
 
 L1 — Pedido original, verbatim: ver S1–S11; pedido completo transcripto por secciones en `## Specs`, con luz verde explícita: "Tienes **luz verde para comenzar la implementación**. No te limites a analizar o proponer cambios: implementa, prueba en el emulador, corrige cualquier problema que encuentres y deja el proyecto funcionando y listo para la actualización."
 L2 — Diseño (skill `gentle-design`): `design/system.md` + `design/system.html` sincronizados desde `ui/theme/Theme.kt` y `res/values/colors.xml`; diseño `design/android-homogeneizacao-ux/` con cuatro tableros — `01-historico-unificado.html`, `02-modal-fleteros.html`, `03-casa-y-tabla.html`, `04-relatorio-caixas.html`. No son direcciones alternativas: el pedido fija la referencia (Histórico de Massas), así que cada tablero aplica ese lenguaje a una superficie distinta.
+L3 — T1 cerrada: `AeroAudit.testRequest` + prefijo `Android App / ERP · client=android · via=native`; el panel escribe una línea `test` por intento con dirección. Prueba unitaria verde; la prueba de extremo a extremo (línea real en `logs/aero-integration.log`) queda en T12 contra el emulador.
