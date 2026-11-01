@@ -1,643 +1,219 @@
-# PRD v2.0 — Trindade Massas Operações
+# Especificación de producto — Trindade Massas Operações
 
-# 1. Visión General
+**Versión:** 3.0
+**Estado:** vigente
+**Reemplaza a:** PRD v2.0 (solo web)
+**Última actualización:** 2026-11
 
-## Nombre del Proyecto
-
-Trindade Massas Operações
-
-## Descripción
-
-Sistema web operativo para Trindade Massas destinado a gestionar:
-
-* Relatórios operativos.
-* Horários de carregamento.
-* Histórico operacional.
-* Exportación optimizada para WhatsApp.
-* Gestión de usuarios.
-
-El objetivo principal es reducir el tiempo de elaboración de relatórios y horarios de cargamento a menos de 2 minutos desde cualquier dispositivo.
+Esta especificación describe el producto que existe hoy: web responsive, aplicación Android nativa, integración con el ERP Aero32 y administración centralizada. Las decisiones técnicas de implementación están en [docs/arquitectura.md](docs/arquitectura.md); los procedimientos operativos, en [docs/despliegue.md](docs/despliegue.md) y [docs/release-android.md](docs/release-android.md).
 
 ---
 
-# 2. Objetivos del Negocio
+## 1. Visión y problema
 
-## Problemas actuales
+La operación de Trindade Massas se reparte entre la fábrica, el patio de cargas y la administración. Antes de esta plataforma, los reportes de higiene y temperatura se escribían a mano, los horarios de carga se armaban en papel o en mensajes sueltos y el conteo de producción vivía en planillas separadas. Eso producía formatos inconsistentes, pérdida de tiempo y errores al programar fleteros.
 
-* Relatórios escritos manualmente.
-* Formatos inconsistentes.
-* Pérdida de tiempo.
-* Horarios de cargamento organizados manualmente.
-* Riesgo de errores al programar fleteros.
+**Visión:** una sola plataforma que registre la operación diaria con reglas explícitas, deje trazabilidad de quién hizo cada cosa y permita que la planta trabaje desde el teléfono o la tablet sin pasar por una computadora.
 
-## Objetivos
-
-* Estandarizar relatórios.
-* Estandarizar horarios.
-* Reducir errores.
-* Facilitar uso desde celular.
-* Mantener histórico.
-* Mejorar la presentación profesional en WhatsApp.
+**Resultado esperado:** completar un reporte o un cronograma de carga en menos de dos minutos desde cualquier dispositivo, con el mismo resultado en web y Android.
 
 ---
 
-# 3. Identidad Visual
+## 2. Objetivos y métricas
 
-La aplicación deberá utilizar como referencia:
-
-https://trindademassas.com.br
-
-## Elementos visuales
-
-* Logo oficial.
-* Colores corporativos.
-* Tipografía coherente.
-* Diseño amigable.
-* Optimización móvil primero (Mobile First).
+| Objetivo | Métrica |
+| --- | --- |
+| Reducir el tiempo de elaboración de reportes y cronogramas | Menos de 2 minutos por operación |
+| Eliminar formatos manuales inconsistentes | Un único formato generado por el sistema |
+| Evitar errores al asignar fleteros | Validación de cupos y duplicados por horario |
+| Mantener trazabilidad | Registro de autor, fecha, hora y auditoría por evento |
+| Operar desde el terreno | Paridad funcional web/Android en los módulos de planta |
+| Conciliar producción con la empresa | Espejo de movimientos del ERP y lanzamientos conciliados |
 
 ---
 
-# 4. Tecnologías
+## 3. Usuarios y roles
 
-## Frontend
+| Rol | Puede | No puede |
+| --- | --- | --- |
+| **Administrador** | Gestionar usuarios, categorías, tareas, conductores, vehículos, horarios y auditoría; crear y editar reportes, cargas y lanzamientos; ver todo el histórico; configurar la integración con el ERP | Eludir las reglas de negocio ni editar un día cerrado |
+| **Trabajador** | Crear reportes, cargas y lanzamientos propios; consultar históricos; agregar categorías y tareas cuando la política lo permita; copiar textos para WhatsApp | Crear o eliminar usuarios, administrar permisos, acceder a auditoría o editar registros de otros operarios |
 
-* React
-* TypeScript
-* Vite
-* TailwindCSS
-* shadcn/ui
-* React Query
-* React Hook Form
-* i18next
+Reglas transversales:
 
-## Backend
-
-* Node.js 24 LTS
-* Fastify
-* TypeScript
-* Zod
-* JWT
-
-## Base de Datos
-
-* SQLite
-* better-sqlite3
-
-## Infraestructura
-
-* Docker
-* Docker Compose
-* Ubuntu VPS
-* Nginx o Caddy
+- La autoría de un lanzamiento de masas pertenece a quien lo creó. Editarlo o eliminarlo es potestad del autor en el día corriente; un administrador puede intervenir según la política del módulo.
+- La auditoría es exclusiva del Administrador.
+- Los catálogos de tareas y conductores son visibles para ambos roles; las secciones de administración restringidas solo se muestran al Administrador.
 
 ---
 
-# 5. Roles
+## 4. Alcance actual
 
-## Administrador
+### 4.1 Canales
 
-Puede:
+| Canal | Estado | Notas |
+| --- | --- | --- |
+| Web responsive | Producción | Optimizada para móvil, tablet y escritorio |
+| Android nativo | Producción | Kotlin + Jetpack Compose; misma API y mismas reglas |
+| Integración ERP | Producción | Aero32 por WebService local y espejo de movimientos |
 
-* Gestionar usuarios.
-* Gestionar categorías.
-* Gestionar tareas.
-* Gestionar catálogo maestro.
-* Gestionar fleteros.
-* Gestionar vehículos de casa.
-* Gestionar relatórios.
-* Gestionar horarios.
-* Ver histórico completo.
+### 4.2 Superficies
 
-## Trabajador
-
-Puede:
-
-* Crear relatórios.
-* Crear horarios.
-* Editar registros permitidos.
-* Agregar categorías.
-* Agregar tareas.
-* Copiar para WhatsApp.
-
-No puede:
-
-* Crear usuarios.
-* Eliminar usuarios.
-* Administrar permisos.
+- Panel operativo.
+- Lanzamiento de masas e historial.
+- Reportes: generación, detalle, edición e historial.
+- Cronograma de carga, edición e historial.
+- Stock: calculadora, historial y resumen colectivo.
+- Calculadora de Assaí.
+- Compartir app.
+- Administración: usuarios, categorías, tareas, conductores, vehículos, horarios y auditoría.
+- Perfil y seguridad de la cuenta.
 
 ---
 
-# 6. Sistema de Idiomas
+## 5. Módulos y reglas de negocio
 
-Idiomas soportados:
+### 5.1 Panel
 
-* Portugués
-* Español
+Muestra los indicadores del día, el cronograma activo, el acceso al lanzamiento de masas y los totales históricos. El día activo se calcula en la zona `America/Sao_Paulo` y respeta el corte operativo definido por el backend.
 
-Reglas:
+### 5.2 Lanzamiento de masas
 
-* Detectar idioma del navegador.
-* Permitir cambio manual.
-* Guardar preferencia.
+- Catálogo de diez productos de masas.
+- Carga por cajas enteras, con cálculo automático de unidades.
+- Resumen colectivo del día con detalle por operario.
+- Historial cronológico por fecha.
+- Actualización pasiva cada 15 segundos mientras la pantalla está visible y no hay edición activa.
+- Exportación a WhatsApp con formato limpio y sin línea de total general.
+- **Días pasados en solo lectura:** no se crean, editan ni eliminan lanzamientos de fechas anteriores a hoy.
+- **Conciliación con el ERP:** un lanzamiento que ya existe como asiento del ERP queda marcado como conciliado y no se edita ni se elimina desde Trindade.
+- **Autoría:** editar o eliminar un lanzamiento corresponde a su autor; el backend aplica la misma regla aunque la petición llegue por fuera de la interfaz.
 
-IMPORTANTE:
+### 5.3 Reportes
 
-Toda exportación para WhatsApp deberá generarse en portugués independientemente del idioma utilizado dentro del sistema.
+- Formularios generados a partir de categorías y tareas configurables.
+- Tipos de elemento: verificación (check), lista de selección, temperatura y cantidad.
+- Fotos opcionales en formatos de imagen admitidos y con límite de tamaño.
+- Texto final generado por el sistema y exportable a WhatsApp, TXT y PDF.
+- Edición limitada a la ventana operativa; las fechas cerradas son solo lectura.
+- El reporte puede incluir la tarjeta de movimientos del ERP del día, con las masas y los insumos bajo una sola acción de sincronización.
 
----
+### 5.4 Cronograma de carga
 
-# 7. Módulo Relatórios
+- Horarios configurables por el Administrador.
+- Fleteros externos y conductores de la casa.
+- Placa obligatoria para vehículos propios y opcional para fleteros.
+- Límite indicativo de tres fleteros por horario: el sistema **no bloquea** al cuarto; lo acepta y marca el exceso para que logística decida.
+- Exportación a WhatsApp en orden ascendente por horario.
+- Envío directo, uno a uno, a cada fletero del lote que tenga teléfono conocido.
+- Edición e historial por fecha.
 
-## Objetivo
+### 5.5 Stock y calculadoras
 
-Generar relatórios profesionales mediante selección visual.
+- **Calculadora de Assaí:** nueve productos; el pedido solo existe en cajas enteras y se exporta por WhatsApp con una línea por producto y el total.
+- **Calculador de stock:** catálogo de veinticinco productos en dos secciones; acumulación de cajas por producto y unidades recalculadas a partir de ellas.
+- **Historial de stock:** lectura de los días ya contados, con resumen colectivo, exportación y control de rol. El Trabajador lee; el Administrador corrige.
+- La calculadora de stock opera siempre sobre el día corriente en São Paulo. Consultar un día pasado es tarea del historial.
 
-Sin necesidad de escribir textos largos.
+### 5.6 Compartir app
 
----
+- Enlaces oficiales de descarga para Android, iPhone/web o ambos.
+- Credenciales de acceso visibles solo para el Administrador.
+- Máscara telefónica progresiva y normalización internacional para abrir WhatsApp.
+- Alta rápida de un operario desde la propia pantalla cuando el flujo lo requiere.
 
-# 8. Determinación Automática del Turno
+### 5.7 Administración y auditoría
 
-## Relatório da Tarde
+- Usuarios: alta, aprobación, roles y protección contra la autoexclusión.
+- Categorías y tareas de reportes.
+- Conductores y vehículos.
+- Horarios de carga.
+- Auditoría paginada con filtros por acción, entidad y usuario.
+- Configuración de la integración con Aero32.
 
-Desde:
+### 5.8 Integración con Aero32
 
-18:30
-
-En adelante.
-
-## Relatório da Noite
-
-06:00
-
-Fecha y hora obtenidas automáticamente del servidor.
-
----
-
-# 9. Generador Inteligente de Relatório
-
-El usuario únicamente selecciona información.
-
-El sistema construye automáticamente el texto final.
-
----
-
-# 10. Tipos de Elementos del Relatório
-
-## Tipo 1 — Check
-
-Ejemplo:
-
-* Pátio organizado
-* Câmara principal organizada
-* Separação de romaneio
-
-Interfaz:
-
-☑ Realizado
-
----
-
-## Tipo 2 — Lista
-
-Ejemplo:
-
-Recebimento de mercadorias
-
-* Farinha
-* Sal
-* Gordura
-* Pizza
-
-Interfaz:
-
-Selección múltiple.
+- El lanzamiento se guarda primero en Trindade; la empresa nunca es la única copia.
+- La web usa un atajo de iOS como puente para alcanzar el WebService HTTP local de la fábrica desde una página HTTPS.
+- Android llama al WebService directamente cuando está en la red de la planta.
+- El snapshot de movimientos del ERP se guarda en `aero_movements` y se comparte con toda la planta.
+- La importación de un asiento conserva la identidad del operario que el ERP registró, no la de quien importa.
+- Un asiento sin operario vinculado se rechaza con `MASSAS_OPERATOR_NOT_LINKED`; uno con la cuenta desactivada, con `MASSAS_OPERATOR_INACTIVE`.
+- El detalle operativo está en [docs/integracion-aero-masas-web.md](docs/integracion-aero-masas-web.md) y los contratos en [docs/registro-integracion-aero-webservice.md](docs/registro-integracion-aero-webservice.md).
 
 ---
 
-## Tipo 3 — Temperatura
+## 6. Idiomas y formatos
 
-Ejemplo:
-
-Câmara Principal
-
--18°C
-
-Validaciones:
-
-* Numérico
-* Negativos permitidos
-* Unidad °C
+- La interfaz de usuario soporta **portugués de Brasil** y **español**, con detección automática del idioma del dispositivo o del navegador.
+- La documentación del repositorio se mantiene **en español**.
+- Las exportaciones para WhatsApp se generan **en portugués**, independientemente del idioma de la interfaz.
+- Los nombres de productos y catálogos se conservan en portugués porque son los que usa la planta y el ERP.
 
 ---
 
-## Tipo 4 — Cantidad
+## 7. Modelo de datos
 
-Ejemplo:
+Base SQLite con versionado atómico por `PRAGMA user_version`. La revisión vigente es la **9**, con 18 tablas agrupadas así:
 
-Rolo 2kg
+| Dominio | Tablas |
+| --- | --- |
+| Seguridad y usuarios | `roles`, `users`, `auth_sessions` |
+| Reportes | `report_categories`, `report_tasks`, `report_templates`, `reports`, `report_items`, `report_temperatures`, `report_photos` |
+| Carga | `drivers`, `vehicles`, `loading_schedules` |
+| Stock | `stock_counts` |
+| Masas | `massa_launches` |
+| Integración ERP | `aero_movements` |
+| Auditoría y configuración | `audit_logs`, `settings` |
 
-31 caixas montadas
-
-Interfaz:
-
-Producto seleccionado
-
-*
-
-Cantidad numérica
-
----
-
-# 11. Categorías Dinámicas
-
-Cualquier usuario autorizado podrá crear nuevas categorías.
-
-Ejemplos:
-
-* Organização
-* Recebimento de mercadorias
-* Temperaturas
-* Lotes
-* Abastecimento
-* Produção
+El servidor nunca migra automáticamente al arrancar. Las migraciones son un paso explícito del operador y se ejecutan con la API detenida. El detalle está en [docs/despliegue.md](docs/despliegue.md).
 
 ---
 
-# 12. Catálogo Maestro de Montagem de Caixas
+## 8. Requisitos no funcionales
 
-Administrado por el Administrador.
-
-Los nombres deben mantenerse en portugués.
-
----
-
-## Caixas Assaí Grandes
-
-* Nhoque 1kg
-* Quadrada
-* Rolo 500g
-* Rolo 1kg
-* Rolo 2kg
-* Disco 400g
-* Disco 500g
+| Requisito | Criterio |
+| --- | --- |
+| Rendimiento | Respuesta percibida menor a 1 segundo en operaciones normales |
+| Compatibilidad web | Chrome, Edge y Safari actuales |
+| Compatibilidad móvil | Android 8.0 o superior; iPhone por web |
+| Seguridad | Autenticación con tokens, refresh rotativo, roles y auditoría |
+| Disponibilidad | Contenedores Docker con healthcheck y reinicio automático |
+| Recuperación | Copia consistente antes de cada cambio y procedimiento de rollback documentado |
+| Accesibilidad | Objetivos de toque de 48 dp y contraste según Material 3 en Android |
+| Idioma | Interfaz `pt-BR`/`es`; documentación en español |
 
 ---
 
-## Caixas Pequenas
+## 9. Criterios de aceptación
 
-* Nhoque 400g
-* Nhoque 1kg
-* Quadrada
-* Rolo 500g
-* Rolo 1kg
-* Rolo 2kg
-* Disco 400g
-* Disco 500g
-
----
-
-# 13. Recebimento de Mercadorias
-
-Catálogo dinámico.
-
-Ejemplos:
-
-* Farinha
-* Sal
-* Gordura
-* Pizza
-* Canudo
-* Salgadinho
-
-Se podrán agregar nuevos productos.
+- [ ] Un operario puede completar un reporte y un cronograma de carga en menos de dos minutos.
+- [ ] Web y Android aplican las mismas reglas de autoría, fechas y roles.
+- [ ] Un día cerrado no admite altas, ediciones ni borrados desde ninguna interfaz.
+- [ ] Un lanzamiento conciliado con el ERP no se puede editar ni eliminar.
+- [ ] El resumen colectivo de masas coincide en web y Android para el mismo día.
+- [ ] La exportación de WhatsApp sale en portugués y con el formato acordado.
+- [ ] La importación de un asiento ERP conserva el operario del asiento o se rechaza con el código correspondiente.
+- [ ] El esquema de base de datos se puede inspeccionar y migrar sin ambigüedad.
+- [ ] El APK de producción se firma con el certificado oficial y se verifica antes de publicarse.
 
 ---
 
-# 14. Fotos
+## 10. Fuera de alcance
 
-Opcionales.
-
-Permitidos:
-
-* JPG
-* JPEG
-* PNG
-* WEBP
-
-Tamaño máximo:
-
-5 MB
-
-Validaciones:
-
-* Solo imágenes.
-* Rechazar cualquier otro formato.
+- Facturación, notas fiscales y contabilidad dentro de Trindade.
+- Escritura directa sobre las tablas fiscales del ERP Aero32.
+- Reimplementar el protocolo móvil propietario del proveedor del ERP.
+- Sincronización offline completa: la cola del atajo de iOS cubre el reintento de un lanzamiento, no la operación sin red.
+- Traducción de la interfaz a idiomas distintos de portugués y español.
 
 ---
 
-# 15. Historial de Relatórios
-
-Guardar todos los relatórios.
-
-Filtros:
-
-* Hoy
-* Ayer
-* Últimos 7 días
-* Últimos 30 días
-* Personalizado
-
----
-
-# 16. Reglas de Edición
-
-Puede editarse:
-
-* Día actual
-* Día anterior
-
-Más antiguos:
-
-Solo lectura.
-
----
-
-# 17. Formato de Exportación del Relatório
-
-Ejemplo:
-
-📋 Relatório da Tarde — 11/06/2026
-
-━━━━━━━━━━━━━━
-
-✅ ORGANIZAÇÃO
-
-• Pátio organizado
-• Câmara principal organizada
-• Separação de romaneio
-• Abastecimento realizado
-
-━━━━━━━━━━━━━━
-
-📦 MONTAGEM DE CAIXAS
-
-🔸 Caixas Assaí Grandes
-
-• Nhoque 1kg
-• Quadrada
-• Rolo 1kg
-
-🔸 Caixas Pequenas
-
-• Nhoque 400g
-• Disco 500g
-
-━━━━━━━━━━━━━━
-
-🌡️ TEMPERATURAS
-
-• Câmara Principal: -18°C
-• Câmara Secundária: -20°C
-
-━━━━━━━━━━━━━━
-
-📥 RECEBIMENTO
-
-• Farinha
-• Sal
-• Pizza
-
-━━━━━━━━━━━━━━
-
-🎯 RESULTADO
-
-✅ Operação concluída com sucesso
-
----
-
-# 18. Módulo Horário de Carregamento
-
-## Objetivo
-
-Organizar el cargamento del día siguiente.
-
----
-
-# 19. Tipos de Motoristas
-
-## Fleteros
-
-Características:
-
-* Externos.
-* Nombre obligatorio.
-* Placa opcional.
-* Sujetos a regla de capacidad.
-
-## Casa
-
-Características:
-
-* Vehículos de la empresa.
-* Placa obligatoria.
-* No cuentan para la regla de capacidad.
-
----
-
-# 20. Regla de Capacidad
-
-Límite indicativo:
-
-3 fleteros por horario.
-
-La regla es orientativa, no un bloqueo. El sistema **no rechaza** al cuarto fletero: lo acepta y
-marca el exceso para que logística lo vea y decida. Responde a la operación real de la empresa,
-no a una validación del software.
-
-Ejemplo:
-
-05:00
-
-* Pedro
-* José
-* Marcos
-
-Se agrega:
-
-* Antônio
-
-Resultado:
-
-Se acepta.
-
-La pantalla muestra 4/3 y una advertencia de que se superó el límite indicativo.
-
----
-
-# 21. Horarios Permitidos
-
-* 04:00
-* 04:30
-* 05:00
-* 05:30
-* 06:00
-* 06:30
-* 07:00
-
-Configurables en futuras versiones.
-
----
-
-# 22. Exportación WhatsApp del Horario
-
-Orden obligatorio:
-
-Ascendente por horario.
-
-Formato:
-
-🚛 HORÁRIO DE CARREGAMENTO
-
-📅 Sexta-feira — 12/06/2026
-
-| Horário | Nome           | Placa |
-| ------- | -------------- | ----- |
-| 04:00   | Juverson       | RKM   |
-| 04:00   | Luís Guilherme | —     |
-| 04:00   | Raffael        | RXK   |
-| 04:30   | André          | —     |
-| 05:00   | Leonardo       | —     |
-| 05:00   | Roberto        | —     |
-| 05:00   | Matheus        | —     |
-| 06:00   | Luís Eloi      | —     |
-
----
-
-# 23. Exportaciones
-
-## Relatórios
-
-* Copiar WhatsApp
-* TXT
-* PDF
-
-## Horarios
-
-* Copiar WhatsApp
-* TXT
-* PDF
-
----
-
-# 24. Dashboard
-
-Tarjetas:
-
-📋 Relatórios de hoy
-
-🚛 Cargamentos de mañana
-
-👥 Usuarios
-
-📈 Resumen operativo
-
----
-
-# 25. Base de Datos
-
-Tablas:
-
-users
-
-roles
-
-report_categories
-
-report_tasks
-
-report_products
-
-report_templates
-
-reports
-
-report_items
-
-report_temperatures
-
-report_quantities
-
-report_photos
-
-drivers
-
-vehicles
-
-loading_schedules
-
-audit_logs
-
-settings
-
----
-
-# 26. Auditoría
-
-Registrar:
-
-* Usuario
-* Acción
-* Fecha
-* Hora
-* IP
-
-Eventos:
-
-* Login
-* Creación
-* Edición
-* Eliminación
-
----
-
-# 27. Requisitos No Funcionales
-
-* Responsive.
-* Mobile First.
-* Tiempo de respuesta menor a 1 segundo.
-* Compatible con Chrome.
-* Compatible con Edge.
-* Compatible con Safari.
-* Compatible con Android.
-* Compatible con iPhone.
-* Bajo consumo de recursos.
-* Preparado para dominio futuro.
-
----
-
-# 28. MVP Inicial
-
-Fase 1 obligatoria:
-
-* Login.
-* Roles.
-* Dashboard.
-* Relatórios.
-* Generador inteligente.
-* Catálogo maestro de caixas.
-* Temperaturas.
-* Recebimento.
-* Fotos.
-* Horário de carregamento.
-* Regla indicativa de 3 fleteros (no bloquea).
-* Copiar para WhatsApp.
-* Historial.
-* SQLite.
-* Docker Compose.
-
----
-
-# 29. Objetivo Final
-
-Convertir Trindade Massas Operações en la herramienta oficial de control operativo de la empresa para relatórios y programación de cargamentos, centralizando toda la información diaria en una única plataforma web rápida, moderna y optimizada para dispositivos móviles.
+## 11. Referencias
+
+- [docs/arquitectura.md](docs/arquitectura.md) — mapa técnico del sistema.
+- [docs/despliegue.md](docs/despliegue.md) — despliegue, migraciones y rollback.
+- [docs/release-android.md](docs/release-android.md) — firma y publicación del APK.
+- [docs/integracion-aero-masas-web.md](docs/integracion-aero-masas-web.md) — integración operativa con Aero32.
+- [docs/calculadoras.md](docs/calculadoras.md) — reglas de Assaí y stock.
+- [CHANGELOG.md](CHANGELOG.md) — historial de versiones.

@@ -1,247 +1,171 @@
-# Android Release Procedure — Trindade Massas
+# Release Android — Trindade Massas
 
-This is the procedure for cutting a signed Android release of the Trindade app: where its version comes
-from, how it is signed and published, how to build one by hand, what has to be backed up, and where the
-crew downloads the APK from.
+Este documento explica cómo se firma, versiona, construye y publica la aplicación Android de Trindade. El
+histórico de builds, hashes y verificaciones está en [release-android-historial.md](release-android-historial.md).
 
-It exists because a release APK has one property no other artifact in this repository has: **it can never
-be replaced once it is installed on a phone.** Android refuses an APK signed with a different key over an
-existing install, so a release built with the wrong key — or with no key at all — is not a bad release,
-it is no release. Everything below follows from that one fact.
+## 1. Principio fundamental: la firma no se puede reemplazar
 
-Everything here is about the Android client in `packages/android/`. The backend and web deployment
-procedure is `docs/deployment.md`.
+Un APK de producción tiene una restricción que ningún otro artefacto del repositorio tiene: **una vez instalado
+en un teléfono, solo puede actualizarse con un APK firmado por el mismo certificado**. Android rechaza la
+instalación con `INSTALL_FAILED_UPDATE_INCOMPATIBLE` si la clave cambia.
 
----
+Consecuencias:
 
-## 1. What has been verified, and what has not
+- Un APK firmado con la clave equivocada, o sin firmar, no es una release defectuosa: **no es una release**.
+- La clave de producción se respalda y se custodia fuera del repositorio.
+- La huella del certificado se verifica antes de publicar.
+- Un tag publicado no se mueve ni se reutiliza.
 
-Stated first, because the difference matters when a release fails at 22:00.
+## 2. Versionado desde el tag
 
-| Part | Status |
-| --- | --- |
-| The keystore at `~/.android-keystores/trindade-release.jks` | Used to build and sign a real release APK, which `apksigner` reports as signed by an RSA 4096 certificate with the fingerprint in Section 6 and DN `CN=Trindade Massas Operacoes, ...`. The store type, the alias, the self-signed status and the 2054 validity date come from the operator's own record of how the key was created and were **not** re-checked while writing this document. |
-| A signed release built locally from the keystore | Verified. The build, the `apksigner verify --print-certs` result and the certificate digest that matched the fingerprint are recorded in Section 5. |
-| The **0.4.0** release APK (versionCode 400) | Verified on 2026-10-14 in the pinned SDK container: `Verifies`, signed with the v2 scheme and a single signer whose SHA-256 digest is the fingerprint in Section 6, `aapt2` reports `versionCode='400'` and `versionName='0.4.0'`, the generated `BuildConfig` carries `API_BASE_URL = "https://trindademasas.duckdns.org/"` with `DEBUG = false`, the packaged manifest is not debuggable, and no `app-release-unsigned.apk` sits beside it. The APK is 10,440,140 bytes, `sha256 11d219393ae457e6776c0c675b9fed634f6850043e8c283658c214a18ecfc273`. **Not published**: it was built from `main` and no tag has been pushed, so the release workflow has not run for this version. |
-| The **0.5.0** release APK (versionCode 501) | Verified on 2026-10-20 in the pinned SDK 35 container: `Verifies` with APK Signature Scheme v2 under `CN=Trindade Massas Operacoes`, `versionCode=501`, `versionName=0.5.0`, `API_BASE_URL="https://trindademasas.duckdns.org/"`. Exact size `10,588,860` bytes, `sha256 32ab931c338dd94700cfd79f91e7abb7d349c09b84d8ea0c811f77a18388adf1`. Published/clobbered on GitHub Release `v0.5.0`. |
-| The **0.5.1** release APK (versionCode 506) | Verified in the pinned SDK 35 container: `Verifies` with APK Signature Scheme v2 under `CN=Trindade Massas Operacoes` (certificate SHA-256 `ee0e404b211052b311ae0e0730606e9c7d5554315463d02f9ef33c9573c431f6`), `aapt2` reports `versionCode='506'`, `versionName='0.5.1'`, `API_BASE_URL="https://trindademasas.duckdns.org/"`, and `massas_read_only_badge` no longer appears in the packaged resources. Exact size `10,814,260` bytes, `sha256 0d0912a9162c654154956916d50bccfc8ad3c9625ee51f34c896d2774c3a670b`. Automatic system locale i18n (`pt-BR` and `es` parity), binary digest comparison for update checks, strict read-only mode for historical dates in Massas, and a header with a single "Voltar" action, the bold `titleLarge` title and the production date on its own line (no read-only badge). Published/clobbered on GitHub Release `v0.5.1`. |
-| The **0.5.1** release APK (versionCode 507) | Verified on 2026-10-22 in the pinned SDK 35 container: `Verifies` with APK Signature Scheme v2 (v1 and v3 absent, one signer) under `CN=Trindade Massas Operacoes` (certificate SHA-256 `ee0e404b211052b311ae0e0730606e9c7d5554315463d02f9ef33c9573c431f6`), `aapt2` reports `versionCode='507'` and `versionName='0.5.1'`, the generated `BuildConfig` carries `API_BASE_URL = "https://trindademasas.duckdns.org/"`, and no `app-release-unsigned.apk` sits beside it. Exact size `10,814,264` bytes, `sha256 3d03d5819423c05d9cc9bc61b28227363a4ce751bd86085bc8859cb725675cf7`. Massas: individual launches now above the collective summary, the worker filter applied to both, worker names per product (`👤 João Silva, Maria Souza`), no day total, amber product cards with dedicated `cx` and `un` badges, and a WhatsApp preview with `Resumo Coletivo` plus `*Por Trabalhador:*` and the leading `MASSA` prefix removed. Published/clobbered on GitHub Release `v0.5.1` as `trindade-0.5.1.apk`, with `trindade-0.5.1.apk.sha256` matching. The stale `app-release.apk` that the previous release left on the same tag was clobbered with these same bytes: `UpdateDetector` takes the first asset whose name ends in `.apk`, so leaving an older build under that name would have handed the updater the 506 binary. |
-| The **0.5.1** release APK (versionCode 508) | Superseded the 507 build so that the report export fix ships with the same version name. Verified in the pinned SDK 35 container: `Verifies` with APK Signature Scheme v2 (one signer) under `CN=Trindade Massas Operacoes` (certificate SHA-256 `ee0e404b211052b311ae0e0730606e9c7d5554315463d02f9ef33c9573c431f6`), `aapt2` reporting `versionCode='508'` and `versionName='0.5.1'`, `API_BASE_URL = "https://trindademasas.duckdns.org/"` in the release `BuildConfig`. Exact size `10,814,264` bytes, `sha256 091f5cf7be05b3214fedf75ec29b8c56cda0d2da27608d3e894734301522ae19`. Reports: the exported WhatsApp text no longer keeps the `MASSA` prefix on product lines of `Por Operário:` and `Resumo Coletivo:`. Published/clobbered on GitHub Release `v0.5.1` as `trindade-0.5.1.apk`, with `trindade-0.5.1.apk.sha256` and the leftover `app-release.apk` carrying the same bytes. |
-| The **0.5.1** release APK (versionCode 509) | Carries the audit remediation on the same version name. Verified in the pinned SDK 35 container with `:app:testDebugUnitTest :app:assembleRelease -PversionCode=509 -PversionName=0.5.1 -PrequireSigned=true` (969 unit tests, 0 failures): `Verifies` with APK Signature Scheme v2 (v1 and v3 absent, one signer) under `CN=Trindade Massas Operacoes` (certificate SHA-256 `ee0e404b211052b311ae0e0730606e9c7d5554315463d02f9ef33c9573c431f6`), `aapt2` reporting `versionCode='509'` and `versionName='0.5.1'`, `API_BASE_URL = "https://trindademasas.duckdns.org/"` in the release `BuildConfig`, and no `app-release-unsigned.apk` beside it. Exact size `10,879,792` bytes, `sha256 1545739f45625f711ef6b4fbe05faa7fbdfb204d11f37d9c588b6a49ffb58fd5`. Web renews the session with the refresh token; Massas answers `{ error, code }` and refuses future dates; the seven admin screens and the Massas, Stock and Report view models take their text from the locale catalogs (622 keys in pt and es); editing a launch is the author's alone; date pickers open in `America/Sao_Paulo`; a failed vehicle read is reported with a retry. Published/clobbered on GitHub Release `v0.5.1` as `trindade-0.5.1.apk`, with `trindade-0.5.1.apk.sha256` and the leftover `app-release.apk` carrying the same bytes, and the identical verified file copied to the Desktop. |
-| The **0.5.1** release APK (versionCode 510) | Closes the administration ViewModel gap on the same version name. Verified in the pinned SDK 35 container with :app:testDebugUnitTest :app:assembleRelease -PversionCode=510 -PversionName=0.5.1 -PrequireSigned=true: 969 unit tests, 0 failures; apksigner Verifies with APK Signature Scheme v2 (v1 and v3 absent, one signer) under CN=Trindade Massas Operacoes (certificate SHA-256 ee0e404b211052b311ae0e0730606e9c7d5554315463d02f9ef33c9573c431f6); aapt2 reports versionCode='510' and versionName='0.5.1'; no app-release-unsigned.apk beside it. Exact size 10,885,848 bytes, sha256 4d8440dbc66ee17adee22916406ca9497b66a2a428031bd440194cf58bb94b55. Admin: Users, Vehicles, Categories, Drivers, Tasks, Time slots and Audit view models carry their messages as UiText and the screens resolve them, 12 new keys per locale with 634 keys in pt and es and the Portuguese text byte-identical to 509. Published/clobbered on GitHub Release v0.5.1 as trindade-0.5.1.apk, with trindade-0.5.1.apk.sha256 and the leftover app-release.apk carrying the same bytes, and the identical verified file copied to the Desktop. |
-| The **0.5.1** release APK built as versionCode 511 | Carries the stock message without the product code and the day's collective summary on both platforms. Verified in the pinned SDK 35 container with :app:testDebugUnitTest :app:assembleRelease -PversionCode=511 -PversionName=0.5.1 -PrequireSigned=true: 974 unit tests, 0 failures; apksigner Verifies with APK Signature Scheme v2 (v1 and v3 absent, one signer) under CN=Trindade Massas Operacoes (certificate SHA-256 ee0e404b211052b311ae0e0730606e9c7d5554315463d02f9ef33c9573c431f6); aapt2 reports versionCode='511' and versionName='0.5.1'; aapt2 dump strings finds 'Resumo Coletivo do Dia' in the packaged resources; no app-release-unsigned.apk beside it. Exact size 10,888,124 bytes, sha256 04f3848bc2194fda7262bb3ce916122cb74942a96dba3fa6174995bd2554f593. Published/clobbered on GitHub Release v0.5.1 as app-release.apk, trindade-0.5.1.apk and trindade-0.5.1.apk.sha256, and the identical verified file copied to the Desktop. |
-| The **0.5.2** release APK (versionCode 512) | Carries the Android design remediation: seventeen vector icons, the icon-only header, an eight-tab row, a thirteen-entry drawer in two groups, Tarefas and Motoristas folded into the admin panel for both roles, module roots without a repeated title or a way back, and a stock counter that always counts today. Verified in the pinned SDK 35 container with `:app:testDebugUnitTest :app:assembleRelease -PapiBaseUrl=https://trindademasas.duckdns.org/ -PversionName=0.5.2 -PversionCode=512 -PrequireSigned=true`: 975 unit tests, 0 failures; `apksigner` Verifies with APK Signature Scheme v2 (v1 and v3 absent, one signer) under CN=Trindade Massas Operacoes (certificate SHA-256 ee0e404b211052b311ae0e0730606e9c7d5554315463d02f9ef33c9573c431f6); `aapt2` reports versionCode='512' and versionName='0.5.2'; no app-release-unsigned.apk beside it. Exact size 10,900,292 bytes, sha256 f302cf5dc33e0e82fad0341df2689c4bc5c7cda70b00c6ca8009294d9e26811a. Checked on the Ubuntu `emulator-5554` before publishing: dashboard, drawer, admin panel, stock counter and massas launch, plus the released binary opening without the mandatory-update prompt. Published on GitHub Release `v0.5.2` as `trindade-0.5.2.apk` with `trindade-0.5.2.apk.sha256` describing those same bytes. Re-verified from the published download rather than from the build directory: both release files fetched over HTTPS, `sha256sum -c` reports `trindade-0.5.2.apk: OK`, `apksigner` on the downloaded APK reports v2 only (v1, v3, v3.1, v3.2 and v4 absent, one signer) with certificate SHA-256 `ee0e404b…431f6`, no unsigned APK beside it, and an `adb install -r` of that download over the 502 build succeeded in place and left the app on the dashboard at `versionCode=512`, which is the upgrade path a 0.5.1 install takes. The versionCode is 512 and not the code the workflow derived for this tag (502) because `v0.5.1` had been published by hand as 511: Android compares that number to decide what an update is, so the 502 build was one every 0.5.1 install would have refused as a downgrade. The published asset is the 512 build, and the derivation was widened below so that the next tag lands above it. |
-| The **0.5.2** release APK (versionCode 513) | Carries the whole-application Material 3 pass: every colour comes from the scheme (`M3TokenHygieneTest` fails on a literal outside `ui/theme/Theme.kt`), cards share one surface and the 12dp corner, small controls sit inside 48dp touch targets, the six administration sections confirm before they write and report in a result dialog, and the profile reads as cards. Verified in the pinned SDK 35 container: 1010 unit and Compose tests, 0 failures, `apksigner` Verifies with APK Signature Scheme v2 (one signer, certificate SHA-256 ee0e404b…431f6), `aapt2` reports versionCode='513' and versionName='0.5.2'. Exact size 10,947,412 bytes, sha256 f33393a0b31be905fd32b6427c3147cb4007aa0b7ccfc230fa9ef816dc4fc3ba. Published/clobbered on GitHub Release `v0.5.2` as `trindade-0.5.2.apk` and `trindade-0.5.2.apk.sha256`. |
-| The **0.5.2** release APK (versionCode 514) | Carries the four screens the V514 directive named, and was clobbered over the 513 assets on the same tag. Verified in the pinned SDK 35 container with `:app:testDebugUnitTest :app:assembleRelease -PapiBaseUrl=https://trindademasas.duckdns.org/ -PversionName=0.5.2 -PversionCode=514 -PrequireSigned=true`: 1029 unit and Compose tests, 0 failures; `apksigner` Verifies with APK Signature Scheme v2 (v1 and v3 absent, one signer) under CN=Trindade Massas Operacoes (certificate SHA-256 ee0e404b…431f6); `aapt2` reports versionCode='514' and versionName='0.5.2'; no app-release-unsigned.apk beside it. Exact size 10,947,844 bytes, sha256 f855dcff7b3fc5641711b578f2e31fec3058a44ac6bf45242c8a2d5f19013f6e. The profile header names the screen beside Voltar and the filled download action exists only for an update the check found or a download that failed, with the install hint following it; a reading typed as `4.5-` settles as `-4.5` and `±` rewrites it as `4.5`; the hour field turns `1430` into `14:30` and its clock opens the platform picker seeded at `14:30`; and the stock history is a reading of the day, drawing the collective summary with the server totals and offering WhatsApp and e-mail, with a calendar bounded to today and the thirty days before it. Checked on the Ubuntu `emulator-5554` from the **published** download rather than the build directory: both release files fetched over HTTPS, the downloaded APK's sha256 equals the published `trindade-0.5.2.apk.sha256`, `adb install -r` over the 513 build succeeded in place, and the captures show each behaviour on device. Published/clobbered on GitHub Release `v0.5.2` as `trindade-0.5.2.apk` and `trindade-0.5.2.apk.sha256`. |
-| The **0.5.3** release APK (versionCode 5003) | Carries the same four screens as the 514 build — profile header, temperature sign, hour mask and stock history — and exists so that delivery has a version its own tag declares. The 514 build sits on the `v0.5.2` tag, whose assets were replaced twice; a published tag is neither moved nor reused, so the same code is cut as `v0.5.3`, whose derivation gives `5003` — above the 514 already installed. Verified in the pinned SDK 35 container through `scripts/ci-android.sh`: 1029 unit and Compose tests, 0 failures. Verified again **from the published download** rather than the build directory: both assets fetched over HTTPS from the `v0.5.3` release, `sha256sum -c trindade-0.5.3.apk.sha256` reports `trindade-0.5.3.apk: OK`, and `apksigner` on the downloaded APK reports `Verifies` with APK Signature Scheme v2 only (v1, v3, v3.1 and v4 absent, one signer) under `CN=Trindade Massas Operacoes` (certificate SHA-256 `ee0e404b…431f6`). `aapt2` reports `versionCode='5003'` and `versionName='0.5.3'`. Exact size `10,964,228` bytes, `sha256 b658a952a5863e3a7bba207e98f0781450e2087f9a70dd1b2bc480f7e1d1fb58`. The tag push published both assets itself — the `build` and `publish` jobs of the `v0.5.3` run succeeded, and the sidecar was written by the job that uploaded the APK — so nothing here was uploaded by hand. `adb install -r` of the published download over the 514 build succeeded in place, the app opened without the mandatory-update prompt, and the profile reports `Versão do aplicativo 0.5.3` with `Você já está na versão mais recente` and the outlined verify action only, no download button. |
-| The **0.6.0** release APK (versionCode 6000) | Carries the Android parity with the web's Aero32 work: native WebService calls over OkHttp with Basic auth read from the encrypted store, the one massas table over the day's three states with the balance bar and the universal operator filter, the native day sync into the ERP mirror, the permanent massas card on both report screens, and the fixed **Integração ERP / Aero32** section in the admin panel. It also carries the rule that a launch the ERP already recorded offers no edit or delete, for any role. Verified in the pinned SDK 35 container with `:app:testDebugUnitTest :app:assembleRelease -PapiBaseUrl=https://trindademasas.duckdns.org/ -PversionName=0.6.0 -PversionCode=6000 -PrequireSigned=true`: 1091 unit and Compose tests, 0 failures; `apksigner verify --verbose` reports `Verifies` with APK Signature Scheme v2 (v1, v3, v3.1 and v4 absent, one signer) under `CN=Trindade Massas Operacoes` (certificate SHA-256 `ee0e404b211052b311ae0e0730606e9c7d5554315463d02f9ef33c9573c431f6`); `aapt2 dump badging` reports versionCode='6000' and versionName='0.6.0'. Size 11,115,300 bytes, sha256 `1f5bb2dc7b880ca16033d65972358a22eb8b3f8519e67e2ab7155d8928d5eb10`. It was rebuilt before the first install to carry the update-check fix recorded below, so this hash is the one the download serves. **Not published**: no tag and no GitHub release, per the directive. The same bytes were copied to `~/Desktop/trindade-0.6.0.apk`, `~/backups/trindade-0.6.0.apk` and `packages/backend/apk/trindade-0.6.0.apk`, which is where `GET /api/app/download-apk` serves them from. Emulator installation was not performed: there is no SSH access to the Ubuntu emulator in this session. |
-| The **0.6.1** release APK (versionCode 6001) | Carries the two massas rules of this delivery: the unified table offers the import only on the seat the backend attributes to the reader (`canImportRow`, over the `owner_user_id` the mirror resolves, with unknown belonging to an administrator alone), and a past day is read-only on the phone as it now is on the server. Built on the 0.6.0 keystore and certificate and verified in the pinned SDK 35 container with `:app:assembleRelease -PapiBaseUrl=https://trindademasas.duckdns.org/ -PversionName=0.6.1 -PversionCode=6001 -PrequireSigned=true`: `apksigner verify --print-certs` reports the one signer under `CN=Trindade Massas Operacoes, OU=Mobile, O=Trindade, L=Sao Paulo, ST=SP, C=BR` (certificate SHA-256 `ee0e404b211052b311ae0e0730606e9c7d5554315463d02f9ef33c9573c431f6`), and `aapt2 dump badging` reports versionCode='6001' and versionName='0.6.1'. Size 11,115,300 bytes, sha256 `b2ccb9f165ab1d42090f236dc88e9b02a5ef6adfd4a597959de06ba215469736`. **Not published to GitHub**: no tag and no release. The same bytes were copied to `~/Desktop/trindade-0.6.1.apk`, `~/backups/trindade-0.6.1.apk` and `packages/backend/apk/trindade-0.6.1.apk`, which is the file `GET /api/app/download-apk` now serves (`/api/app/latest-release` answers `v0.6.1`, size 11115300, through the rebuilt `trindade-api-1`). |
-| The **0.6.2** release APK (versionCode 6002) | Carries the refusal sentences and the report attribution. A refused launch now arrives with the server's `errorCode` and Portuguese sentence and the tablet answers by code first, so a `409` no longer reaches the operator as a bare status number; and an imported launch is credited to the operator the ERP seat names (with `erpOnly` when that person has no Trindade account) instead of to whoever imported it. Built in the pinned SDK 35 container with `:app:assembleRelease -PapiBaseUrl=https://trindademasas.duckdns.org/ -PversionName=0.6.2 -PversionCode=6002 -PrequireSigned=true` after `:app:testDebugUnitTest` and the massas+ui suites were green (job-79). `apksigner verify --print-certs` reports the one signer under `CN=Trindade Massas Operacoes` (certificate SHA-256 `ee0e404b211052b311ae0e0730606e9c7d5554315463d02f9ef33c9573c431f6`), and `aapt2 dump badging` reports versionCode='6002' and versionName='0.6.2'. Size 11,118,952 bytes, sha256 `60a1d012087cfb2ca37d0b3b0ff64e53608c2c87757100b8b008c8b4b9b23750`. **Not published to GitHub**: no tag and no release. The same bytes were copied to `~/Desktop/trindade-0.6.2.apk`, `~/backups/trindade-0.6.2.apk` and `packages/backend/apk/trindade-0.6.2.apk`, which is the file `GET /api/app/download-apk` serves (`/api/app/latest-release` answers `v0.6.2`, size 11118952, and the download's sha256 matches the build). |
-| The **0.6.3** release APK (versionCode 6003) | Carries the report card that parses the day the backend actually sends, and the share screen that creates the worker it is about. `GET /api/massas-launch/report` now answers every operator with both shapes of the same fact (`name` and `displayName`, `erpOnly` and `onlyErp`, plus `operatorKey` and `entLans`) and the balance with the two seat counts beside the box counts, which is what the Kotlin contract requires: the card used to stay empty because kotlinx refused the body and the repository answered null. The share screen offers **Criar novo operário** by default — login suggested from the display name, generated password equal to the login plus the running digit sequence up to fifteen characters, role fixed to Trabalhador — and `Selecionar existente` keeps the previous dropdown; the account is created before the message leaves the phone. Built in the pinned SDK 35 container with `:app:assembleRelease -PapiBaseUrl=https://trindademasas.duckdns.org/ -PversionName=0.6.3 -PversionCode=6003 -PrequireSigned=true` after `:app:testDebugUnitTest` was green (202 unit and Compose tests, 0 failures; the backend answered 620/620 and the web 451/451). `apksigner verify --print-certs` reports the one signer under `CN=Trindade Massas Operacoes, OU=Mobile, O=Trindade, L=Sao Paulo, ST=SP, C=BR` (certificate SHA-256 `ee0e404b211052b311ae0e0730606e9c7d5554315463d02f9ef33c9573c431f6`), and `aapt2 dump badging` reports versionCode='6003' and versionName='0.6.3'. Size 11,124,200 bytes, sha256 `a0b2b4f6a1be0b4750d3c854c246bb9ca243928decd191be4082c1cef919e47e`. **Not published to GitHub**: no tag and no release. The same bytes were copied to `~/Desktop/trindade-0.6.3.apk`, `~/backups/trindade-0.6.3.apk` and `packages/backend/apk/trindade-0.6.3.apk`, which is the file `GET /api/app/download-apk` serves: after rebuilding `trindade-api-1` and `trindade-web-1`, `/api/app/latest-release` answers `v0.6.3` with size 11124200 and the download's sha256 matches the build. |
-| The **0.7.0** release APK (versionCode 7000) | Carries the four fronts of `odd/tasks/relatorio-erp-unico-y-operarios-por-asiento.md`: the Relatório reads the ERP snapshot only, with the ten massas codes as production and everything else as `Recebimento de Insumos`, both blocks under one card with a single sync button in the header; credentials are shared only for an operator registered on purpose with `+ Cadastrar Operário` and a dot-free login (`JOAO H` becomes `joaoh`); a seat the ERP signed and Trindade cannot name offers `+ Criar Operário` inline, and the import refuses an unlinked seat (`MASSAS_OPERATOR_NOT_LINKED`) or a disabled one (`MASSAS_OPERATOR_INACTIVE`, `owner_status: inactive` in the mirror) instead of crediting the importer. Built in the pinned SDK 35 container with `:app:assembleRelease -PapiBaseUrl=https://trindademasas.duckdns.org/ -PversionName=0.7.0 -PversionCode=7000 -PrequireSigned=true`, the keystore mounted read-only at `/keys` from `~/.android-keystores/trindade-release.jks`, after `:app:testDebugUnitTest` was green (1131 unit and Compose tests, 0 failures; the backend answered 640/640, the web 468/468 and Playwright 82/82 on a clean server). `apksigner verify --verbose --print-certs` reports `Verifies` with APK Signature Scheme v2 (v1, v3, v3.1 and v4 absent, one signer) under `CN=Trindade Massas Operacoes, OU=Mobile, O=Trindade, L=Sao Paulo, ST=SP, C=BR` (certificate SHA-256 `ee0e404b211052b311ae0e0730606e9c7d5554315463d02f9ef33c9573c431f6`), and `aapt2 dump badging` reports versionCode='7000' and versionName='0.7.0'. Size 11,149,040 bytes, sha256 `903b37afb6fb62c6623abf4723f0dd516801d8e9880c470a4889061d9d298d4b`. **Not published to GitHub**: no tag and no release, per the directive. The same bytes were copied to `~/Desktop/trindade-0.7.0.apk`, `~/backups/trindade-0.7.0.apk` and `packages/backend/apk/trindade-0.7.0.apk`, which is the file `GET /api/app/download-apk` serves: after rebuilding `trindade-api-1` and `trindade-web-1`, `/api/app/latest-release` answers `v0.7.0` with size 11149040, the downloaded file's sha256 equals the build's, and `curl -I` reports `200`, `Content-Type: application/vnd.android.package-archive` and `Content-Length: 11149040`. |
-| The **0.7.0** release APK (versionCode 7001) | The published build of the 0.7.0 line, and the first 0.7.x release that exists on GitHub. It carries five changes on top of the 7000 build: the update check asks `GET /api/app/latest-release` instead of GitHub's anonymous API, whose shared hourly quota answered 403 and made the app report "up to date" because it could not ask; the report generator hosts the ERP movements card the detail screen hosts, with the day's massas and the supply receipts under one sync action; the launch screen's ERP sync states why it cannot run, shows a spinner while it does, and writes the outcome under its own button instead of into the module's banner above a taller-than-screen column; the connection test posts to `/usuarios` without the trailing slash, which is the redirect that turned the POST into a GET and the route's 405; and the ERP card stacks its title and action below 420dp (below `sm` on the web), because on a phone the two were sharing a row that fit neither. Built in the pinned SDK 35 container with `:app:assembleRelease -PapiBaseUrl=https://trindademasas.duckdns.org/ -PversionName=0.7.0 -PversionCode=7001 -PrequireSigned=true`, the keystore mounted read-only at `/keys`, after `:app:testDebugUnitTest` was green (1140 unit and Compose tests, 0 failures). `apksigner verify --print-certs` reports the one signer under `CN=Trindade Massas Operacoes, OU=Mobile, O=Trindade, L=Sao Paulo, ST=SP, C=BR` (certificate SHA-256 `ee0e404b211052b311ae0e0730606e9c7d5554315463d02f9ef33c9573c431f6`) with APK Signature Scheme v2, and `aapt2 dump badging` reports versionCode='7001' and versionName='0.7.0'. Size 11,149,040 bytes, sha256 `8f6156f2d5dfe8e5ad343ed01e52de629e4de5b8d9cd4c1304b38313435a8621`. **Published** as GitHub Release `v0.7.0` with `trindade-0.7.0.apk` and `trindade-0.7.0.apk.sha256`, verified from the published download rather than the build directory: `sha256sum -c` reports `OK`, `apksigner` on the downloaded file reports the certificate above, and `aapt2` reports the two version numbers above. The publication was made by hand with `gh release create --target main`, and the tag-triggered workflow was disabled for its duration and re-enabled immediately after: that workflow derives the versionCode from the tag (`7000` for `v0.7.0`) and would have replaced the verified 7001 asset with a build every device holding the earlier 7000 test build refuses as a downgrade. The same bytes were copied to `~/Desktop/trindade-0.7.0.apk`, `~/backups/trindade-0.7.0.apk` and `packages/backend/apk/trindade-0.7.0.apk`, which is the file `GET /api/app/download-apk` serves: after rebuilding `trindade-api-1` and `trindade-web-1`, `/api/app/latest-release` answers `v0.7.0` with size 11149040 and the download's sha256 equals the build's. The web suite answered 468/468; Playwright answered 81 of 82, with `admin-edit-export.spec.ts › 4.1` failing on a spec that files a report for the day's shift and so cannot run twice against the same database (it reached a different step on each of two runs).|
-| The absent-keystore path | Verified. `-PrequireSigned=true` with no keystore fails the build with the guard message in Section 5 and produces no APK at all. |
-| `scripts/ci-android.sh` | Run end to end in the pinned SDK 35 container for the 0.5.3 release: the lane compiles, runs the 1029 unit and Compose tests and assembles the release APK, 0 failures. Its comment on the version encoding was corrected to the rule the workflow applies; the lane executes that rule no more than before, because the numbers arrive as `-P` properties. |
-| `.github/workflows/android-release.yml` | **Ran for the first time on the `v0.5.2` tag, and the run found two defects in it.** Both are fixed here and both are the kind only an execution shows, which is why this row no longer says UNVERIFIED. On the `v0.5.3` tag the run was green in both jobs and the publish job uploaded the APK and the sidecar it wrote itself, which is the first release this workflow produced without an operator standing next to it.
-| The update check on an older release | **Was a defect and is fixed on this build.** `ReleaseVersion.Comparison` answered `UpToDate` both for "this is the same version" and for "the release is older", and `UpdateDetector` read `UpToDate` as the first of those: it went on to compare the release's APK with the installed one, found the sizes different by construction, and classified an older release as `SAME_RELEASE_PATCH`. On a phone running 0.6.0 against a GitHub `latest` of v0.5.3 that set `isUpdateAvailable`, and `MainActivity` answers that flag by sitting on `ProfileRoute(isMandatoryUpdate = true)` with a `BackHandler` that only reopens the dialog: the app reopened into itself with no way forward. The comparison now has four answers -- `Newer`, `SameVersion`, `Older`, `Undetermined` -- and the detector returns `NONE` for `Older` before it looks at any asset. The digest, size and timestamp comparison runs only for `SameVersion`, which is the only case where a difference means anything. Pinned by `ReleaseVersionTest` and `UpdateDetectorTest` (an older release with a different size, digest and a newer timestamp answers `NONE` with `isUpdateAvailable == false`), 1093 unit and Compose tests, 0 failures. |
-| The version derivation | Was `major * 10000 + minor * 100 + patch`. On the 0.x line the major contributes nothing above the minor, so `v0.5.2` derived **502** while `v0.5.1` was already in the field as 511: the release the tag produced was a downgrade no 0.5.1 install would accept. Now `major * 1000000 + minor * 1000 + patch`, with the digit budget and the collision it prevents written next to it. Verified by extracting this step from the workflow file and running it over a table of refs: `v0.3.0`→3000, `v0.5.2`→5002, `v0.5.3`→5003, `v0.6.0`→6000, `v1.0.0`→1000000, the repair branch→301, every tag code above the published 512 and increasing, and `v0.5.1000`, `v1.1000.0`, `v0.5`, `refs/heads/main` and a mismatched tag name all failing closed. |
-| The release checksum | The publish job published only `release-assets/*.apk`; the `trindade-*.apk.sha256` beside it was something an operator uploaded by hand. On `v0.5.2` that produced the worst possible pair: the tag push made the workflow replace the APK with its own build, while the checksum kept describing the file it had just replaced, so the release advertised a digest no download could match. The publish job now writes the sidecar itself, with `sha256sum` over the exact bytes it is about to upload, and refuses to publish anything but the APK plus that sidecar. Verified by running the step's own body over a scratch `release-assets` directory: the sidecar is written, `sha256sum -c` passes against it, the publish guard counts two assets, and an empty artifact set fails closed. |
-| The secrets named in Section 4 | Not verified as configured; they are configured on GitHub, outside this repository. |
+La versión no se edita a mano en el código. El workflow la deriva del tag de Git, que es la única fuente de
+verdad para `versionName` y `versionCode`.
 
----
+Para un tag `v<major>.<minor>.<patch>`:
 
-## 2. The version comes from the git tag
-
-No human edits the version. The release workflow derives it from the tag, and the tag is the single source
-of truth for both numbers Android records in the APK.
-
-**For a tag `v<major>.<minor>.<patch>`:**
-
-```
-versionName = <major>.<minor>.<patch>                    e.g. v1.2.3  ->  1.2.3
-versionCode = major * 1000000 + minor * 1000 + patch     e.g. v1.2.3  ->  1002003
+```text
+versionName = <major>.<minor>.<patch>
+versionCode = major * 1000000 + minor * 1000 + patch
 ```
 
-| Tag | versionName | versionCode |
+| Tag | `versionName` | `versionCode` |
 | --- | --- | --- |
 | `v0.0.1` | `0.0.1` | `1` |
 | `v0.5.3` | `0.5.3` | `5003` |
 | `v0.6.0` | `0.6.0` | `6000` |
+| `v0.7.0` | `0.7.0` | `7000` |
 | `v1.2.3` | `1.2.3` | `1002003` |
 | `v2.0.0` | `2.0.0` | `2000000` |
 
-The wider factors are not decoration: they are what makes the `0.x` line releasable. The common narrower
-encoding is `major * 10000 + minor * 100 + patch`, and with a major of `0` the tag contributes nothing above
-the minor, so `v0.5.2` derived **502** while build 511 was already in the field: Android compares
-`versionCode` to decide what is an update, and the release the tag produced was a downgrade no install would
-accept. Under the encoding above the same tag is `5002`, above everything the hand-built 0.x builds carry
-(510, 511, 512, 513, 514), and `v0.5.3` is `5003`.
+Reglas:
 
-Three consequences worth knowing before choosing a tag:
+- `versionCode` es lo que Android compara para decidir si un APK es una actualización. La fórmula ancha evita
+  que la línea `0.x` produzca códigos menores que builds ya instaladas. La fórmula anterior,
+  `major * 10000 + minor * 100 + patch`, produjo `502` para `v0.5.2` mientras el `511` ya estaba en campo:
+  Android habría rechazado esa release como un downgrade.
+- `minor` y `patch` tienen tres dígitos cada uno. `v1.1000.0` codificaría `2000000`, el mismo código que
+  `v2.0.0`; el workflow lo rechaza en lugar de publicar una colisión. Para superar el límite, subir el major.
+- La `v` pertenece al tag, no al `versionName`. Un `-PversionName` con `v` inicial falla la validación del
+  build.
+- Una build release **exige** `-PversionName` y `-PversionCode`. No hay valores por defecto para release, así
+  que un APK no puede salir con una versión inventada por el build.
+- Una build debug usa el placeholder **`0.6.3` / `6003`**, definido en `packages/android/app/build.gradle.kts`.
 
-- **`versionCode` is what Android compares.** It decides whether an install is an update. The encoding
-  above grows with every release as long as tags grow in order, which is the whole reason for the formula
-  rather than a hand-picked number.
-- **`minor` and `patch` each have three digits of room.** `v1.1000.0` would encode to `2000000`, the same
-  as `v2.0.0`, so the workflow **refuses** such a tag instead of publishing an APK Android would compare
-  against the wrong version. Roll over to a new major instead.
-- **The `v` belongs to the tag, not the version.** `versionName` is digits and dots; a build whose
-  `-PversionName` carries a leading `v` fails the build's own validation.
+Los dos números se calculan una sola vez en `build.gradle.kts` y alimentan tanto el manifiesto como
+`BuildConfig`. La app muestra la versión en **Perfil → Versión de la aplicación**.
 
-### How the version reaches the APK
+## 3. Releases y builds
 
-- `-PversionName` and `-PversionCode` define both numbers, and a **release build requires both**: the build
-  has no default for a release, so an APK can never be published carrying a version the build invented
-  instead of the one its tag declares. A debug build keeps the placeholder `0.6.0` / `6000`, so local work
-  needs no properties at all.
-- The two values are computed **once** in `packages/android/app/build.gradle.kts` and used both for the
-  manifest (`defaultConfig.versionName` / `.versionCode`) and for the `BuildConfig` fields the app reads.
-  That is why the number on screen cannot drift from the number that was packaged.
-- The app displays it in **Perfil**, under the label *Versão do aplicativo*, read from
-  `BuildConfig.APP_VERSION_NAME`. That line is drawn outside the block that needs a loaded profile, because
-  an operator asking "did the update land?" is exactly the situation where the profile may not have loaded.
+| Versión | Build | Estado | Nota |
+| --- | --- | --- | --- |
+| 0.5.0 | 501 | Publicada | Primera release con calculadoras |
+| 0.5.1 | 506–511 | Publicada | Varias builds bajo el mismo `versionName` |
+| 0.5.2 | 512–514 | Publicada | Assets reemplazados; la derivación del tag se corrigió |
+| 0.5.3 | 5003 | Publicada | Misma entrega que 514, con un tag propio |
+| 0.6.0 | 6000 | Interna | Paridad Android con Aero32 |
+| 0.6.1 | 6001 | Interna | Importación por asiento y día pasado en solo lectura |
+| 0.6.2 | 6002 | Interna | Códigos de error y atribución por asiento |
+| 0.6.3 | 6003 | Interna | Contrato del reporte y alta de operario |
+| 0.7.0 | 7000 | **Publicada** | Asset actual de GitHub Release `v0.7.0` (verificado el 2026-11-01) |
+| 0.7.0 | 7001 | No publicada | Build de respaldo; las notas de la release la mencionan, pero no es el asset |
+| 0.7.0 | 7002 | Distribución interna | APK servido por `GET /api/app/download-apk`; no es el asset de GitHub |
+| 0.7.0 | 7003 | En preparación | Homogeneización visual de Android |
 
----
+Las builds 0.6.x se distribuyeron por `GET /api/app/download-apk`, no por un tag de GitHub. Los hashes y las
+verificaciones completas están en [release-android-historial.md](release-android-historial.md).
 
-## 3. Cutting a release
+> **Discrepancia verificada el 2026-11-01.** El asset `trindade-0.7.0.apk` de GitHub se descarga y verifica como
+> `versionCode 7000`, sha256 `e8cee2d3857696e90094115ce7915258f79d7e883dd57bf85e221da373d28ffd`, 11.149.516 bytes.
+> Su sidecar publicado contiene ese mismo hash. Las notas de la release dicen `versionCode 7001` y sha256
+> `8f6156f2d5dfe8e5ad343ed01e52de629e4de5b8d9cd4c1304b38313435a8621`, que corresponden a la build 7001 guardada en
+> respaldos, no al asset. El APK que sirve producción es la build 7002, sha256
+> `bc038f2eeda605fb07bfdd26550c93cfc5a1a8b9c9b06408df0fe505c6ec2f4c`. El tag no se movió. Antes de publicar una
+> nueva release, corregir las notas o volver a subir el build que se quiera distribuir.
 
-1. **Make sure the commit you are about to tag is green.** A tag on `main` from which the CI workflow
-   (`ci.yml`) passed — including the JVM suite and the Android lane. The release workflow does not re-run
-   the unit suite: it exists to sign and to verify the signature.
-2. **Tag and push the tag** (the tag is the entire release procedure):
+## 4. Workflow de publicación
 
-   ```bash
-   git tag v1.2.3
-   git push origin v1.2.3
-   ```
+El workflow es `.github/workflows/android-release.yml`.
 
-3. **The `Android release` workflow runs**, and in this order:
-   - checks out the tagged commit, inside the SDK container
-     `ghcr.io/cirruslabs/android-sdk:35@sha256:c724009e305b4607157287624033ab97f319af44c244bfc9f73b6293f3bb01b9`
-     (the same image `make ci-android` uses locally, so the toolchain is the one the lane is verified
-     against);
-   - derives `versionName` and `versionCode` from the tag by the rule in Section 2 and **refuses three
-     kinds of tag**: `v1.2` and `vabc`, which its three-component regex does not read as a version at
-     all, and `v1.1000.0`, which it does read but whose `minor` is above 999 — that one would encode to
-     `2000000`, the `versionCode` of `v2.0.0`, so it is refused instead of published as a collision;
-   - decodes the keystore from `ANDROID_KEYSTORE_BASE64` into the runner's temporary directory (never into
-     the workspace) and deletes it again at the end of the job;
-   - builds `:app:assembleRelease` with `-PapiBaseUrl`, `-PversionName`, `-PversionCode` and
-     `-PrequireSigned=true`;
-   - **verifies the APK before anything is published**: it confirms the output is `app-release.apk` and not
-     `app-release-unsigned.apk`, runs `apksigner verify`, and compares the signer's SHA-256 certificate
-     digest against the fingerprint pinned in the workflow (Section 6). A mismatch fails the release;
-   - asserts the packaged version — `aapt2 dump badging` must report the `versionName` and `versionCode`
-     the tag produced;
-   - publishes the APK as the release asset `trindade-<version>.apk` on the GitHub release for the tag.
+### 4.1 Disparadores
 
-4. **If the run fails**, nothing was published. Fix the cause and re-run the failed job: the publish step
-   updates an existing release for the tag in place rather than failing with "release already exists".
+- Push de un tag `v*`: construye, firma, verifica y **publica**.
+- Push a la rama de reparación `feature/android-v0.3.0-ux-repair`: construye y firma una build de prueba
+  (`0.3.0` / `301`), pero **no publica**. Es un disparador heredado; no se usa para releases nuevas.
 
-5. **Never move a tag.** Re-pointing a published tag at a different commit means two different APKs claim
-   the same `versionCode`, and Android will install whichever one it sees.
+### 4.2 Contenedor
 
-The digest, and not only the tag, is what pins the toolchain here, and it is written in **six places across
-four files**, all of which must move together: the two `docker run` lines in the `Makefile`
-(`make ci-android`), `.github/workflows/ci.yml`, `.github/workflows/android-release.yml`, and **two copies
-on this page** — the container the release workflow checks out (Section 3) and the local build command in
-Section 5. There is deliberately no shared variable file or script between them: the image changes once or
-twice a year, and a mechanism would cost more to keep correct than the six edits it saves. When the image
-moves, change all six to the same digest, this page included: its two copies are the ones a maintainer
-reads and copies from, so a page left teaching the old digest is exactly the drift this paragraph exists
-to prevent, and it is the copy nothing else can catch.
+El build corre en la imagen oficial del SDK, fijada por digest:
 
----
+```text
+ghcr.io/cirruslabs/android-sdk:35@sha256:c724009e305b4607157287624033ab97f319af44c244bfc9f73b6293f3bb01b9
+```
 
-## 4. Secrets and variables the workflow needs
+El mismo digest se usa en `Makefile`, `.github/workflows/ci.yml`, `.github/workflows/android-release.yml` y en
+este documento. Si cambia la imagen, hay que actualizar todas las copias.
 
-Configure these **once**, on GitHub, before the first release. They are repository secrets
-(*Settings → Secrets and variables → Actions*), and none of them belongs in a tracked file.
+### 4.3 Pasos del job `build`
 
-| Secret | Contents |
+1. Checkout del commit del tag.
+2. Derivación de `versionName` y `versionCode`; rechazo de tags mal formados y de `minor`/`patch` mayores a 999.
+3. Decodificación del keystore desde `ANDROID_KEYSTORE_BASE64` a un directorio temporal del runner, nunca al
+   workspace; se borra al final del job.
+4. `:app:assembleRelease` con `-PapiBaseUrl`, `-PversionName`, `-PversionCode` y `-PrequireSigned=true`.
+5. Verificación de que el artefacto es `app-release.apk` y no `app-release-unsigned.apk`.
+6. `apksigner verify` y comparación de la huella SHA-256 del certificado con la fijada en el workflow.
+7. `aapt2 dump badging` para confirmar que el APK declara el `versionName` y `versionCode` del tag.
+8. Publicación del artifact para el job `publish`.
+
+### 4.4 Job `publish`
+
+- Calcula el `.sha256` sobre los bytes exactos que va a subir.
+- Publica `trindade-<version>.apk` y `trindade-<version>.apk.sha256`.
+- Si la release ya existe, actualiza los assets con `--clobber`; nunca crea una release duplicada.
+- Si el tag no existe todavía como release, la crea con notas generadas.
+
+### 4.5 Secretos y variables
+
+Configurar una vez en GitHub, en *Settings → Secrets and variables → Actions*:
+
+| Secreto | Contenido |
 | --- | --- |
-| `ANDROID_KEYSTORE_BASE64` | The release keystore, base64-encoded, as one line. |
-| `ANDROID_KEYSTORE_PASSWORD` | The keystore (store) password. |
-| `ANDROID_KEY_ALIAS` | The key alias inside the keystore: `trindade`. |
-| `ANDROID_KEY_PASSWORD` | *Optional.* The key password, only if it differs from the store password. A PKCS12 store built with `keytool` uses one password for both, so this is normally **left unset** and the build falls back to the store password. |
+| `ANDROID_KEYSTORE_BASE64` | Keystore de release codificado en base64, en una sola línea |
+| `ANDROID_KEYSTORE_PASSWORD` | Contraseña del keystore |
+| `ANDROID_KEY_ALIAS` | Alias de la clave: `trindade` |
+| `ANDROID_KEY_PASSWORD` | **Opcional**. Solo si la clave usa una contraseña distinta de la del store; en PKCS12 normalmente no se define |
 
-The command that produces the base64 value for the first one, run on the machine that holds the keystore:
+Variable de repositorio:
 
-```bash
-# Linux
-base64 -w0 ~/.android-keystores/trindade-release.jks
-```
-
-```bash
-# macOS (base64 has no -w)
-base64 -i ~/.android-keystores/trindade-release.jks | tr -d '\n'
-```
-
-The value is one long line with no newline; a trailing newline would survive `base64 --decode` harmlessly,
-but an unencoded keystore would not, which is why the workflow fails loudly if decoding yields an empty
-file. With the `gh` CLI the whole configuration is:
-
-```bash
-gh secret set ANDROID_KEYSTORE_BASE64 --body "$(base64 -w0 ~/.android-keystores/trindade-release.jks)"
-gh secret set ANDROID_KEYSTORE_PASSWORD          # prompts, so the password stays out of your shell history
-gh secret set ANDROID_KEY_ALIAS --body trindade
-```
-
-**Recommended repository variable** (*Settings → Secrets and variables → Actions → Variables*):
-
-| Variable | Contents |
+| Variable | Contenido |
 | --- | --- |
-| `ANDROID_API_BASE_URL` | The base URL the release APK talks to, e.g. `https://trindademasas.duckdns.org/`. It must be an `https://` URL with a host, and end with `/`. |
+| `ANDROID_API_BASE_URL` | URL base del APK, por ejemplo `https://trindademasas.duckdns.org/`. Debe ser `https://`, con host y barra final |
 
-When unset, the workflow falls back to `https://trindademasas.duckdns.org/`, the same host
-`.env.example` and `docs/deployment.md` name. A release build has no default of its own, so a base URL
-that is missing, non-`https` or without its trailing slash fails the build rather than shipping an APK
-that points at the development loopback.
+Si la variable no está definida, el workflow usa `https://trindademasas.duckdns.org/`. Una URL inválida hace
+fallar el build en lugar de publicar un APK apuntando al loopback de desarrollo.
 
-**No secret holds the certificate fingerprint.** The fingerprint pinned in the workflow is public
-(Section 6): pinning it is what turns "the APK is signed" into "the APK is signed by the key whose
-fingerprint we published".
+La huella del certificado no es un secreto: es el dato público que permite verificar que el APK fue firmado por
+la clave del proyecto.
 
----
+## 5. Build y firma local
 
-## 5. Building and signing an APK locally
+El keystore y su contraseña se pasan desde fuera del repositorio, por propiedades `-P`, variables de entorno o
+un `keystore.properties` ignorado por Git.
 
-The keystore and its password are supplied **from outside the repository** — through `-P` properties, the
-environment, or a gitignored `keystore.properties`. They are never written into a tracked file, and the
-keystore itself lives at `~/.android-keystores/trindade-release.jks`, never in the checkout.
-
-### The three sources, and their precedence
-
-The same four names are read in all three places, in this order — a `-P` property beats the environment,
-which beats the properties file. `keystore.properties` is read from the app module
-(`packages/android/app/keystore.properties`) or from the Gradle root beside it
-(`packages/android/keystore.properties`); either location works.
-
-| `-P` property | environment variable | `keystore.properties` key |
+| Propiedad `-P` | Variable de entorno | Clave en `keystore.properties` |
 | --- | --- | --- |
 | `trindadeKeystorePath` | `TRINDADE_KEYSTORE_PATH` | `trindadeKeystorePath` |
 | `trindadeKeystorePassword` | `TRINDADE_KEYSTORE_PASSWORD` | `trindadeKeystorePassword` |
 | `trindadeKeyAlias` | `TRINDADE_KEY_ALIAS` | `trindadeKeyAlias` |
-| `trindadeKeyPassword` *(defaults to the store password)* | `TRINDADE_KEY_PASSWORD` | `trindadeKeyPassword` |
+| `trindadeKeyPassword` | `TRINDADE_KEY_PASSWORD` | `trindadeKeyPassword` |
 
-```properties
-# packages/android/app/keystore.properties — gitignored, never committed
-trindadeKeystorePath=/home/<user>/.android-keystores/trindade-release.jks
-trindadeKeystorePassword=<the store password>
-trindadeKeyAlias=trindade
-```
+Precedencia: `-P` gana sobre la variable de entorno, que gana sobre el archivo.
 
-`keystore.properties` and `*.jks` / `*.keystore` / `*.p12` / `*.pfx` are in `.gitignore`, but ignoring a file is not permission
-to keep it in the tree: the point of these rules is that no password and no key can be committed by
-accident.
-
-### A signed release, in the container the project builds with
+Ejemplo de build firmado en el contenedor oficial:
 
 ```bash
 docker run --rm --user "$(id -u):$(id -g)" \
   --env GRADLE_USER_HOME=/gradle-home --env HOME=/gradle-home \
   --env TRINDADE_KEYSTORE_PATH=/keys/trindade-release.jks \
-  --env TRINDADE_KEYSTORE_PASSWORD=<the store password> \
+  --env TRINDADE_KEYSTORE_PASSWORD=<contraseña-del-store> \
   --env TRINDADE_KEY_ALIAS=trindade \
   --volume "$HOME/.cache/trindade-gradle:/gradle-home" \
   --volume "$HOME/.cache/trindade-android-sdk:/opt/android-sdk-linux" \
@@ -249,139 +173,111 @@ docker run --rm --user "$(id -u):$(id -g)" \
   --volume "$(git rev-parse --show-toplevel):/work" \
   --workdir /work/packages/android \
   ghcr.io/cirruslabs/android-sdk:35@sha256:c724009e305b4607157287624033ab97f319af44c244bfc9f73b6293f3bb01b9 \
-  bash -c './gradlew :app:assembleRelease --no-daemon -PapiBaseUrl=https://trindade.example/ -PversionName=1.0.0 -PversionCode=10000 -PrequireSigned=true'
+  bash -c './gradlew :app:assembleRelease --no-daemon -PapiBaseUrl=https://trindade.example/ -PversionName=1.0.0 -PversionCode=1000000 -PrequireSigned=true'
 ```
 
-`-PapiBaseUrl` carries a placeholder host on purpose: the real one is supplied by the release
-(`ANDROID_API_BASE_URL` in Section 4), and what this build exists to prove is the signature, not the
-endpoint.
+El host de `-PapiBaseUrl` es un placeholder a propósito: lo que este build verifica es la firma, no el endpoint.
 
-**Verified on 2026-09-19** with this exact command against the real keystore. It produced
-`packages/android/app/build/outputs/apk/release/app-release.apk` — **9,683,207 bytes**, and no
-`app-release-unsigned.apk` beside it — and `apksigner verify --print-certs` reported `Verifies` with
-`Signer #1 certificate SHA-256 digest: ee0e404b211052b311ae0e0730606e9c7d5554315463d02f9ef33c9573c431f6`,
-which matches the fingerprint in Section 6. It was signed with the **v2** scheme (`Verified using v2 scheme:
-true`, v1 `false`), which is what the `minSdk` 26 floor requires: Android 8.0 and later verify v2, so
-there is no reason to carry the older JAR signature.
+### `-PrequireSigned=true`
 
-### `-PrequireSigned=true`, and what happens without a keystore
+- Sin keystore, `assembleRelease` produce `app-release-unsigned.apk`. Eso es lo que usa la lane de CI para
+  comprobar que el camino de release compila sin clave.
+- Con `-PrequireSigned=true`, un keystore irresoluble es fatal. El workflow lo pasa; la lane de CI no.
+- Un keystore parcialmente configurado también es fatal aunque no se pase `-PrequireSigned=true`: si falta una
+  de las tres propiedades o el archivo no se puede leer, el build falla y nombra lo que falta.
 
-**A missing keystore is not an error by itself.** Without one, `assembleRelease` produces
-`app-release-unsigned.apk`, which is how `scripts/ci-android.sh` proves the release path still builds on a
-machine that has no key — and it is also how a half-configured keystore would silently produce an APK that
-looks signed until someone checks.
-
-- **`-PrequireSigned=true`** makes an unresolvable keystore fatal, in the same voice as the base-URL guard
-  and for the same reason: *a published APK that cannot be verified as coming from this project is worse
-  than no APK.* The release workflow passes it; the CI lane does not.
-- **A partially configured keystore is always fatal**, even without `-PrequireSigned=true`: if any of the
-  three settings is present but the set is incomplete or the file is unreadable, the build fails and names
-  what is missing, rather than quietly assembling an unsigned APK.
-
-**Verified:** the same release build without the keystore environment and with `-PrequireSigned=true`
-fails with
-
-```
-> A release build with -PrequireSigned=true requires a keystore, and none could be resolved. Provide
-trindadeKeystorePath, trindadeKeystorePassword and trindadeKeyAlias as -P properties, as
-TRINDADE_KEYSTORE_PATH, TRINDADE_KEYSTORE_PASSWORD and TRINDADE_KEY_ALIAS in the environment, or in
-keystore.properties. A published APK that cannot be verified as coming from this project is worse than no
-APK.
-```
-
-and produces no new artifact — the previously built signed APK is left untouched.
-
-### Checking a locally built APK yourself
+### Verificación manual
 
 ```bash
-# The signature and the certificate, in one shot
-/opt/android-sdk-linux/build-tools/<version>/apksigner verify --verbose --print-certs \
+# Firma y certificado
+$ANDROID_HOME/build-tools/<versión>/apksigner verify --verbose --print-certs \
   app/build/outputs/apk/release/app-release.apk
 
-# What the APK actually declares
-aapt2 dump badging app/build/outputs/apk/release/app-release.apk | head -1
+# Versión declarada por el APK
+$ANDROID_HOME/build-tools/<versión>/aapt2 dump badging \
+  app/build/outputs/apk/release/app-release.apk | head -1
 ```
 
-`apksigner` and `aapt2` are not on `PATH` in the SDK image; they live under
-`$ANDROID_HOME/build-tools/<version>/`.
+## 6. La clave y la huella oficial
 
----
-
-## 6. The key, and the fingerprint everyone compares against
-
-| | |
+| Dato | Valor |
 | --- | --- |
-| Keystore file | `~/.android-keystores/trindade-release.jks` (outside the repository) |
-| Type / alias | PKCS12 / `trindade` |
-| Key | RSA 4096, self-signed, valid until 2054 |
-| Certificate DN | `CN=Trindade Massas Operacoes, OU=Mobile, O=Trindade, L=Sao Paulo, ST=SP, C=BR` |
-| **SHA-256 fingerprint** | `EE:0E:40:4B:21:10:52:B3:11:AE:0E:07:30:60:6E:9C:7D:55:54:31:54:63:D0:2F:9E:F3:3C:95:73:C4:31:F6` |
-| SHA-1 fingerprint | `D4:8B:1B:D4:D9:8D:76:24:ED:1D:74:BA:BA:C6:9B:11:9A:1A:33:DF` (informational; compare SHA-256) |
+| Archivo | `~/.android-keystores/trindade-release.jks` (fuera del repositorio) |
+| Tipo / alias | PKCS12 / `trindade` |
+| Clave | RSA 4096, autofirmada, válida hasta 2054 |
+| DN del certificado | `CN=Trindade Massas Operacoes, OU=Mobile, O=Trindade, L=Sao Paulo, ST=SP, C=BR` |
+| **Huella SHA-256** | `EE:0E:40:4B:21:10:52:B3:11:AE:0E:07:30:60:6E:9C:7D:55:54:31:54:63:D0:2F:9E:F3:3C:95:73:C4:31:F6` |
+| SHA-1 (informativa) | `D4:8B:1B:D4:D9:8D:76:24:ED:1D:74:BA:BA:C6:9B:11:9A:1A:33:DF` |
 
-Compare fingerprints with either tool, and mind the format difference: `keytool` prints them
-colon-separated, `apksigner` prints the same digest as bare lowercase hex.
+`keytool` imprime la huella con dos puntos; `apksigner` la imprime como hex minúsculo sin separadores. Comparar
+siempre SHA-256.
 
 ```bash
-# From the keystore itself
 keytool -list -v -keystore ~/.android-keystores/trindade-release.jks -alias trindade | grep SHA256
 
-# From a built APK — this is the check the release workflow automates
 apksigner verify --print-certs app/build/outputs/apk/release/app-release.apk | grep 'certificate SHA-256'
 ```
 
-If the APK's digest does not match this fingerprint, **do not publish it and do not install it**: an
-installed app signed with this key cannot be updated by an APK signed with another, so the wrong key is
-the one mistake that cannot be repaired later.
+Si la huella del APK no coincide, **no publicar y no instalar**. La clave equivocada es el único error que no se
+puede reparar después.
 
----
+### Respaldo del keystore
 
-## 7. Back up the keystore. This is the part that cannot be undone
+Perder el keystore significa que ninguna copia instalada de la app podrá actualizarse nunca más. Hay que:
 
-**Losing the keystore means every installed copy of the app can never be updated again.** Not "needs a new
-build": Android refuses to install an APK whose signing certificate differs from the installed one
-(`INSTALL_FAILED_UPDATE_INCOMPATIBLE`). The only way forward would be to uninstall the app on every phone —
-losing whatever local state it holds — and install the new one from scratch.
+- Respaldar el `.jks` **y su contraseña**, por separado, en al menos dos lugares fuera del repositorio y fuera de
+  la máquina que construye releases.
+- No copiar el keystore al checkout ni escribir la contraseña en un archivo versionado.
+- Recordar que no hay rotación posible que conserve la actualizabilidad de las apps instaladas.
 
-- Back up `trindade-release.jks` **and its password**, and keep them **separate** from each other, in at
-  least two places that are not this repository and not the machine that builds releases.
-- Never copy the keystore into the checkout, and never write its password into a file git tracks. The
-  `.gitignore` rules for `keystore.properties`, `*.jks`, `*.keystore`, `*.p12` and `*.pfx` exist as a backstop for an
-  accident, not as a place to store it.
-- The keystore is valid until 2054 and self-signed; there is no rotation path that keeps installed apps
-  updatable, which is exactly why the file must outlive every laptop that has touched it.
+## 7. Distribución
 
----
+Hay dos vías:
 
-## 8. Where the crew downloads the APK
+1. **GitHub Releases:** <https://github.com/wilkinbarban/Trindade/releases/latest>. El asset se llama
+   `trindade-<versión>.apk` y va acompañado de su `.sha256`.
+2. **Instancia de producción:** `GET /api/app/download-apk`, que sirve el APK incluido en
+   `packages/backend/apk/`. La app consulta `GET /api/app/latest-release` para verificar la versión.
 
-Every release is published at:
+En el teléfono, abrir el enlace, descargar el APK y permitir la instalación desde esa fuente la primera vez. La
+versión instalada se lee en **Perfil → Versión de la aplicación**.
 
-**https://github.com/wilkinbarban/Trindade/releases/latest**
+## 8. Lane de CI
 
-The asset is named `trindade-<version>.apk` (for example `trindade-1.2.3.apk`), and the release notes
-list the commits since the previous tag. On the phone, open that link, download the APK and open it; the
-installer asks to allow installing from this source the first time. The version that was installed is
-readable in the app under **Perfil → Versão do aplicativo**, which is the answer to "did this phone get
-the update?".
+`scripts/ci-android.sh` (`make ci-android` y el job `android` de `ci.yml`) compila un release **sin firma y sin
+keystore**:
 
-An update installs over the existing app only when both APKs come from the same signing key — see
-Section 7 for why that makes the keystore the most important file in this procedure.
+- Pasa `-PversionName=0.0.1 -PversionCode=1`, placeholders consistentes.
+- Pasa `-PapiBaseUrl=https://ci.invalid/`, una URL válida pero deliberadamente irresoluble.
+- No pasa `-PrequireSigned=true`, para ejercitar el camino sin firma.
+- Verifica que un release sin `-PapiBaseUrl` falla con el mensaje de la guarda.
+- Verifica el `network_security_config.xml` y el contrato Android.
 
----
+La única lane con keystore es el workflow de release, y la única forma de que la versión deje de ser un
+placeholder es un tag.
 
-## 9. What the CI lane does, and deliberately does not
+## 9. Checklist de release
 
-`scripts/ci-android.sh` (`make ci-android`, and the `android` job in `.github/workflows/ci.yml`) builds a
-release, but it does so **unsigned and keystore-free**, and that is the point:
+- [ ] El commit a etiquetar está verde en `ci.yml`.
+- [ ] El tag sigue el formato `v<major>.<minor>.<patch>`.
+- [ ] `minor` y `patch` están entre 0 y 999.
+- [ ] El tag no existe ni se mueve.
+- [ ] Los secretos de firma están configurados.
+- [ ] `ANDROID_API_BASE_URL` termina en `/` y usa `https://`.
+- [ ] El workflow construye, verifica la huella y publica APK + `.sha256`.
+- [ ] La descarga publicada se verifica con `sha256sum -c` y `apksigner`.
+- [ ] Las notas de la release declaran el mismo `versionCode` y hash que el asset publicado.
+- [ ] El APK se instala sobre la versión anterior con `adb install -r`.
+- [ ] El histórico de builds se actualiza con la versión, el build y el hash.
 
-- it passes `-PversionName=0.0.1 -PversionCode=1`, consistent placeholders, because a release build
-  requires a version and this lane is not a release;
-- it passes `-PapiBaseUrl=https://ci.invalid/`, a URL that is valid and deliberately unresolvable;
-- it does **not** pass `-PrequireSigned=true`, so the unsigned path stays exercised;
-- it asserts that a release build without a base URL fails with the base-URL guard's own sentence,
-  `A release build requires -PapiBaseUrl=`. That assertion passes the version properties and greps that
-  longer prefix on purpose: three rules now open with the words "A release build requires", and a check
-  that greps only that prefix could be satisfied by a build that failed because no version was given.
+## 10. Problemas frecuentes
 
-The only place a keystore exists is the release workflow, and the only place the version stops being a
-placeholder is a tag.
+| Síntoma | Causa probable | Acción |
+| --- | --- | --- |
+| `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | APK firmado con otra clave | Detener la publicación; recuperar el keystore correcto |
+| El workflow falla al decodificar el keystore | `ANDROID_KEYSTORE_BASE64` vacío o con formato inválido | Regenerar el base64 en una sola línea |
+| `A release build requires -PversionName` | Faltan las propiedades de versión | Pasar `-PversionName` y `-PversionCode` |
+| `A release build requires -PapiBaseUrl=` | Falta la URL base o no es `https` | Configurar `ANDROID_API_BASE_URL` con barra final |
+| `versionCode` menor que el instalado | Tag o fórmula incorrectos | Revisar la fórmula y usar un tag superior; no mover el tag |
+| El APK no aparece en la release | Job `publish` falló o no se ejecutó | Revisar logs del job y reejecutarlo |
+| El `.sha256` no coincide | Asset reemplazado por una build distinta | Regenerar el sidecar desde el job de publicación |

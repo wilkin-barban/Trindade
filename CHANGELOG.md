@@ -1,282 +1,347 @@
 # Changelog — Trindade Massas
 
-Todas as alterações notáveis neste projeto serão documentadas neste arquivo.
-O formato baseia-se em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
-e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
+Todos los cambios relevantes del proyecto se documentan en este archivo. El formato sigue
+[Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el versionado usa
+[SemVer](https://semver.org/lang/es/).
+
+Las versiones **0.6.x** se distribuyeron por `GET /api/app/download-apk` y no tienen tag propio en GitHub.
+La release **v0.7.0** es la primera de la línea 0.7.x publicada en GitHub Releases. El detalle de builds,
+hashes y verificaciones está en [docs/release-android-historial.md](docs/release-android-historial.md).
+
+---
+
+## [0.7.0+7000] — 2026-10-31
+
+### Añadido
+
+- **Reporte con el ERP como única fuente de verdad.** El reporte del día se alimenta de `aero_movements` y
+  separa los diez códigos de masas de todo lo demás, que se clasifica como **Recepción de Insumos**. Ambos
+  bloques viven bajo una sola tarjeta y una sola acción de sincronización.
+- **Operarios por asiento del ERP.** Cada asiento conserva el operario que la empresa registró. Si el nombre
+  no resuelve a una cuenta, la fila ofrece `+ Crear Operario` en línea; si la cuenta existe pero está
+  desactivada, se rechaza con `MASSAS_OPERATOR_INACTIVE`.
+- **Alta explícita de operarios.** El botón `+ Registrar Operario` crea la cuenta con rol Trabajador, login
+  sin puntos y contraseña de al menos 15 caracteres.
+- **Espejo ERP en web y Android.** El snapshot del día queda disponible para toda la planta, con chips por
+  operario, conciliación por número de asiento y lectura de solo lectura para los asientos de la empresa.
+- **Vista móvil de iPhone** para el espejo y el panel de integración, con el panel de configuración reducido a
+  URL, usuario y contraseña.
+
+### Cambiado
+
+- El **Reporte** dejó de leer `massa_launches`: la comparación de balance ya no se dibuja allí y queda en
+  Lanzamiento de Masas, que es donde tiene sentido.
+- La **importación de un asiento** se rechaza con `MASSAS_OPERATOR_NOT_LINKED` cuando el asiento no tiene
+  operario vinculado, en lugar de atribuirlo a quien importa.
+- La **verificación de actualización** de Android consulta `GET /api/app/latest-release` en lugar de la API
+  anónima de GitHub.
+- La tarjeta ERP apila título y acción por debajo de 420 dp para que quepan en pantalla de teléfono.
+
+### Distribución Android
+
+- Build **7000** es el asset actual de GitHub Release `v0.7.0` (`trindade-0.7.0.apk` y su `.sha256`), verificado
+  el 2026-11-01 con `versionCode 7000` y sha256 `e8cee2d3…`.
+- Build **7001** existe en respaldos y es la que mencionan las notas de la release, pero **no** es el asset
+  publicado.
+- Build **7002** es la que sirve `GET /api/app/download-apk` en producción, con sha256 `bc038f2e…`.
+- Hay una build **7003** en preparación para la homogeneización visual de Android. El tag `v0.7.0` no se mueve.
+- La discrepancia entre las notas y el asset está documentada en [docs/release-android-historial.md](docs/release-android-historial.md).
+
+---
+
+## [0.6.3+6003] — 2026-10-31
+
+### Corregido
+
+- La tarjeta de reporte de masas interpreta correctamente la respuesta del backend (`name`/`displayName`,
+  `erpOnly`/`onlyErp`, `operatorKey` y `entLans`), que antes quedaba vacía porque el contrato Kotlin no
+  aceptaba el cuerpo.
+- La pantalla **Compartir App** crea el operario antes de enviar el mensaje, con login sugerido desde el
+  nombre y contraseña generada.
+
+### Distribución Android
+
+- Build **6003** distribuida por `/api/app/download-apk`; sin tag ni release en GitHub.
+
+---
+
+## [0.6.2+6002] — 2026-10-30
+
+### Corregido
+
+- Las negativas del módulo de masas llegan con `errorCode` y frase en portugués; Android resuelve primero el
+  código, de modo que un `409` ya no aparece como un número de estado sin contexto.
+- Un lanzamiento importado se atribuye al operario que nombra el asiento del ERP, con `erpOnly` cuando esa
+  persona no tiene cuenta en Trindade, en lugar de atribuirlo a quien importó.
+
+### Distribución Android
+
+- Build **6002** distribuida por `/api/app/download-apk`; sin tag ni release en GitHub.
+
+---
+
+## [0.6.1+6001] — 2026-10-30
+
+### Añadido
+
+- La tabla unificada de masas solo ofrece la importación en el asiento que el backend atribuye al lector
+  (`canImportRow`, sobre `owner_user_id`).
+- Un día pasado es de solo lectura también en el teléfono, igual que en el servidor.
+
+### Distribución Android
+
+- Build **6001** distribuida por `/api/app/download-apk`; sin tag ni release en GitHub.
+
+---
+
+## [0.6.0+6000] — 2026-10-30
+
+### Añadido
+
+- **Paridad Android con el trabajo de Aero32 de la web:** llamadas nativas al WebService por OkHttp con Basic
+  Auth leída del almacén cifrado, tabla única de masas sobre los tres estados del día, barra de balance y
+  filtro universal por operario.
+- Sincronización nativa del día hacia el espejo ERP y tarjeta permanente de masas en las dos pantallas de
+  reportes.
+- Sección **Integración ERP / Aero32** en el panel de administración.
+- Regla de inmutabilidad: un lanzamiento que el ERP ya registró no ofrece editar ni eliminar, para ningún rol.
+
+### Distribución Android
+
+- Build **6000** distribuida por `/api/app/download-apk`; sin tag ni release en GitHub.
 
 ---
 
 ## [0.5.3+5003] — 2026-10-25
 
-### 📦 Distribuição Android v0.5.3 (Code 5003)
-- **A mesma entrega, agora com a versão que a tag declara**: o conteúdo é o da build 514 — Perfil com
-  cabeçalho e ação de descarga só quando há atualização, sinal `-` preso ao início nas temperaturas, máscara
-  `HH:mm` com relógio nos horários de carga e Histórico de Contagem de leitura com o resumo do dia. Nada
-  muda no comportamento; muda o número que o Android compara.
-- **Por que a versão sobe sem código novo**: a build 514 foi publicada sobre a tag `v0.5.2`, cujos assets
-  foram substituídos duas vezes. Tag publicada não se move e não se reaproveita, então a entrega sai de novo
-  como `v0.5.3`. A derivação da tag dá `versionName=0.5.3` e `versionCode=5003`, acima do 514 já instalado:
-  é uma atualização que qualquer telefone aceita, e não um downgrade.
-- **Workflow da tag**: a release não é mais montada à mão. O push da tag constrói, assina, confere a
-  impressão digital do certificado e o `versionCode` empacotado, e publica o `trindade-0.5.3.apk` junto ao
-  `trindade-0.5.3.apk.sha256` que ele mesmo calcula sobre os bytes enviados.
+### Distribución Android
 
-### 🔧 Manutenção
-- **Gate de testes**: 1029 testes de unidade e Compose do cliente Android, 0 falhas, 0 omitidos; 520 de
-  backend e os de frontend, verdes.
-- **Derivação de versão documentada de novo**: `docs/release-android.md` e o comentário da lane do Android
-  ainda ensinavam `major * 10000 + minor * 100 + patch`, a fórmula estreita que fez `v0.5.2` derivar 502
-  abaixo do 511 que já estava na rua. A página agora ensina a que o workflow usa
-  (`major * 1000000 + minor * 1000 + patch`), com o orçamento de três dígitos por componente e o exemplo da
-  colisão que ela recusa.
-- **Contrato da API em dia**: `packages/contracts/openapi.json` foi regerado com o `MassasErrorResponse` que a
-  remediação de auditoria 509 introduziu. O job `verify` falhava desde então comparando o contrato versionado
-  com o gerado.
-- **Teste do Lançamento de Massas sem vazamento**: `MassasLaunchViewModelTest` deixava o `viewModelScope` do
-  modelo criado no `setUp` consultando o servidor enquanto o teste seguinte trocava o dispatcher principal, e
-  o `resetMain` estourava com `IllegalStateException` no job `android`. O `tearDown` agora cancela o escopo
-  antes de derrubar o servidor e restaurar o dispatcher.
+- La misma entrega de la build 514, cortada como `v0.5.3` porque la build 514 quedó sobre el tag `v0.5.2`,
+  cuyos assets se reemplazaron dos veces. El tag publicado no se mueve ni se reutiliza.
+- El workflow del tag construye, firma, verifica la huella del certificado y el `versionCode` empaquetado, y
+  publica el APK junto al `.sha256` calculado sobre los bytes enviados.
+
+### Mantenimiento
+
+- Compuerta de pruebas verde en Android, backend y frontend.
+- Documentación de la derivación de versión corregida a `major*1000000 + minor*1000 + patch`.
+- Contrato OpenAPI regenerado con `MassasErrorResponse`.
+- Corregido un test de lanzamiento de masas que dejaba el `viewModelScope` activo entre pruebas.
+
+---
 
 ## [0.5.2+514] — 2026-10-24
 
-### ✨ Melhorado (Perfil, temperatura, horários e histórico de estoque)
-- **Perfil**: o título `Perfil` aparece na cabeçalho junto ao `Voltar`, no padrão das pantallas secundárias, e
-  a ação primária preenchida `Baixar nova versão` só é desenhada quando existe uma atualização de fato — uma
-  versão disponível, ou uma leitura que falhou e se pode repetir. Com o aplicativo em dia ficam só o aviso de
-  que já está na versão mais recente e o botão para verificar outra vez.
-- **Temperatura nos relatórios**: o sinal `-` agora só existe no começo. Um `-` digitado no fim ou no meio do
-  número muda de lugar enquanto se escreve, o `±` reescreve o valor com um único sinal e o campo aceita um
-  único separador decimal — `.` ou `,`.
-- **Horário de carga (Painel Admin)**: teclado numérico, máscara `HH:mm` que coloca os dois pontos sozinha
-  conforme os quatro dígitos chegam (e volta atrás ao apagar) e um relógio ao lado do campo que abre o seletor
-  de hora do sistema já com o valor escolhido.
-- **Histórico de estoque**: virou leitura nos dois lados. A pantalla mostra o **Resumo Coletivo do Dia** que o
-  servidor somou, com o total do dia, e oferece enviá-lo por WhatsApp ou correio; a calculadora, os campos de
-  quantidade e os botões `Adicionar`/`Zerar` saíram. O calendário aceita hoje e os trinta dias anteriores, e a
-  data abre pelo campo ou pelo botão.
-- **Material 3**: nenhum literal `Color(0x…)` fora de `ui/theme/Theme.kt` e nenhum alvo de toque abaixo de
-  48dp nas quatro pantallas tocadas.
+### Mejorado
+
+- **Perfil:** título en el encabezado junto a Volver y botón de descarga solo cuando existe una actualización
+  real o una lectura que se puede reintentar.
+- **Temperaturas:** el signo `-` solo existe al inicio; `±` reescribe el valor con un único signo y el campo
+  acepta un solo separador decimal.
+- **Horario de carga:** teclado numérico, máscara `HH:mm` y selector de hora del sistema.
+- **Historial de stock:** lectura del resumen colectivo del día, con envío por WhatsApp o correo y calendario
+  limitado a hoy y los treinta días anteriores.
+- **Material 3:** sin colores literales fuera del tema y objetivos de toque de 48 dp.
+
+### Distribución Android
+
+- Build **514** publicada sobre `v0.5.2`; assets reemplazados dos veces.
+
+---
 
 ## [0.5.2+513] — 2026-10-24
 
-### ✨ Melhorado (toda a interface Android nos tokens do Material 3)
-- **Cores do tema em toda a aplicação**: os literais `Color(0xFF…)` saíram das telas e dos diálogos; cada
-  cor agora vem de `MaterialTheme.colorScheme` (ou de um token nomeado na paleta, como o âmbar da ajuda e o
-  verde do WhatsApp). Um teste de fonte (`M3TokenHygieneTest`) falha se um `Color(0x…)` reaparecer fora de
-  `ui/theme/Theme.kt`.
-- **Cartões com a mesma superfície e o mesmo raio**: `Card` usa as superfícies tonais do esquema
-  (`surfaceContainer`, `surfaceContainerHigh`) e o canto padrão de 12dp do Material 3, em vez de cinco raios
-  diferentes espalhados pelas telas.
-- **Alvos de toque de 48dp também nos controles desenhados menores**: os botões de histórico e ajuda das
-  cabeçalhos são uma pílula de 36dp dentro de uma área de toque de 48dp, e o mesmo tratamento vale para o
-  sincronizar do Lançamento de Massas e os chips de operário. A pílula cresce com a escala de fonte em vez de
-  cortar a etiqueta.
-- **Diálogos de administração**: confirmação antes de criar, editar, excluir, ativar e desativar em
-  Usuários, Veículos, Categorias, Horários, Tarefas e Motoristas, e uma janela de resultado com ✅ Sucesso ou
-  ❌ Erro e um único botão para fechar. O botão `Atualizar` redundante saiu das seis seções e do histórico de
-  massas.
-- **Perfil reorganizado**: cabeçalho com avatar (iniciais ou ícone), nome de exibição, `@usuário` e o papel;
-  depois `Dados da Conta`, `Segurança`, `Versão do aplicativo e atualizações` e `Sair da conta`, cada bloco
-  em seu cartão.
-- **Calculadora de Assaí**: título do módulo e ajuda na mesma linha, com o subtítulo abaixo.
+### Mejorado
+
+- Toda la interfaz Android pasa a los tokens de Material 3: colores del esquema, superficies tonales, radio
+  de 12 dp y objetivos de toque de 48 dp.
+- Los seis paneles de administración confirman antes de escribir y muestran un diálogo de resultado.
+- Perfil reorganizado en tarjetas.
+- Calculadora de Assaí con título y ayuda en la misma línea.
+
+### Distribución Android
+
+- Build **513** publicada sobre `v0.5.2`.
+
+---
 
 ## [0.5.2+512] — 2026-10-24
 
-### ✨ Melhorado (navegação, ícones e cabeçalhos do Android como na Web)
-- **Ícones vetoriais próprios**: dezessete recursos XML novos (`ic_menu`, `ic_profile`, `ic_dashboard`, `ic_reports`, `ic_truck`, `ic_layers`, `ic_calculator`, `ic_boxes`, `ic_calendar`, `ic_archive`, `ic_file_clock`, `ic_history`, `ic_share`, `ic_admin`, `ic_audit`, `ic_tasks`, `ic_drivers`) substituem os glifos emprestados do Material por formas equivalentes às do Lucide na Web. Antes quatro telas dividiam a mesma área de transferência e dois históricos o mesmo relógio, e o menu só se lia pelo texto.
-- **Cabeçalho sem texto**: a barra superior fica com o botão de menu (`ic_menu`) à esquerda, a marca ao centro e o perfil (`ic_profile`, com o indicador de atualização quando há uma) à direita, todos com alvo de toque de 48dp e descrição de acessibilidade.
-- **Fila de abas reduzida a oito módulos raiz**: Dashboard, Relatórios, Horários, Lançamento de Massas, Calculadora de Assaí, Calculador de Estoque, Painel Admin e Compartilhar App. Os históricos e os catálogos secundários saem da fila e continuam a um toque no menu.
-- **Menu lateral em treze entradas com ícone**, agrupadas em `OPERAÇÕES` e `ADMINISTRAÇÃO`, na ordem da barra lateral da Web. `Painel Admin` aparece para Administrador e Trabalhador, cada um com as seções do seu papel; `Auditoria` continua exclusiva do Administrador.
-- **Painel Admin com Tarefas e Motoristas**: as duas seções passam a ser cartões do painel para os dois papéis (respeitando `CATALOG_TASKS` e `CATALOG_DRIVERS`), em vez de abas próprias. As cinco seções de administração seguem exclusivas do Administrador, e o backend não mudou.
-- **Módulos sem título repetido nem "Voltar" na raiz**: Assaí, Estoque, Carregamento, Massas, Relatórios e Compartilhar App perdem o `titleLarge` que repetia o nome da aba e o botão que voltava ao Dashboard; no lugar entra uma barra de ações com `Histórico` (nos módulos que têm um) e `Ajuda`. "Voltar" fica onde há subpantalla de verdade: os históricos.
-- **Calculador de Estoque conta só o dia de hoje**: o campo de data e o seletor de dia saem da calculadora, que passa a operar sempre sobre o dia corrente em São Paulo. Corrigir um dia anterior é trabalho do Histórico de Estoque, que abre a data que se escolheu — antes um campo de data permitia contar sem olhar para o dia.
-- **Frase do módulo de massas inteira**: a legenda do Lançamento de Massas dividia a linha com os dois botões e aparecia cortada a meio; passa a ocupar duas linhas e a ser lida por completo.
+### Mejorado
 
-### 🔧 Manutenção
-- **Gate de testes**: 975 testes de unidade do cliente Android, 0 falhas. Os testes de navegação e do painel foram reescritos para as novas regras: a fila de abas e sua ordem, as treze entradas do menu com os históricos fora da fila, os overlays que um histórico abre, o papel que vê `Auditoria`, e Tarefas/Motoristas como cartões do painel para o Trabalhador.
-- **Distribuição Android v0.5.2 (Code 512)**: `versionCode=512`, `versionName=0.5.2`, binário assinado sob APK Signature Scheme v2 (`CN=Trindade Massas Operacoes`), `aapt2` com `versionCode='512'` e `versionName='0.5.2'`, `10,900,292` bytes, `sha256 f302cf5dc33e0e82fad0341df2689c4bc5c7cda70b00c6ca8009294d9e26811a`, publicado em GitHub Release `v0.5.2` e copiado para o Desktop.
-- **Entrega que se pode instalar por cima da anterior**: o workflow da tag derivava `versionCode=502` para `v0.5.2`, porque na linha 0.x o major não rende dígito acima do minor, enquanto `v0.5.1` já estava publicado como 511. O Android compara esse número para decidir o que é atualização, então a build de 502 seria recusada como downgrade em quem tem 0.5.1. A release carrega a build 512 e a derivação passou a `major*1000000 + minor*1000 + patch` (`v0.5.3` → 5003, `v0.6.0` → 6000), verificada contra uma tabela de tags que inclui os casos que devem falhar.
-- **Checksum gerado por quem publica**: o `trindade-0.5.2.apk.sha256` agora sai do próprio job de publicação, sobre os bytes que ele envia. Antes era um arquivo enviado à mão e, nesta tag, ele descrevia o APK que o workflow tinha acabado de substituir: a release anunciava um digest que nenhum download podia conferir.
+- **Navegación Android:** diecisiete iconos vectoriales propios, encabezado sin texto, ocho pestañas raíz,
+  menú lateral de trece entradas agrupadas en Operaciones y Administración.
+- **Panel de administración:** Tareas y Conductores pasan a ser tarjetas para ambos roles.
+- **Módulos raíz:** sin título repetido ni botón Volver en la raíz; las acciones de Historial y Ayuda quedan
+  en la barra.
+- **Calculador de stock:** opera siempre sobre hoy en São Paulo; la corrección de un día anterior es tarea
+  del Historial de stock.
+- **Distribución Android:** build **512**, publicada sobre `v0.5.2` con la derivación de versión corregida.
+
+### Mantenimiento
+
+- Se corrigió la derivación de `versionCode` que producía `502` para `v0.5.2` y habría sido un downgrade
+  frente al `511` ya instalado.
+- El `.sha256` lo genera el propio job de publicación sobre los bytes que sube.
 
 ---
 
 ## [0.5.1+511] — 2026-10-23
 
-### ✨ Melhorado (estoque mais limpo e com o resumo do dia)
-- **Calculador de Estoque — mensagem e e-mail sem o código do produto**: o texto que sai da planta deixa de carregar o código (`CANUDO (787) — 150 un` virou `CANUDO — 150 un`) e o corpo do e-mail perde a coluna `Código`, passando a `Categoria | Produto | Unidades`. Paridade exata entre Web (`stock.ts`) e Android (`StockMessages.kt`), com os testes dos dois lados afirmando a ausência do código em vez da presença.
-- **Resumo Coletivo do Dia no estoque**: nova seção logo abaixo da calculadora, com o mesmo desenho do resumo de massas — cartelas âmbar com nome, `un/cx` e as etiquetas de caixas e unidades — e **sem** filtro por operador, porque uma contagem de estoque é do galpão e não de quem passou por ele. Os números vêm do que o servidor já somou; a tela não recalcula nada. Web (`StockCalculatorPage.tsx`) e Android (`StockCalculatorScreen.kt`), 6 chaves novas por idioma com paridade `pt`/`es` (639 em cada) e o curto espanhol `cj`/`un`.
+### Mejorado
 
-### 🔧 Manutenção
-- **Gate de testes**: 520 testes de backend, 149 de frontend e 974 de Android, todos verdes. O teste de payload `AdminApiPayloadTest` trocou um `timeout` de 5 s por um guarda de 30 s: aquele prazo estourava com a suíte inteira no mesmo contêiner (o mesmo teste passa sozinho e levou 8,2 s na corrida que falhou), e o que ele afirma é o conteúdo do payload, não a latência.
-- **Distribuição Android v0.5.1 (Code 511)**: `versionCode=511`, `versionName=0.5.1`, binário assinado sob APK Signature Scheme v2 (`CN=Trindade Massas Operacoes`), `aapt2` com `versionCode='511'`, `10,888,124` bytes, `sha256 04f3848bc2194fda7262bb3ce916122cb74942a96dba3fa6174995bd2554f593`, publicado em GitHub Release `v0.5.1` (`app-release.apk`, `trindade-0.5.1.apk` e `.sha256` com os mesmos bytes) e copiado para o Desktop.
+- **Stock:** el mensaje y el correo dejan de incluir el código de producto; se añade el Resumen Colectivo del
+  Día con el total del día.
+- **Paridad web/Android** en la ausencia del código y en el resumen colectivo.
+
+### Distribución Android
+
+- Build **511** publicada sobre `v0.5.1`.
 
 ---
 
 ## [0.5.1+510] — 2026-10-23
 
-### ✨ Melhorado (mensagens administrativas no idioma ativo)
-- **Android — ViewModels de administração traduzidos**: `Usuários`, `Veículos`, `Categorias`, `Motoristas`, `Tarefas`, `Faixas horárias` e `Auditoria` deixam de guardar frases prontas em português. Cada mensagem viaja como recurso (`UiText`) e a tela resolve no idioma ativo, igual ao já feito em Massas, Estoque e Relatório — inclui validações de formulário, aviso de senha e as mensagens embutidas de Faixas horárias.
-- **Catálogos**: 12 chaves novas por idioma, com paridade exata `pt`/`es` (634 chaves em cada) e frases em português byte a byte iguais às publicadas.
+### Mejorado
 
-### 🔧 Manutenção
-- **Distribuição Android v0.5.1 (Code 510)**: `versionCode=510`, `versionName=0.5.1`, binário assinado sob APK Signature Scheme v2 (`CN=Trindade Massas Operacoes`), `aapt2` com `versionCode='510'`, `10,885,848` bytes, `sha256 4d8440dbc66ee17adee22916406ca9497b66a2a428031bd440194cf58bb94b55`, publicado em GitHub Release `v0.5.1` (`trindade-0.5.1.apk`, `.sha256` e `app-release.apk` com os mesmos bytes) e copiado para o Desktop.
+- Los ViewModels de administración (Usuarios, Vehículos, Categorías, Conductores, Tareas, Horarios y
+  Auditoría) usan recursos de texto y resuelven el idioma activo en la pantalla.
+- Doce claves nuevas por idioma con paridad `pt`/`es`.
+
+### Distribución Android
+
+- Build **510** publicada sobre `v0.5.1`.
 
 ---
 
 ## [0.5.1+509] — 2026-10-22
 
-### ✨ Melhorado (segurança de sessão, i18n e datas)
-- **Web — renovação transparente da sessão**: o cliente guarda o refresh token, renova o access token expirado contra `/api/auth/refresh` e repete a requisição original uma única vez; renovações concorrentes compartilham uma só chamada e a sessão só é encerrada quando a renovação falha.
-- **Android — telas administrativas traduzidas**: `Usuários`, `Veículos`, `Categorias`, `Motoristas`, `Tarefas`, `Faixas horárias` e `Auditoria` passam a ler todo o texto de `strings.xml`, com paridade `pt`/`es`. Nenhum texto em português fica fixo no código dessas telas.
-- **Android — mensagens de erro modeladas**: os ViewModels de Massas, Estoque e Relatório deixam de emitir frases prontas e passam a carregar o recurso a ser resolvido na tela, no idioma ativo.
-- **Android — permissões de lançamento iguais ao servidor**: editar e excluir um lançamento de massas fica restrito ao próprio autor na data corrente; a rama de administrador que nunca podia ser satisfeita foi removida.
-- **Datas**: o backend recusa lançamentos de massas com data futura (`MASSAS_FUTURE_DATE`), os inputs de data da Web limitam-se a hoje em São Paulo e todos os seletores de data do Android abrem no fuso `America/Sao_Paulo`, não no fuso do aparelho.
-- **Falhas visíveis**: o carregamento de veículos do cronograma e a consulta de versão/QR da tela de compartilhamento passam a mostrar o erro com ação de tentar de novo em vez de falharem em silêncio.
+### Mejorado
 
-### 🔧 Manutenção
-- **Contrato de erros**: as rotas de Massas respondem `{ error, code }` com um código semântico estável; o backend não lê `Accept-Language` nem traduz, e cada cliente resolve o texto no seu próprio catálogo.
-- **Distribuição Android v0.5.1 (Code 509)**: `versionCode=509`, `versionName=0.5.1`, binário assinado sob APK Signature Scheme v2 (`CN=Trindade Massas Operacoes`).
+- **Web:** renovación transparente de la sesión con refresh token y reintento único de la petición original.
+- **Android:** pantallas administrativas traducidas y mensajes de error modelados como recursos.
+- **Permisos:** editar y eliminar un lanzamiento de masas queda restringido al autor en la fecha corriente.
+- **Fechas:** el backend rechaza lanzamientos futuros (`MASSAS_FUTURE_DATE`) y los selectores abren en
+  `America/Sao_Paulo`.
+- **Errores visibles:** las lecturas de vehículos y de versión/QR muestran el fallo con opción de reintentar.
+
+### Distribución Android
+
+- Build **509** publicada sobre `v0.5.1`.
 
 ---
 
 ## [0.5.1+508] — 2026-10-22
 
-### 🐛 Corrigido (Relatório — seção de massas)
-- **Prefixo `MASSA` removido do texto exportado**: o texto de WhatsApp gerado pelo backend para o módulo Relatório passa a exibir `CASEIRA` e `ROLO 2KG` em `Por Operário:` e `Resumo Coletivo:`, em vez de `MASSA CASEIRA` / `MASSA ROLO 2KG`, alinhando o relatório ao módulo Lançamento de Massas. Regra aplicada: `^MASSAS?\s+(?:DE\s+)?` (insensível a caixa), portanto nomes sem o prefixo permanecem intactos.
+### Corregido
 
-### 🔧 Manutenção
-- **Distribuição Android v0.5.1 (Code 508)**: `versionCode=508`, `versionName=0.5.1`, binário assinado sob APK Signature Scheme v2 (`CN=Trindade Massas Operacoes`), `aapt2` com `versionCode='508'`, `10,814,264` bytes, `sha256 091f5cf7be05b3214fedf75ec29b8c56cda0d2da27608d3e894734301522ae19`, publicado em GitHub Release `v0.5.1` (`trindade-0.5.1.apk`, `.sha256` e `app-release.apk` com os mesmos bytes) e copiado para o Desktop.
+- La exportación de WhatsApp del reporte elimina el prefijo `MASSA` de los nombres de producto en
+  `Por Operario:` y `Resumen Colectivo:`.
+
+### Distribución Android
+
+- Build **508** publicada sobre `v0.5.1`.
 
 ---
 
 ## [0.5.1+507] — 2026-10-22
 
-### ✨ Melhorado (Lançamento de Massas — paridade Web e Android)
-- **Ordem das vistas**: *Lançamentos Individuais* passam a aparecer acima do *Resumo Coletivo do Dia* nas duas plataformas.
-- **Filtro simultâneo por trabalhador**: os chips de trabalhador filtram tanto a lista de lançamentos individuais quanto os produtos do resumo coletivo, recalculados a partir dos lançamentos visíveis (o catálogo fornece apenas nomes, unidades por caixa e ordem).
-- **Nomes dos trabalhadores por produto**: cada item do resumo coletivo exibe `👤 João Silva, Maria Souza`.
-- **Total Geral removido** do resumo coletivo; o total do formulário de lançamento permanece inalterado.
-- **Destaque visual do resumo coletivo**: cartões em âmbar, tipografia em negrito e badges dedicados para `cx` e `un`.
-- **Prévia de WhatsApp reformulada**: remove o prefixo `MASSA ` / `MASSA DE ` dos nomes de produto, inclui o *Resumo Coletivo* e adiciona o bloco `*Por Trabalhador:*` com `un (cx)` por operador, em ordem alfabética e com os produtos na ordem do catálogo.
-- **Distribuição Android v0.5.1 (Code 507)**: `versionCode=507`, `versionName=0.5.1`, binário assinado sob APK Signature Scheme v2 (`CN=Trindade Massas Operacoes`), `aapt2` com `versionCode='507'`, `10,814,264` bytes, `sha256 3d03d5819423c05d9cc9bc61b28227363a4ce751bd86085bc8859cb725675cf7`, com `app-release-unsigned.apk` ausente do diretório de saída. Publicado em GitHub Release `v0.5.1` (`trindade-0.5.1.apk`) e copiado para o Desktop.
+### Mejorado
+
+- **Lanzamiento de masas:** lanzamientos individuales por encima del resumen colectivo, filtro simultáneo por
+  trabajador, nombres por producto, sin total general y con tarjetas ámbar.
+- **WhatsApp:** vista previa con resumen colectivo y bloque `Por Trabajador:`; se elimina el prefijo `MASSA`.
+- **Distribución Android:** build **507** publicada sobre `v0.5.1`.
 
 ---
 
 ## [0.5.1] — 2026-10-21
 
-### 🎯 Adicionado (Lançamento de Massas e Ajuda Contextual)
-- **Módulo Lançamento de Massas** (`/massas-launch`, web e Android):
-  - Catálogo de 10 produtos de massas com cálculo em tempo real de caixas para unidades.
-  - **Resumo Coletivo do Dia**: agregação de caixas e unidades totais em formato adaptado a dispositivos móveis, com detalhe cronológico de cada lançamento registrado (hora, operador, quantidades).
-  - **RBAC e controle de autor**: botões de edição e exclusão de lançamentos habilitados exclusivamente para o próprio usuário autor (`launch.user_id == currentUserId`) ou para Administradores.
-  - **Atualização pasiva em tempo real (Live Polling)**: sincronização silenciosa a cada 15 segundos (`POLL_INTERVAL_MS = 15000L`) em segundo plano enquanto a tela estiver visível e sem edição ativa, sem interromper foco nem inputs do operador.
-  - **Histórico de Lançamentos de Massas** (`/massas-history`, web e Android): navegação cronológica por data com resumo acumulado dos produtos lançados.
-  - **Modo Leitura Estrito em Datas Anteriores**: em datas passadas (`date != saopauloToday()`), oculta a calculadora de caixas e inputs de produção, desativa a edição e exclusão de lançamentos individuais, exibe badge informativo de *Modo Leitura* / *Modo Lectura*, suspende o Live Polling e provê navegação de retorno ágil ao Histórico (`Voltar ao Histórico` e suporte via `BackHandler`).
-  - **Compartilhamento WhatsApp**: formato limpo `🍝 *Lançamento de Massas — DD/MM/AAAA*` com lista de itens lançados e rodapé `*Lançado por:* Operador1, Operador2`, estritamente sem linha de total geral.
-- **Componente Reutilizável de Ajuda Contextual** (`ModuleHelpDialog` / `ModuleHelpModal`):
-  - Modal explicativo passo-a-passo com design consistente em Material 3 / shadcn, ícone âmbar e seções roláveis.
-  - Integrado no cabeçalho dos principais módulos operacionais: Dashboard, Estoque, Assaí, Carregamento, Relatórios, Compartilhar Acesso e Lançamento de Massas.
-- **Internacionalização Automática e Paridade de Idioma Nativa (`pt-BR` e `es`)**:
-  - Resolução nativa de idioma automática baseada no `Locale` do dispositivo do usuário (100% automático, sem seletores manuais na interface).
-  - Recurso base `values/strings.xml` por padrão em Português do Brasil (`pt-BR`) sincronizado com 463 chaves.
-  - Novo recurso `values-es/strings.xml` contendo todas as 463 chaves traduzidas fielmente para Espanhol (`es`) com paridade estrita de especificadores de formato posicional (`%1$s`, `%1$d`).
-  - Refatoração de strings hardcoded em componentes Compose para uso de `stringResource(R.string.*)` em todas as telas operacionais.
-  - Cobertura de testes unitários: `LocaleStringsParityTest` (validação de chaves e especificadores de formato XML) e `SpanishLocaleResolutionTest` (resolução em tempo de execução via Robolectric para locales `es` e `pt-rBR`).
-- **Remediação do Detector de Atualização Obrigatória**:
-  - Inspeção precisa do binário local instalado (`InstalledAppInfo`) com cálculo de hash SHA-256 em streaming com cache em memória e tamanho do `base.apk`.
-  - Comparação estrita de digest e tamanho contra os metadatos do GitHub Release (`GitHubAsset.digest`), eliminando falsos positivos e loops infinitos provocados pela discrepância de timestamps entre a compilação Gradle e o upload do release.
-- **Dashboard Operacional**:
-  - Cartão "Lançamento de Massas" posicionado fixamente na 3ª posição (entre Cronograma Ativo e Calculador de Estoque), com ícone 🍝 e atalhos para lançamento e histórico.
-  - **Cabeçalho Enxuto**: removido o selo "Modo Leitura" e o segundo `Row` que o envolvia; o cabeçalho mantém apenas o botão "Voltar", o título e a data de produção (ou o slogan), sem perda de informação operacional.
-- **Distribuição Android v0.5.1 (Code 506)**:
-  - Binário oficial assinado sob esquema APK Signature Scheme v2 (`CN=Trindade Massas Operacoes`).
-  - Instalado e validado em emulador Ubuntu (`Trindade_UX_v030`).
+### Añadido
+
+- **Módulo Lanzamiento de Masas** en web y Android: diez productos, resumen colectivo del día, historial,
+  polling pasivo cada 15 segundos y exportación a WhatsApp.
+- **Modo lectura** en fechas pasadas: sin calculadora, sin edición, sin polling y con retorno al historial.
+- **Ayuda contextual** en los módulos principales.
+- **Internacionalización** `pt-BR`/`es` con detección automática del locale y paridad de claves.
+- **Detector de actualización** basado en digest y tamaño del binario instalado.
+- **Panel:** tarjeta de Lanzamiento de Masas en tercera posición y encabezado simplificado.
+
+### Distribución Android
+
+- Builds **506** y **507** publicadas sobre `v0.5.1`.
 
 ---
 
 ## [0.5.0] — 2026-10-15
 
-### 🎯 Adicionado (Calculadoras operacionais)
-- **Calculadora de Assaí** (`/assai-calculator`, web e Android): nove produtos com as suas unidades por caixa e a regra de que **um pedido só existe em caixas inteiras**. Uma quantidade que não fecha caixas é recusada em vez de arredondada —arredondar produziria um número que não corresponde ao que chega ao portão, e no portão se contam caixas—; o aviso por produto só aparece **depois de o operador sair do campo**, porque enquanto se digita uma quantidade está a ser escrita; e a exportação sai com uma linha por produto e o total, sem a quantidade por caixa, que é aritmética que quem lê não pediu.
-- **Calculador de Estoque** (`/stock-calculator`, web e Android): o catálogo de 25 produtos em **duas secções** (Terceirizados e Massas) que chega do servidor e não de uma cópia local, a acumulação corrida de caixas por produto com as unidades recalculadas a partir delas em cada escrita —assim os dois números não podem discordar—, o reset por produto que zera os totais **sem apagar o registo** do que já tinha sido contado, e os totais do dia como o servidor os respondeu.
-- **Histórico de Estoque** (`/stock-history`, web e Android): uma rota própria, com a antiga `/stock/history` a redirecionar porque um link já partilhado é um link que alguém pode abrir. Lista **só os produtos contados** —vinte e quatro zeros escondem a linha por que alguém veio—, com selector de data, exportação por WhatsApp e correio, e **controlo de papel**: um Trabalhador lê, um Administrador corrige, e o servidor aplica a mesma fronteira com o seu 403.
-- **Marca de água do autor**, no pé do login, do painel de administração e do perfil: «Desenvolvido por Wilkin Barban Rosabal» e «E-mail: wilkin.barban@gmail.com», em 10sp, com o tom atenuado do tema e centrada. Um componente único nas duas plataformas, porque um crédito escrito três vezes fica velho em duas.
-- **Paridade Android completa (A1–A7)**: a Calculadora de Assaí, o Calculador de Estoque e o Histórico de Estoque em Compose, sobre os tipos gerados do contrato publicado, mais os três acessos no `MainActivity` como **pestañas** —não como rotas, que é o que o shell tem— e a verificação no emulador de Ubuntu (`Trindade_UX_v030`).
+### Añadido
 
-### 🔧 Alterado
-- **Correio do stock**: o destino passou a ser o da planta (`xmitrindade@hotmail.com`) em vez da morada de provas, e a tabela do correio passa a ser **medida a partir dos dados** —alinhada à esquerda nas três primeiras colunas e à direita nas unidades, com separador e o total debaixo dessa coluna— em vez de tubos sem largura. O correio do autor é outra coisa e continua a ser o do crédito.
-- **Sessão de duas horas**: o token de acesso deixou de expirar aos quinze minutos, que desligavam o operário a meio de uma contagem. A janela de quinze minutos do limitador de tentativas de login **ficou como estava**: essa é sobre adivinhar uma palavra-passe e não sobre terminar um trabalho.
-- **Validação ao sair do campo** (as duas calculadoras): a regra é pura e testada —o campo vazio não é um erro, é um campo que ninguém tocou—, o aviso espera que o campo seja deixado e volta a apagar-se ao reentrar para corrigir, porque a primeira tecla de uma correção não é o erro que se está a corrigir; e o botão de adicionar fica apagado quando não há nada para adicionar ou o que há não se pode adicionar.
-- **Esquema da base de dados: revisão 5** com a tabela `stock_counts`, aditiva e sem reescrever nada, com o catálogo em código e cada linha a guardar o nome e as unidades por caixa **do momento em que foi contada**, para que uma mudança futura do catálogo não reescreva uma contagem antiga. A migração corre com cópia de segurança preventiva verificada antes de tocar na base, e as filas ficaram intactas.
-- **Android**: as três superfícies novas entraram no `RolePolicy` no conjunto partilhado —os três os vê qualquer operário com sessão, como na web— e `RolePolicyTest` obrigou a declarar a mudança em vez de a deixar passar em silêncio.
+- **Calculadora de Assaí:** nueve productos, pedido solo en cajas enteras, validación al salir del campo y
+  exportación por WhatsApp.
+- **Calculador de stock:** catálogo de veinticinco productos en dos secciones, acumulación de cajas y
+  unidades recalculadas, reset por producto y totales del día.
+- **Historial de stock:** ruta propia, solo productos contados, selector de fecha, exportación y control de
+  rol.
+- **Paridad Android** de las tres superficies sobre el contrato publicado.
+
+### Cambiado
+
+- Correo del stock a la dirección de la planta.
+- Sesión de acceso de dos horas; la ventana de intentos de login se mantiene en quince minutos.
+- **Esquema revisión 5:** tabla `stock_counts`, aditiva y sin reescribir datos.
 
 ---
+
 ## [0.4.0] — 2026-10-14
 
-### 🎯 Adicionado (Operação de carregamento e exportação WhatsApp)
-- **Telefone do motorista e do fletero** (`drivers.phone`): campo **opcional** no cadastro rápido do cronograma e na aba de frota do painel administrativo, na web e no Android. O número é guardado como o operador o escreveu —a lista devolve o que ele digitou, e um valor que voltasse reformatado se leria como a aplicação tendo-o corrigido— e a limpeza tem uma regra única nos dois clientes: enquanto o operador digita, os caracteres que não podem compor um número não chegam ao campo, e ao salvar o texto é recortado e os espaços repetidos colapsados. Editar e esvaziar o campo remove o número; deixá-lo intocado não o altera.
-- **Compartilhamento nativo por WhatsApp** (web e Android): o diálogo de exportação do cronograma e o do relatório passam a usar a folha de compartilhamento do sistema, com a cópia como reserva. Uma folha que o operador descarta responde como descartada e **não** copia nada: colocar o texto na área de transferência depois de ele ter dito que não seria o oposto do que pediu.
-- **Envio direto, um a um, para fleteros** (web e Android): na exportação do cronograma, cada fletero **daquele lote** cujo número é conhecido ganha um atalho que abre o chat privado com o texto do dia já carregado. A lista sai do lote e não da frota inteira —um cronograma de um dia enviado a quem não está nele é uma mensagem sobre um dia que não lhe diz respeito— e cada motorista aparece uma vez, ainda que ocupe vários horários.
-- **Cartão do Cronograma Ativo no Dashboard** (web e Android): mostra **o dia que está sendo carregado** e a sua contagem, e abre o lote correspondente; substitui a contagem de "Cargas de Amanhã", que era um número sobre um dia que o operador não estava carregando.
+### Añadido
 
-### 🔧 Alterado
-- **Janela operativa de 15 horas**: o resumo do Dashboard passa a considerar a operação que termina às 10:00 (horário de São Paulo). Depois desse corte, o dia ativo aponta para a **próxima data de carregamento** —sexta avança para segunda— em sincronia com o anúncio exportado, em vez de somar um dia no calendário.
-- **Contrato da API**: `/api/dashboard/summary` passa a expor `activeScheduleDate`, `activeScheduleCount` e `activeScheduleBatchDate`. O texto exportado do cronograma e o do relatório foram verificados ponta a ponta, e a semântica de `date` —a data do lote, não a do dia de carga— ficou documentada no contrato.
-- **Android**: o cartão do Dashboard e o diálogo de exportação do cronograma abrem, respectivamente, o dia do lote e a pantalla de edição daquele dia; a regra de "que dia é hoje em São Paulo" passou a ser uma única função, lida pelas duas telas, em vez de duas cópias que podem discordar à meia-noite.
+- **Teléfono del conductor y del fletero** (`drivers.phone`), opcional, en web y Android.
+- **Compartir nativo por WhatsApp** en el cronograma y en el reporte.
+- **Envío directo, uno a uno,** a cada fletero del lote con teléfono conocido.
+- **Tarjeta del cronograma activo** en el panel.
 
-### 🔒 Backend & Banco de Dados (Revisão 4)
-- **Revisão 4 do esquema SQLite (`PRAGMA user_version = 4`)**: coluna `drivers.phone` opcional, com migração aditiva `3 → 4`. A migração só acrescenta a coluna e **não invalida sessões**.
-- **Nulo e ausente são intenções distintas no PATCH administrativo**: `null` remove o número, uma chave ausente deixa-o como está, e o cliente web e o Android enviam cada uma das duas quando corresponde.
+### Cambiado
 
-### 🧪 Testes e Qualidade
-- 471 testes de backend, 34 testes puros de frontend, 54 testes ponta a ponta (Playwright/Chromium) e 797 testes JVM do Android com Robolectric e Compose UI Test, todos passando sobre o mesmo commit.
-- APK release **0.4.0** (versionCode 400) construído e verificado: assinatura conferida contra a impressão digital fixada do projeto, esquema APK v2, não depurável e `API_BASE_URL` de produção.
+- Ventana operativa de quince horas; después del corte, el día activo apunta a la próxima fecha de carga.
+- Contrato del panel con `activeScheduleDate`, `activeScheduleCount` y `activeScheduleBatchDate`.
+
+### Base de datos
+
+- **Revisión 4:** columna `drivers.phone`, migración aditiva que no invalida sesiones.
 
 ---
 
 ## [0.3.0] — 2026-09-29
 
-### 🎯 Adicionado (Android)
-- **Paridade Funcional Android–Web Completa (11 telas + Perfil)**:
-  - `DashboardScreen`: Painel de indicadores em tempo real (relatórios de hoje, cargas de amanhã, usuários ativos, totais históricos).
-  - `ReportEditScreen`: Edição e correção de relatórios operacionais diretamente pelo celular.
-  - `LoadingEditScreen`: Edição de cronogramas e remanejamento de fleteros por horário.
-  - `TasksScreen`: Catálogo de tipos de tarefas com suporte a criação rápida e distinção de permissão.
-  - `DriversScreen`: Catálogo de motoristas e fleteros cadastrados.
-  - `CategoriesScreen`: Gestão administrativa de categorias de relatórios, ordem e hierarquia (exclusivo Administrador).
-  - `VehiclesScreen`: Gestão de frota e veículos próprios da empresa (exclusivo Administrador).
-  - `TimeSlotsScreen`: Configuração dinâmica e substituição atômica de horários de carregamento com persistência imediata (exclusivo Administrador).
-  - `UsersScreen`: Gestão de usuários, aprovação de cadastros, alteração de funções e proteções estritas contra auto-exclusão/desativação (exclusivo Administrador).
-  - `AuditScreen`: Consulta paginada do log de auditoria com filtros combináveis por ação, entidade e ID de usuário (exclusivo Administrador).
-- **Navegação Móvel Adaptativa**:
-  - Implementação de rolagem horizontal fluida (`horizontalScroll`) e insets de tela cheia (`safeDrawingPadding`) na barra superior de navegação em `MainActivity.kt`.
-- **Acesso Estrito por Função (Role-Gating)**:
-  - `RolePolicy.kt`: Mapeamento centralizado de pontos de entrada alinhado aos guards do backend (`adminGuard` e `catalogGuard`). O trabalhador recebe visualização focada e avisos de *Somente leitura*.
+### Añadido
 
-### 🔒 Backend & Banco de Dados (Revisão 3)
-- **Revisão 3 do Esquema SQLite (`PRAGMA user_version = 3`)**:
-  - Adição da coluna `security_version` na tabela `users`.
-  - Invalidação atômica de sessões e refresh tokens existentes na migração e em eventos de alteração de credenciais.
-- **Aperfeiçoamento de Segurança e Admissão**:
-  - Rate limiting adaptativo e controle de admissão em `/api/auth/login` e `/api/auth/refresh`.
-  - Revogação atômica de sessões em alterações administrativas e troca de senha do próprio usuário.
-  - Alinhamento de contratos OpenAPI para cobertura integral das operações administrativas e de auditoria.
+- **Paridad Android–Web completa:** once pantallas más Perfil, con navegación adaptativa, roles y catálogos.
+- **Control de acceso por rol** centralizado en `RolePolicy`, alineado con los guards del backend.
 
-### 🧪 Testes e Qualidade
-- 530 testes unitários JVM no módulo Android com Robolectric e Compose UI Test passando com 0 falhas.
-- 432 testes de backend com cobertura rigorosa de concorrência e migrações.
-- 55 testes ponta a ponta (E2E) com Playwright no navegador Chromium em ambiente limpo (`ci-clone`).
-- Inspeção e validação visual de matriz em emulador real Pixel 8 (Android 14) contra a API de produção.
+### Base de datos
+
+- **Revisión 3:** `users.security_version` con invalidación atómica de sesiones y refresh tokens.
+
+### Seguridad
+
+- Rate limiting y control de admisión en login y refresh.
+- Revocación atómica de sesiones ante cambios administrativos y cambio de contraseña.
+- Contratos OpenAPI para las operaciones administrativas y de auditoría.
 
 ---
 
 ## [0.2.1] — 2026-09-20
-- Correção de verificação de atualização no aplicativo Android e alinhamento de digests do SDK de build.
-- Implementação de visualização de versão na tela de Perfil.
+
+- Corrección de la verificación de actualización en Android y alineación de los digests del SDK de build.
+- Visualización de la versión instalada en Perfil.
 
 ## [0.2.0] — 2026-09-20
-- Primeira versão pública do aplicativo Android com assinatura oficial e automação de release no GitHub Actions.
-- Suporte a geração de relatórios de produção e cronograma de carregamento com exportação WhatsApp.
+
+- Primera versión pública del APK Android con firma oficial y automatización de release en GitHub Actions.
+- Reportes de producción y cronograma de carga con exportación a WhatsApp.
 
 ## [0.1.0] — 2026-09-17
-- Lançamento inicial da plataforma web e infraestrutura de produção Trindade Massas.
+
+- Lanzamiento inicial de la plataforma web y de la infraestructura de producción de Trindade Massas.

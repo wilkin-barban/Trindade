@@ -1,112 +1,114 @@
-# Calculadoras e Lançamentos Operacionais (v0.5.2)
+# Calculadoras y módulos operativos
 
-Quatro ferramentas operacionais para a planta, disponíveis na web e no Android. As duas plataformas partilham a
-**mesma regra de negócio**, escrita uma vez em cada linguagem num módulo puro com os seus testes, e o **mesmo
-contrato**: o catálogo e os lançamentos chegam do servidor e não de uma cópia local em cada cliente.
+Trindade reúne cuatro superficies de cálculo y conteo que comparten la misma regla de negocio entre web y
+Android: **Lanzamiento de Masas**, **Calculadora de Assaí**, **Calculador de Stock** e **Historial de Stock**.
+La regla vive en módulos puros con pruebas propias; el catálogo y los totales los entrega el servidor, no una
+copia local de cada cliente.
 
-## Lançamento de Massas (`/massas-launch` e Android)
+## 1. Lanzamiento de Masas
 
-Registo em tempo real da produção e carregamento de massas por operador:
-- **Catálogo de 10 produtos de massas**: inputs por caixas inteiras com cálculo automático de unidades em tempo real.
-- **Resumo Coletivo do Dia**: agrega totais acumulados de caixas e unidades e lista cada lançamento individual com hora e operador.
-- **RBAC de Autor/Administrador**: botões de edição e exclusão de lançamentos ativos exclusivamente para o próprio autor do lançamento (`launch.user_id == currentUserId`) ou para o Administrador.
-- **Polling pasivo em tempo real**: recarga periódica silenciosa a cada 15 segundos (`POLL_INTERVAL_MS = 15000L`) em segundo plano enquanto a tela estiver visível e sem edição ativa.
-- **Compartilhamento WhatsApp**: formato limpo `🍝 *Lançamento de Massas — DD/MM/AAAA*` com lista de produtos contados e rodapé `*Lançado por:* Operador1, Operador2`, estritamente **sem linha de Total Geral**.
-- **Histórico de Massas (`/massas-history`)**: consulta por data e auditoria de dias anteriores.
-  - **Modo Leitura em Datas Passadas**: quando a data selecionada não for o dia de hoje (`date != saopauloToday()`), oculta a calculadora e os inputs de caixas, desativa ações de edição/exclusão de lançamentos e exibe badge de *Modo Leitura*.
-  - **Suspensão de Live Polling**: recargas automáticas são desativadas em datas históricas para prevenir chamadas desnecessárias à API.
-  - **Navegação Integrada**: botão "Voltar ao Histórico" e retorno via `BackHandler` ao inspecionar lançamentos históricos.
-- **Modal de Ajuda Contextual (`ModuleHelpDialog`)**: botão de ajuda presente no topo explicando o fluxo em 3 passos simples.
+Ruta web: `/massas-launch`. Pantalla Android: `MassasLaunchScreen`.
 
-## Calculadora de Assaí
+- Catálogo de diez productos de masas.
+- Entrada por cajas enteras, con cálculo automático de unidades.
+- Resumen colectivo del día con el detalle de cada lanzamiento, su hora y su operario.
+- Edición y borrado reservados al autor del lanzamiento en el día corriente; el backend aplica la misma regla
+  aunque la petición llegue por fuera de la interfaz.
+- Actualización pasiva cada 15 segundos mientras la pantalla está visible y no hay edición activa.
+- Exportación a WhatsApp con el formato `🍝 *Lançamento de Massas — DD/MM/AAAA*`, una línea por producto y el
+  pie `*Lançado por:*`. No incluye línea de total general.
+- Historial en `/massas-history`, con navegación por fecha.
 
-Calcula um pedido de compra. A regra, em `packages/frontend/src/lib/assai.ts` (web) e em
-`com.trindade.app.assai.AssaiOrder` (Android):
+### Días pasados
 
-- Um pedido só existe em **caixas inteiras**: uma quantidade que não fecha caixas é recusada em vez de
-  arredondada, porque arredondar produziria um número que não corresponde ao que chega ao portão.
-- O aviso por produto aparece **depois de o operador sair do campo** e apaga-se ao reentrar para corrigir:
-  enquanto se digita, uma quantidade está a ser escrita.
-- A exportação sai com uma linha por produto e o total, sem a quantidade por caixa.
-- **Seleção de dia da semana**: permite associar o pedido opcionalmente a *Terça-feira*, *Quinta-feira*,
-  *Sexta-feira* ou *Sábado*, refletindo no cabeçalho `🛒 Pedido Assaí <Dia>`.
+Cuando la fecha no es hoy en `America/Sao_Paulo`:
 
-## Módulo de Compartilhamento (Compartilhar App)
+- Se oculta la calculadora y los campos de caja.
+- Se desactivan edición y borrado.
+- Se suspende el polling.
+- Se muestra el aviso de modo lectura y un retorno al historial.
 
-Permite enviar os links oficiais de acesso ao Trindade Massas via WhatsApp e copiar para a área de transferência:
-- **Plataformas**: Android (APK direto), iPhone / Web (navegador) e Ambos.
-- **Credenciais oficiais (Administrador)**: listagem de usuários do sistema, preenchimento de usuário e senha
-  inicial editável (padrão `123456789`). Operadores não-administradores não visualizam nem anexam credenciais.
-- **Entrada telefônica padronizada**: máscara progressiva `(11) 9XXXX-XXXX` com normalização internacional automática
-  com prefixo `55` para abertura da API do WhatsApp (`wa.me` / `api.whatsapp.com`).
+La regla se aplica en el servidor: un día cerrado no admite altas, ediciones ni borrados, sin importar el rol.
 
-## Calculador de Estoque
+### ERP
 
-Conta caixas de dia. O catálogo (25 produtos, em `stock.catalog.ts` no backend) chega pelo endpoint
-`GET /api/stock?date=YYYY-MM-DD`, que devolve **todos** os produtos —a zero os que ninguém contou— para que a
-pantalla não tenha de os inventar.
+El reporte del día se alimenta del espejo de movimientos de Aero32 (`aero_movements`), no de
+`massa_launches`. Los diez códigos del catálogo de masas se clasifican como producción; el resto de los asientos
+del día se clasifica como **Recepción de Insumos**. El detalle está en
+[integracion-aero-masas-web.md](integracion-aero-masas-web.md).
 
-- As caixas acumulam e as **unidades são recalculadas a partir delas em cada escrita**, de modo que os dois
-  números não podem discordar.
-- Cada entrada e cada reset ficam no **registo** da linha, com o total corrido depois de cada uma: por isso um
-  reset zera os totais sem apagar o que já se tinha contado.
-- Um dia que não se pôde ler é **nada** e não um dia vazio: mostrar zero caixas para um servidor inalcançável é
-  mentir sobre a estante.
-- A calculadora opera **sempre sobre hoje** em São Paulo e não oferece escolha de data: um campo de data ali
-  permitia contar sem olhar para o dia, e a contagem caía num dia que ninguém tinha escolhido. Consultar um dia
-  passado é trabalho do Histórico de Estoque (`/stock-history`), que abre a data que se escolheu.
+## 2. Calculadora de Assaí
 
-## Histórico de Estoque
+Ruta web: `/assai-calculator`. Android: `AssaiCalculatorScreen`.
 
-Uma rota própria na web (`/stock-history`, com a antiga `/stock/history` a redirecionar) e uma pantalla no
-Android. É uma **leitura** nos dois lados: mostra o **Resumo Coletivo do Dia** que o servidor somou —só os
-produtos contados, vinte e quatro zeros escondem a linha por que alguém veio— com as caixas e as unidades de
-cada um e o total do dia, e oferece enviá-lo por WhatsApp ou correio. Não tem calculadora, campos de
-quantidade, "Adicionar" nem "Zerar": a contagem corrige-se onde é feita, e uma segunda calculadora para a mesma
-estante é como duas correções acabam discordando sobre o mesmo dia. O calendário aceita **hoje e os trinta dias
-anteriores**, porque uma contagem corrige-se na manhã seguinte e não no ano seguinte. Os dois `POST` do stock
-(`/api/stock/add-entry` e `/api/stock/reset-product`) continuam a ser do Administrador; a pantalla já não os
-chama.
+Regla en `packages/frontend/src/lib/assai.ts` (web) y `com.trindade.app.assai.AssaiOrder` (Android):
 
-## Exportações e destinos
+- Un pedido solo existe en **cajas enteras**. Una cantidad que no completa cajas se rechaza; no se redondea,
+  porque redondear produciría un número que no corresponde a lo que llega al portón.
+- El aviso por producto aparece **después de salir del campo** y se borra al volver a entrar para corregir.
+- La exportación sale con una línea por producto y el total, sin la cantidad por caja.
+- Selector opcional de día de la semana: martes, jueves, viernes o sábado. Se refleja en el encabezado
+  `🛒 Pedido Assaí <Día>`.
 
-- **WhatsApp**: pela ligação canónica `https://api.whatsapp.com/send?phone=...&text=...`, com a folha de
-  partilha do sistema e a área de transferência como reserva.
-- **Correio do stock**: vai para a planta, `xmitrindade@hotmail.com`.
-- **Marca de água do autor**: «Desenvolvido por Wilkin Barban Rosabal» e «E-mail: wilkin.barban@gmail.com»,
-  em 10sp, no tom atenuado do tema e centrada ao pé das pantallas principais. É outra coisa que o correio do
-  stock e usa a morada do autor.
+## 3. Calculador de Stock
 
-## Esquema da base de dados
+Ruta web: `/stock-calculator`. Android: `StockCalculatorScreen`.
 
-A revisão **5** acrescenta `stock_counts` (aditiva, sem reescrever nada), com `UNIQUE(count_date, product_code)`
-e o catálogo em código: cada linha guarda o nome e as unidades por caixa **do momento em que foi contada**,
-para que uma mudança futura do catálogo não reescreva uma contagem antiga. A migração corre com cópia de
-segurança preventiva verificada antes de tocar na base.
+- Catálogo de **25 productos** en dos secciones: Tercerizados y Masas. Llega del servidor por
+  `GET /api/stock?date=YYYY-MM-DD`, que devuelve todos los productos, incluso los que están en cero.
+- Las cajas se acumulan y las **unidades se recalculan a partir de ellas en cada escritura**, de modo que los
+  dos números no pueden discrepar.
+- Cada entrada y cada reset quedan en el registro de la fila, con el total acumulado después de cada operación.
+  Un reset pone los totales en cero sin borrar lo que ya se había contado.
+- Un día que no se pudo leer es **nada**, no un día vacío: mostrar cero cajas para un servidor inalcanzable
+  sería mentir sobre la estantería.
+- La calculadora opera siempre sobre **hoy** en São Paulo y no ofrece selector de fecha. Consultar o corregir un
+  día anterior es tarea del Historial de Stock.
 
-## Verificação no Android
+## 4. Historial de Stock
+
+Ruta web: `/stock-history`. Android: `StockHistoryScreen`.
+
+- Es una **lectura** en web y Android.
+- Muestra el **Resumen Colectivo del Día** que sumó el servidor, solo con los productos contados y con las cajas
+  y unidades de cada uno.
+- Ofrece enviar el resumen por WhatsApp o correo.
+- No tiene calculadora, campos de cantidad, botones de agregar ni de resetear: el conteo se corrige donde se
+  hace.
+- El calendario acepta hoy y los treinta días anteriores.
+- Los `POST` de stock (`/api/stock/add-entry` y `/api/stock/reset-product`) son del Administrador; la pantalla de
+  historial no los llama.
+
+## 5. Exportaciones y destinos
+
+- **WhatsApp:** enlace canónico `https://api.whatsapp.com/send?phone=...&text=...`, con la hoja de compartir del
+  sistema y el área de transferencia como respaldo.
+- **Correo del stock:** va a la dirección de la planta (`xmitrindade@hotmail.com`).
+- **Marca de agua del autor:** «Desenvolvido por Wilkin Barban Rosabal» y «E-mail: wilkin.barban@gmail.com», en
+  el pie de las pantallas principales. Es independiente del correo del stock.
+
+## 6. Persistencia
+
+- `stock_counts` guarda el conteo por fecha y producto, con `UNIQUE(count_date, product_code)`.
+- Cada fila conserva el nombre y las unidades por caja **del momento en que se contó**, para que un cambio
+  futuro del catálogo no reescriba una contabilidad pasada.
+- `massa_launches` guarda el lanzamiento local y su vínculo con el asiento del ERP (`ent_lan`) cuando existe.
+- El esquema vigente es la **revisión 9**. Las migraciones son explícitas y se ejecutan con la API detenida; ver
+  [despliegue.md](despliegue.md).
+
+## 7. Verificación en Android
 
 ```bash
-# Os testes de unidade do cliente, no host onde vive o SDK
+# Pruebas de los módulos operativos
+cd packages/android
 ./gradlew :app:testDebugUnitTest --tests "com.trindade.app.massas.*"
-./gradlew :app:testDebugUnitTest --tests "com.trindade.app.ui.ModuleHelpTest"
-./gradlew :app:testDebugUnitTest --tests "com.trindade.app.stock.*"
 ./gradlew :app:testDebugUnitTest --tests "com.trindade.app.assai.*"
+./gradlew :app:testDebugUnitTest --tests "com.trindade.app.stock.*"
 
-# O emulador: o APK de debug é o que Android assina sozinho
-./gradlew :app:assembleDebug -PversionName=0.5.2 -PversionCode=512
+# APK de debug para el emulador
+./gradlew :app:assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
-adb exec-out screencap -p > pantalla.png
 ```
 
-O APK de **release** exige três parâmetros e não tem valores por defeito, de propósito:
-
-```bash
-./gradlew :app:assembleRelease --no-daemon \
-  -PapiBaseUrl=https://trindademasas.duckdns.org/ \
-  -PversionName=0.5.2 -PversionCode=512
-```
-
-Um release não pode apontar em silêncio para o loopback de desenvolvimento nem sair com uma versão que o build
-inventou; o `versionCode` sai da fórmula do próprio carril de release (`major*10000 + minor*100 + patch`), e o
-artefacto local sai **`unsigned`**: a assinatura é um passo do carril do CI com o keystore.
+El APK de release exige `-PapiBaseUrl`, `-PversionName` y `-PversionCode`, y no tiene valores por defecto. La
+firma se realiza en la lane de release con el keystore oficial; ver [release-android.md](release-android.md).

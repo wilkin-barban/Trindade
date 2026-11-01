@@ -1,527 +1,327 @@
-# Integração Aero32 — Lançamento de Masas → Estoque da Empresa
+# Integración Aero32 — Lanzamiento de Masas y espejo del ERP
 
-Documento operativo de la integración construida. Complementa —no reemplaza— el contrato del
-WebService (`docs/registro-integracion-aero-webservice.md`) y las notas de la API
-(`docs/integracion-aero32.md`).
+Esta guía describe la integración operativa entre Trindade y el ERP **Aero32**: cómo se configura, cómo viaja un
+lanzamiento desde la web o Android hasta el WebService de la fábrica, cómo se guarda el espejo del día y qué
+reglas se aplican al importar un asiento. Los contratos exactos de los endpoints están en
+[registro-integracion-aero-webservice.md](registro-integracion-aero-webservice.md); la auditoría del ERP, en
+[integracion-aero32.md](integracion-aero32.md).
 
-## 1. Alcance
+## 1. Alcance y principios
 
-La integración es **exclusiva del usuario `wilkin` con rol `Administrador`**. Para cualquier otro usuario
-no existe: el panel no se renderiza, el switch no aparece y el backend rechaza la bitácora con `403`
-porque la autoridad es la base de datos, nunca el cuerpo del pedido ni el estado del navegador.
+- La integración es **exclusiva del usuario `wilkin` con rol Administrador**. Para cualquier otro usuario el panel
+  no se renderiza, el interruptor no aparece y el backend rechaza la bitácora con `403`. La autoridad es la base
+  de datos, no el cuerpo de la petición ni el estado del navegador.
+- **Trindade guarda primero.** El lanzamiento se persiste en Trindade antes de intentar el ERP. Si la empresa no
+  responde, la producción no se pierde.
+- **La empresa manda en lo que ya registró.** Un asiento del ERP es de solo lectura en Trindade. Importarlo crea un
+  lanzamiento local nuevo, nunca modifica el asiento de la empresa.
+- **La identidad del asiento se conserva.** El operario es el que el ERP registró, no quien importa.
+- **El espejo es de la planta.** El snapshot del día se guarda en Trindade y lo puede leer cualquier operario
+  autenticado; es una copia de lo que la empresa ya registró.
 
-El alcance funcional abarca el ciclo completo de inventario reflejado en la app nativa Android (`base.apk`):
-1. **Lanzamiento de Masas / Producción (Entradas)**: `POST /entradasitem` (activo en fase piloto).
-2. **Baja de Stock / Consumo (Salidas)**: `POST /saidasitem` (especificado e incorporable con mismo flujo).
-3. **Auditoría de Movimientos por Usuario**: `POST /movimentoitem` (consulta cruzada de asientos ERP vs Trindade).
+## 2. Por qué la web usa un atajo y Android no
 
-El objetivo de la primera etapa es **medir, no automatizar**. El sistema:
+La web corre en `https://trindademasas.duckdns.org`. El WebService de la fábrica escucha en HTTP plano sobre la red
+interna (`http://192.168.25.250:1453/api`). Safari bloquea ese salto por dos capas: *mixed content* (contenido
+inseguro dentro de una página segura) y *Private Network Access* (una página pública no puede alcanzar direcciones
+privadas). No es un error de configuración que se arregle con cabeceras: es una negativa del navegador antes de
+emitir el paquete.
 
-1. persiste el lanzamiento en Trindade como siempre;
-2. emite un pedido de sincronización hacia el Atajo de iOS;
-3. registra en un log del servidor qué se intentó, con qué destino y qué respondió el WebService.
+Un atajo de iOS corre como proceso nativo, sin origen de página. Puede hablar HTTP plano contra la IP interna
+cuando el teléfono está en el Wi-Fi de la fábrica. Por eso la web delega el `POST` en el atajo y recibe la respuesta
+por un callback.
 
-Ninguna de esas etapas puede perder producción: si la empresa no contesta, el lanzamiento ya está
-guardado en Trindade.
-
-## 2. Por qué un Atajo y no un `fetch`
-
-La Web corre en `https://trindademasas.duckdns.org`. El WebService de la fábrica escucha en HTTP plano
-sobre la red interna (`http://192.168.1.50:8000/api`). Safari —WebKit— bloquea ese salto por diseño en
-dos capas: *mixed content* (contenido inseguro dentro de una página segura) y *Private Network Access*
-(una página pública no puede alcanzar direcciones privadas). No es un error de configuración que se
-arregle con headers: es una negativa del navegador antes de emitir el paquete.
-
-Un Atajo de iOS corre como proceso nativo, sin origen de página. Puede hablar HTTP plano contra la IP
-interna cuando el teléfono está en el Wi-Fi de la fábrica. Por eso el pedido sale de la página y termina
-en el Atajo.
+Android no tiene ese problema: la app corre en la red de la planta y llama al WebService directamente, con
+`OkHttp` y Basic Auth leída del almacén cifrado. La configuración release solo permite HTTP hacia
+`192.168.25.250`; el resto del tráfico exige HTTPS.
 
 ## 3. Flujo completo
 
+```mermaid
+sequenceDiagram
+    actor Operario
+    participant UI as Web o Android
+    participant API as Trindade API
+    participant Cola as Cola local
+    participant Atajo as Atajo iOS
+    participant ERP as Aero32
+
+    Operario->>UI: Carga cajas por producto
+    UI->>API: POST /api/massas-launch
+    API-->>UI: Lanzamiento guardado
+    alt Web
+        UI->>Cola: Encola una entrada por producto
+        Cola->>Atajo: shortcuts://run-shortcut?name=Aero32 Bridge
+        Atajo->>ERP: POST /entradasitem
+        ERP-->>Atajo: Respuesta
+        Atajo-->>UI: Callback con aero_action=aero_data
+    else Android
+        UI->>ERP: POST /entradasitem directo
+        ERP-->>UI: Respuesta
+    end
+    UI->>API: POST /api/integration/aero/movements
+    API-->>UI: Snapshot del día actualizado
 ```
-Operador (wilkin)
-   │  carga cajas por producto y confirma el lanzamiento
-   ▼
-POST /api/massas-launch            ← Trindade guarda la producción (autoridad)
-   │
-   ▼
-cola local (localStorage)          ← una entrada por producto, sobrevive a la ida y vuelta
-   │
-   ▼
-shortcuts://x-callback-url/run-shortcut?name=Aero32 Bridge
-   │        (el Atajo recibe el sobre { url, auth, body, callback } como texto)
-   ▼
-POST     →  la url del sobre  (http://192.168.1.50:8000/api/entradasitem)
-   │
-   ▼
-Abrir URLs → https://trindademasas.duckdns.org/massas-launch?aero_action=entrada&aero_data=<respuesta del ERP>
-   │
-   ▼
-La página lee el retorno, escribe el resultado en el log y sigue con el producto siguiente
-```
 
-`/entradasitem` acepta **un producto por request** (o hasta ocho en el sobre de lote), así que un
-lanzamiento de tres productos son tres idas y vueltas. La cola en `localStorage` es lo que hace que la
-segunda no se pierda si iOS abre la vuelta en otra pestaña.
+`/entradasitem` acepta **un producto por petición** (o hasta ocho en el sobre de lote). Un lanzamiento de tres
+productos son tres idas y vueltas. La cola en `localStorage` evita que la segunda se pierda si iOS abre la vuelta en
+otra pestaña.
 
-Cada entrada de la cola lleva **su operario**. `ENT_USU` es la persona que cargó las cajas, no la que
-configuró el teléfono: el lanzamiento pendiente de Jaime sale como `JAIME` aunque el navegador esté
-configurado con el usuario de Wilkin, y el reintento después de la vuelta del atajo conserva ese nombre
-porque viaja en la cola. Una entrada sin operario —una cola vieja, escrita antes de que el nombre
-viajara— firma con el usuario configurado, que es el respaldo y no la regla.
+Cada entrada de la cola lleva **su operario**. `ENT_USU` es la persona que cargó las cajas, no la que configuró el
+teléfono: el lanzamiento pendiente de Jaime sale como `JAIME` aunque el navegador esté configurado con el usuario de
+Wilkin. Una entrada sin operario, de una cola vieja, firma con el usuario configurado como respaldo.
 
-El botón **Enviar ao ERP** de una fila pendiente y el interruptor de sincronización al lanzar son dos
-caminos distintos y no se mezclan: el botón de la fila arma una cola con ese producto, sus unidades, sus
-lanzamientos y su operario, y dispara el sobre de `entradasitem` (`launch_sync`); el botón **Sincronizar
-com ERP** de la cabecera consulta `movimentoitem` (`read_history`) y no escribe nada en la empresa. Un
-botón que consulta cuando dice enviar deja el lanzamiento pendiente sin que el operario pueda saber por
-qué, que es exactamente el defecto que este flujo corrige.
+El botón **Enviar ao ERP** de una fila pendiente y el interruptor de sincronización al lanzar son dos caminos
+distintos: el botón de la fila arma una cola con ese producto, sus unidades, sus lanzamientos y su operario, y
+dispara `entradasitem` (`launch_sync`); el botón **Sincronizar com ERP** de la cabecera consulta `movimentoitem`
+(`read_history`) y no escribe nada en la empresa.
 
-## 4. Configuración (panel «Configuração Integração Empresa»)
+## 4. Configuración en la web
 
-Dentro de *Lançamento de Masas*, debajo de la grilla, hay una tarjeta colapsable. Arranca abierta solo
-cuando todavía no hay nada configurado.
-
-El panel pide **tres datos obligatorios y nada más**, que es lo que un operario puede saber de memoria en la
-fábrica. Con esos tres la sincronización ya se puede activar:
+Dentro de **Lanzamiento de Masas**, debajo de la grilla, hay una tarjeta colapsable. Arranca abierta solo cuando
+todavía no hay nada configurado. El panel pide **tres datos obligatorios**:
 
 | Campo | Qué es | Validación |
 | --- | --- | --- |
-| URL do WebService | Base del WebService, ej. `http://192.168.1.50:8000/api` | Debe empezar con `http://` o `https://`; se normaliza (sin barra final duplicada) |
-| Usuário da empresa | Usuario del WebService | No vacío |
-| Senha da empresa | Contraseña del WebService | No vacía; se muestra enmascarada |
+| URL del WebService | Base del WebService, por ejemplo `http://192.168.25.250:1453/api` | Debe empezar con `http://` o `https://`; se normaliza sin barra final duplicada |
+| Usuario de la empresa | Usuario del WebService | No vacío |
+| Contraseña de la empresa | Contraseña del WebService | No vacía; se muestra enmascarada |
 
-No hay campo de código de usuario, y no es un olvido: `ENT_USU` viaja con el **usuario en mayúsculas**, que
-es lo que manda el binario Delphi de `base.apk`. El `CODIGO` numérico que devuelve el ERP se muestra al
-probar la conexión y queda en la bitácora, pero no se pide ni se guarda. Un teléfono que todavía tenga el
-campo cargado de una versión anterior lo descarta al leer los ajustes.
+No hay campo de código de usuario: `ENT_USU` viaja con el **usuario en mayúsculas**, que es lo que manda el binario
+Delphi de `base.apk`. El `CODIGO` numérico que devuelve el ERP se muestra al probar la conexión y queda en la
+bitácora, pero no se pide ni se guarda.
 
-Todo lo demás lo resuelve el sistema, porque no es una decisión del operario:
+Datos que resuelve el sistema:
 
 | Dato | Cómo se obtiene |
 | --- | --- |
 | Usuario del asiento (`ENT_USU`) | El usuario del panel, en mayúsculas |
-| Cantidad (`PRO_QTD`) | Siempre en **unidades**: `cajas × unidades por caja`. No existe lanzamiento por cajas |
-| Serie del asiento (`ENT_SER`, `PED_SER`) | Fija en `APL`, la que trae quemada el binario Delphi de `base.apk` |
+| Cantidad (`PRO_QTD`) | Siempre en unidades: `cajas × unidades por caja` |
+| Serie del asiento (`ENT_SER`, `PED_SER`) | Fija en `APL`, la que trae el binario Delphi |
+| Situación tributaria (`PRO_CST`) | `000` (tributada integralmente de fabricación propia) |
 
-Los ajustes viven en el `localStorage` de **ese** iPhone, no en el servidor. Dos consecuencias: hay que
-configurar una vez por teléfono, y borrar los datos de Safari equivale a borrar la configuración. El
-botón **Limpar** hace lo mismo de forma explícita, con confirmación.
+Los ajustes viven en el `localStorage` de **ese** iPhone, no en el servidor. Hay que configurar una vez por
+teléfono, y borrar los datos de Safari equivale a borrar la configuración. El botón **Limpiar** hace lo mismo de
+forma explícita, con confirmación.
 
-### Testar Conexão
+## 5. Prueba de conexión
 
-Hace `POST {URL}/usuarios/` con Basic Auth y traduce el resultado a una frase útil. El método importa: la
-ruta de la fábrica solo acepta `POST` y un `GET` devuelve `405 Supported methods: POST`.
+La prueba hace `POST {URL}/usuarios` con Basic Auth y traduce el resultado a una frase útil. La ruta no lleva barra
+final: la barra provocaba un `301` que convertía el `POST` en `GET` y devolvía `405`.
 
-El botón tiene **dos caminos**, y elige solo:
+El botón elige solo entre dos caminos:
 
 | Camino | Cuándo | Qué hace |
 | --- | --- | --- |
-| Navegador | La página y el WebService comparten esquema (desarrollo local, o un WebService HTTPS) | El `fetch` responde en el acto y devuelve la frase |
-| Atajo | La página es HTTPS y el WebService HTTP | Abre el atajo **`Aero32 Bridge`** con el sobre de `/usuarios/`, que hace el `POST` fuera de Safari y vuelve con la respuesta |
+| Navegador | La página y el WebService comparten esquema (desarrollo local o WebService HTTPS) | El `fetch` responde en el acto |
+| Atajo | La página es HTTPS y el WebService es HTTP | Abre `Aero32 Bridge` con el sobre de `/usuarios` y vuelve con la respuesta |
 
-El segundo camino no es una preferencia, es la única salida: en el despliegue real Safari rechaza el
-destino HTTP antes de que salga un paquete, así que probar «desde el navegador» es probar una cosa
-distinta de la que va a hacer el lanzamiento.
+En la fábrica el camino real es el atajo: probar "desde el navegador" sería probar una cosa distinta de la que va a
+hacer el lanzamiento.
 
-Resultados del camino «navegador»:
+Resultados del camino navegador:
 
 | Resultado | Significado |
 | --- | --- |
-| `Conectado como …` | Credenciales válidas; muestra el `CODIGO` que informa el ERP |
-| `O WebService respondeu 401: …` | El servidor contestó y rechazó el login |
-| `A rede respondeu, mas o WebService não libera CORS` | La IP es correcta; falta la cabecera CORS (el Atajo no la necesita) |
-| `O Safari bloqueia HTTP a partir de uma página HTTPS` | Bloqueo detectado; con este build ya no aparece: el botón pasa al atajo |
+| `Conectado como …` | Credenciales válidas; muestra el `CODIGO` del ERP |
+| `O WebService respondeu 401: …` | El servidor respondió y rechazó el login |
+| `A rede respondeu, mas o WebService não libera CORS` | La IP es correcta; falta CORS (el atajo no lo necesita) |
 | `Não foi possível alcançar o WebService` | Red, IP o puerto equivocados |
 | `O WebService não respondeu em 8 segundos` | Host alcanzable, sin respuesta |
 
-Resultados del camino «atajo», que es el que se ve en la fábrica:
+Resultados del camino atajo:
 
 | Veredicto | Significado |
 | --- | --- |
-| `success = true` | La empresa respondió y aceptó las credenciales: conexión correcta |
-| `success = false` | El endpoint contestó y rechazó el login (usuario o contraseña) |
-| Sin veredicto | El operario volvió sin ejecutar el atajo, o el atajo se cortó antes de leer `success` |
+| `success = true` | La empresa respondió y aceptó las credenciales |
+| `success = false` | El endpoint respondió y rechazó el login |
+| Sin veredicto | El operario volvió sin ejecutar el atajo o el atajo se cortó |
 
-El atajo devuelve el campo `success` **tal como lo leyó**, y la página acepta las formas en que iOS lo
-puede escribir (`true`, `1`, `ok`; y del otro lado `false`, `0`, `error`). Un valor que no reconoce no se
-interpreta: la tarjeta dice que no hubo veredicto en vez de inventar un éxito.
+Cada intento se registra en la bitácora del backend en dos líneas: `requested` antes de que el teléfono salga y
+`result` cuando vuelve. Una línea `requested` sin `result` significa que el pedido nunca salió del teléfono.
 
-Cada intento —exitoso o no— se registra en la bitácora del backend, en dos líneas: la de `requested`
-antes de que el teléfono salga, y la de `result` cuando vuelve. Saber que el pedido nunca salió del
-teléfono es la mitad del diagnóstico, y una línea `requested` sin `result` es exactamente eso.
+## 6. Atajo `Aero32 Bridge`
 
-**Adónde vuelve el atajo.** El panel se mudó al Panel Admin, así que la prueba apunta su callback a
-`/admin?tab=integration` en vez de a la pantalla de lanzamiento. El atajo abre exactamente la URL que se le
-entrega, y una que aterrizara en `/massas-launch` dejaba el veredicto en una pantalla que ya no puede
-dibujarlo: el operario volvía, no veía nada y el intento quedaba sin respuesta visible. El panel lee sus
-propios parámetros (`aero_action`, `aero_data`), limpia el query con `replaceState` y levanta el mismo
-diálogo de resultado que usa el camino del navegador, con la línea de auditoría correspondiente.
+Un archivo `.shortcut` tiene que estar firmado por el dispositivo que lo instala, e iOS solo acepta enlaces
+oficiales de iCloud. Por eso el panel entrega los valores copiables y el enlace profundo a la app, no un archivo.
 
-## 5. Receta del Atajo (Apple Shortcuts)
+Es **un solo atajo**, con ocho acciones. El nombre debe coincidir exactamente con el que invoca la página; se puede
+cambiar en el panel, campo «nombre del atajo».
 
-Un archivo `.shortcut` tiene que estar firmado por el dispositivo que lo instala, e iOS solo acepta
-enlaces oficiales de iCloud: generarlo en el servidor produce un archivo que la web no puede entregar.
-Por eso el panel entrega los valores copiables y el enlace profundo a la app.
-
-Es **un solo atajo**, y se arma una sola vez:
-
-| Atajo | Para qué | Acciones |
-| --- | --- | --- |
-| **`Aero32 Bridge`** | Lleva y trae cualquier llamada al ERP | 8 |
-
-El nombre debe coincidir exactamente: es la clave con la que la página lo invoca (se puede cambiar en el
-panel, campo «nome do atajo»).
-
-### `Aero32 Bridge` — el puente
-
-El atajo no sabe de masas ni de stock. Recibe un sobre, hace el `POST` y devuelve la respuesta:
+El atajo no sabe de masas ni de stock: recibe un sobre, hace el `POST` y devuelve la respuesta.
 
 ```json
 {
-  "url": "http://192.168.1.50:8000/api/entradasitem",
+  "url": "http://192.168.25.250:1453/api/entradasitem",
   "auth": "Basic d2lsa2luOnNlbmhh",
   "body": "{\"PRO_COD\":\"001192\",\"PRO_DES\":\"MASSA QUADRADA\",\"PRO_QTD\":1500,\"PRO_CST\":\"000\",\"ENT_DTA\":\"2026-10-28\",\"ENT_USU\":\"WILKIN\",\"ENT_SER\":\"APL\",\"ENT_OBS\":\"\"}",
   "callback": "https://trindademasas.duckdns.org/massas-launch?aero_action=entrada&aero_data="
 }
 ```
 
-Los cuatro valores son fijos por llamada, y el panel los muestra con su botón de copiar en el diálogo
-*Como instalar o Atalho no iPhone*:
-
-| Clave del sobre | Qué es | Dónde se usa |
+| Clave | Qué es | Dónde se usa |
 | --- | --- | --- |
-| `url` | El endpoint completo, credenciales aparte | campo **URL** del `POST` |
-| `auth` | `Authorization: Basic …` en base64, armado en el momento | **Encabezados** → `Authorization` |
-| `body` | El JSON del pedido **serializado como texto** | **Cuerpo de la petición** → `Texto` |
-| `callback` | La vuelta a esta página, con la acción ya puesta | **Abrir URLs** al final |
+| `url` | Endpoint completo, credenciales aparte | Campo URL del `POST` |
+| `auth` | `Authorization: Basic …` en base64, armado en el momento | Encabezado `Authorization` |
+| `body` | JSON del pedido serializado como texto | Cuerpo de la petición → Texto |
+| `callback` | Vuelta a la página, con la acción ya puesta | Acción Abrir URLs al final |
 
-Pasos, en el orden en que el diálogo los muestra:
+Receta:
 
-0. Abrir **Atajos** → `+` y nombrarlo `Aero32 Bridge`.
-1. **Obtener diccionario de la entrada** — la entrada del atajo.
-2. **Obtener valor del diccionario**, clave `url`.
-3. **Obtener valor del diccionario**, clave `auth`.
-4. **Obtener valor del diccionario**, clave `body`.
-5. **Obtener valor del diccionario**, clave `callback`.
-6. **Obtener contenido de URL**: la URL es el valor `url`; método `POST`; en **Encabezados**
-   `Authorization` = valor `auth`, `Content-Type` = `application/json` y `Accept` = `application/json`; en
-   **Cuerpo de la petición** elegir `Texto` e insertar el valor `body`.
-7. **Codificar URL** sobre el resultado de la acción 6 (la respuesta del ERP).
-8. **Abrir URLs**: valor `callback` + el resultado codificado, uno a continuación del otro.
+1. Abrir **Atajos** → `+` y nombrarlo `Aero32 Bridge`.
+2. **Obtener diccionario de la entrada**.
+3. **Obtener valor del diccionario**, clave `url`.
+4. **Obtener valor del diccionario**, clave `auth`.
+5. **Obtener valor del diccionario**, clave `body`.
+6. **Obtener valor del diccionario**, clave `callback`.
+7. **Obtener contenido de URL**: URL = valor `url`; método `POST`; encabezados `Authorization` = valor `auth`,
+   `Content-Type` = `application/json`, `Accept` = `application/json`; cuerpo = `Texto` con el valor `body`.
+8. **Codificar URL** sobre la respuesta.
+9. **Abrir URLs**: valor `callback` + el resultado codificado.
 
-Ese es el atajo completo, y es el único. El pedido de entrada, la baja, la consulta de movimientos y la
-prueba de conexión salen por ahí: lo único que cambia es el sobre que manda la página.
+Detalles que importan:
 
-Dos detalles que parecen menores y no lo son:
+- **El `body` va como texto, no como diccionario.** Si el sobre trajera un objeto y el teléfono lo insertara en el
+  cuerpo, iOS lo convertiría en una lista de propiedades y el ERP recibiría algo que no es JSON.
+- **La credencial viaja en el sobre.** Cambiar la contraseña en la web no obliga a volver a tocar el iPhone.
+- **La respuesta vuelve por el callback.** La página separa el prefijo, decodifica y lee el cuerpo real. La acción
+  viaja en `aero_action`: `entrada`, `saida`, `movimentos` o `test`. Los parámetros se leen y se borran de la URL
+  con `replaceState`, así que un *pull-to-refresh* no vuelve a procesar el mismo resultado.
 
-- **El `body` va como texto, no como diccionario.** Si el sobre trajera un objeto y el teléfono lo
-  insertara en el cuerpo, iOS lo convertiría en una lista de propiedades y el ERP recibiría algo que no es
-  JSON. La página serializa antes de disparar el atajo, y el atajo solo transporta.
-- **La credencial viaja en el sobre.** Se podría quemar en el atajo, y así era en el diseño de dos atajos.
-  Viajando en el sobre, cambiar la contraseña en la web no obliga a volver a tocar el iPhone; el precio son
-  dos lecturas de diccionario más, que es la diferencia entre 6 y 8 acciones.
-
-### Cómo vuelve la respuesta
-
-El atajo abre `callback` + la respuesta del ERP, codificada. La página separa el prefijo, decodifica y lee
-el cuerpo real. La acción viaja en el parámetro `aero_action`:
-
-| `aero_action` | Endpoint | Qué hace la página al volver |
-| --- | --- | --- |
-| `entrada` | `/entradasitem` | Escribe el resultado en la bitácora y sigue con el producto siguiente de la cola |
-| `saida` | `/saidasitem` | Escribe el resultado; no hay cola que continuar |
-| `movimentos` | `/movimentoitem` | Guarda el día en `aero_movements` y lo cuenta con el lente de la pantalla que lo pidió |
-| `test` | `/usuarios/` | Cierra la prueba de conexión con lo que contestó la empresa |
-
-Los parámetros se leen y se borran de la URL, así que un *pull-to-refresh* en la fábrica no vuelve a
-procesar el mismo resultado. Un teléfono que todavía tenga los atajos anteriores sigue funcionando: la
-página también entiende `aero_sync` y `aero_test`, el formato viejo.
-
-## 6. Contrato con el WebService
+## 7. Contratos del WebService
 
 Cabeceras en todas las llamadas:
 
-```
+```http
 Authorization: Basic base64(usuario:senha)
 Accept: application/json
 Content-Type: application/json
 ```
 
-`POST /usuarios/` → `{ "success": true, "data": { "CODIGO": 12, "SENHA": "…", "NOME": "WILKIN" } }`.
-`CODIGO` es un dato informativo: lo que viaja en `ENT_USU` es el nombre en mayúsculas, como en el binario
-Delphi. La ruta solo acepta `POST`; un `GET` devuelve `405 Supported methods: POST`.
-
-### 6.1 Entrada de Producción (`POST /entradasitem`)
-
-```json
-{
-  "PRO_COD": "005000",
-  "PRO_DES": "MASSA ROLO 1KG",
-  "PRO_QTD": 2000,
-  "PRO_CST": "000",
-  "ENT_DTA": "2026-02-10",
-  "ENT_USU": "WILKIN",
-  "ENT_SER": "APL",
-  "ENT_DTANOT": "2026-02-10",
-  "ENT_DTMOVI": "2026-02-10",
-  "ENT_OBS": "Lancamento de massas via Trindade",
-  "LOTES": []
-}
-```
-
-Detalles del contrato ajustados con la fábrica:
-- `PRO_COD`: 6 dígitos con ceros a la izquierda (`formatAeroProductCode`), idéntico al binario Delphi `base.apk`.
-- `PRO_QTD`: entero escalado × 100 (`formatAeroQuantity`) para que Firebird no lo grabe como decimal `0.20`.
-- `PRO_CST`: situación tributaria (`000` - Tributada integralmente de fabricación propia) requerida por el trigger `ENTRADADET_BIU_SPED_VERIFICA`.
-- `ENT_USU`: el nombre de usuario formateado siempre en mayúsculas (`.toUpperCase()`), tal como lo hace `base.apk`.
-
-### 6.2 Baja de Stock / Consumo (`POST /saidasitem`)
-
-Mismo mecanismo operativo que `/entradasitem`, pero decrementa stock en Firebird para bajas por desecho, mermas o insumos:
-
-```json
-{
-  "PRO_COD": "005000",
-  "PRO_DES": "MASSA ROLO 1KG",
-  "PRO_QTD": 2000,
-  "PED_DTA": "2026-02-10",
-  "PED_USU": "WILKIN",
-  "PED_SER": "APL",
-  "PED_DTANOT": "2026-02-10",
-  "PED_OBS": "Saida de massas via Trindade",
-  "LOTES": []
-}
-```
-
-Diferencias con `/entradasitem`:
-- Campos de cabecera con prefijo `PED_*` (`PED_DTA`, `PED_USU`, `PED_SER`, `PED_DTANOT`, `PED_OBS`).
-- No envía `PED_DTMOVI`.
-- Mantiene `PRO_COD` a 6 dígitos, `PRO_QTD` escalado × 100 y `PED_USU` en mayúsculas.
-
-### 6.3 Consulta de Movimientos por Usuario (`POST /movimentoitem`)
-
-Permite recuperar el historial de asientos registrados en el ERP para contrastar contra la producción de Trindade:
-
-```json
-{
-  "CODFOR": null,
-  "NOMUSU": "WILKIN",
-  "CODPRO": "005000",
-  "DTINI": "2026-02-10",
-  "DTFIM": "2026-02-10",
-  "ENTSAI": "E"
-}
-```
-
-- Filtro `ENTSAI`: `"E"` (entradas), `"S"` (salidas/bajas) o `null` (ambos).
-- Retorna array con `ENT_LAN` (número de asiento), `PRO_COD`, `PRO_DES`, `PRO_QTD`, `ENT_DTA`, `ENT_USU` y `ENTSAI`.
-- **`PRO_QTD` vuelve en unidades humanas, no escalado.** El pedido va ×100 (`2000` = 20 unidades) porque
-  Firebird necesita el entero; la respuesta trae `20.0`, con la máscara `##0.00` que aplica `libso.so`.
-  Comparar contra el escalado que se envió da diferencias de 100× en cualquier conciliación.
-
-Los códigos de producto (`PRO_COD`) salen tal cual de `stock.catalog.ts` (`5000` = MASSA ROLO 1KG,
-`1045` = CASEIRA, …): son idénticos a los del ERP. Las fechas van en `YYYY-MM-DD` y en la zona de São
-Paulo, no en UTC.
-
-### 6.4 Espejo persistido del día (`/api/integration/aero/movements`)
-
-El atajo corre en un solo teléfono, pero el espejo lo lee toda la planta. La respuesta del ERP se guarda
-como snapshot del día para que cualquier dispositivo la vea sin volver a ejecutar el atajo:
-
-- `POST /api/integration/aero/movements` — cuerpo `{ date: "YYYY-MM-DD", movements: [...] }`, un elemento
-  por asiento con `ent_lan`, `product_code`, `product_desc`, `quantity`, `entry_date`, `operator_name` y
-  `movement_type` (`"E"` o `"S"`). Responde `201 { saved }`. Validación estricta: un cuerpo que el módulo
-  no sabe describir se rechaza con `400 INVALID_MOVEMENTS` y no escribe nada.
-- `GET /api/integration/aero/movements?date=YYYY-MM-DD` — responde `{ date, movements }` ordenado por
-  `ent_lan`. Cualquier operario autenticado puede leerlo: es una copia de lo que la empresa ya registró.
-- `UNIQUE(movement_date, ent_lan)`: una segunda sincronización del mismo día actualiza los asientos que
-  reconoce en lugar de duplicarlos. Los asientos que la respuesta ya no menciona **no** se borran — en
-  Aero32 un asiento no desaparece, y una respuesta parcial es más probable que un borrado.
-- `operator_name` se normaliza a mayúsculas al guardar: el ERP responde `ENT_USU` en mayúsculas y dos
-  grafías del mismo operador no deben renderizarse como dos chips distintos.
-- La tabla `aero_movements` es la **revisión 7** del esquema: se crea con `npm run db:migrate`, nunca al
-  arrancar (Production Immutability Gate). Contra una base sin migrar los dos endpoints responden
-  `503 AERO_MOVEMENTS_NOT_MIGRATED`.
-- `synced_at` es cuándo Trindade supo del ERP, no cuándo ocurrió el movimiento: el asiento es inmutable
-  en Aero32 y `entry_date` es lo que hizo la fábrica.
-
-**Un lanzamiento conciliado no se toca.** Cuando el asiento del ERP y el lanzamiento local describen la
-misma producción —misma fecha, mismo código, misma cantidad y mismo operario—, esa fila queda conciliada y
-deja de ofrecer editar y eliminar, para cualquier rol. No es una restricción de permisos sino de
-consistencia: Delphi ya asentó esa entrada, y corregirla en Trindade dejaría las dos bases contando cosas
-distintas sin que nadie vuelva a mirar. La pantalla lo dice con la insignia **Conciliado** en lugar de los
-botones apagados, y el backend rechaza el `PUT` y el `DELETE` de una fila conciliada aunque se los pida por
-fuera de la interfaz. Si el asiento del ERP está mal, se corrige en Aero32; Trindade no puede ser el origen
-de esa corrección.
-
-## 7. Bitácora
-
-Ruta interna: `POST /api/integration/aero/log`, restringida al admin. El archivo se escribe en
-`logs/aero-integration.log`, montado al host para poder leerlo por SSH sin entrar al contenedor:
-
-```bash
-ssh <host> 'tail -n 50 /ruta/al/proyecto/logs/aero-integration.log'
-```
-
-Una línea JSON por evento:
-
-```json
-{"timestamp":"2026-02-10T12:00:00.000Z","event":"launch_sync","phase":"requested","user":"wilkin",
- "destinationUrl":"http://192.168.1.50:8000/api/entradasitem","httpStatus":null,"payload":{…},
- "response":null,"error":null}
-```
-
-Eventos soportados: `test_connection`, `launch_sync`, `exit_sync`, `history_query`. La identidad se toma del token verificado
-contra la base, nunca del cuerpo. La cabecera `Authorization` **no se escribe nunca** (lleva las
-credenciales en base64) y el payload/respuesta se truncan para que una línea siga siendo una línea.
-
-`test_connection` usa dos líneas y una nota:
-
-| `phase` | `note` | `error` |
+| Endpoint | Método | Uso |
 | --- | --- | --- |
-| `requested` | `via=shortcut reason=mixed_content` (o `via=browser`) | `null`, o `invalid_config` si faltaban datos |
-| `result` | `via=shortcut aero_test=<cuerpo del ERP>` (`true`, `false` o el JSON crudo) | `null` si fue `true`; `shortcut:error` si fue `false`; `shortcut:unknown` si no se pudo leer |
-| `result` | `the operator returned without a shortcut result` | `shortcut:no_verdict` |
+| `/usuarios` | `POST` | Prueba de credenciales y obtención del `CODIGO` |
+| `/entradasitem` | `POST` | Entrada de producción (lanzamiento de masas) |
+| `/saidasitem` | `POST` | Baja o consumo de stock (contrato listo, interfaz pendiente) |
+| `/movimentoitem` | `POST` | Consulta de movimientos por usuario, producto y rango de fechas |
 
-`via=shortcut` nombra el medio, no la receta: tanto el atajo único como el viejo escriben esa palabra.
-Quien quiera distinguirlos mira `launch_sync`, que cierra con `via=bridge` y la acción en la nota
-(`action=entrada`), más la respuesta del ERP truncada.
+Reglas de payload:
 
-## 8. Procedimiento de prueba en fábrica
+- `PRO_COD` va a **6 dígitos con ceros a la izquierda**.
+- `PRO_QTD` se escala **×100** en el pedido para que Firebird no lo grabe como decimal; la respuesta de
+  `/movimentoitem` vuelve en unidades humanas, no escalada.
+- `ENT_USU` y `PED_USU` van en mayúsculas.
+- `ENT_SER` y `PED_SER` van fijos en `APL`.
+- Las fechas van en `YYYY-MM-DD` y en la zona de São Paulo.
 
-Antes de ir:
+Los JSON completos, los campos de `/saidasitem` y el mapeo de `/movimentoitem` están en
+[registro-integracion-aero-webservice.md](registro-integracion-aero-webservice.md).
 
-- [ ] `docker compose ps` con `web` y `api` sanos, y `https://trindademasas.duckdns.org` respondiendo 200.
-- [ ] El iPhone tiene el Atajo `Aero32 Bridge` creado (8 acciones) y **probado a mano** con un sobre de ejemplo.
-- [ ] El iPhone está en el Wi-Fi de la fábrica (el Atajo no funciona por datos móviles: la IP es interna).
+## 8. Espejo del día y conciliación
 
-En la fábrica:
+El atajo corre en un solo teléfono, pero el espejo lo lee toda la planta. La respuesta del ERP se guarda como
+snapshot del día en `aero_movements` para que cualquier dispositivo la vea sin volver a ejecutar el atajo.
 
-1. Abrir la Web en Safari, entrar como `wilkin`.
-2. *Lançamento de Masas* → **Configuração Integração Empresa** → completar URL, usuario y contraseña.
-3. **Testar Conexão**. El botón abre `Aero32 Bridge` con el sobre de `/usuarios/`; al volver, la tarjeta
-   dice si la empresa respondió y con qué `CODIGO`. Lo que importa es que no quede en «sin veredicto»: eso
-   significa que el puente no llegó a volver.
-4. Cargar **un** producto, una caja, y confirmar con el switch *Sincronizar com ERP da Empresa* activo.
-5. iOS abre el Atajo; al volver, la tarjeta de confirmación debe desaparecer y aparecer el resultado.
-6. Verificar en el ERP que la entrada existe, y en el log del servidor las dos líneas (`requested` y
-   `result`).
-7. Repetir con dos productos para comprobar que la cola envía el segundo después del retorno del primero.
-8. Probar el camino de fallo: apagar el Wi-Fi, lanzar, y confirmar que el lanzamiento **igual** quedó
-   guardado en Trindade y que la tarjeta de confirmación manual permite registrar la falla.
+- `POST /api/integration/aero/movements` — cuerpo `{ date, movements }`, un elemento por asiento con `ent_lan`,
+  `product_code`, `product_desc`, `quantity`, `entry_date`, `operator_name` y `movement_type` (`"E"` o `"S"`).
+  Responde `201 { saved }`. Un cuerpo inválido se rechaza con `400 INVALID_MOVEMENTS` y no escribe nada.
+- `GET /api/integration/aero/movements?date=YYYY-MM-DD` — responde `{ date, movements }` ordenado por `ent_lan`.
+  Cualquier operario autenticado puede leerlo.
+- La clave única es `(movement_date, ent_lan, product_code)`: una segunda sincronización del mismo día actualiza
+  los asientos que reconoce en lugar de duplicarlos. Los asientos que la respuesta ya no menciona **no** se borran.
+- `operator_name` se normaliza a mayúsculas al guardar.
+- La tabla es la revisión **7** del esquema y se migra explícitamente; contra una base sin migrar los endpoints
+  responden `503 AERO_MOVEMENTS_NOT_MIGRATED`.
+- `synced_at` es cuándo Trindade supo del ERP, no cuándo ocurrió el movimiento.
 
-## 9. Errores: qué lee el operario
+**Un lanzamiento conciliado no se toca.** Cuando el asiento del ERP y el lanzamiento local describen la misma
+producción —misma fecha, código, cantidad y operario—, la fila queda conciliada y deja de ofrecer editar y
+eliminar, para cualquier rol. No es una restricción de permisos sino de consistencia: Delphi ya asentó esa entrada.
+El backend rechaza `PUT` y `DELETE` aunque se los pida por fuera de la interfaz.
 
-Toda negativa del módulo de masas viaja con dos campos y en portugués: `code` es el hecho
-(`MASSAS_HISTORY_FROZEN`) y `error` es la frase que el operario puede leer. El código decide antes que la
-frase, porque una frase se reescribe y un código no; la frase es el respaldo de un cliente viejo o de un
-proxy que pierde el campo.
+**La importación conserva la identidad del asiento.** `POST /api/massas-launch` acepta `ent_lan` y
+`operator_name`; el lanzamiento guarda el asiento en `massa_launches.ent_lan` y el operario del asiento como dueño
+cuando ese nombre resuelve a un usuario activo. La conciliación empareja primero por `ent_lan`, sin mirar el
+nombre. Un asiento ya importado se rechaza con `409 MASSAS_ALREADY_IMPORTED`.
+
+**Importar es de quien es el asiento.** El backend resuelve el dueño en `aero_movements`, no en el cuerpo de la
+petición, y responde `403 MASSAS_FORBIDDEN` cuando un trabajador intenta importar el asiento de otro operario. Un
+administrador puede importar el asiento de cualquier operario que exista en Trindade.
+
+**Nadie hereda un asiento que no puede atribuir.** Si el nombre del asiento no resuelve a ningún usuario, el
+import se rechaza con `409 MASSAS_OPERATOR_NOT_LINKED`, también para un administrador. Si resuelve a una cuenta
+desactivada, el rechazo es `409 MASSAS_OPERATOR_INACTIVE`. La pantalla ofrece `+ Crear Operario` en lugar de
+`Importar` para esas filas.
+
+## 9. Errores y mensajes
+
+Toda negativa del módulo de masas viaja con dos campos y en portugués: `code` es el hecho y `error` es la frase que
+el operario puede leer. El código decide antes que la frase, porque una frase se reescribe y un código no.
 
 | `code` | HTTP | Lo que dice la pantalla |
 | --- | --- | --- |
-| `MASSAS_HISTORY_FROZEN` | 409 | O histórico de massas é somente leitura: dias passados não podem ser alterados. |
-| `MASSAS_FORBIDDEN` | 403 | Este lançamento pertence a outro operário. |
-| `MASSAS_ALREADY_IMPORTED` | 409 | Este lançamento do ERP já foi importado. |
-| `MASSAS_RECONCILED` | 409 | Esta produção já foi conciliada com o ERP e não pode ser alterada. |
-| `MASSAS_FUTURE_DATE` | 400 | Não é possível lançar em datas futuras. |
-| `MASSAS_NOT_FOUND` | 404 | Lançamento não encontrado. |
-| `MASSAS_INVALID_BOXES` | 400 | Quantidade de caixas inválida. |
-| `MASSAS_CREATE_FAILED`, `…_UPDATE_FAILED`, `…_DELETE_FAILED` | 400 | Não foi possível registrar/atualizar/excluir o lançamento. |
+| `MASSAS_HISTORY_FROZEN` | 409 | El histórico de masas es de solo lectura: los días pasados no se pueden alterar |
+| `MASSAS_FORBIDDEN` | 403 | Este lanzamiento pertenece a otro operario |
+| `MASSAS_ALREADY_IMPORTED` | 409 | Este lanzamiento del ERP ya fue importado |
+| `MASSAS_RECONCILED` | 409 | Esta producción ya fue conciliada con el ERP y no se puede alterar |
+| `MASSAS_OPERATOR_NOT_LINKED` | 409 | El asiento no tiene un operario vinculado en Trindade |
+| `MASSAS_OPERATOR_INACTIVE` | 409 | El operario del asiento está desactivado |
+| `MASSAS_FUTURE_DATE` | 400 | No se puede lanzar en fechas futuras |
+| `MASSAS_NOT_FOUND` | 404 | Lanzamiento no encontrado |
+| `MASSAS_INVALID_BOXES` | 400 | Cantidad de cajas inválida |
+| `MASSAS_CREATE_FAILED`, `…_UPDATE_FAILED`, `…_DELETE_FAILED` | 400 | No se pudo registrar, actualizar o eliminar |
 
 El resto de los códigos (`MASSAS_INVALID_DATE_FORMAT`, `MASSAS_INVALID_LAUNCH_DATA`, `MASSAS_EMPTY_ITEMS`,
-`MASSAS_INVALID_ID`) siguen la misma regla y tienen su frase en la tabla de i18n de la Web.
+`MASSAS_INVALID_ID`) siguen la misma regla y tienen su frase en la tabla de i18n de la web.
 
-La frase del servicio no viaja al cliente: un fallo interno responde `MASSAS_CREATE_FAILED` con el texto
-genérico y deja el detalle en el log. Si el código es uno que esta versión no conoce —un backend más nuevo
-que la app—, Android muestra la frase del servidor tal como llegó, y sólo si no hay frase cae al código
-con el número de estado.
+## 10. Procedimiento de prueba en fábrica
 
-## 10. Límites conocidos
+Antes de ir:
 
-- El Atajo necesita el teléfono en la red de la fábrica; no hay acceso remoto al WebService.
-- Sin retorno del Atajo (el operador lo cancela), la página no puede adivinar el resultado: lo pregunta.
+- [ ] `docker compose ps` con `api` y `web` sanos, y `https://trindademasas.duckdns.org` respondiendo 200.
+- [ ] El iPhone tiene el atajo `Aero32 Bridge` creado y **probado a mano** con un sobre de ejemplo.
+- [ ] El iPhone está en el Wi-Fi de la fábrica; el atajo no funciona por datos móviles porque la IP es interna.
+
+En la fábrica:
+
+1. Abrir la web en Safari e iniciar sesión como `wilkin`.
+2. **Lanzamiento de Masas → Configuración Integración Empresa**: URL, usuario y contraseña.
+3. **Probar conexión**. El botón abre el atajo con el sobre de `/usuarios`; al volver, la tarjeta dice si la
+   empresa respondió y con qué `CODIGO`. Lo que importa es que no quede en «sin veredicto».
+4. Cargar **un** producto, una caja, y confirmar con el interruptor **Sincronizar con ERP** activo.
+5. iOS abre el atajo; al volver, la tarjeta de confirmación debe desaparecer y aparecer el resultado.
+6. Verificar en el ERP que la entrada existe y en el log del servidor las dos líneas (`requested` y `result`).
+7. Repetir con dos productos para comprobar que la cola envía el segundo después del retorno del primero.
+8. Probar el fallo: apagar el Wi-Fi, lanzar y confirmar que el lanzamiento **igual** quedó guardado en Trindade.
+
+## 11. Límites conocidos
+
+- El atajo necesita el teléfono en la red de la fábrica; no hay acceso remoto al WebService.
+- Sin retorno del atajo (el operario lo cancela), la página no puede adivinar el resultado: lo pregunta.
 - La configuración es por dispositivo, no por usuario del sistema.
-- El test de conexión desde la página HTTPS siempre fallará por diseño; sirve para distinguir «red mal»
-  de «bloqueo del navegador», no para validar credenciales en producción. En ese despliegue el test va por
-  el puente, que sí puede.
-- La respuesta vuelve por la URL del callback: un rango de movimientos muy grande puede superar lo que iOS
-  está dispuesto a abrir. Es un motivo más para no pedir historiales largos desde el teléfono.
+- La prueba de conexión desde la página HTTPS siempre fallará por diseño; sirve para distinguir «red mal» de
+  «bloqueo del navegador», no para validar credenciales en producción. En ese despliegue la prueba va por el
+  puente.
+- La respuesta vuelve por la URL del callback: un rango de movimientos muy grande puede superar lo que iOS está
+  dispuesto a abrir. Es un motivo más para no pedir historiales largos desde el teléfono.
+- La integración no escribe en las tablas fiscales del ERP ni reemplaza la operación de la empresa.
 
-## 11. Evolución y Roadmap: Bajas de Stock y Consulta de Movimientos
+## 12. Estado de las piezas
 
-A partir de la ingeniería inversa de `base.apk`, el modelo de datos de la empresa soporta dos
-funcionalidades clave a incorporar. El contrato ya está listo -- el atajo único sabe llevar `saidasitem` y
-`movimentoitem` --, lo que falta es la interfaz que los dispare:
+| Pieza | Estado |
+| --- | --- |
+| Prueba de conexión `/usuarios` | Implementada |
+| Lanzamiento de masas `/entradasitem` | Implementada |
+| Espejo `/movimentoitem` | Implementada |
+| Reporte del día desde el ERP | Implementada |
+| Importación de asiento y conciliación | Implementada |
+| Alta de operario desde el asiento | Implementada |
+| Bajas de stock `/saidasitem` | Contrato listo; interfaz pendiente |
+| Escritura directa en Firebird | Descartada; se usa el WebService |
 
-### 10.1 Módulo de Bajas / Saídas de Insumos y Masas
-- **Objetivo**: Permitir dar de baja stock por mermas, desecho o consumo interno directamente desde Trindade.
-- **Ruta WebService**: `POST /saidasitem` con prefijo `PED_*` (`PED_DTA`, `PED_USU`, `PED_SER: "APL"`).
-- **Implementación**:
-  - Reutiliza la cola y el mismo atajo único, con `aero_action=saida` en la vuelta.
-  - Escala la cantidad x100 y formatea el código a 6 dígitos con ceros a la izquierda.
+## 13. Referencias
 
-### 10.3 Relatório diário lido do ERP — implementado
-- **Objetivo**: que el relatório del día diga lo que la empresa registró, sin mezclarlo con lo que la
-  planta escribió en Trindade.
-- **Ruta**: `GET /api/massas-launch/report?date=YYYY-MM-DD`, alimentada **sólo** por `aero_movements` con
-  `movement_type = 'E'`. `massa_launches` no se lee.
-- **Clasificación**: los diez códigos del catálogo de masas (`1045`, `39`, `60`, `84`, `91`, `1192`,
-  `5000`, `1047`, `22`, `1616`) son **Massas**; cualquier otro asiento del día —brotinho, pizza, canudo,
-  harina, lo que cargó un tercero— es **Recebimento de Insumos**. El corte lo hace el servidor, así que
-  Web, Android y el texto de WhatsApp no pueden discrepar.
-- **Consecuencia**: el `balance` compara el día contra sí mismo (`differenceUnits: 0`, `reconciledSeats`
-  y `pendingSeats` en cero) y la barra comparativa ya no se dibuja en el Relatório; queda en Lançamento
-  de Masas, que es donde tiene sentido.
-- **Operarios**: cada operario del día sale del ERP. Si su nombre no resuelve a una cuenta, aparece
-  igual —con su producción—, marcado para que el administrador pueda crearlo desde el asiento.
-
-### 10.2 Vista de Movimientos del Usuario (ERP vs Trindade) — implementado
-- **Objetivo**: Mostrar en la interfaz de Trindade qué se registró efectivamente en el ERP, y permitir
-  importar al lanzamiento local lo que se hizo desde otra vía.
-- **Ruta WebService**: `POST /movimentoitem` con `{"NOMUSU": "WILKIN", "DTINI": "...", "DTFIM": "...", "ENTSAI": "E"}`.
-  Enviando `NOMUSU: null` el ERP devuelve los movimientos de todos los operarios de la planta.
-- **Implementación**:
-  - Pestaña «Espelho do ERP» en Lançamento de Massas, con el snapshot del día persistido (§6.4) y
-    operario por asiento en chips.
-  - Cruza el historial local de Trindade con el número de asiento Firebird (`ENT_LAN`) y marca
-    «Conciliado» cuando ambos lados coinciden.
-  - Los asientos del ERP son **solo lectura** en Trindade; importar crea un lanzamiento local nuevo,
-    nunca edita el asiento de la empresa.
-  - **La importación conserva la identidad del asiento.** `POST /massas-launch` acepta `ent_lan` y
-    `operator_name`; el lanzamiento guarda el asiento en `massa_launches.ent_lan` y el operario de la
-    tableta como dueño cuando ese nombre resuelve a un usuario activo. La conciliación empareja primero
-    por `ent_lan`, sin mirar el nombre: el mismo trabajo no se duplica ni queda «pendiente» por cómo se
-    escribió el operario en cada lado. Un asiento ya importado se rechaza con `409`
-    `MASSAS_ALREADY_IMPORTED` (índice único parcial sobre `ent_lan`), así que el botón no puede crear
-    lanzamientos huérfanos.
-  - **Importar es de quien es el asiento.** `POST /massas-launch` resuelve el dueño del asiento en
-    `aero_movements` — no en el cuerpo de la petición — y responde `403 MASSAS_FORBIDDEN` cuando un
-    trabajador intenta importar un asiento de otro operario. Un administrador importa el asiento de
-    cualquier operario **que exista en Trindade**. El espejo expone el mismo `owner_user_id` resuelto con
-    las mismas reglas, así que Web y Android ocultan el botón en la misma fila que el backend rechazaría:
-    un botón que solo fallar es peor que ningún botón.
-  - **Nadie hereda un asiento que no puede atribuir.** Cuando el nombre del asiento no resuelve a ningún
-    usuario, el import se rechaza con `409 MASSAS_OPERATOR_NOT_LINKED` —también para un administrador— en
-    lugar de anotarlo a nombre de quien aprieta el botón. Si el nombre resuelve a una cuenta desactivada,
-    el rechazo es `409 MASSAS_OPERATOR_INACTIVE`: existe y hay que reactivarla, no crear un duplicado que
-    el login único haría fallar. El alta que destraba la fila es `POST /api/admin/users` con
-    `{ username, password, display_name, role_id: 2 }`, donde el login sale del nombre del asiento
-    (`JOAO H` → `joaoh`, sin puntos ni iniciales) y la senha de `quickWorkerPassword(login)`. El espejo
-    marca esas filas y la pantalla ofrece `+ Criar Operário` en lugar de `Importar`.
-  - **El histórico es solo lectura, desde el alta hasta el borrado.** `PUT` y `DELETE
-    /api/massas-launch/:id` responden `409 MASSAS_HISTORY_FROZEN` para cualquier lanzamiento cuyo día no
-    sea hoy en São Paulo, y lo hacen antes de mirar el rol: la regla vale igual para un administrador.
-    `POST /api/massas-launch` responde el mismo `409` con el mismo `code` cuando la fecha pedida ya pasó,
-    así que un día cerrado tampoco admite filas nuevas: la guardia corre antes de leer los ítems y no
-    consulta el rol, porque lo que se cerró es el día y no la persona. La pantalla de Histórico monta la
-    tabla en solo lectura y no cablea ningún manejador de edición o borrado; la pantalla de Lanzamiento,
-    al abrir una fecha anterior a hoy, reemplaza la grilla por la foto del día —cajas por producto, sin
-    campos ni botón *Lançar*, con el aviso de que el día no acepta lanzamientos— y el manejador de alta
-    corta antes del `POST`. En Android, abrir una fecha pasada deja la pantalla en solo lectura, no dibuja
-    el bloque de lanzamiento y rechaza importar un asiento dentro de ese día.
-  - La consulta también se dispara desde Recebimento, en el relatório: el atajo vuelve a la ruta del
-    reporte (`aero_return` es la propia ruta, validada como path relativo) y el modal cuenta sólo los
-    insumos. El snapshot se guarda entero en las dos pantallas; lo que cambia es el lente, que el
-    backend responde ya desglosado como `{ saved, massas, insumos }` (§6.4).
-
+- [registro-integracion-aero-webservice.md](registro-integracion-aero-webservice.md) — contratos JSON completos.
+- [integracion-aero32.md](integracion-aero32.md) — auditoría del ERP y alternativas.
+- [calculadoras.md](calculadoras.md) — reglas de masas y stock.
+- [arquitectura.md](arquitectura.md) — mapa técnico del sistema.

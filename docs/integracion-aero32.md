@@ -1,14 +1,33 @@
-# Integración Aero32 ↔ Trindade: auditoría de ingeniería inversa y hoja de ruta
+# Integración Aero32 ↔ Trindade: auditoría de ingeniería inversa y referencia técnica
 
-Documento de referencia para la interoperabilidad entre los módulos operativos de Trindade (lanzamiento de masas y
-stock) y el ERP de la empresa (**Aero32 / AeroSML**, cliente Windows del proveedor Aero Informática).
+Documento de referencia para la interoperabilidad entre los módulos operativos de Trindade y el ERP de la empresa
+(**Aero32 / AeroSML**, cliente Windows del proveedor Aero Informática). Conserva la auditoría técnica del ERP; el
+flujo operativo implementado está en [integracion-aero-masas-web.md](integracion-aero-masas-web.md) y los contratos
+exactos de los endpoints en [registro-integracion-aero-webservice.md](registro-integracion-aero-webservice.md).
 
 Todo lo que sigue proviene de **análisis estático de solo lectura** sobre una copia de trabajo del cliente en Linux.
 El host Windows de producción no se modificó: los binarios se copiaron, se desempacaron y se analizaron fuera de él.
 
 - Fecha: 2026-10-25 (cliente de escritorio) · 2026-10-26 (cliente móvil Android)
-- Alcance: cliente `aerosml.exe` (v. portable instalada en `C:\Users\wilki\proyectos\Aero32`), DLLs auxiliares y archivos de configuración exportados; más el cliente móvil Android de stock (`br.com.aerosytem.Estoque`, v2.0.0) copiado del teléfono (§13).
-- Estado: **auditoría cerrada, integración no iniciada**. Este documento es la base de decisión, no una implementación.
+- Alcance: cliente `aerosml.exe` (versión portable instalada en el equipo de la empresa), DLLs auxiliares y archivos de configuración exportados; más el cliente móvil Android de stock (`br.com.aerosytem.Estoque`, v2.0.0) copiado del teléfono (§13).
+- Estado: **auditoría cerrada; integración implementada y en producción desde las versiones 0.6.x/0.7.0**. La integración usa el **WebService HTTP de la fábrica**, no escritura directa sobre Firebird. Las secciones 5–8 se conservan como análisis de alternativas y riesgos, no como trabajo pendiente.
+- Dirección de producción: `http://192.168.25.250:1453/api`. Las direcciones `192.168.1.50:8000` que aparecen en ejemplos son ilustrativas.
+- Seguridad: este documento no reproduce contraseñas, API keys ni secretos del entorno analizado.
+
+## 0. Implementación actual
+
+| Pieza | Dónde vive | Qué hace |
+| --- | --- | --- |
+| Panel web de integración | `packages/frontend/src/pages/massas/AeroIntegrationPanel.tsx` y `lib/aero-*.ts` | Configura URL, usuario y contraseña; prueba la conexión; encola lanzamientos y lee el espejo |
+| Atajo de iOS | Apple Shortcuts, receta `Aero32 Bridge` | Transporta el sobre `{ url, auth, body, callback }` fuera de Safari para alcanzar HTTP local desde una página HTTPS |
+| Cliente Android | `packages/android/app/src/main/java/com/trindade/app/aero/` | Llama al WebService directamente desde la red de la planta, con Basic Auth y ajustes cifrados |
+| Backend de integración | `packages/backend/src/modules/integration/` | Bitácora, validación y snapshot de movimientos del día |
+| Espejo persistido | Tabla `aero_movements` (revisiones 7–9) | Snapshot del día compartido por toda la planta |
+| Reporte del día | `GET /api/massas-launch/report` | Clasifica masas vs insumos a partir del espejo del ERP |
+
+El resto de este documento explica **cómo funciona el ERP por dentro** y por qué se eligió el WebService como
+camino de integración. Para operar la integración no hace falta leerlo completo; para diagnosticar un endpoint o
+entender sus límites, sí.
 
 ---
 
