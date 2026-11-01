@@ -45,7 +45,7 @@ S8 — Entrega, verbatim:
 - T4 | S5 | inline | con el interruptor de un tipo de caja apagado, sus cajas no se dibujan — commit: `be7f7ef` (verde: `ReportBoxTypeSwitchTest` 4/4)
 - T5 | S3 | inline | cabecera de Compartir App con título y subtítulo, y acción «Compartir arquivo APK» — commit: `98f4415` (verde: `ShareAppViewModelTest` 12/12, `ServerApkSharerTest` 3/3, `ShareManagerTest` 10/10)
 - T6 | S6 | inline | Dashboard: fuera Histórico de Contagem, dentro Compartir App tras Calculadora de Assaí — commit: `491fab9` (verde: `DashboardScreenTest` 14/14)
-- T7 | S7 | inline | un solo cuadro de resumen con las tres cifras y el día en curso — commit: `_pendiente_`
+- T7 | S7 | inline | un solo cuadro de resumen con las tres cifras, el plantel y los dos pares `done/total` (sin fila para `reportsToday`: el rótulo «Relatórios Hoje» ya es el de la tarjeta de arriba) — commit: `1fb022f` (verde: `DashboardScreenTest` 15/15)
 - T8 | S8 | inline | `versionCode` 7004, build firmado, verificación en `emulator-5554`, despliegue y reemplazo del asset de `v0.7.0` — commit: `_pendiente_`
 
 ## Log
