@@ -17,8 +17,10 @@ import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.Dp
@@ -362,7 +364,7 @@ class LoadingScreenTest {
         repeat(SLOTS.size) { index -> waysIn[index].assertIsNotEnabled() }
 
         // And the removal of every row the settled day drew is withheld too.
-        val removals = composeRule.onAllNodesWithText(copy(R.string.report_photo_remove))
+        val removals = composeRule.onAllNodesWithContentDescription(copy(R.string.report_photo_remove))
         removals.assertCountEquals(day.size)
         repeat(day.size) { index -> removals[index].assertIsNotEnabled() }
     }
@@ -429,8 +431,8 @@ class LoadingScreenTest {
 
         composeRule.onAllNodesWithText(copy(R.string.report_edit)).assertCountEquals(1)
 
-        day.forEach { displayed(describe(it)) }
-        composeRule.onAllNodesWithText(copy(R.string.report_photo_remove)).assertCountEquals(day.size)
+        day.forEach { displayed(it.driverName.orEmpty()) }
+        composeRule.onAllNodesWithContentDescription(copy(R.string.report_photo_remove)).assertCountEquals(day.size)
 
         composeRule.onNodeWithText(copy(R.string.report_edit)).performScrollTo().assertIsDisplayed().performClick()
         composeRule.waitForIdle()
@@ -512,7 +514,7 @@ class LoadingScreenTest {
         assertTrue("Edit height >= 48dp", editBounds.bottom - editBounds.top >= 48.dp)
         assertTrue("Edit width >= 48dp", editBounds.right - editBounds.left >= 48.dp)
 
-        val deleteNodes = composeRule.onAllNodesWithText(copy(R.string.report_photo_remove))
+        val deleteNodes = composeRule.onAllNodesWithContentDescription(copy(R.string.report_photo_remove))
         val firstDeleteNode = deleteNodes[0].performScrollTo().assertIsDisplayed()
         val firstDeleteBounds = firstDeleteNode.getUnclippedBoundsInRoot()
         assertTrue("Delete height >= 48dp", firstDeleteBounds.bottom - firstDeleteBounds.top >= 48.dp)
@@ -557,8 +559,8 @@ class LoadingScreenTest {
         }
 
         // Tap Remove on the same editable row that also has Edit (editable entry, EDITABLE_ID)
-        composeRule.onNodeWithText(describe(editable)).performScrollTo().assertIsDisplayed()
-        val removeButtons = composeRule.onAllNodesWithText(copy(R.string.report_photo_remove))
+        composeRule.onNodeWithText(editable.driverName.orEmpty()).performScrollTo().assertIsDisplayed()
+        val removeButtons = composeRule.onAllNodesWithContentDescription(copy(R.string.report_photo_remove))
         val editableRemoveNode = removeButtons[3].performScrollTo().assertIsDisplayed()
         editableRemoveNode.performClick()
         composeRule.waitForIdle()
@@ -644,7 +646,7 @@ class LoadingScreenTest {
         assertWithinViewport(counterNode)
 
         // Entry identity text (driver, vehicle, plate)
-        val identityNode = composeRule.onNodeWithText(describe(responsiveEntry)).performScrollTo()
+        val identityNode = composeRule.onNodeWithText(responsiveEntry.driverName.orEmpty()).performScrollTo()
         assertWithinViewport(identityNode)
         val identityBounds = identityNode.getUnclippedBoundsInRoot()
 
@@ -656,7 +658,7 @@ class LoadingScreenTest {
         assertTrue("Edit button width >= 48dp at 1.5x", editBounds.right - editBounds.left >= 48.dp)
 
         // Remove button on editable row
-        val removeNode = composeRule.onNodeWithText(copy(R.string.report_photo_remove)).performScrollTo()
+        val removeNode = composeRule.onNodeWithContentDescription(copy(R.string.report_photo_remove)).performScrollTo()
         assertWithinViewport(removeNode)
         val removeBounds = removeNode.getUnclippedBoundsInRoot()
         assertTrue("Remove button height >= 48dp at 1.5x", removeBounds.bottom - removeBounds.top >= 48.dp)
@@ -666,7 +668,10 @@ class LoadingScreenTest {
         assertNoOverlap(editBounds, removeBounds)
         assertNoOverlap(identityBounds, editBounds)
         assertNoOverlap(identityBounds, removeBounds)
-        assertTrue("Identity text sits above edit action", identityBounds.bottom <= editBounds.top)
+        assertTrue(
+            "Identity sits left of the actions in the row: ${identityBounds.right} vs ${editBounds.left}",
+            identityBounds.right <= editBounds.left,
+        )
     }
 
     @Test
@@ -727,7 +732,7 @@ class LoadingScreenTest {
         assertWithinViewport(counterNode)
 
         // Entry identity text (driver, vehicle, plate)
-        val identityNode = composeRule.onNodeWithText(describe(responsiveEntry)).performScrollTo()
+        val identityNode = composeRule.onNodeWithText(responsiveEntry.driverName.orEmpty()).performScrollTo()
         assertWithinViewport(identityNode)
         val identityBounds = identityNode.getUnclippedBoundsInRoot()
 
@@ -739,7 +744,7 @@ class LoadingScreenTest {
         assertTrue("Edit button width >= 48dp at 2.0x", editBounds.right - editBounds.left >= 48.dp)
 
         // Remove button on editable row
-        val removeNode = composeRule.onNodeWithText(copy(R.string.report_photo_remove)).performScrollTo()
+        val removeNode = composeRule.onNodeWithContentDescription(copy(R.string.report_photo_remove)).performScrollTo()
         assertWithinViewport(removeNode)
         val removeBounds = removeNode.getUnclippedBoundsInRoot()
         assertTrue("Remove button height >= 48dp at 2.0x", removeBounds.bottom - removeBounds.top >= 48.dp)
@@ -749,7 +754,10 @@ class LoadingScreenTest {
         assertNoOverlap(editBounds, removeBounds)
         assertNoOverlap(identityBounds, editBounds)
         assertNoOverlap(identityBounds, removeBounds)
-        assertTrue("Identity text sits above edit action", identityBounds.bottom <= editBounds.top)
+        assertTrue(
+            "Identity sits left of the actions in the row: ${identityBounds.right} vs ${editBounds.left}",
+            identityBounds.right <= editBounds.left,
+        )
     }
 
     private fun assertWithinViewport(
@@ -899,12 +907,82 @@ class LoadingScreenTest {
      * order, so a row's block is the last one whose heading is above it.
      */
     private fun drawnSlot(row: SchedulesResponseSchedulesInner): String {
-        composeRule.onAllNodesWithText(describe(row)).assertCountEquals(1)
-        val identity = composeRule.onNodeWithText(describe(row)).getUnclippedBoundsInRoot()
+        composeRule.onAllNodesWithText(row.driverName.orEmpty()).assertCountEquals(1)
+        val identity = composeRule.onNodeWithText(row.driverName.orEmpty()).getUnclippedBoundsInRoot()
 
         return MOVED_SLOTS.last { slot ->
             composeRule.onNodeWithText(slot).getUnclippedBoundsInRoot().top <= identity.top
         }
+    }
+
+    // ---- The slot's table ----
+
+    /**
+     * The row of a slot is a row, and the last thing on it is the removal.
+     *
+     * The section's complaint was a list that read as paragraphs: every fact of an assignment started
+     * wherever the one before it ended, and the removal was a word as wide as the row's own text. What the
+     * table buys is two x positions held for every row of the slot -- the plate line under the name, and the
+     * removal at the row's end -- so the two rows below carry different names, different plates and a
+     * vehicle each, and what they share is where their facts start.
+     *
+     * The glyph of the removal is measured on the unmerged tree, where the icon is still its own node: the
+     * button around it is 48dp because a finger needs that, and asserting the button's size would say
+     * nothing about a glyph that filled it.
+     */
+    @Test
+    fun `a slot draws its drivers as aligned rows that end in one small removal`() {
+        val rows = listOf(
+            FakeLoadingApi.entry(1, SLOTS[0]).copy(
+                driverName = "Carlos",
+                vehiclePlate = "ABC1D23",
+                vehicleDescription = "VW Delivery",
+            ),
+            FakeLoadingApi.entry(2, SLOTS[0]).copy(
+                driverName = "Marcos",
+                vehiclePlate = "XYZ9K88",
+                vehicleDescription = "Mercedes Sprinter",
+            ),
+        )
+        renderState(state().copy(schedules = rows))
+
+        val firstPlate = composeRule.onNodeWithText("ABC1D23 · VW Delivery").performScrollTo()
+            .getUnclippedBoundsInRoot()
+        val secondPlate = composeRule.onNodeWithText("XYZ9K88 · Mercedes Sprinter").performScrollTo()
+            .getUnclippedBoundsInRoot()
+        assertEquals(
+            "both plate lines start at the same x: ${firstPlate.left} vs ${secondPlate.left}",
+            firstPlate.left.value,
+            secondPlate.left.value,
+            0.5f,
+        )
+
+        val removals = composeRule.onAllNodesWithContentDescription(copy(R.string.report_photo_remove))
+        removals.assertCountEquals(rows.size)
+        val firstRemoval = removals[0].getUnclippedBoundsInRoot()
+        val secondRemoval = removals[1].getUnclippedBoundsInRoot()
+        assertEquals(
+            "both removals end at the same x: ${firstRemoval.right} vs ${secondRemoval.right}",
+            firstRemoval.right.value,
+            secondRemoval.right.value,
+            0.5f,
+        )
+
+        // The target keeps what a finger needs; the glyph inside it is the small thing the section asked
+        // for, and it is the glyph that says so.
+        rows.indices.forEach { index ->
+            val target = removals[index].getUnclippedBoundsInRoot()
+            assertTrue("removal target height >= 48dp", target.bottom - target.top >= 48.dp)
+            assertTrue("removal target width >= 48dp", target.right - target.left >= 48.dp)
+        }
+        val glyph = composeRule.onAllNodesWithContentDescription(
+            copy(R.string.report_photo_remove),
+            useUnmergedTree = true,
+        )[0].getUnclippedBoundsInRoot()
+        assertTrue(
+            "the removal's glyph must stay small: ${glyph.right - glyph.left}",
+            (glyph.right - glyph.left).value in 18f..24f,
+        )
     }
 
     // ---- Export actions ----

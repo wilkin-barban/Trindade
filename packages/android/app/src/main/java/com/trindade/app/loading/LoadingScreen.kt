@@ -8,10 +8,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
@@ -27,13 +29,15 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -46,9 +50,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -58,7 +64,6 @@ import com.trindade.app.contract.models.SchedulesResponseSchedulesInner
 import com.trindade.app.contract.models.VehiclesResponseVehiclesInner
 import com.trindade.app.ui.cleanPhone
 import com.trindade.app.ui.filterPhoneInput
-import com.trindade.app.ui.components.AdminDestructiveButton
 import com.trindade.app.ui.components.AdminPrimaryButton
 import com.trindade.app.ui.components.AdminSecondaryButton
 import com.trindade.app.ui.components.HelpSection
@@ -341,42 +346,12 @@ private fun SlotBlock(
         }
 
         entries.forEach { entry ->
-            // Stacks the row identity and actions cleanly: identity gets full width on top, and the action
-            // buttons wrap in a FlowRow below it, preserving >=48dp touch targets and preventing overlap.
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Text(
-                    text = describe(entry),
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.fillMaxWidth().padding(start = 8.dp),
-                )
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    // The way in, offered only where the server's own flags allow it. `isReadOnly()` is the
-                    // predicate the edit screen reads too -- one function in this package, so a row this grid
-                    // offers an edit for is never one that screen would draw with no save at all. A row the
-                    // server closed draws no action here rather than a disabled one, which is the reports'
-                    // rule: an action that is drawn but refuses is still an offer. The day travels with the id
-                    // because that screen reads the row out of its day (`GET /api/loading/schedules?date=`),
-                    // and the day this grid is showing is written down here and nowhere else.
-                    if (!entry.isReadOnly() && !state.loading) {
-                        NavigationActionButton(
-                            onClick = { onEditEntry(entry.id, state.date) },
-                            text = stringResource(R.string.report_edit),
-                        )
-                    }
-                    AdminDestructiveButton(
-                        onClick = { onDelete(entry.id) },
-                        text = stringResource(R.string.report_photo_remove),
-                        enabled = !state.busy && !state.loading,
-                    )
-                }
-            }
+            SlotTableRow(
+                entry = entry,
+                state = state,
+                onDelete = onDelete,
+                onEditEntry = onEditEntry,
+            )
         }
 
         // Offered even when the window is exceeded. The limit is a display, and withholding this
@@ -391,6 +366,102 @@ private fun SlotBlock(
         )
         HorizontalDivider()
     }
+}
+
+/** The height a row's own actions keep whatever the font scale asks of the text beside them. */
+private val SlotActionTarget = 48.dp
+
+/**
+ * One driver of a slot, as a row of the table the slot draws.
+ *
+ * The three facts of an assignment used to arrive as one sentence -- driver, vehicle and plate joined by
+ * dots -- which put the same fact at a different x on every row and made a slot with two drivers of the
+ * same fleet read as two paragraphs. Held in a column, the plate starts at the same x on every row of the
+ * slot whatever the name beside it measures, and the removal is one small target at the row's end rather
+ * than a word as wide as the row's own text.
+ *
+ * The plate shares the cell with the vehicle instead of claiming a column of its own: a plate is one
+ * unbreakable word and, at 320dp with the font at twice its size, a column reserved for it would be
+ * measured against the buttons beside it rather than against the plate. Stacked under the name, it still
+ * lines up down the slot -- which is the alignment a table buys -- and the row cannot be squeezed narrower
+ * than the words it holds. The plate comes first on that line because it is the part that has to align;
+ * the vehicle follows it because it is what the plate is attached to.
+ */
+@Composable
+private fun SlotTableRow(
+    entry: SchedulesResponseSchedulesInner,
+    state: LoadingViewModel.UiState,
+    onDelete: (Int) -> Unit,
+    onEditEntry: (Int, String) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f).padding(horizontal = 4.dp)) {
+            Text(
+                text = entry.driverName ?: entry.licensePlate.orEmpty(),
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            // A fletero drives their own vehicle and a company driver drives the one assigned to them, so
+            // the plate is read from the vehicle when there is one and from the driver's own record when
+            // there is not. An em dash is drawn rather than nothing: an empty line reads as a plate nobody
+            // got round to filling in, and this one is a plate that does not exist.
+            val plate = entry.vehiclePlate ?: entry.licensePlate
+            val vehicle = entry.vehicleDescription?.takeIf { it != plate }
+            Text(
+                text = listOfNotNull(plate, vehicle).joinToString(" · ").ifEmpty { "—" },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // The way in, offered only where the server's own flags allow it. `isReadOnly()` is the
+            // predicate the edit screen reads too -- one function in this package, so a row this grid
+            // offers an edit for is never one that screen would draw with no save at all. A row the
+            // server closed draws no action here rather than a disabled one, which is the reports'
+            // rule: an action that is drawn but refuses is still an offer. The day travels with the id
+            // because that screen reads the row out of its day (`GET /api/loading/schedules?date=`),
+            // and the day this grid is showing is written down here and nowhere else.
+            if (!entry.isReadOnly() && !state.loading) {
+                TextButton(
+                    onClick = { onEditEntry(entry.id, state.date) },
+                    modifier = Modifier.heightIn(min = SlotActionTarget).widthIn(min = SlotActionTarget),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.report_edit),
+                        style = MaterialTheme.typography.labelLarge,
+                        maxLines = 1,
+                    )
+                }
+            }
+            // The removal keeps the 48dp a finger needs while drawing a 20dp glyph inside it: a word as
+            // wide as the row's own text made the target of the row's smallest action the biggest thing
+            // on it. Its name survives as the description a screen reader announces.
+            IconButton(
+                onClick = { onDelete(entry.id) },
+                modifier = Modifier.size(SlotActionTarget),
+                enabled = !state.busy && !state.loading,
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_delete),
+                    contentDescription = stringResource(R.string.report_photo_remove),
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+    }
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 }
 
 /**
@@ -446,7 +517,7 @@ private fun DriverPickerDialog(
                 )
 
                 val fleteros = state.pickerTab == LoadingPickerTab.FLETEROS
-                TabRow(selectedTabIndex = if (fleteros) 0 else 1) {
+                PrimaryTabRow(selectedTabIndex = if (fleteros) 0 else 1) {
                     Tab(
                         selected = fleteros,
                         onClick = { onTabSelected(LoadingPickerTab.FLETEROS) },
