@@ -2034,14 +2034,18 @@
             "enum": [
               "test_connection",
               "launch_sync",
-              "read_history"
+              "read_history",
+              "dispatch",
+              "sync",
+              "test"
             ]
           },
           "phase": {
             "type": "string",
             "enum": [
               "requested",
-              "result"
+              "result",
+              "response"
             ]
           },
           "destinationUrl": {
@@ -2085,6 +2089,25 @@
               "null"
             ],
             "maxLength": 256
+          },
+          "client": {
+            "type": "string",
+            "enum": [
+              "android",
+              "web",
+              "shortcut",
+              "bridge"
+            ]
+          },
+          "attemptId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "durationMs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 600000
           }
         },
         "required": [

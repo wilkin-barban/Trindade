@@ -196,4 +196,58 @@ describe('Aero integration routes', () => {
     const body = JSON.parse(res.body);
     assert.equal(body.code, 'INVALID_AERO_LOG');
   });
+
+  it('accepts the events Android sends and records identity, attempt and duration', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/integration/aero/log',
+      headers: { authorization: `Bearer ${workerToken}` },
+      payload: {
+        event: 'dispatch',
+        phase: 'response',
+        client: 'android',
+        attemptId: '3d1f6a1e-0d5c-4c31-9a1b-8a6f2f0f9c11',
+        durationMs: 1840,
+        destinationUrl: 'http://192.168.1.50:8000/api/entradasitem',
+        httpStatus: 200,
+      },
+    });
+    assert.equal(res.statusCode, 200);
+
+    const lines = readFileSync(join(tempLogDir, AERO_LOG_FILE), 'utf-8').split('\n').filter(Boolean);
+    const lastLine = JSON.parse(lines[lines.length - 1]);
+    assert.equal(lastLine.event, 'dispatch');
+    assert.equal(lastLine.phase, 'response');
+    assert.equal(lastLine.client, 'android');
+    assert.equal(lastLine.attemptId, '3d1f6a1e-0d5c-4c31-9a1b-8a6f2f0f9c11');
+    assert.equal(lastLine.durationMs, 1840);
+  });
+
+  it('keeps the server strict: an oversized error and an unknown client are refused, not trimmed', async () => {
+    const oversized = await app.inject({
+      method: 'POST',
+      url: '/api/integration/aero/log',
+      headers: { authorization: `Bearer ${wilkinToken}` },
+      payload: {
+        event: 'test_connection',
+        destinationUrl: 'http://192.168.1.50:8000/api/usuarios/',
+        error: 'x'.repeat(1025),
+      },
+    });
+    assert.equal(oversized.statusCode, 400);
+    assert.equal(JSON.parse(oversized.body).code, 'INVALID_AERO_LOG');
+
+    const unknownClient = await app.inject({
+      method: 'POST',
+      url: '/api/integration/aero/log',
+      headers: { authorization: `Bearer ${wilkinToken}` },
+      payload: {
+        event: 'test_connection',
+        client: 'desktop',
+        destinationUrl: 'http://192.168.1.50:8000/api/usuarios/',
+      },
+    });
+    assert.equal(unknownClient.statusCode, 400);
+    assert.equal(JSON.parse(unknownClient.body).code, 'INVALID_AERO_LOG');
+  });
 });

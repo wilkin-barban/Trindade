@@ -59,6 +59,9 @@ export async function aeroIntegrationRoutes(fastify: FastifyInstance) {
         error: body.error ?? null,
         launchId: body.launchId ?? null,
         note: body.note ?? null,
+        client: body.client ?? null,
+        attemptId: body.attemptId ?? null,
+        durationMs: body.durationMs ?? null,
       });
 
       return reply.status(200).send({ ok: true });

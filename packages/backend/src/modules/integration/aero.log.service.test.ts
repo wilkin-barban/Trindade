@@ -36,6 +36,9 @@ describe('Aero integration log service', () => {
         error: null,
         launchId: null,
         note: 'connectivity test ok',
+        client: 'android',
+        attemptId: 'attempt-7',
+        durationMs: 250,
       };
 
       const returnedPath = appendAeroLog(entry, tempDir);
@@ -61,6 +64,9 @@ describe('Aero integration log service', () => {
         error: null,
         launchId: null,
         note: 'connectivity test ok',
+        client: 'android',
+        attemptId: 'attempt-7',
+        durationMs: 250,
       });
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
@@ -83,6 +89,9 @@ describe('Aero integration log service', () => {
         error: null,
         launchId: null,
         note: 'first call',
+        client: 'web',
+        attemptId: null,
+        durationMs: null,
       };
       const entry2: AeroLogEntry = {
         ts: '2026-10-27T12:01:00.000Z',
@@ -97,6 +106,9 @@ describe('Aero integration log service', () => {
         error: null,
         launchId: 42,
         note: 'second call',
+        client: 'web',
+        attemptId: null,
+        durationMs: null,
       };
 
       appendAeroLog(entry1, tempDir);
@@ -140,6 +152,9 @@ describe('Aero integration log service', () => {
         error: null,
         launchId: null,
         note: 'after rotation',
+        client: 'web',
+        attemptId: null,
+        durationMs: null,
       };
 
       appendAeroLog(entry, tempDir);
@@ -189,6 +204,9 @@ describe('Aero integration log service', () => {
         error: null,
         launchId: null,
         note: null,
+        client: 'web',
+        attemptId: null,
+        durationMs: null,
       };
 
       appendAeroLog(entry, tempDir);
@@ -245,6 +263,9 @@ describe('Aero integration log service', () => {
         error: null,
         launchId: null,
         note: null,
+        client: 'web',
+        attemptId: null,
+        durationMs: null,
       };
 
       appendAeroLog(entry, tempDir);

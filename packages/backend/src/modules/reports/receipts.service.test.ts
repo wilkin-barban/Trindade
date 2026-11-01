@@ -22,6 +22,7 @@ function movement(overrides: Partial<AeroMovement>): AeroMovement {
     movement_type: 'E',
     synced_at: '2026-10-29T18:00:00.000Z',
     owner_user_id: null,
+    owner_status: 'missing',
     ...overrides,
   };
 }
