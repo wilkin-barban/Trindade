@@ -6,10 +6,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -107,16 +109,15 @@ class DashboardScreenTest {
     private fun card(label: String) = composeRule.onNodeWithText(label).performScrollTo()
 
     @Test
-    fun `the five cards and the values the summary carries are drawn`() {
+    fun `the cards and the values the summary carries are drawn`() {
         render(state = state())
 
-        // The five labels, in the web's order and with the web's words.
+        // The labels of the doors, in the web's order and with the web's words, plus the panel that is
+        // not a door.
         for (id in listOf(
             R.string.dashboard_reports_today,
             R.string.dashboard_active_schedule,
-            R.string.dashboard_active_users,
-            R.string.dashboard_reports_total,
-            R.string.dashboard_schedules_total,
+            R.string.dashboard_summary_title,
         )) {
             displayed(copy(id))
         }
@@ -127,16 +128,54 @@ class DashboardScreenTest {
         displayed(copy(R.string.dashboard_higiene_count, FakeSystemApi.HIGIENE_DONE))
         displayed(copy(R.string.dashboard_recepcion_count, FakeSystemApi.RECEPCION_DONE))
 
-        // The four plain counts. Every number in the fake's summary is one of its own, so none of these
-        // assertions can pass because the screen drew another card's value in its place.
+        // The count of the schedules card, in its own style.
         displayed(FakeSystemApi.ACTIVE_SCHEDULE_COUNT.toString())
-        displayed(FakeSystemApi.ACTIVE_USERS.toString())
-        displayed(FakeSystemApi.REPORTS_TOTAL.toString())
-        displayed(FakeSystemApi.SCHEDULES_TOTAL.toString())
 
         // The day the count belongs to is drawn beside it: a number of carregamentos without its day is
         // one the operator cannot act on, which is what the card stops being once the day is on it.
         displayed(FakeSystemApi.ACTIVE_SCHEDULE_DATE)
+    }
+
+    /**
+     * The panel that replaced three cards, asserted on the three plain totals and the two progress pairs.
+     *
+     * Each figure is checked once, by the label and the value the screen builds for it: two cards showing
+     * the same number in the same style is exactly what this test cannot tell apart from a panel, so the
+     * count of the panel's own title is asserted as well -- there is one panel, not four.
+     *
+     * `reportsToday` is asserted out of the panel on purpose: the card above is titled with those same
+     * words, and a second row carrying the label would make the screen say the same sentence twice.
+     */
+    @Test
+    fun `one panel carries every count, including the day's reports and the two progress pairs`() {
+        render(state = state())
+
+        composeRule.onNodeWithText(copy(R.string.dashboard_summary_title)).performScrollTo().assertIsDisplayed()
+        composeRule.onAllNodesWithText(copy(R.string.dashboard_summary_title)).assertCountEquals(1)
+
+        for (label in listOf(
+            R.string.dashboard_schedules_total,
+            R.string.dashboard_reports_total,
+            R.string.dashboard_active_users,
+            R.string.dashboard_higiene_label,
+            R.string.dashboard_recepcion_label,
+        )) {
+            composeRule.onNodeWithText(copy(label)).performScrollTo().assertIsDisplayed()
+        }
+
+        // The two plain totals the screen used to draw alone, the day's own count that no client drew,
+        // the workforce, and the two pairs as done over total rather than as done alone.
+        displayed(FakeSystemApi.SCHEDULES_TOTAL.toString())
+        displayed(FakeSystemApi.REPORTS_TOTAL.toString())
+        displayed(FakeSystemApi.ACTIVE_USERS.toString())
+        displayed(copy(R.string.dashboard_task_progress, FakeSystemApi.HIGIENE_DONE, FakeSystemApi.HIGIENE_TOTAL))
+        displayed(copy(R.string.dashboard_goods_progress, FakeSystemApi.RECEPCION_DONE, FakeSystemApi.RECEPCION_TOTAL))
+        composeRule.onAllNodesWithText(copy(R.string.dashboard_reports_today)).assertCountEquals(1)
+
+        // The totals reach a pixel now, which is what the pair is for: `done` alone cannot say how much is
+        // left, and `higieneTotal`/`recepcionTotal` were the fields no screen read.
+        assertTrue(FakeSystemApi.HIGIENE_TOTAL > 0)
+        assertTrue(FakeSystemApi.RECEPCION_TOTAL > 0)
     }
 
     /**
@@ -343,6 +382,7 @@ class DashboardScreenTest {
         composeRule.onNodeWithText(copy(R.string.dashboard_overview)).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(copy(R.string.dashboard_reports_today)).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(copy(R.string.dashboard_active_schedule)).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(copy(R.string.dashboard_summary_title)).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(copy(R.string.dashboard_active_users)).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(copy(R.string.dashboard_reports_total)).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(copy(R.string.dashboard_schedules_total)).performScrollTo().assertIsDisplayed()

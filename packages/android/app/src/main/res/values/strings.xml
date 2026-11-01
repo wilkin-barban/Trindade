@@ -164,6 +164,11 @@
     <string name="dashboard_schedules_total">Histórico de Cargamento Total</string>
     <string name="dashboard_higiene_count">Hig. &amp; Org. -> %1$d Tarefas</string>
     <string name="dashboard_recepcion_count">Recepção -> %1$d Mercadorias</string>
+    <string name="dashboard_summary_title">Resumo</string>
+    <string name="dashboard_higiene_label">Hig. &amp; Org.</string>
+    <string name="dashboard_recepcion_label">Recepção</string>
+    <string name="dashboard_task_progress">%1$d/%2$d tarefas</string>
+    <string name="dashboard_goods_progress">%1$d/%2$d mercadorias</string>
     <string name="dashboard_deferred_notice">Novos módulos estarão disponíveis em versões futuras.</string>
     <!-- The one string here the web does not have, and it says what it says on purpose. It names no
          cause, because a timeout, a refused connection and a reply nobody could read are not

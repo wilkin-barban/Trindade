@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
@@ -284,16 +285,48 @@ fun DashboardScreen(
                     )
                 }
 
-                // The three cards the web leaves unlinked, and the reason is the same one there: they
-                // are counts the operator reads and not doors to anywhere.
-                DashboardCard(label = stringResource(R.string.dashboard_active_users), onClick = null) {
-                    SummaryValue(summary.activeUsers)
-                }
-                DashboardCard(label = stringResource(R.string.dashboard_reports_total), onClick = null) {
-                    SummaryValue(summary.reportsTotal)
-                }
-                DashboardCard(label = stringResource(R.string.dashboard_schedules_total), onClick = null) {
-                    SummaryValue(summary.schedulesTotal)
+                // One panel with every count on it, instead of three panels with one count each. The three
+                // were the web's unlinked cards -- counts the operator reads and not doors to anywhere -- and
+                // a third of the screen for three numbers was the reason this screen felt longer than the
+                // work on it. The two task pairs, which were read as `done` and never as `done/total`, are
+                // here as the pair they are.
+                //
+                // `reportsToday` is not one of the rows: the card above is already titled with those exact
+                // words -- it is the web's own card, and it shows the higiene/recepção breakdown rather than
+                // the count the title promises -- so a row repeating the label here would say the same thing
+                // twice on one screen and still not show the day's number. Whether that card should carry the
+                // number its title promises is a decision about the web's copy, made once, there.
+                DashboardCard(label = stringResource(R.string.dashboard_summary_title), onClick = null) {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        SummaryRow(
+                            label = stringResource(R.string.dashboard_schedules_total),
+                            value = summary.schedulesTotal.toString(),
+                        )
+                        SummaryRow(
+                            label = stringResource(R.string.dashboard_reports_total),
+                            value = summary.reportsTotal.toString(),
+                        )
+                        SummaryRow(
+                            label = stringResource(R.string.dashboard_active_users),
+                            value = summary.activeUsers.toString(),
+                        )
+                        SummaryRow(
+                            label = stringResource(R.string.dashboard_higiene_label),
+                            value = stringResource(
+                                R.string.dashboard_task_progress,
+                                summary.higieneDone,
+                                summary.higieneTotal,
+                            ),
+                        )
+                        SummaryRow(
+                            label = stringResource(R.string.dashboard_recepcion_label),
+                            value = stringResource(
+                                R.string.dashboard_goods_progress,
+                                summary.recepcionDone,
+                                summary.recepcionTotal,
+                            ),
+                        )
+                    }
                 }
 
                 Text(
@@ -439,8 +472,36 @@ private fun DashboardCard(
     }
 }
 
-/** One of the four plain counts, in the style those four share. The two breakdown lines of the first card
- * are drawn smaller -- see the card -- because at headline size they wrap on a narrow phone. */
+/**
+ * One line of the summary panel: what is counted on the left, the count on the right.
+ *
+ * The label takes the space the value leaves instead of the row being a fixed two-column grid, because the
+ * longest label here -- `Histórico de Cargamento Total` -- does not fit half of a 360dp-wide screen and would
+ * wrap, while the counts never need more than a few characters.
+ */
+@Composable
+private fun SummaryRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        Spacer(Modifier.width(12.dp))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+/** The count of the schedules card: one number, the one that card is about. */
 @Composable
 private fun SummaryValue(count: Int) {
     Text(
