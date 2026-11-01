@@ -70,6 +70,7 @@ class LoadingHistoryScreenTest {
                     onClearFilters = { cleared++ },
                     onPrevious = {},
                     onNext = {},
+                    onRetry = {},
                     onDeactivate = {},
                     onDelete = {},
                 )
@@ -120,6 +121,7 @@ class LoadingHistoryScreenTest {
                     onClearFilters = {},
                     onPrevious = { previous++ },
                     onNext = { next++ },
+                    onRetry = {},
                     onDeactivate = { deactivated++ },
                     onDelete = { deleted++ },
                 )
@@ -182,6 +184,7 @@ class LoadingHistoryScreenTest {
                         onClearFilters = {},
                         onPrevious = {},
                         onNext = {},
+                        onRetry = {},
                         onDeactivate = {},
                         onDelete = {},
                     )
@@ -237,6 +240,7 @@ class LoadingHistoryScreenTest {
                         onClearFilters = {},
                         onPrevious = {},
                         onNext = {},
+                        onRetry = {},
                         onDeactivate = {},
                         onDelete = {},
                     )
@@ -287,6 +291,7 @@ class LoadingHistoryScreenTest {
                     onClearFilters = {},
                     onPrevious = {},
                     onNext = {},
+                    onRetry = {},
                     onDeactivate = {},
                     onDelete = {
                         deleteCallCount++
@@ -366,6 +371,7 @@ class LoadingHistoryScreenTest {
                         onClearFilters = {},
                         onPrevious = {},
                         onNext = {},
+                        onRetry = {},
                         onDeactivate = {},
                         onDelete = {},
                     )
@@ -374,7 +380,7 @@ class LoadingHistoryScreenTest {
         }
 
         // Assert identity texts are visible and rendered without clipping
-        val dateNode = composeRule.onNodeWithText(displayDate("2026-09-18")).performScrollTo()
+        val dateNode = composeRule.onNodeWithText(displayDate("2026-09-18"), substring = true).performScrollTo()
         assertWithinViewport(dateNode)
 
         val loadingsNode = composeRule.onNodeWithText(copy(R.string.loading_history_loadings, 3)).performScrollTo()
@@ -435,6 +441,7 @@ class LoadingHistoryScreenTest {
                         onClearFilters = {},
                         onPrevious = {},
                         onNext = {},
+                        onRetry = {},
                         onDeactivate = {},
                         onDelete = {},
                     )
@@ -443,7 +450,7 @@ class LoadingHistoryScreenTest {
         }
 
         // Assert identity texts are visible and rendered without clipping
-        val dateNode = composeRule.onNodeWithText(displayDate("2026-09-18")).performScrollTo()
+        val dateNode = composeRule.onNodeWithText(displayDate("2026-09-18"), substring = true).performScrollTo()
         assertWithinViewport(dateNode)
 
         val loadingsNode = composeRule.onNodeWithText(copy(R.string.loading_history_loadings, 3)).performScrollTo()

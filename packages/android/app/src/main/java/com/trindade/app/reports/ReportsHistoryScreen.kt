@@ -5,19 +5,14 @@ import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -41,10 +36,10 @@ import com.trindade.app.ui.components.HistoryHeader
 import com.trindade.app.ui.components.HistoryLoading
 import com.trindade.app.ui.components.HistoryPager
 import com.trindade.app.ui.components.HistoryRecordCard
+import com.trindade.app.ui.components.MonthPickerDialog
 import com.trindade.app.ui.displayDate
 import com.trindade.app.ui.displayMonth
 import com.trindade.app.ui.notesPreview
-import com.trindade.app.ui.recentMonths
 import com.trindade.app.ui.saoPauloLocalDate
 import java.time.LocalDate
 import java.util.Locale
@@ -267,43 +262,6 @@ fun ReportsHistoryScreen(
             },
         )
     }
-}
-
-/**
- * The twelve months behind the filter, as a list rather than the platform's day picker.
- *
- * Computed once per opening rather than on every recomposition, and dropped when the dialog leaves the
- * composition -- which is what makes reopening it pick up a month that has since changed. Scrollable,
- * because twelve rows do not fit the dialog's slot on a short screen and an unscrollable list would hide
- * the older half of the year behind an invisible edge.
- */
-@Composable
-private fun MonthPickerDialog(onDismiss: () -> Unit, onPick: (String) -> Unit) {
-    val months = remember { recentMonths(LocalDate.now()) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.history_month_picker_title)) },
-        text = {
-            Column(
-                modifier = Modifier
-                    .heightIn(max = 360.dp)
-                    .verticalScroll(rememberScrollState()),
-            ) {
-                months.forEach { iso ->
-                    TextButton(
-                        onClick = { onPick(iso) },
-                        modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp),
-                    ) {
-                        Text(displayMonth(iso), style = MaterialTheme.typography.labelLarge)
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            AdminSecondaryButton(onClick = onDismiss, text = stringResource(R.string.loading_cancel))
-        },
-    )
 }
 
 /**

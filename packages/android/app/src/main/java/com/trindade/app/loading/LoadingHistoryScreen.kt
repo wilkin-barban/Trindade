@@ -2,26 +2,16 @@ package com.trindade.app.loading
 
 import android.app.DatePickerDialog
 import android.content.Context
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -39,10 +29,15 @@ import com.trindade.app.contract.models.ScheduleHistoryResponseItemsInner
 import com.trindade.app.ui.components.AdminDestructiveButton
 import com.trindade.app.ui.components.AdminDestructiveConfirmButton
 import com.trindade.app.ui.components.AdminSecondaryButton
-import com.trindade.app.ui.components.NavigationActionButton
+import com.trindade.app.ui.components.HistoryEmptyState
+import com.trindade.app.ui.components.HistoryErrorBanner
+import com.trindade.app.ui.components.HistoryHeader
+import com.trindade.app.ui.components.HistoryLoading
+import com.trindade.app.ui.components.HistoryPager
+import com.trindade.app.ui.components.HistoryRecordCard
+import com.trindade.app.ui.components.MonthPickerDialog
 import com.trindade.app.ui.displayDate
 import com.trindade.app.ui.displayMonth
-import com.trindade.app.ui.recentMonths
 import com.trindade.app.ui.saoPauloLocalDate
 import java.time.LocalDate
 import java.util.Locale
@@ -64,8 +59,7 @@ import java.util.Locale
  * day the load happens, which the server answers as the batch date plus one day except on a Friday,
  * where it answers the batch date itself. The row says which is which rather than showing one of them
  * and letting the operator guess, because the two differ on six days out of seven.
- */
-@Composable
+ */@Composable
 fun LoadingHistoryScreen(
     state: LoadingHistoryViewModel.UiState,
     onBack: () -> Unit,
@@ -75,6 +69,7 @@ fun LoadingHistoryScreen(
     onClearFilters: () -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
+    onRetry: () -> Unit,
     onDeactivate: (String) -> Unit,
     onDelete: (String) -> Unit,
     modifier: Modifier = Modifier,
@@ -87,7 +82,7 @@ fun LoadingHistoryScreen(
      *
      * The delete is irreversible on the server, and it takes a whole day's entries rather than one row
      * -- which is the larger of the two mistakes this screen can make with a tap. The button sits next
-     * to the deactivate one in a row an operator taps with gloves on, so the confirmation is the
+     * to the deactivate one in a card an operator taps with gloves on, so the confirmation is the
      * difference between a mis-tap and a lost day, and it is deliberately the only action here that
      * asks twice.
      */
@@ -95,30 +90,20 @@ fun LoadingHistoryScreen(
 
     LazyColumn(
         modifier = modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            NavigationActionButton(onClick = onBack, text = stringResource(R.string.report_back))
-        }
-
-        item {
-            Column {
-                Text(
-                    text = stringResource(R.string.loading_history_title),
-                    style = MaterialTheme.typography.titleLarge,
-                )
-                Text(
-                    // The active filter in words. A day reads as the operators write dates and a month
-                    // by name, because `2026-09` is the wire's spelling and not a label.
-                    text = when {
-                        state.date != null -> stringResource(R.string.loading_history_filtered, displayDate(state.date))
-                        state.month != null -> stringResource(R.string.loading_history_filtered, displayMonth(state.month))
-                        else -> stringResource(R.string.loading_history_all)
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            HistoryHeader(
+                title = stringResource(R.string.loading_history_title),
+                // The active filter in words. A day reads as the operators write dates and a month
+                // by name, because `2026-09` is the wire's spelling and not a label.
+                subtitle = when {
+                    state.date != null -> stringResource(R.string.loading_history_filtered, displayDate(state.date))
+                    state.month != null -> stringResource(R.string.loading_history_filtered, displayMonth(state.month))
+                    else -> stringResource(R.string.loading_history_all)
+                },
+                onBack = onBack,
+            )
         }
 
         item {
@@ -150,36 +135,24 @@ fun LoadingHistoryScreen(
         }
 
         state.message?.let { message ->
-            item {
-                Text(
-                    text = message,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
+            item { HistoryErrorBanner(message = message, onRetry = onRetry) }
         }
 
         if (state.loading) {
-            item { CircularProgressIndicator() }
+            item { HistoryLoading() }
         }
 
         // Only when a read answered. An empty list next to an error sentence would state a failed read
         // as a fact about the history, and "no batches for this period" is a different sentence from
         // "the server did not answer".
         if (state.loaded && state.items.isEmpty()) {
-            item {
-                Text(
-                    text = stringResource(R.string.loading_history_empty),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            item { HistoryEmptyState(message = stringResource(R.string.loading_history_empty)) }
         }
 
         // Keyed by the batch date, which is the key this endpoint groups by and therefore unique in the
         // list; there is no id in this answer to key on.
         items(state.items, key = { it.batchDate }) { batch ->
-            BatchRow(
+            BatchCard(
                 batch = batch,
                 busy = state.busy,
                 onOpen = { onOpenBatch(batch) },
@@ -194,78 +167,26 @@ fun LoadingHistoryScreen(
         // above goes out of its way to avoid, one line further down.
         if (state.loaded) {
             item {
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(
-                        text = stringResource(
-                            R.string.history_pagination,
-                            state.page,
-                            // The server answers `totalPages` 0 for an empty history, and the SPA draws
-                            // the same maximum for the same reason: "Página 1 de 0" is a sentence about
-                            // the arithmetic rather than about the batches.
-                            maxOf(1, state.totalPages),
-                            state.total,
-                        ),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        AdminSecondaryButton(
-                            onClick = onPrevious,
-                            // Disabled while a page is in flight as well as at the bound, so a second
-                            // tap cannot ask for a page relative to an answer that has not arrived.
-                            enabled = state.canGoPrevious && !state.loading,
-                            text = stringResource(R.string.history_previous),
-                        )
-                        AdminSecondaryButton(
-                            onClick = onNext,
-                            enabled = state.canGoNext && !state.loading,
-                            text = stringResource(R.string.history_next),
-                        )
-                    }
-                }
+                HistoryPager(
+                    page = state.page,
+                    totalPages = state.totalPages,
+                    total = state.total,
+                    canGoPrevious = state.canGoPrevious,
+                    canGoNext = state.canGoNext,
+                    loading = state.loading,
+                    onPrevious = onPrevious,
+                    onNext = onNext,
+                )
             }
         }
     }
 
     if (pickingMonth) {
-        // Computed once per opening rather than on every recomposition, and dropped when the dialog
-        // leaves the composition -- which is what makes reopening it pick up a month that has since
-        // changed. The list itself lives in the shared `ui` package, imported rather than copied:
-        // twelve months ending at today is the same twelve months on both screens.
-        val months = remember { recentMonths(LocalDate.now()) }
-
-        AlertDialog(
-            onDismissRequest = { pickingMonth = false },
-            title = { Text(stringResource(R.string.history_month_picker_title)) },
-            text = {
-                // Scrollable, because twelve rows do not fit the dialog's slot on a short screen and an
-                // unscrollable list would hide the older half of the year behind an invisible edge.
-                Column(
-                    modifier = Modifier
-                        .heightIn(max = 360.dp)
-                        .verticalScroll(rememberScrollState()),
-                ) {
-                    months.forEach { iso ->
-                        TextButton(
-                            onClick = {
-                                pickingMonth = false
-                                onMonthSelected(iso)
-                            },
-                            modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp),
-                        ) {
-                            Text(displayMonth(iso), style = MaterialTheme.typography.labelLarge)
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                AdminSecondaryButton(onClick = { pickingMonth = false }, text = stringResource(R.string.loading_cancel))
+        MonthPickerDialog(
+            onDismiss = { pickingMonth = false },
+            onPick = {
+                pickingMonth = false
+                onMonthSelected(it)
             },
         )
     }
@@ -297,67 +218,23 @@ fun LoadingHistoryScreen(
  * One batch in the list: the day the entries belong to, the day they load, how many there are, and
  * what may be done with the whole batch.
  *
- * The block that opens the grid is one tap target and the two lifecycle actions sit outside it, so a
- * tap on "Excluir" is never also a tap on "open this day".
+ * The block that opens the grid is one tap target and the two lifecycle actions sit in the card's own
+ * footer, so a thumb reaches them without covering the batch it changes -- the same shape the launch
+ * and report histories use, because an operator reads the three lists the same way.
  */
 @Composable
-private fun BatchRow(
+private fun BatchCard(
     batch: ScheduleHistoryResponseItemsInner,
     busy: Boolean,
     onOpen: () -> Unit,
     onDeactivate: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .defaultMinSize(minHeight = 48.dp)
-                .clickable(enabled = !busy, onClick = onOpen)
-                .padding(vertical = 4.dp),
-        ) {
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
-            ) {
-                Text(text = displayDate(batch.batchDate), style = MaterialTheme.typography.bodyLarge)
-                Text(
-                    text = stringResource(R.string.loading_history_loadings, batch.totalLoadings),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                // Plain negation rather than the report history's `== false`: this contract declares
-                // `isActive` required, so there is no absent flag to guard against, and `!x` says what
-                // is meant without implying an optionality the server does not have.
-                if (!batch.isActive) {
-                    Text(
-                        text = stringResource(R.string.history_inactive),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-            }
-
-            // The loading date is labelled, because it is not the date above it on six days out of
-            // seven and an unlabelled second date would read as a duplicate of the first.
-            Text(
-                text = stringResource(R.string.loading_history_loading_date, displayDate(batch.loadingDate)),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-
-            // Drawn only when the server sent a creator. The SPA renders a translation key that reads
-            // "Legado sem criador" in this slot, and an absent creator is not a product term: printing
-            // one here would be inventing vocabulary the app does not have anywhere else.
-            batch.creator?.let { creator ->
-                Text(text = creator.displayName, style = MaterialTheme.typography.bodyMedium)
-            }
-        }
-
-        if (offersDeactivate(batch) || offersDelete(batch)) {
-            FlowRow(
-                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
+    HistoryRecordCard(
+        onClick = onOpen,
+        enabled = !busy,
+        footer = if (offersDeactivate(batch) || offersDelete(batch)) {
+            {
                 // Each action is drawn only where the server said it would be accepted, which is the
                 // `== true` inside those two predicates rather than a role decided here: this client does
                 // not know the caller's role, and the flag is the server's own answer to that question.
@@ -378,10 +255,54 @@ private fun BatchRow(
                     )
                 }
             }
-        }
+        } else {
+            null
+        },
+        lines = {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
+            ) {
+                Text(
+                    text = "📅 " + displayDate(batch.batchDate),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    text = stringResource(R.string.loading_history_loadings, batch.totalLoadings),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                // Plain negation rather than the report history's `== false`: this contract declares
+                // `isActive` required, so there is no absent flag to guard against, and `!x` says what
+                // is meant without implying an optionality the server does not have.
+                if (!batch.isActive) {
+                    Text(
+                        text = stringResource(R.string.history_inactive),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
 
-        HorizontalDivider()
-    }
+            Text(
+                // The loading date is labelled, because it is not the date above it on six days out of
+                // seven and an unlabelled second date would read as a duplicate of the first.
+                text = stringResource(R.string.loading_history_loading_date, displayDate(batch.loadingDate)),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            // Drawn only when the server sent a creator. The SPA renders a translation key that reads
+            // "Legado sem criador" in this slot, and an absent creator is not a product term: printing
+            // one here would be inventing vocabulary the app does not have anywhere else.
+            batch.creator?.let { creator ->
+                Text(
+                    text = creator.displayName,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+    )
 }
 
 /**
@@ -435,5 +356,6 @@ fun LoadingHistoryRoute(
         onNext = viewModel::next,
         onDeactivate = viewModel::deactivateBatch,
         onDelete = viewModel::deleteBatch,
+        onRetry = { viewModel.load() },
     )
 }
