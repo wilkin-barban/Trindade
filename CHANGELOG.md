@@ -10,6 +10,41 @@ hashes y verificaciones está en [docs/release-android-historial.md](docs/releas
 
 ---
 
+## [0.7.0+7004] — 2026-11-01
+
+### Cambiado
+
+- **Las decisiones de un histórico se dibujan como iconos.** Desactivar y eliminar ocupaban el ancho de dos
+  botones de texto en cada tarjeta, así que la decisión menor de la lista era lo que más pesaba en ella.
+  Ahora son dos glifos de 20 dp en la línea de cierre, cada uno dentro de un toque de 48 dp, con la acción
+  destructiva en rojo.
+- **El filtro de fecha de los históricos es una sola línea de chips.** Día, mes y limpiar conviven en una
+  barra compacta que dice qué fecha está aplicada, en lugar de dos campos apilados que empujaban la lista
+  media pantalla hacia abajo.
+- **El Histórico de Contagem lee la fecha en un panel propio.** La fecha estaba en un campo de texto de
+  cuerpo pequeño al lado de un botón aparte. Ahora la superficie entera es el control: la etiqueta arriba,
+  la fecha en tipografía de titular y el calendario al extremo.
+- **Montagem das Caixas muestra solo los tipos encendidos.** Con el interruptor de un tipo apagado, su grilla
+  de cajas desaparece en lugar de seguir ocupando la pantalla sin poder seleccionarse.
+- **Compartilhar App explica qué hace y comparte el archivo.** La cabecera tenía el título pegado a la
+  izquierda y un vacío hasta Ajuda; ahora lleva título y subtítulo balanceados. La pantalla suma
+  **Compartilhar arquivo APK**, que descarga `GET /api/app/download-apk` en la caché de la aplicación y abre
+  la hoja de compartir del sistema con el tipo `application/vnd.android.package-archive`, sin exponer rutas
+  internas del paquete instalado.
+- **El inicio dejó de ofrecer el atajo al Histórico de Contagem** y **Compartilhar App** quedó inmediatamente
+  después de **Calculadora de Assaí**, en el orden en que se usan.
+- **El resumen del inicio es un solo cuadro.** Tres tarjetas separadas —usuarios activos, relatórios totales y
+  historial de cargamentos— pasaron a un panel **Resumo** que además muestra higiene y recepción como
+  `hecho/total`, para leer el día sin bajar por la pantalla.
+
+### Distribución Android
+
+- Build **7004** es el asset de GitHub Release `v0.7.0` (`trindade-0.7.0.apk` y su `.sha256`) y la que sirve
+  `GET /api/app/download-apk`, con `versionCode 7004`, 11.194.408 bytes y sha256 `7622756d…`.
+- El tag `v0.7.0` no se movió: se reemplazaron los assets de la misma release.
+
+---
+
 ## [0.7.0+7003] — 2026-11-01
 
 ### Cambiado
@@ -39,8 +74,8 @@ hashes y verificaciones está en [docs/release-android-historial.md](docs/releas
 
 ### Distribución Android
 
-- Build **7003** es el asset de GitHub Release `v0.7.0` (`trindade-0.7.0.apk` y su `.sha256`) y la que sirve
-  `GET /api/app/download-apk`, con `versionCode 7003`, 11.187.920 bytes y sha256 `82fce07f…`.
+- Build **7003** fue el asset de GitHub Release `v0.7.0` hasta el reemplazo por el build 7004, con
+  `versionCode 7003`, 11.187.920 bytes y sha256 `82fce07f…`.
 - El tag `v0.7.0` no se movió: se reemplazaron los assets de la misma release.
 
 ---

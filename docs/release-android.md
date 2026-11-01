@@ -71,15 +71,16 @@ Los dos números se calculan una sola vez en `build.gradle.kts` y alimentan tant
 | 0.7.0 | 7000 | Reemplazada | Build histórica; fue el asset inicial de GitHub Release `v0.7.0` |
 | 0.7.0 | 7001 | No publicada | Build de respaldo; citada por notas anteriores |
 | 0.7.0 | 7002 | Reemplazada | Binario anterior de producción; nunca fue asset de GitHub |
-| 0.7.0 | 7003 | **Publicada** | Asset actual de GitHub Release `v0.7.0` y binario de producción |
+| 0.7.0 | 7003 | Reemplazada | Asset anterior de GitHub Release `v0.7.0` |
+| 0.7.0 | 7004 | **Publicada** | Acciones y filtros de históricos, Compartilhar App y resumen del inicio; asset actual de GitHub Release `v0.7.0` y binario de producción |
 
 Las builds 0.6.x se distribuyeron por `GET /api/app/download-apk`, no por un tag de GitHub. Los hashes y las
 verificaciones completas están en [release-android-historial.md](release-android-historial.md).
 
-> **Estado final del 2026-11-01.** La release `v0.7.0` se republicó con el build **7003**. El asset de GitHub, su
+> **Estado final del 2026-11-01.** La release `v0.7.0` se republicó con el build **7004**. El asset de GitHub, su
 > `.sha256`, `packages/backend/apk/trindade-0.7.0.apk` y `GET /api/app/download-apk` son el mismo binario:
-> `versionCode 7003`, 11.187.920 bytes, sha256
-> `82fce07f17e98206a0ad6916463c80053154a87b5991b3679d47e001747e5810`. Las builds 7000, 7001 y 7002 son
+> `versionCode 7004`, 11.194.408 bytes, sha256
+> `7622756da304157904a1e47eccacff04e65d97d46615ecc804d62d24f0d1674f`. Las builds 7000 a 7003 son
 > históricas. El tag `v0.7.0` no se movió.
 
 ## 4. Workflow de publicación

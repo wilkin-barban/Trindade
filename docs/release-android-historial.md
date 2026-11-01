@@ -28,14 +28,18 @@ La guía de firma y publicación está en [release-android.md](release-android.m
 | 0.7.0 | 7000 | 2026-10-31 | Reemplazada | Asset anterior de GitHub Release `v0.7.0` | `e8cee2d3857696e90094115ce7915258f79d7e883dd57bf85e221da373d28ffd` |
 | 0.7.0 | 7001 | 2026-10-31 | No publicada | Build de respaldo; citada por las notas de la release | `8f6156f2d5dfe8e5ad343ed01e52de629e4de5b8d9cd4c1304b38313435a8621` |
 | 0.7.0 | 7002 | 2026-10-31 | Reemplazada | Binario anterior servido por producción; nunca fue asset de GitHub | `bc038f2eeda605fb07bfdd26550c93cfc5a1a8b9c9b06408df0fe505c6ec2f4c` |
-| 0.7.0 | 7003 | 2026-11-01 | **Publicada** | Homogeneización visual de Android; asset de GitHub y binario de producción | `82fce07f17e98206a0ad6916463c80053154a87b5991b3679d47e001747e5810` |
+| 0.7.0 | 7003 | 2026-11-01 | Reemplazada | Homogeneización visual de Android; asset de GitHub y binario de producción hasta el build 7004 | `82fce07f17e98206a0ad6916463c80053154a87b5991b3679d47e001747e5810` |
+| 0.7.0 | 7004 | 2026-11-01 | **Publicada** | Acciones y filtros de históricos, Compartilhar App con el APK y resumen único del inicio; asset de GitHub y binario de producción | `7622756da304157904a1e47eccacff04e65d97d46615ecc804d62d24f0d1674f` |
 
 Notas:
 
 - **Interna** significa distribuida por `GET /api/app/download-apk`, sin tag ni release de GitHub.
-- **Reemplazo del 2026-11-01:** la build **7003** reemplazó al asset anterior de GitHub y al binario que servía
-  producción. El asset, su `.sha256`, `packages/backend/apk/trindade-0.7.0.apk` y
+- **Reemplazo del 2026-11-01 (build 7004):** la build **7004** reemplazó al asset de GitHub y al binario que
+  servía producción. El asset, su `.sha256`, `packages/backend/apk/trindade-0.7.0.apk` y
   `https://trindademasas.duckdns.org/api/app/download-apk` apuntan al mismo digest
+  `7622756da304157904a1e47eccacff04e65d97d46615ecc804d62d24f0d1674f` (11.194.408 bytes).
+- **Reemplazo del 2026-11-01 (build 7003):** la build **7003** reemplazó al asset anterior de GitHub y al
+  binario que servía producción, con digest
   `82fce07f17e98206a0ad6916463c80053154a87b5991b3679d47e001747e5810` (11.187.920 bytes). La discrepancia previa
   (asset 7000 frente a notas que citaban 7001, producción en 7002) queda cerrada por este reemplazo.
 - El tag `v0.7.0` no se movió. Un tag publicado no se mueve ni se reutiliza: si hace falta distribuir otra build,
@@ -64,16 +68,16 @@ aapt2 dump badging trindade-0.7.0.apk | head -1
 Resultado esperado para el asset actual de `v0.7.0`:
 
 - `sha256sum -c` imprime `OK` y el digest es
-  `82fce07f17e98206a0ad6916463c80053154a87b5991b3679d47e001747e5810`.
+  `7622756da304157904a1e47eccacff04e65d97d46615ecc804d62d24f0d1674f`.
 - `apksigner` reporta `Verifies` con APK Signature Scheme v2 y un solo firmante.
 - El certificado SHA-256 es
   `ee0e404b211052b311ae0e0730606e9c7d5554315463d02f9ef33c9573c431f6`.
-- `aapt2` reporta `versionCode='7003'` y `versionName='0.7.0'`.
-- El tamaño es de `11.187.920` bytes.
+- `aapt2` reporta `versionCode='7004'` y `versionName='0.7.0'`.
+- El tamaño es de `11.194.408` bytes.
 
-El APK servido por producción (`GET /api/app/download-apk`) es el **mismo build 7003**: el asset de GitHub, su
+El APK servido por producción (`GET /api/app/download-apk`) es el **mismo build 7004**: el asset de GitHub, su
 `.sha256`, `packages/backend/apk/trindade-0.7.0.apk` y la descarga de producción comparten el digest
-`82fce07f17e98206a0ad6916463c80053154a87b5991b3679d47e001747e5810`. Verificar siempre con `aapt2`, no solo con
+`7622756da304157904a1e47eccacff04e65d97d46615ecc804d62d24f0d1674f`. Verificar siempre con `aapt2`, no solo con
 el nombre del archivo.
 
 ## 3. Verificar la instalación en un dispositivo
