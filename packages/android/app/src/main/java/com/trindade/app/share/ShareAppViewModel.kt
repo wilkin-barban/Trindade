@@ -24,6 +24,8 @@ import javax.inject.Inject
 class ShareAppViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val usersRepository: UsersRepository,
+    /** Wired by Hilt in the app and left inert by default, so a screen drawn without a backend says so. */
+    private val apkSharer: ApkSharer = NoOpApkSharer,
 ) : ViewModel() {
 
     data class UiState(
@@ -50,6 +52,12 @@ class ShareAppViewModel @Inject constructor(
         val phone: String = "",
         val isAdmin: Boolean = false,
         val note: String = "",
+        /** The APK is being fetched: the button says so instead of accepting a second tap. */
+        val sharingApk: Boolean = false,
+        /** How far the download got, or null when it is too early to say. */
+        val apkPercent: Int? = null,
+        /** Whether the last attempt to hand over the APK failed, so the screen can say it in its own line. */
+        val apkFailed: Boolean = false,
     )
 
     private val _state = MutableStateFlow(UiState())
@@ -271,6 +279,23 @@ class ShareAppViewModel @Inject constructor(
                 locale = locale,
             ),
         )
+    }
+
+    /**
+     * Fetches this deployment's APK and hands it to the platform's own share sheet.
+     *
+     * The file comes from the address the API publishes -- the same one the web's button fetches and the
+     * updater installs -- rather than from the package this app was installed as: that one lives under
+     * `/data/app`, which the provider deliberately does not expose, and what the operator wants to send is
+     * something the other phone can install.
+     */
+    fun shareApk() {
+        if (_state.value.sharingApk) return
+        viewModelScope.launch {
+            _state.update { it.copy(sharingApk = true, apkPercent = null, apkFailed = false) }
+            val shared = apkSharer.share { percent -> _state.update { it.copy(apkPercent = percent) } }
+            _state.update { it.copy(sharingApk = false, apkPercent = null, apkFailed = !shared) }
+        }
     }
 
     fun whatsappLink(): String? {

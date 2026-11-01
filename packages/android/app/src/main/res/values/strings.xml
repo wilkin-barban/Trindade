@@ -490,6 +490,7 @@
     <string name="nav_stock_history">Histórico de Contagem</string>
     <string name="nav_share">Compartilhar App</string>
     <string name="dashboard_stock_counter">Conte e some as caixas do dia</string>
+    <string name="dashboard_share_app">Envie o aplicativo e os acessos para o próximo celular.</string>
     <string name="dashboard_stock_history">Os dias já contados, só com o que foi contado</string>
     <string name="dashboard_assai">Monte o pedido de compra em caixas inteiras</string>
     <string name="guest_readonly_title">Modo Somente Leitura</string>
@@ -704,6 +705,11 @@
     <string name="help_assai_weekdays_title">Dias de Entrega</string>
     <string name="help_assai_weekdays_desc">Selecione opcionalmente o dia da semana para o qual o pedido se destina (Terça, Quinta, Sexta ou Sábado) antes de compartilhar.</string>
     <string name="share_access_title">Compartilhar Acesso</string>
+    <string name="share_send_apk">Compartilhar Arquivo APK</string>
+    <string name="share_preparing_apk">Preparando arquivo APK...</string>
+    <string name="share_preparing_apk_percent">Preparando arquivo APK... %1$d%%</string>
+    <string name="share_apk_failed">Não foi possível preparar o APK. Tente novamente.</string>
+
     <string name="share_subtitle">Compartilhe o link oficial e acessos do Trindade Massas via WhatsApp.</string>
     <string name="share_platform_label">Plataforma</string>
     <string name="share_platform_android">Android</string>

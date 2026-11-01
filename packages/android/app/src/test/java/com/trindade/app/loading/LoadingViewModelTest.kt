@@ -684,6 +684,8 @@ private class RecordingShareManager(
         return returns
     }
 
+    override fun shareApk(file: File, title: String?): Boolean = returns
+
     override fun sharePdf(file: File, title: String?): Boolean {
         lastSharedPdf = file
         lastSharedTitle = title

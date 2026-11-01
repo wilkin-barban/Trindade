@@ -490,6 +490,7 @@
     <string name="nav_stock_history">Historial de Conteo</string>
     <string name="nav_share">Compartir App</string>
     <string name="dashboard_stock_counter">Cuente y sume las cajas del día</string>
+    <string name="dashboard_share_app">Envía la aplicación y los accesos al próximo celular.</string>
     <string name="dashboard_stock_history">Los días ya contados, solo con lo que se contó</string>
     <string name="dashboard_assai">Arme el pedido de compra en cajas enteras</string>
     <string name="guest_readonly_title">Modo Solo Lectura</string>
@@ -704,6 +705,11 @@
     <string name="help_assai_weekdays_title">Días de Entrega</string>
     <string name="help_assai_weekdays_desc">Seleccione opcionalmente el día de la semana al cual se destina el pedido (Martes, Jueves, Viernes o Sábado) antes de compartir.</string>
     <string name="share_access_title">Compartir Acceso</string>
+    <string name="share_send_apk">Compartir archivo APK</string>
+    <string name="share_preparing_apk">Preparando archivo APK...</string>
+    <string name="share_preparing_apk_percent">Preparando archivo APK... %1$d%%</string>
+    <string name="share_apk_failed">No se pudo preparar el APK. Inténtalo de nuevo.</string>
+
     <string name="share_subtitle">Comparta el enlace oficial y accesos de Trindade Massas por WhatsApp.</string>
     <string name="share_platform_label">Plataforma</string>
     <string name="share_platform_android">Android</string>

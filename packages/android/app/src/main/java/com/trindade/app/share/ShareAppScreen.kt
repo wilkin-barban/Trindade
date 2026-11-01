@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -19,6 +20,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -35,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.KeyboardType
@@ -72,17 +75,54 @@ fun ShareAppScreen(
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        // The module's own header, not a help button with a paragraph under it. The title was in the tab and
+        // only in the tab, so the top of this screen was a narrow button at the right of an empty row and a
+        // sentence that named nothing. The title and what the screen does now sit where they belong, and the
+        // help keeps the corner it had.
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.nav_share),
+                    style = MaterialTheme.typography.headlineSmall,
+                )
+                Text(
+                    text = stringResource(R.string.share_subtitle),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             ModuleHelpButton(onClick = { showHelpDialog = true })
         }
-        Text(
-            stringResource(R.string.share_subtitle),
-            style = MaterialTheme.typography.bodySmall,
-        )
+
+        // The web's own action, in the place the web gives it: hand over the package a phone installs, so
+        // the operator does not need the store, a cable or the admin panel to put the app on a second phone.
+        if (state.platform != SharePlatform.IOS) {
+            Button(
+                onClick = { viewModel.shareApk() },
+                enabled = !state.sharingApk,
+                modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp),
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_share),
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(modifier = Modifier.size(8.dp))
+                Text(
+                    text = when {
+                        !state.sharingApk -> stringResource(R.string.share_send_apk)
+                        state.apkPercent != null ->
+                            stringResource(R.string.share_preparing_apk_percent, state.apkPercent ?: 0)
+                        else -> stringResource(R.string.share_preparing_apk)
+                    },
+                    style = MaterialTheme.typography.labelLarge,
+                )
+            }
+        }
 
         // Platform selection card
         SectionCard {
@@ -376,6 +416,14 @@ fun ShareAppScreen(
                     style = MaterialTheme.typography.labelLarge,
                 )
             }
+        }
+
+        if (state.apkFailed) {
+            Text(
+                text = stringResource(R.string.share_apk_failed),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
         }
 
         if (state.note.isNotEmpty()) {

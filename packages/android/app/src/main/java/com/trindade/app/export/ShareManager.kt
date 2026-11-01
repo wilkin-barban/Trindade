@@ -11,6 +11,15 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
+ * The type the platform uses to name an installable Android package.
+ *
+ * Spelled here rather than at the call site because both the chooser and the receiving application decide
+ * what to offer from it: a messaging app that is told this is an APK offers to install it, and one that is
+ * told it is a stream of bytes offers nothing.
+ */
+internal const val APK_MIME_TYPE = "application/vnd.android.package-archive"
+
+/**
  * Seam for sharing export content via the platform's ACTION_SEND chooser.
  *
  * Uses generic Android ACTION_SEND intents with [Intent.createChooser] rather than targeting
@@ -39,6 +48,19 @@ interface ShareManager {
      * @return true if the chooser was launched successfully, false otherwise.
      */
     fun sharePdf(file: File, title: String? = null): Boolean
+
+    /**
+     * Launches the platform ACTION_SEND chooser with the given APK [file].
+     *
+     * The file is the download the backend serves, not the installation this app is running as: an
+     * installed binary lives under `/data/app`, which the provider deliberately does not expose, and what
+     * the operator wants to hand over is the package a phone can install.
+     *
+     * @param file The APK in the cache updates directory.
+     * @param title Optional chooser title shown to the operator.
+     * @return true if the chooser was launched successfully, false otherwise.
+     */
+    fun shareApk(file: File, title: String? = null): Boolean
 
     /**
      * Opens [url], the one-on-one chat link the operator picked.
@@ -109,6 +131,37 @@ class AndroidShareManager @Inject constructor(
         }
     }
 
+    /**
+     * Builds the chooser [Intent] for sharing the published APK.
+     *
+     * Same grant, same clip entry and same authority as the PDF: the difference is the type the receiving
+     * application is told to expect, which is what makes a messaging app offer "install" instead of opening
+     * the file as something it cannot read.
+     */
+    internal fun createApkShareIntent(file: File, title: String? = null): Intent? {
+        if (!file.exists() || file.length() == 0L) {
+            return null
+        }
+        val authority = "${context.packageName}.fileprovider"
+        val uri: Uri = try {
+            FileProvider.getUriForFile(context, authority, file)
+        } catch (_: Throwable) {
+            return null
+        }
+
+        val sendIntent = Intent(Intent.ACTION_SEND).apply {
+            type = APK_MIME_TYPE
+            putExtra(Intent.EXTRA_STREAM, uri)
+            clipData = ClipData.newRawUri("APK", uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+
+        return Intent.createChooser(sendIntent, title).apply {
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+    }
+
     override fun shareText(text: String, title: String?): Boolean {
         return try {
             val chooser = createTextShareIntent(text, title)
@@ -122,6 +175,16 @@ class AndroidShareManager @Inject constructor(
     override fun sharePdf(file: File, title: String?): Boolean {
         return try {
             val chooser = createPdfShareIntent(file, title) ?: return false
+            context.startActivity(chooser)
+            true
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    override fun shareApk(file: File, title: String?): Boolean {
+        return try {
+            val chooser = createApkShareIntent(file, title) ?: return false
             context.startActivity(chooser)
             true
         } catch (_: Throwable) {
@@ -154,6 +217,7 @@ class AndroidShareManager @Inject constructor(
 object NoOpShareManager : ShareManager {
     override fun shareText(text: String, title: String?): Boolean = true
     override fun sharePdf(file: File, title: String?): Boolean = true
+    override fun shareApk(file: File, title: String?): Boolean = true
     override fun openLink(url: String): Boolean = true
 }
 

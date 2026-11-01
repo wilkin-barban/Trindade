@@ -38,7 +38,9 @@ import com.trindade.app.network.AdminApi
 import com.trindade.app.network.AuthApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import kotlinx.serialization.json.Json
@@ -277,7 +279,59 @@ class ShareAppViewModelTest {
         assertFalse(vm.state.value.createSuccess)
         assertTrue(adminApi.created.isEmpty())
     }
+
+    @Test
+    fun `sharing the app reports the download as it advances and stops saying so once the chooser opens`() {
+        val sharer = RecordingApkSharer(result = true, progress = listOf(null, 12, 74))
+        val vm = ShareAppViewModel(
+            AuthRepository(FakeAuthApi(role = "Administrador", userId = 1), FakeTokenStore("Administrador"), Json),
+            UsersRepository(FakeAdminApi(fixtureUsers)),
+            sharer,
+        )
+
+        vm.shareApk()
+
+        assertEquals(1, sharer.calls)
+        assertEquals(listOf(null, 12, 74), sharer.reported)
+        assertFalse("The button must stop saying it prepares once the file was handed over", vm.state.value.sharingApk)
+        assertNull("The progress belongs to the attempt, not to the screen", vm.state.value.apkPercent)
+        assertFalse(vm.state.value.apkFailed)
+    }
+
+    @Test
+    fun `a download that produced no file leaves the failure on screen`() {
+        val vm = ShareAppViewModel(
+            AuthRepository(FakeAuthApi(role = "Administrador", userId = 1), FakeTokenStore("Administrador"), Json),
+            UsersRepository(FakeAdminApi(fixtureUsers)),
+            RecordingApkSharer(result = false),
+        )
+
+        vm.shareApk()
+
+        assertTrue("A share that did not happen is not a silent one", vm.state.value.apkFailed)
+        assertFalse(vm.state.value.sharingApk)
+    }
+
+    @Test
+    fun `a second tap while the file is being prepared does not fetch a second one`() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val sharer = RecordingApkSharer(result = true, gate = gate)
+        val vm = ShareAppViewModel(
+            AuthRepository(FakeAuthApi(role = "Administrador", userId = 1), FakeTokenStore("Administrador"), Json),
+            UsersRepository(FakeAdminApi(fixtureUsers)),
+            sharer,
+        )
+
+        vm.shareApk()
+        assertTrue("The button reports the attempt while it runs", vm.state.value.sharingApk)
+        vm.shareApk()
+        assertEquals("A second tap during the download must not fetch a second file", 1, sharer.calls)
+
+        gate.complete(Unit)
+        assertFalse(vm.state.value.sharingApk)
+    }
 }
+
 
 private class FakeAdminApi(
     private val rows: List<AdminUserResponseUser>,
@@ -341,4 +395,29 @@ private class FakeTokenStore(private val roleName: String) : TokenStore {
     override fun save(accessToken: String, refreshToken: String) {}
     override fun saveRole(role: String) {}
     override fun clear() {}
+}
+
+/**
+ * Records how the screen asked for the app as a file, without touching the network or a chooser.
+ *
+ * The [gate] holds the attempt open so the test can look at the button while the file is still being
+ * prepared, which is the state a second tap would otherwise start over.
+ */
+private class RecordingApkSharer(
+    private val result: Boolean,
+    private val progress: List<Int?> = emptyList(),
+    private val gate: CompletableDeferred<Unit>? = null,
+) : ApkSharer {
+    var calls = 0
+    val reported = mutableListOf<Int?>()
+
+    override suspend fun share(onProgress: (Int?) -> Unit): Boolean {
+        calls += 1
+        if (progress.isEmpty()) onProgress(null) else progress.forEach {
+            reported += it
+            onProgress(it)
+        }
+        gate?.await()
+        return result
+    }
 }

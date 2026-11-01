@@ -371,6 +371,8 @@ private class RecordingShareManager : ShareManager {
 
     override fun sharePdf(file: File, title: String?): Boolean = true
 
+    override fun shareApk(file: File, title: String?): Boolean = true
+
     override fun openLink(url: String): Boolean = true
 }
 

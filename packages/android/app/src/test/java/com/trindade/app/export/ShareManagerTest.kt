@@ -133,6 +133,59 @@ class ShareManagerTest {
     }
 
     @Test
+    fun `createApkShareIntent hands over an installable package, not a stream of bytes`() {
+        val apkFile = File(File(context.cacheDir, "updates").apply { mkdirs() }, "trindade.apk").apply {
+            writeBytes(byteArrayOf(0x50, 0x4b, 0x03, 0x04))
+        }
+
+        val chooser = shareManager.createApkShareIntent(apkFile, "Compartilhar APK")
+        assertNotNull("A downloaded APK must produce a chooser intent", chooser)
+
+        assertEquals(Intent.ACTION_CHOOSER, chooser!!.action)
+        assertTrue(
+            "Chooser must have FLAG_GRANT_READ_URI_PERMISSION",
+            (chooser.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION) != 0,
+        )
+        assertTrue(
+            "Chooser must have FLAG_ACTIVITY_NEW_TASK",
+            (chooser.flags and Intent.FLAG_ACTIVITY_NEW_TASK) != 0,
+        )
+
+        @Suppress("DEPRECATION")
+        val target = chooser.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)
+        assertNotNull(target)
+        assertEquals(Intent.ACTION_SEND, target!!.action)
+        assertEquals(
+            "The receiving application decides what to offer from the type, so it must be the APK one",
+            "application/vnd.android.package-archive",
+            target.type,
+        )
+
+        @Suppress("DEPRECATION")
+        val streamUri = target.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
+        assertNotNull("Target intent must carry the file URI in EXTRA_STREAM", streamUri)
+        assertTrue("URI scheme must be content://", streamUri!!.toString().startsWith("content://"))
+        assertTrue(
+            "URI authority must match application fileprovider",
+            streamUri.authority?.endsWith(".fileprovider") == true,
+        )
+        assertEquals(streamUri, target.clipData?.getItemAt(0)?.uri)
+        assertNull("ShareManager must not hardcode WhatsApp or any package", target.`package`)
+    }
+
+    @Test
+    fun `createApkShareIntent safely returns null when the download is missing or empty`() {
+        assertNull(
+            "Nothing was downloaded, so there is nothing to hand over",
+            shareManager.createApkShareIntent(File(File(context.cacheDir, "updates"), "missing.apk")),
+        )
+        val emptyApk = File(File(context.cacheDir, "updates").apply { mkdirs() }, "empty.apk").apply {
+            writeBytes(ByteArray(0))
+        }
+        assertNull("A zero-byte file is not a package", shareManager.createApkShareIntent(emptyApk))
+    }
+
+    @Test
     fun `createPdfShareIntent safely returns null for non-existent file`() {
         val nonExistentFile = File(exportsDir, "does_not_exist.pdf")
         val chooser = shareManager.createPdfShareIntent(nonExistentFile)
