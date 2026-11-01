@@ -25,18 +25,19 @@ La guía de firma y publicación está en [release-android.md](release-android.m
 | 0.6.1 | 6001 | 2026-10-30 | Interna | Importación por asiento y día pasado en solo lectura | `b2ccb9f165ab1d42090f236dc88e9b02a5ef6adfd4a597959de06ba215469736` |
 | 0.6.2 | 6002 | 2026-10-30 | Interna | Códigos de error y atribución por asiento | `60a1d012087cfb2ca37d0b3b0ff64e53608c2c87757100b8b008c8b4b9b23750` |
 | 0.6.3 | 6003 | 2026-10-31 | Interna | Contrato del reporte y alta de operario | `a0b2b4f6a1be0b4750d3c854c246bb9ca243928decd191be4082c1cef919e47e` |
-| 0.7.0 | 7000 | 2026-10-31 | **Publicada** | Asset actual de GitHub Release `v0.7.0` | `e8cee2d3857696e90094115ce7915258f79d7e883dd57bf85e221da373d28ffd` |
+| 0.7.0 | 7000 | 2026-10-31 | Reemplazada | Asset anterior de GitHub Release `v0.7.0` | `e8cee2d3857696e90094115ce7915258f79d7e883dd57bf85e221da373d28ffd` |
 | 0.7.0 | 7001 | 2026-10-31 | No publicada | Build de respaldo; citada por las notas de la release | `8f6156f2d5dfe8e5ad343ed01e52de629e4de5b8d9cd4c1304b38313435a8621` |
-| 0.7.0 | 7002 | 2026-10-31 | Distribución interna | APK servido por producción; no es el asset de GitHub | `bc038f2eeda605fb07bfdd26550c93cfc5a1a8b9c9b06408df0fe505c6ec2f4c` |
-| 0.7.0 | 7003 | — | En preparación | Homogeneización visual de Android | — |
+| 0.7.0 | 7002 | 2026-10-31 | Reemplazada | Binario anterior servido por producción; nunca fue asset de GitHub | `bc038f2eeda605fb07bfdd26550c93cfc5a1a8b9c9b06408df0fe505c6ec2f4c` |
+| 0.7.0 | 7003 | 2026-11-01 | **Publicada** | Homogeneización visual de Android; asset de GitHub y binario de producción | `82fce07f17e98206a0ad6916463c80053154a87b5991b3679d47e001747e5810` |
 
 Notas:
 
 - **Interna** significa distribuida por `GET /api/app/download-apk`, sin tag ni release de GitHub.
-- **Discrepancia verificada el 2026-11-01:** el asset de GitHub es la build **7000** (11.149.516 bytes, sha256
-  `e8cee2d3…`); su sidecar coincide con ese hash. Las notas de la release afirman `versionCode 7001` y sha256
-  `8f6156f2…`, que corresponden a la build 7001 guardada en `~/backups/trindade-0.7.0.apk`. El APK servido por
-  producción es la build **7002** (11.149.516 bytes, sha256 `bc038f2e…`).
+- **Reemplazo del 2026-11-01:** la build **7003** reemplazó al asset anterior de GitHub y al binario que servía
+  producción. El asset, su `.sha256`, `packages/backend/apk/trindade-0.7.0.apk` y
+  `https://trindademasas.duckdns.org/api/app/download-apk` apuntan al mismo digest
+  `82fce07f17e98206a0ad6916463c80053154a87b5991b3679d47e001747e5810` (11.187.920 bytes). La discrepancia previa
+  (asset 7000 frente a notas que citaban 7001, producción en 7002) queda cerrada por este reemplazo.
 - El tag `v0.7.0` no se movió. Un tag publicado no se mueve ni se reutiliza: si hace falta distribuir otra build,
   se reemplazan los assets de la misma release y se sube el `versionCode`, o se corta un tag nuevo.
 - Si se reemplaza el asset de GitHub, actualizar esta tabla, el `.sha256` y las notas de la release en el mismo

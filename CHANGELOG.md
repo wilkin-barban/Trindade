@@ -10,6 +10,41 @@ hashes y verificaciones está en [docs/release-android-historial.md](docs/releas
 
 ---
 
+## [0.7.0+7003] — 2026-11-01
+
+### Cambiado
+
+- **Los cuatro históricos comparten un solo dibujo.** Massas era el único legible; Horário, Relatório y
+  Estoque tenían cada uno su cabecera, su tarjeta y su forma de decir que la lectura falló. Ahora usan los
+  mismos componentes (`HistoryHeader`, `HistoryRecordCard`, `HistoryPager`, `HistoryStates`): la tarjeta a
+  ancho completo con la acción en el cierre, la paginación abajo y el error con reintento.
+- **La fecha de la tarjeta dejó de ser un emoji.** El emoji de calendario se dibuja como una hoja con una
+  fecha fija impresa, así que todas las tarjetas mostraban el mismo "17 JUL" al lado de fechas distintas.
+  Ahora es `ic_calendar` del propio proyecto (`HistoryDateLabel`).
+- **Los números concuerdan con lo que cuentan.** "1 produtos lançados · 1 operadores" pasa a
+  "1 produto lançado · 1 operador"; igual para cajas, unidades, cargas y días registrados (`<plurals>`).
+- **Desactivar y eliminar dejaron de ser los botones más grandes de la tarjeta.** Pasaron de las píldoras de
+  administración a acciones de texto (`HistoryActionButton`), con la destructiva en rojo y 48 dp de toque.
+- **Montagem das Caixas separa los tipos de caja** con un interruptor por tipo, que limpia la selección del
+  anterior en lugar de mezclar las dos cuentas.
+- **El horario elige motorista en dos pestañas y con chapa.** Fleteros y Motoristas da Casa son pestañas
+  separadas, la marca es múltiple y cada motorista recibe la chapa del camión en la misma pasada.
+- **La tabla del horario alinea motorista, vehículo y chapa**, y la lixeira es un icono de 20 dp dentro de un
+  toque de 48 dp.
+- **El Histórico de Contagem ya no saca al operario del módulo**: abre como overlay de stock y volver lleva a
+  la calculadora.
+- **Las tarjetas de Compartilhar App ocupan el ancho completo** (`SectionCard`).
+- **Las llamadas al ERP se identifican como `Android App / ERP`** también en el test de conexión, con
+  `client=android · via=native`, para que el ERP distinga el aplicativo del navegador en su auditoría.
+
+### Distribución Android
+
+- Build **7003** es el asset de GitHub Release `v0.7.0` (`trindade-0.7.0.apk` y su `.sha256`) y la que sirve
+  `GET /api/app/download-apk`, con `versionCode 7003`, 11.187.920 bytes y sha256 `82fce07f…`.
+- El tag `v0.7.0` no se movió: se reemplazaron los assets de la misma release.
+
+---
+
 ## [0.7.0+7000] — 2026-10-31
 
 ### Añadido
@@ -44,7 +79,8 @@ hashes y verificaciones está en [docs/release-android-historial.md](docs/releas
 - Build **7001** existe en respaldos y es la que mencionan las notas de la release, pero **no** es el asset
   publicado.
 - Build **7002** es la que sirve `GET /api/app/download-apk` en producción, con sha256 `bc038f2e…`.
-- Hay una build **7003** en preparación para la homogeneización visual de Android. El tag `v0.7.0` no se mueve.
+- Build **7003** reemplazó a las anteriores como asset de la release y como binario servido por producción
+  (ver la entrada `0.7.0+7003`). El tag `v0.7.0` no se movió.
 - La discrepancia entre las notas y el asset está documentada en [docs/release-android-historial.md](docs/release-android-historial.md).
 
 ---
