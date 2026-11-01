@@ -59,6 +59,7 @@ class StockHistoryScreenTest {
         state: StockHistoryViewModel.UiState,
         onPickDate: () -> Unit = {},
         onDaySelected: (String) -> Unit = {},
+        onRetry: () -> Unit = {},
     ) {
         composeRule.setContent {
             TrindadeTheme {
@@ -70,6 +71,7 @@ class StockHistoryScreenTest {
                     onNumberChange = {},
                     onWhatsApp = {},
                     onEmail = {},
+                    onRetry = onRetry,
                 )
             }
         }
@@ -102,6 +104,17 @@ class StockHistoryScreenTest {
 
         composeRule.onNodeWithText(copy(R.string.whatsapp_send_button)).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(copy(R.string.stock_send_email_button)).performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun `a failed read keeps its retry beside the sentence`() {
+        var retried = 0
+        render(StockHistoryViewModel.UiState(date = "2026-10-23", failed = true), onRetry = { retried++ })
+
+        composeRule.onNodeWithText(copy(R.string.stock_failed_to_load_count_day)).assertIsDisplayed()
+        composeRule.onNodeWithText(copy(R.string.report_retry)).performScrollTo().performClick()
+
+        org.junit.Assert.assertEquals(1, retried)
     }
 
     @Test

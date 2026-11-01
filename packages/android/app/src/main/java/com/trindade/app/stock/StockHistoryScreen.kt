@@ -9,7 +9,6 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
@@ -19,8 +18,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -38,7 +35,10 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trindade.app.R
 import com.trindade.app.ui.BrazilianPhoneVisualTransformation
-import com.trindade.app.ui.components.NavigationActionButton
+import com.trindade.app.ui.components.HistoryErrorBanner
+import com.trindade.app.ui.components.HistoryHeader
+import com.trindade.app.ui.components.HistoryLoading
+import com.trindade.app.ui.components.SectionCard
 import com.trindade.app.ui.filterPhoneDigits
 import com.trindade.app.ui.saoPauloLocalDate
 import java.time.LocalDate
@@ -85,6 +85,7 @@ fun StockHistoryScreen(
             context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse(viewModel.mailtoLink())))
             viewModel.onNote(openingEmailNote)
         },
+        onRetry = { viewModel.load() },
     )
 }
 
@@ -103,6 +104,7 @@ internal fun StockHistoryContent(
     onNumberChange: (String) -> Unit,
     onWhatsApp: () -> Unit,
     onEmail: () -> Unit,
+    onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val summary = state.day?.let { stockCollectiveSummary(it) } ?: emptyList()
@@ -114,21 +116,11 @@ internal fun StockHistoryContent(
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            NavigationActionButton(onClick = onBack, text = stringResource(R.string.report_back))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(stringResource(R.string.nav_stock_history), style = MaterialTheme.typography.titleLarge)
-                Text(
-                    stringResource(R.string.stock_history_subtitle_readonly),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
+        HistoryHeader(
+            title = stringResource(R.string.nav_stock_history),
+            subtitle = stringResource(R.string.stock_history_subtitle_readonly),
+            onBack = onBack,
+        )
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -188,70 +180,69 @@ internal fun StockHistoryContent(
         }
 
         if (state.loading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 12.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                CircularProgressIndicator()
-            }
+            HistoryLoading()
         }
 
         if (state.failed) {
-            Text(
-                stringResource(R.string.stock_failed_to_load_count_day),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.error,
+            HistoryErrorBanner(
+                message = stringResource(R.string.stock_failed_to_load_count_day),
+                onRetry = onRetry,
             )
         }
 
-        HorizontalDivider()
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(stringResource(R.string.stock_day_total), style = MaterialTheme.typography.bodyLarge)
-            Text(
-                stringResource(
-                    R.string.stock_day_total_format,
-                    state.day?.totalBoxes ?: 0,
-                    state.day?.totalUnits ?: 0,
-                ),
-                style = MaterialTheme.typography.titleMedium,
-            )
+        SectionCard {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(stringResource(R.string.stock_day_total), style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    stringResource(
+                        R.string.stock_day_total_format,
+                        state.day?.totalBoxes ?: 0,
+                        state.day?.totalUnits ?: 0,
+                    ),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            }
         }
 
         // The same card the counter draws, from the same server totals: the history is a reading of the day,
         // and a reading that rendered its own version of the day would be a second opinion instead.
         StockCollectiveSummary(products = summary)
 
-        OutlinedTextField(
-            value = state.number,
-            onValueChange = onNumberChange,
-            visualTransformation = BrazilianPhoneVisualTransformation(),
-            label = { Text(stringResource(R.string.whatsapp_phone_label)) },
-            placeholder = { Text(stringResource(R.string.whatsapp_phone_placeholder)) },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
+        SectionCard {
+            OutlinedTextField(
+                value = state.number,
+                onValueChange = onNumberChange,
+                visualTransformation = BrazilianPhoneVisualTransformation(),
+                label = { Text(stringResource(R.string.whatsapp_phone_label)) },
+                placeholder = { Text(stringResource(R.string.whatsapp_phone_placeholder)) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
 
-        Button(
-            onClick = onWhatsApp,
-            enabled = summary.isNotEmpty(),
-            modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp),
-        ) {
-            Text(stringResource(R.string.whatsapp_send_button), style = MaterialTheme.typography.labelLarge)
-        }
+            Button(
+                onClick = onWhatsApp,
+                enabled = summary.isNotEmpty(),
+                modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp),
+            ) {
+                Text(stringResource(R.string.whatsapp_send_button), style = MaterialTheme.typography.labelLarge)
+            }
 
-        Button(
-            onClick = onEmail,
-            enabled = summary.isNotEmpty(),
-            modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp),
-        ) {
-            Text(stringResource(R.string.stock_send_email_button), style = MaterialTheme.typography.labelLarge)
-        }
+            Button(
+                onClick = onEmail,
+                enabled = summary.isNotEmpty(),
+                modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp),
+            ) {
+                Text(stringResource(R.string.stock_send_email_button), style = MaterialTheme.typography.labelLarge)
+            }
 
-        if (state.note.isNotEmpty()) {
-            Text(state.note, style = MaterialTheme.typography.bodySmall)
+            if (state.note.isNotEmpty()) {
+                Text(
+                    text = state.note,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
