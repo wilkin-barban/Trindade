@@ -2,11 +2,9 @@ package com.trindade.app.reports
 
 import android.app.DatePickerDialog
 import android.content.Context
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,8 +15,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -39,7 +35,12 @@ import com.trindade.app.contract.models.ReportsResponseReportsInner
 import com.trindade.app.ui.components.AdminDestructiveButton
 import com.trindade.app.ui.components.AdminDestructiveConfirmButton
 import com.trindade.app.ui.components.AdminSecondaryButton
-import com.trindade.app.ui.components.NavigationActionButton
+import com.trindade.app.ui.components.HistoryEmptyState
+import com.trindade.app.ui.components.HistoryErrorBanner
+import com.trindade.app.ui.components.HistoryHeader
+import com.trindade.app.ui.components.HistoryLoading
+import com.trindade.app.ui.components.HistoryPager
+import com.trindade.app.ui.components.HistoryRecordCard
 import com.trindade.app.ui.displayDate
 import com.trindade.app.ui.displayMonth
 import com.trindade.app.ui.notesPreview
@@ -59,8 +60,7 @@ import java.util.Locale
  * twelve months rather than the same picker. That distinction is deliberate: the platform picker
  * answers a day, so using it to choose a month would mean asking for a value and then ignoring it, and
  * a control whose answer has no effect is a control that lies about what it does.
- */
-@Composable
+ */@Composable
 fun ReportsHistoryScreen(
     state: ReportsHistoryViewModel.UiState,
     onBack: () -> Unit,
@@ -70,6 +70,7 @@ fun ReportsHistoryScreen(
     onClearFilters: () -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
+    onRetry: () -> Unit,
     onDeactivate: (Int) -> Unit,
     onDelete: (Int) -> Unit,
     modifier: Modifier = Modifier,
@@ -89,27 +90,20 @@ fun ReportsHistoryScreen(
 
     LazyColumn(
         modifier = modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            NavigationActionButton(onClick = onBack, text = stringResource(R.string.report_back))
-        }
-
-        item {
-            Column {
-                Text(text = stringResource(R.string.history_title), style = MaterialTheme.typography.titleLarge)
-                Text(
-                    // The active filter in words. A day reads as the operators write dates and a month
-                    // by name, because `2026-09` is the wire's spelling and not a label.
-                    text = when {
-                        state.date != null -> stringResource(R.string.history_filtered, displayDate(state.date))
-                        state.month != null -> stringResource(R.string.history_filtered, displayMonth(state.month))
-                        else -> stringResource(R.string.history_all_reports)
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            HistoryHeader(
+                title = stringResource(R.string.history_title),
+                // The active filter in words. A day reads as the operators write dates and a month by name,
+                // because `2026-09` is the wire's spelling and not a label.
+                subtitle = when {
+                    state.date != null -> stringResource(R.string.history_filtered, displayDate(state.date))
+                    state.month != null -> stringResource(R.string.history_filtered, displayMonth(state.month))
+                    else -> stringResource(R.string.history_all_reports)
+                },
+                onBack = onBack,
+            )
         }
 
         item {
@@ -129,8 +123,8 @@ fun ReportsHistoryScreen(
                         ?.let { stringResource(R.string.history_filter_month_value, displayMonth(it)) }
                         ?: stringResource(R.string.history_filter_month),
                 )
-                // Offered only when there is a filter to clear: a control that does nothing when tapped
-                // is worse than one that is not there, because the operator cannot tell which it is.
+                // Offered only when there is a filter to clear: a control that does nothing when tapped is
+                // worse than one that is not there, because the operator cannot tell which it is.
                 if (state.date != null || state.month != null) {
                     AdminSecondaryButton(
                         onClick = onClearFilters,
@@ -141,39 +135,81 @@ fun ReportsHistoryScreen(
         }
 
         state.message?.let { message ->
-            item {
-                Text(
-                    text = message,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
+            item { HistoryErrorBanner(message = message, onRetry = onRetry) }
         }
 
         if (state.loading) {
-            item { CircularProgressIndicator() }
+            item { HistoryLoading() }
         }
 
         // Only when a read answered. An empty list next to an error sentence would state a failed read
         // as a fact about the history, and "no reports for this period" is a different sentence from
         // "the server did not answer".
         if (state.loaded && state.items.isEmpty()) {
-            item {
-                Text(
-                    text = stringResource(R.string.history_empty),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            item { HistoryEmptyState(message = stringResource(R.string.history_empty)) }
         }
 
         items(state.items, key = { it.id }) { report ->
-            ReportRow(
-                report = report,
-                busy = state.busy,
-                onOpen = { onOpenReport(report.id) },
-                onDeactivate = { onDeactivate(report.id) },
-                onDelete = { confirmingDelete = report.id },
+            HistoryRecordCard(
+                onClick = { onOpenReport(report.id) },
+                enabled = !state.busy,
+                footer = if (offersDeactivate(report) || offersDelete(report)) {
+                    {
+                        // Each action is drawn only where the server said it would be accepted, which is the
+                        // `== true` inside those two predicates rather than a role decided here: this client
+                        // does not know the caller's role, and the flag is the server's own answer to that.
+                        if (offersDeactivate(report)) {
+                            AdminSecondaryButton(
+                                onClick = { onDeactivate(report.id) },
+                                enabled = !state.busy,
+                                text = stringResource(R.string.history_deactivate),
+                            )
+                        }
+                        if (offersDelete(report)) {
+                            AdminDestructiveButton(
+                                onClick = { confirmingDelete = report.id },
+                                enabled = !state.busy,
+                                text = stringResource(R.string.history_delete),
+                            )
+                        }
+                    }
+                } else {
+                    null
+                },
+                lines = {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
+                    ) {
+                        Text(
+                            text = "📅 " + displayDate(report.reportDate),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(text = turnoLabel(report.turno), style = MaterialTheme.typography.bodyMedium)
+                        // `== false`, and not `!= true`: the badge is a claim that the report is inactive,
+                        // and an absent flag is not a claim about anything. The five lifecycle flags are
+                        // optional in the contract, so null is a state this screen has to survive without
+                        // inventing a fact.
+                        if (report.isActive == false) {
+                            Text(
+                                text = stringResource(R.string.history_inactive),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                    }
+
+                    val notes = notesPreview(report.notes)
+                    Text(
+                        text = if (notes == null) {
+                            report.user.displayName
+                        } else {
+                            "${report.user.displayName} — $notes"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                },
             )
         }
 
@@ -183,77 +219,26 @@ fun ReportsHistoryScreen(
         // above goes out of its way to avoid, one line further down.
         if (state.loaded) {
             item {
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(
-                        text = stringResource(
-                            R.string.history_pagination,
-                            state.page,
-                            // The server answers `totalPages` 0 for an empty history, and the SPA draws
-                            // the same maximum for the same reason: "Página 1 de 0" is a sentence about
-                            // the arithmetic rather than about the reports.
-                            maxOf(1, state.totalPages),
-                            state.total,
-                        ),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        AdminSecondaryButton(
-                            onClick = onPrevious,
-                            // Disabled while a page is in flight as well as at the bound, so a second
-                            // tap cannot ask for a page relative to an answer that has not arrived.
-                            enabled = state.canGoPrevious && !state.loading,
-                            text = stringResource(R.string.history_previous),
-                        )
-                        AdminSecondaryButton(
-                            onClick = onNext,
-                            enabled = state.canGoNext && !state.loading,
-                            text = stringResource(R.string.history_next),
-                        )
-                    }
-                }
+                HistoryPager(
+                    page = state.page,
+                    totalPages = state.totalPages,
+                    total = state.total,
+                    canGoPrevious = state.canGoPrevious,
+                    canGoNext = state.canGoNext,
+                    loading = state.loading,
+                    onPrevious = onPrevious,
+                    onNext = onNext,
+                )
             }
         }
     }
 
     if (pickingMonth) {
-        // Computed once per opening rather than on every recomposition, and dropped when the dialog
-        // leaves the composition -- which is what makes reopening it pick up a month that has since
-        // changed.
-        val months = remember { recentMonths(LocalDate.now()) }
-
-        AlertDialog(
-            onDismissRequest = { pickingMonth = false },
-            title = { Text(stringResource(R.string.history_month_picker_title)) },
-            text = {
-                // Scrollable, because twelve rows do not fit the dialog's slot on a short screen and an
-                // unscrollable list would hide the older half of the year behind an invisible edge.
-                Column(
-                    modifier = Modifier
-                        .heightIn(max = 360.dp)
-                        .verticalScroll(rememberScrollState()),
-                ) {
-                    months.forEach { iso ->
-                        TextButton(
-                            onClick = {
-                                pickingMonth = false
-                                onMonthSelected(iso)
-                            },
-                            modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp),
-                        ) {
-                            Text(displayMonth(iso), style = MaterialTheme.typography.labelLarge)
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                AdminSecondaryButton(onClick = { pickingMonth = false }, text = stringResource(R.string.loading_cancel))
+        MonthPickerDialog(
+            onDismiss = { pickingMonth = false },
+            onPick = {
+                pickingMonth = false
+                onMonthSelected(it)
             },
         )
     }
@@ -275,87 +260,50 @@ fun ReportsHistoryScreen(
                 )
             },
             dismissButton = {
-                AdminSecondaryButton(onClick = { confirmingDelete = null }, text = stringResource(R.string.loading_cancel))
+                AdminSecondaryButton(
+                    onClick = { confirmingDelete = null },
+                    text = stringResource(R.string.loading_cancel),
+                )
             },
         )
     }
 }
 
 /**
- * One report in the list: its date, its shift, its author, and what may be done with it.
+ * The twelve months behind the filter, as a list rather than the platform's day picker.
  *
- * The block that opens the detail is one tap target and the two lifecycle actions sit outside it, so a
- * tap on "Excluir" is never also a tap on "open this report".
+ * Computed once per opening rather than on every recomposition, and dropped when the dialog leaves the
+ * composition -- which is what makes reopening it pick up a month that has since changed. Scrollable,
+ * because twelve rows do not fit the dialog's slot on a short screen and an unscrollable list would hide
+ * the older half of the year behind an invisible edge.
  */
 @Composable
-private fun ReportRow(
-    report: ReportsResponseReportsInner,
-    busy: Boolean,
-    onOpen: () -> Unit,
-    onDeactivate: () -> Unit,
-    onDelete: () -> Unit,
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .defaultMinSize(minHeight = 48.dp)
-                .clickable(enabled = !busy, onClick = onOpen)
-                .padding(vertical = 4.dp),
-        ) {
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
+private fun MonthPickerDialog(onDismiss: () -> Unit, onPick: (String) -> Unit) {
+    val months = remember { recentMonths(LocalDate.now()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.history_month_picker_title)) },
+        text = {
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 360.dp)
+                    .verticalScroll(rememberScrollState()),
             ) {
-                Text(text = displayDate(report.reportDate), style = MaterialTheme.typography.bodyLarge)
-                Text(text = turnoLabel(report.turno), style = MaterialTheme.typography.bodyMedium)
-                // `== false`, and not `!= true`: the badge is a claim that the report is inactive, and
-                // an absent flag is not a claim about anything. The five lifecycle flags are optional in
-                // the contract, so null is a state this screen has to survive without inventing a fact.
-                if (report.isActive == false) {
-                    Text(
-                        text = stringResource(R.string.history_inactive),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.error,
-                    )
+                months.forEach { iso ->
+                    TextButton(
+                        onClick = { onPick(iso) },
+                        modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp),
+                    ) {
+                        Text(displayMonth(iso), style = MaterialTheme.typography.labelLarge)
+                    }
                 }
             }
-
-            val notes = notesPreview(report.notes)
-            Text(
-                text = if (notes == null) report.user.displayName else "${report.user.displayName} — $notes",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
-
-        if (offersDeactivate(report) || offersDelete(report)) {
-            FlowRow(
-                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                // Each action is drawn only where the server said it would be accepted, which is the
-                // `== true` inside those two predicates rather than a role decided here: this client does
-                // not know the caller's role, and the flag is the server's own answer to that question.
-                if (offersDeactivate(report)) {
-                    AdminSecondaryButton(
-                        onClick = onDeactivate,
-                        enabled = !busy,
-                        text = stringResource(R.string.history_deactivate),
-                    )
-                }
-                if (offersDelete(report)) {
-                    AdminDestructiveButton(
-                        onClick = onDelete,
-                        enabled = !busy,
-                        text = stringResource(R.string.history_delete),
-                    )
-                }
-            }
-        }
-
-        HorizontalDivider()
-    }
+        },
+        confirmButton = {
+            AdminSecondaryButton(onClick = onDismiss, text = stringResource(R.string.loading_cancel))
+        },
+    )
 }
 
 /**
@@ -416,5 +364,6 @@ fun ReportsHistoryRoute(
         onNext = viewModel::next,
         onDeactivate = viewModel::deactivate,
         onDelete = viewModel::delete,
+        onRetry = { viewModel.load() },
     )
 }
