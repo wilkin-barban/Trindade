@@ -25,7 +25,6 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.trindade.app.ui.components.HistoryActionButton
 import com.trindade.app.R
 import com.trindade.app.contract.models.ScheduleHistoryResponseItemsInner
 import com.trindade.app.ui.components.AdminDestructiveConfirmButton
@@ -33,6 +32,7 @@ import com.trindade.app.ui.components.AdminSecondaryButton
 import com.trindade.app.ui.components.HistoryEmptyState
 import com.trindade.app.ui.components.HistoryErrorBanner
 import com.trindade.app.ui.components.HistoryDateLabel
+import com.trindade.app.ui.components.HistoryIconAction
 import com.trindade.app.ui.components.HistoryHeader
 import com.trindade.app.ui.components.HistoryLoading
 import com.trindade.app.ui.components.HistoryPager
@@ -235,7 +235,7 @@ private fun BatchCard(
     HistoryRecordCard(
         onClick = onOpen,
         enabled = !busy,
-        footer = if (offersDeactivate(batch) || offersDelete(batch)) {
+        actions = if (offersDeactivate(batch) || offersDelete(batch)) {
             {
                 // Each action is drawn only where the server said it would be accepted, which is the
                 // `== true` inside those two predicates rather than a role decided here: this client does
@@ -243,18 +243,20 @@ private fun BatchCard(
                 // `canDelete` is known to overstate a Trabalhador on this route, which is why the refusal
                 // has a sentence of its own rather than being folded into "it failed".
                 if (offersDeactivate(batch)) {
-                    HistoryActionButton(
+                    HistoryIconAction(
+                        iconRes = R.drawable.ic_deactivate,
+                        label = stringResource(R.string.history_deactivate),
                         onClick = onDeactivate,
                         enabled = !busy,
-                        text = stringResource(R.string.history_deactivate),
                     )
                 }
                 if (offersDelete(batch)) {
-                    HistoryActionButton(
+                    HistoryIconAction(
+                        iconRes = R.drawable.ic_delete,
+                        label = stringResource(R.string.history_delete),
                         onClick = onDelete,
                         enabled = !busy,
                         destructive = true,
-                        text = stringResource(R.string.history_delete),
                     )
                 }
             }

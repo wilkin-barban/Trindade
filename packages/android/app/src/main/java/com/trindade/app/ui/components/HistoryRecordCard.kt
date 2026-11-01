@@ -26,8 +26,9 @@ import androidx.compose.ui.unit.dp
  * are the caller's, because a report says its date and shift where a day says its boxes and its operators; what
  * this owns is the shape they are read in.
  *
- * [footer] is for a record's own actions -- deactivating a report, deleting a schedule -- and sits below the
- * text, at the end of the card, where a thumb can reach it without covering the line it acts on.
+ * [actions] is for a record's own decisions -- deactivating a report, deleting a schedule -- and sits on the
+ * card's closing line, as glyphs beside the way in: a record that can be acted on is the height of its own
+ * lines, which is what the pills and then the text actions it used to carry could not be.
  */
 @Composable
 fun HistoryRecordCard(
@@ -35,7 +36,7 @@ fun HistoryRecordCard(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     action: String? = null,
-    footer: (@Composable RowScope.() -> Unit)? = null,
+    actions: (@Composable RowScope.() -> Unit)? = null,
     lines: @Composable ColumnScope.() -> Unit,
 ) {
     Card(
@@ -55,21 +56,32 @@ fun HistoryRecordCard(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                     content = lines,
                 )
-                if (action != null) {
-                    Text(
-                        text = action,
-                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.primary,
-                    )
+                // The way in and the record's own decisions share one line: the first is what the card is
+                // for, the second are the two things done to it without opening it. A row here instead of a
+                // row below is what keeps this card the height of its own lines, which is the height the
+                // reference card has -- the pills this replaces set that height from a control.
+                if (action != null || actions != null) {
+                    Row(
+                        modifier = Modifier.padding(start = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (action != null) {
+                            Text(
+                                text = action,
+                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                        if (actions != null) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(0.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                content = actions,
+                            )
+                        }
+                    }
                 }
-            }
-
-            if (footer != null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-                    content = footer,
-                )
             }
         }
     }

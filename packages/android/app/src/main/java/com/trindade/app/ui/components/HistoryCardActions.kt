@@ -1,15 +1,13 @@
 package com.trindade.app.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,38 +51,41 @@ fun HistoryDateLabel(
 }
 
 /**
- * A record's own action, at the end of its card.
+ * A record's own action, on the card's closing corner.
  *
- * Deactivating and deleting a record were drawn with the same filled pills the admin screens use for their
- * primary actions, so the smallest decision on a card — retracting one schedule — was the largest thing on it,
- * and a list of cards read as a list of buttons. As a text action it keeps the reference card's language: the
- * label is the whole target, the touch area still reaches 48dp, and the destructive one is told apart by its
- * colour rather than by its size.
+ * Deactivating and deleting a record were drawn first as the filled pills the admin screens use, and then as
+ * text actions: both made the record's smallest decision the element that set the card's height, and a list
+ * of them read as a list of buttons. As a glyph the action keeps its meaning, its name -- announced through
+ * [contentDescription] -- and its 48dp target, while taking the room of an icon; the destructive one is told
+ * apart by its colour, not by its size.
+ *
+ * The handler is the button's own, so a tap on it acts on the record instead of opening it: the card behind
+ * it is a door, and these are the two decisions taken without going through it.
  */
 @Composable
-fun HistoryActionButton(
-    text: String,
+fun HistoryIconAction(
+    iconRes: Int,
+    label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     destructive: Boolean = false,
 ) {
-    TextButton(
+    IconButton(
         onClick = onClick,
-        modifier = modifier.heightIn(min = 48.dp),
         enabled = enabled,
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+        // Sized rather than left to the button's own minimum: a glyph is 24dp in a 40dp container, and the
+        // 48dp a glove needs is the target the operator actually lands on.
+        modifier = modifier.size(48.dp),
     ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelLarge,
-            color = if (destructive) {
+        Icon(
+            painter = painterResource(iconRes),
+            contentDescription = label,
+            tint = if (destructive) {
                 MaterialTheme.colorScheme.error
             } else {
                 MaterialTheme.colorScheme.primary
             },
-            maxLines = 1,
-            modifier = Modifier.padding(0.dp),
         )
     }
 }

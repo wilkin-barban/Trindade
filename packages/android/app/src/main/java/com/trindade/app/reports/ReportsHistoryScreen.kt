@@ -25,7 +25,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.trindade.app.ui.components.HistoryActionButton
 import com.trindade.app.R
 import com.trindade.app.contract.models.ReportsResponseReportsInner
 import com.trindade.app.ui.components.AdminDestructiveConfirmButton
@@ -33,6 +32,7 @@ import com.trindade.app.ui.components.AdminSecondaryButton
 import com.trindade.app.ui.components.HistoryEmptyState
 import com.trindade.app.ui.components.HistoryErrorBanner
 import com.trindade.app.ui.components.HistoryDateLabel
+import com.trindade.app.ui.components.HistoryIconAction
 import com.trindade.app.ui.components.HistoryHeader
 import com.trindade.app.ui.components.HistoryLoading
 import com.trindade.app.ui.components.HistoryPager
@@ -149,24 +149,26 @@ fun ReportsHistoryScreen(
             HistoryRecordCard(
                 onClick = { onOpenReport(report.id) },
                 enabled = !state.busy,
-                footer = if (offersDeactivate(report) || offersDelete(report)) {
+                actions = if (offersDeactivate(report) || offersDelete(report)) {
                     {
                         // Each action is drawn only where the server said it would be accepted, which is the
                         // `== true` inside those two predicates rather than a role decided here: this client
                         // does not know the caller's role, and the flag is the server's own answer to that.
                         if (offersDeactivate(report)) {
-                            HistoryActionButton(
+                            HistoryIconAction(
+                                iconRes = R.drawable.ic_deactivate,
+                                label = stringResource(R.string.history_deactivate),
                                 onClick = { onDeactivate(report.id) },
                                 enabled = !state.busy,
-                                text = stringResource(R.string.history_deactivate),
                             )
                         }
                         if (offersDelete(report)) {
-                            HistoryActionButton(
+                            HistoryIconAction(
+                                iconRes = R.drawable.ic_delete,
+                                label = stringResource(R.string.history_delete),
                                 onClick = { confirmingDelete = report.id },
                                 enabled = !state.busy,
                                 destructive = true,
-                                text = stringResource(R.string.history_delete),
                             )
                         }
                     }

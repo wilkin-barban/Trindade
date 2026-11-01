@@ -1,6 +1,8 @@
 package com.trindade.app.ui.components
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
@@ -11,6 +13,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -110,25 +113,66 @@ class HistoryComponentsTest {
     }
 
     @Test
-    fun `a record's own actions sit below its lines`() {
+    fun `a record's own decisions ride its closing line and add no height`() {
         composeRule.setContent {
             TrindadeTheme {
-                Box(modifier = Modifier.width(411.dp)) {
+                Column(modifier = Modifier.fillMaxWidth()) {
                     HistoryRecordCard(
                         onClick = {},
-                        modifier = Modifier.testTag("record"),
-                        lines = { Text("Relatório de 12/03") },
-                        footer = {
-                            AdminSecondaryButton(onClick = {}, text = "Desativar")
+                        modifier = Modifier.testTag("plain").fillMaxWidth(),
+                        action = "Abrir ›",
+                        lines = {
+                            HistoryDateLabel(date = "18/09/2026")
+                            Text("12 carregamentos")
+                            Text("Carregado em 19/09/2026")
+                        },
+                    )
+                    HistoryRecordCard(
+                        onClick = {},
+                        modifier = Modifier.testTag("acted").fillMaxWidth(),
+                        action = "Abrir ›",
+                        lines = {
+                            HistoryDateLabel(date = "18/09/2026")
+                            Text("12 carregamentos")
+                            Text("Carregado em 19/09/2026")
+                        },
+                        actions = {
+                            HistoryIconAction(
+                                iconRes = R.drawable.ic_deactivate,
+                                label = "Desativar",
+                                onClick = {},
+                            )
+                            HistoryIconAction(
+                                iconRes = R.drawable.ic_delete,
+                                label = "Excluir",
+                                onClick = {},
+                                destructive = true,
+                            )
                         },
                     )
                 }
             }
         }
 
-        val line = composeRule.onNodeWithText("Relatório de 12/03", useUnmergedTree = true).getUnclippedBoundsInRoot()
-        val action = composeRule.onNodeWithText("Desativar", useUnmergedTree = true).getUnclippedBoundsInRoot()
-        assertTrue("the action of a record belongs under its own line", action.top > line.bottom)
+        val plain = composeRule.onNodeWithTag("plain").getUnclippedBoundsInRoot()
+        val acted = composeRule.onNodeWithTag("acted").getUnclippedBoundsInRoot()
+
+        // The claim the glyphs are drawn for: on a record that carries a date and two more lines -- the
+        // shape both histories draw -- the decisions cost no height at all. The pills this replaces added a
+        // row below those lines, and the text actions added it again at the height of a button.
+        assertEquals(
+            "a card with actions must not be taller than one without",
+            plain.bottom.value - plain.top.value,
+            acted.bottom.value - acted.top.value,
+            0.5f,
+        )
+
+        // And they are on the closing line rather than on one of their own: level with the way in.
+        // The second one, because both cards draw the same way in and only the acted card has the glyphs.
+        val wayIn = composeRule.onAllNodesWithText("Abrir ›", useUnmergedTree = true)[1].getUnclippedBoundsInRoot()
+        val delete = composeRule.onNodeWithContentDescription("Excluir").getUnclippedBoundsInRoot()
+        val overlap = minOf(wayIn.bottom.value, delete.bottom.value) - maxOf(wayIn.top.value, delete.top.value)
+        assertTrue("the decisions must share the way in's line, overlapped by $overlap dp", overlap > 0f)
     }
 
     @Test
@@ -152,7 +196,7 @@ class HistoryComponentsTest {
     }
 
     @Test
-    fun `a record's action is a text action that still reaches 48dp`() {
+    fun `a record's decisions are glyphs that still reach 48dp`() {
         var deleted = 0
         var deactivated = 0
         composeRule.setContent {
@@ -162,26 +206,36 @@ class HistoryComponentsTest {
                         onClick = {},
                         modifier = Modifier.testTag("record"),
                         lines = { Text("Horário de 12/03") },
-                        footer = {
-                            HistoryActionButton(text = "Desativar", onClick = { deactivated++ })
-                            HistoryActionButton(text = "Excluir", onClick = { deleted++ }, destructive = true)
+                        actions = {
+                            HistoryIconAction(
+                                iconRes = R.drawable.ic_deactivate,
+                                label = "Desativar",
+                                onClick = { deactivated++ },
+                            )
+                            HistoryIconAction(
+                                iconRes = R.drawable.ic_delete,
+                                label = "Excluir",
+                                onClick = { deleted++ },
+                                destructive = true,
+                            )
                         },
                     )
                 }
             }
         }
 
-        composeRule.onNodeWithText("Excluir", useUnmergedTree = true).performClick()
-        composeRule.onNodeWithText("Desativar", useUnmergedTree = true).performClick()
+        // Found by the name it announces, because a glyph is the whole of what it draws.
+        composeRule.onNodeWithContentDescription("Excluir").performClick()
+        composeRule.onNodeWithContentDescription("Desativar").performClick()
         assertEquals(1, deleted)
         assertEquals(1, deactivated)
 
         for (label in listOf("Desativar", "Excluir")) {
-            // Measured on the button, not its label: the text is one line tall and the target that has to
-            // reach 48dp is the thing a thumb lands on.
-            val bounds = composeRule.onNodeWithText(label).getUnclippedBoundsInRoot()
+            val bounds = composeRule.onNodeWithContentDescription(label).getUnclippedBoundsInRoot()
             val height = bounds.bottom - bounds.top
+            val width = bounds.right - bounds.left
             assertTrue("\"$label\" must stay reachable: $height is under the 48dp target", height >= 48.dp)
+            assertTrue("\"$label\" must stay reachable: $width is under the 48dp target", width >= 48.dp)
         }
     }
 

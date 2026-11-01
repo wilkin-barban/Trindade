@@ -12,6 +12,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -127,14 +128,14 @@ class ReportsHistoryScreenTest {
             }
         }
 
-        val deactNode = composeRule.onNodeWithText(copy(R.string.history_deactivate))
+        val deactNode = composeRule.onNodeWithContentDescription(copy(R.string.history_deactivate))
         deactNode.performScrollTo().assertIsDisplayed()
         val deactBounds = deactNode.getUnclippedBoundsInRoot()
         assertTrue("Deactivate height >= 48dp", deactBounds.bottom - deactBounds.top >= 48.dp)
         deactNode.performClick()
         assertEquals(1, deactivated)
 
-        val deleteNode = composeRule.onNodeWithText(copy(R.string.history_delete))
+        val deleteNode = composeRule.onNodeWithContentDescription(copy(R.string.history_delete))
         deleteNode.performScrollTo().assertIsDisplayed()
         val deleteBounds = deleteNode.getUnclippedBoundsInRoot()
         assertTrue("Delete height >= 48dp", deleteBounds.bottom - deleteBounds.top >= 48.dp)
@@ -300,7 +301,7 @@ class ReportsHistoryScreenTest {
         }
 
         // Tap delete button on the report row
-        val rowDeleteNode = composeRule.onNodeWithText(copy(R.string.history_delete))
+        val rowDeleteNode = composeRule.onNodeWithContentDescription(copy(R.string.history_delete))
         rowDeleteNode.performScrollTo().assertIsDisplayed().performClick()
         composeRule.waitForIdle()
 
@@ -386,13 +387,13 @@ class ReportsHistoryScreenTest {
         assertWithinViewport(userNode)
 
         // Assert actions meet touch target size and do not overlap
-        val deactNode = composeRule.onNodeWithText(copy(R.string.history_deactivate)).performScrollTo()
+        val deactNode = composeRule.onNodeWithContentDescription(copy(R.string.history_deactivate)).performScrollTo()
         assertWithinViewport(deactNode)
         val deactBounds = deactNode.getUnclippedBoundsInRoot()
         assertTrue("Deactivate height >= 48dp at 1.5x", deactBounds.bottom - deactBounds.top >= 48.dp)
         assertTrue("Deactivate width >= 48dp at 1.5x", deactBounds.right - deactBounds.left >= 48.dp)
 
-        val deleteNode = composeRule.onNodeWithText(copy(R.string.history_delete)).performScrollTo()
+        val deleteNode = composeRule.onNodeWithContentDescription(copy(R.string.history_delete)).performScrollTo()
         assertWithinViewport(deleteNode)
         val deleteBounds = deleteNode.getUnclippedBoundsInRoot()
         assertTrue("Delete height >= 48dp at 1.5x", deleteBounds.bottom - deleteBounds.top >= 48.dp)
@@ -450,13 +451,13 @@ class ReportsHistoryScreenTest {
         assertWithinViewport(userNode)
 
         // Assert actions meet touch target size and do not overlap
-        val deactNode = composeRule.onNodeWithText(copy(R.string.history_deactivate)).performScrollTo()
+        val deactNode = composeRule.onNodeWithContentDescription(copy(R.string.history_deactivate)).performScrollTo()
         assertWithinViewport(deactNode)
         val deactBounds = deactNode.getUnclippedBoundsInRoot()
         assertTrue("Deactivate height >= 48dp at 2.0x", deactBounds.bottom - deactBounds.top >= 48.dp)
         assertTrue("Deactivate width >= 48dp at 2.0x", deactBounds.right - deactBounds.left >= 48.dp)
 
-        val deleteNode = composeRule.onNodeWithText(copy(R.string.history_delete)).performScrollTo()
+        val deleteNode = composeRule.onNodeWithContentDescription(copy(R.string.history_delete)).performScrollTo()
         assertWithinViewport(deleteNode)
         val deleteBounds = deleteNode.getUnclippedBoundsInRoot()
         assertTrue("Delete height >= 48dp at 2.0x", deleteBounds.bottom - deleteBounds.top >= 48.dp)
