@@ -39,8 +39,8 @@ S8 — Entrega, verbatim:
 
 ## Tasks
 
-- T1 | S1 | inline | acciones de las tarjetas de histórico como iconos (desactivar, eliminar) alineados a la derecha, sin fila propia — commit: `_pendiente_`
-- T2 | S2 | inline | filtro de fecha compacto en una sola fila: día, mes y limpiar como chips — commit: `_pendiente_`
+- T1 | S1 | inline | acciones de las tarjetas de histórico como iconos (desactivar, eliminar) alineados a la derecha, sin fila propia — commit: `8c1153b` (verde: `HistoryComponentsTest` 11/11)
+- T2 | S2 | inline | filtro de fecha compacto en una sola fila: día, mes y limpiar como chips — commit: `9b4441d` (verde: `HistoryFilterBarTest` 4/4, históricos 7/7 + 7/7)
 - T3 | S4 | inline | campo de fecha del histórico de contagem legible y de tamaño coherente — commit: `_pendiente_`
 - T4 | S5 | inline | con el interruptor de un tipo de caja apagado, sus cajas no se dibujan — commit: `_pendiente_`
 - T5 | S3 | inline | cabecera de Compartir App con título y subtítulo, y acción «Compartir arquivo APK» — commit: `_pendiente_`
