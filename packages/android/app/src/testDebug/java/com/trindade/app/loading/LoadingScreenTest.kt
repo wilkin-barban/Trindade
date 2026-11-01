@@ -8,16 +8,11 @@ import androidx.compose.ui.platform.ClipboardManager
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.assertIsNotSelected
-import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasProgressBarRangeInfo
@@ -188,12 +183,16 @@ class LoadingScreenTest {
     )
 
     /**
-     * The grid with one slot's add form open, which is where the two selections live.
+     * The grid with the driver picker open, which is where the two lists and the plate live.
      *
-     * The selected driver is the company one, so the vehicle list is drawn as well: a company driver
-     * brings no vehicle of their own and the server refuses the assignment without one.
+     * Nothing is picked here: the picker is what the operator fills, so a test that needs a row selected
+     * says which row it selected and why.
      */
-    private fun addingState() = LoadingViewModel.UiState(
+    private fun addingState(
+        tab: LoadingPickerTab = LoadingPickerTab.FLETEROS,
+        pickedFleteros: Set<Int> = emptySet(),
+        pickedCasa: Map<Int, Int?> = emptyMap(),
+    ) = LoadingViewModel.UiState(
         date = DATE,
         loading = false,
         schedules = listOf(editable.copy(timeSlot = "04:00")),
@@ -201,24 +200,33 @@ class LoadingScreenTest {
         drivers = FakeLoadingApi.defaultDrivers(),
         vehicles = FakeLoadingApi.defaultVehicles(),
         addingToSlot = "04:00",
-        selectedDriverId = FakeLoadingApi.CASA_DRIVER_ID,
+        pickerTab = tab,
+        pickedFleteros = pickedFleteros,
+        pickedCasa = pickedCasa,
     )
 
-    private fun renderAddingForm(
-        onDriverSelected: (Int) -> Unit = {},
-        onVehicleSelected: (Int) -> Unit = {},
+    private fun renderPicker(
+        state: LoadingViewModel.UiState = addingState(),
+        onPickerTabSelected: (LoadingPickerTab) -> Unit = {},
+        onFleteroPicked: (Int, Boolean) -> Unit = { _, _ -> },
+        onCasaPicked: (Int, Boolean) -> Unit = { _, _ -> },
+        onCasaVehiclePicked: (Int, Int) -> Unit = { _, _ -> },
+        onConfirmAdd: () -> Unit = {},
+        onCancelAdding: () -> Unit = {},
     ) {
         composeRule.setContent {
             TrindadeTheme {
                 LoadingScreen(
-                    state = addingState(),
+                    state = state,
                     onBack = {},
                     onOpenHistory = {},
                     onStartAdding = {},
-                    onCancelAdding = {},
-                    onDriverSelected = onDriverSelected,
-                    onVehicleSelected = onVehicleSelected,
-                    onConfirmAdd = {},
+                    onCancelAdding = onCancelAdding,
+                    onPickerTabSelected = onPickerTabSelected,
+                    onFleteroPicked = onFleteroPicked,
+                    onCasaPicked = onCasaPicked,
+                    onCasaVehiclePicked = onCasaVehiclePicked,
+                    onConfirmAdd = onConfirmAdd,
                     onDelete = {},
                     onEditEntry = { _, _ -> },
                     onLoadExport = {},
@@ -237,8 +245,10 @@ class LoadingScreenTest {
                     onOpenHistory = {},
                     onStartAdding = {},
                     onCancelAdding = {},
-                    onDriverSelected = {},
-                    onVehicleSelected = {},
+                    onPickerTabSelected = {},
+                    onFleteroPicked = { _, _ -> },
+                    onCasaPicked = { _, _ -> },
+                    onCasaVehiclePicked = { _, _ -> },
                     onConfirmAdd = {},
                     onDelete = {},
                     onEditEntry = { _, _ -> },
@@ -248,46 +258,86 @@ class LoadingScreenTest {
         }
     }
 
-    // ---- The two selections of the add form (AND-03) ----
+    // ---- The driver picker: two lists, many drivers, and a plate (AND-03) ----
 
     /**
-     * The rule this pair of tests exists for: the whole row is the control.
+     * The rule the picker exists for: a slot carries one, two or several drivers.
      *
-     * The trap the change closes is small and real. The radio alone used to own the click, so the row an
-     * operator reads -- the name of the driver, the description and plate of the vehicle -- was a label
-     * they could touch with nothing happening, while a circle a few points wide did the selecting. The
-     * label is what they aim at, which is why the tap below goes to the label and not to the button.
+     * The whole row is the target as it is everywhere else in the app -- the name is what an operator aims
+     * at, and a check box handed its own click would be a second, smaller control for one decision -- and
+     * the answer a tap gives is the driver and whether they are now in the slot.
      */
     @Test
-    fun `the whole driver row is the control and the label selects that driver`() {
-        val selected = mutableListOf<Int>()
-        renderAddingForm(onDriverSelected = { selected += it })
+    fun `the fleteros list is the one the picker opens on, and its row reports the driver it picked`() {
+        val picked = mutableListOf<Pair<Int, Boolean>>()
+        renderPicker(onFleteroPicked = { id, value -> picked += id to value })
 
         composeRule.onNodeWithText("Fletero").performScrollTo().assertIsDisplayed().performClick()
 
-        assertEquals(listOf(FakeLoadingApi.FLETERO_DRIVER_ID), selected)
+        assertEquals(listOf(FakeLoadingApi.FLETERO_DRIVER_ID to true), picked)
     }
 
     @Test
-    fun `a driver row carries the radio role and its own selected state`() {
-        renderAddingForm()
+    fun `the second tab is the one that reports the company list`() {
+        val tabs = mutableListOf<LoadingPickerTab>()
+        renderPicker(onPickerTabSelected = { tabs += it })
 
-        val chosen = composeRule.onNodeWithText("Carlos").performScrollTo()
-        chosen.assertIsDisplayed()
-        chosen.assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton))
-        chosen.assertIsSelected()
+        composeRule.onNodeWithText("Motoristas da casa").performClick()
 
-        composeRule.onNodeWithText("Fletero").assertIsNotSelected()
+        assertEquals(listOf(LoadingPickerTab.CASA), tabs)
     }
 
     @Test
-    fun `the whole vehicle row is the control too`() {
-        val selected = mutableListOf<Int>()
-        renderAddingForm(onVehicleSelected = { selected += it })
+    fun `the casa tab lists the company drivers rather than the fleteros`() {
+        renderPicker(state = addingState(tab = LoadingPickerTab.CASA))
 
-        composeRule.onNodeWithText("Fiorino · XYZ9876").performScrollTo().assertIsDisplayed().performClick()
+        composeRule.onNodeWithText("Carlos").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Fletero").assertDoesNotExist()
+    }
 
-        assertEquals(listOf(FakeLoadingApi.VEHICLE_ID), selected)
+    @Test
+    fun `a company driver picked without a plate says so on its own row, and the plate comes from the day's vehicles`() {
+        val plates = mutableListOf<Pair<Int, Int>>()
+        renderPicker(
+            state = addingState(tab = LoadingPickerTab.CASA, pickedCasa = mapOf(FakeLoadingApi.CASA_DRIVER_ID to null)),
+            onCasaVehiclePicked = { driverId, vehicleId -> plates += driverId to vehicleId },
+        )
+
+        // The button says what is missing instead of showing a blank, and the row itself is the driver's.
+        composeRule.onNodeWithText("Chapa").performScrollTo().assertIsDisplayed().performClick()
+        composeRule.onNodeWithText("XYZ9876 · Fiorino").performClick()
+
+        assertEquals(listOf(FakeLoadingApi.CASA_DRIVER_ID to FakeLoadingApi.VEHICLE_ID), plates)
+    }
+
+    @Test
+    fun `a plate cannot be chosen for a company driver nobody picked`() {
+        renderPicker(state = addingState(tab = LoadingPickerTab.CASA))
+
+        // Drawn, and withheld: the picker says what the row needs without letting the operator set a value
+        // that the request would then ignore for want of a pick.
+        composeRule.onNodeWithText("Chapa").performScrollTo().assertIsNotEnabled()
+    }
+
+    /** What the dialog says and what its buttons report, on the state the view model would produce. */
+    @Test
+    fun `the picker names the slot it is filling, counts the picks and reports accept and cancel`() {
+        val accepted = mutableListOf<Unit>()
+        val cancelled = mutableListOf<Unit>()
+        renderPicker(
+            state = addingState(pickedFleteros = setOf(FakeLoadingApi.FLETERO_DRIVER_ID)),
+            onConfirmAdd = { accepted += Unit },
+            onCancelAdding = { cancelled += Unit },
+        )
+
+        composeRule.onNodeWithText("Motoristas do horário 04:00").assertIsDisplayed()
+        composeRule.onNodeWithText("1 selecionados").assertIsDisplayed()
+
+        composeRule.onNodeWithText("Aceitar").performClick()
+        composeRule.onNodeWithText("Cancelar").performClick()
+
+        assertEquals(1, accepted.size)
+        assertEquals(1, cancelled.size)
     }
 
     // ---- A day that is still being read offers nothing to change (AND-01) ----
@@ -331,8 +381,10 @@ class LoadingScreenTest {
                     onOpenHistory = {},
                     onStartAdding = {},
                     onCancelAdding = {},
-                    onDriverSelected = {},
-                    onVehicleSelected = {},
+                    onPickerTabSelected = {},
+                    onFleteroPicked = { _, _ -> },
+                    onCasaPicked = { _, _ -> },
+                    onCasaVehiclePicked = { _, _ -> },
                     onConfirmAdd = {},
                     onDelete = {},
                     onEditEntry = { id, date -> opened += id to date },
@@ -400,8 +452,10 @@ class LoadingScreenTest {
                     onOpenHistory = { openedHistory++ },
                     onStartAdding = {},
                     onCancelAdding = {},
-                    onDriverSelected = {},
-                    onVehicleSelected = {},
+                    onPickerTabSelected = {},
+                    onFleteroPicked = { _, _ -> },
+                    onCasaPicked = { _, _ -> },
+                    onCasaVehiclePicked = { _, _ -> },
                     onConfirmAdd = {},
                     onDelete = { deletedId = it },
                     onEditEntry = { _, _ -> },
@@ -483,8 +537,10 @@ class LoadingScreenTest {
                     onOpenHistory = {},
                     onStartAdding = {},
                     onCancelAdding = {},
-                    onDriverSelected = {},
-                    onVehicleSelected = {},
+                    onPickerTabSelected = {},
+                    onFleteroPicked = { _, _ -> },
+                    onCasaPicked = { _, _ -> },
+                    onCasaVehiclePicked = { _, _ -> },
                     onConfirmAdd = {},
                     onDelete = {
                         deleteCount++
@@ -540,8 +596,10 @@ class LoadingScreenTest {
                         onOpenHistory = {},
                         onStartAdding = {},
                         onCancelAdding = {},
-                        onDriverSelected = {},
-                        onVehicleSelected = {},
+                        onPickerTabSelected = {},
+                        onFleteroPicked = { _, _ -> },
+                        onCasaPicked = { _, _ -> },
+                        onCasaVehiclePicked = { _, _ -> },
                         onConfirmAdd = {},
                         onDelete = {},
                         onEditEntry = { _, _ -> },
@@ -628,8 +686,10 @@ class LoadingScreenTest {
                         onOpenHistory = {},
                         onStartAdding = {},
                         onCancelAdding = {},
-                        onDriverSelected = {},
-                        onVehicleSelected = {},
+                        onPickerTabSelected = {},
+                        onFleteroPicked = { _, _ -> },
+                        onCasaPicked = { _, _ -> },
+                        onCasaVehiclePicked = { _, _ -> },
                         onConfirmAdd = {},
                         onDelete = {},
                         onEditEntry = { _, _ -> },
@@ -892,8 +952,10 @@ class LoadingScreenTest {
                     onOpenHistory = {},
                     onStartAdding = {},
                     onCancelAdding = {},
-                    onDriverSelected = {},
-                    onVehicleSelected = {},
+                    onPickerTabSelected = {},
+                    onFleteroPicked = { _, _ -> },
+                    onCasaPicked = { _, _ -> },
+                    onCasaVehiclePicked = { _, _ -> },
                     onConfirmAdd = {},
                     onDelete = {},
                     onEditEntry = { _, _ -> },
@@ -946,8 +1008,10 @@ class LoadingScreenTest {
                     onOpenHistory = {},
                     onStartAdding = {},
                     onCancelAdding = {},
-                    onDriverSelected = {},
-                    onVehicleSelected = {},
+                    onPickerTabSelected = {},
+                    onFleteroPicked = { _, _ -> },
+                    onCasaPicked = { _, _ -> },
+                    onCasaVehiclePicked = { _, _ -> },
                     onConfirmAdd = {},
                     onDelete = {},
                     onEditEntry = { _, _ -> },
@@ -984,8 +1048,10 @@ class LoadingScreenTest {
                     onOpenHistory = {},
                     onStartAdding = {},
                     onCancelAdding = {},
-                    onDriverSelected = {},
-                    onVehicleSelected = {},
+                    onPickerTabSelected = {},
+                    onFleteroPicked = { _, _ -> },
+                    onCasaPicked = { _, _ -> },
+                    onCasaVehiclePicked = { _, _ -> },
                     onConfirmAdd = {},
                     onDelete = {},
                     onEditEntry = { _, _ -> },
@@ -1024,8 +1090,10 @@ class LoadingScreenTest {
                         onOpenHistory = {},
                         onStartAdding = {},
                         onCancelAdding = {},
-                        onDriverSelected = {},
-                        onVehicleSelected = {},
+                        onPickerTabSelected = {},
+                        onFleteroPicked = { _, _ -> },
+                        onCasaPicked = { _, _ -> },
+                        onCasaVehiclePicked = { _, _ -> },
                         onConfirmAdd = {},
                         onDelete = {},
                         onEditEntry = { _, _ -> },
@@ -1054,8 +1122,10 @@ class LoadingScreenTest {
                     onOpenHistory = {},
                     onStartAdding = {},
                     onCancelAdding = {},
-                    onDriverSelected = {},
-                    onVehicleSelected = {},
+                    onPickerTabSelected = {},
+                    onFleteroPicked = { _, _ -> },
+                    onCasaPicked = { _, _ -> },
+                    onCasaVehiclePicked = { _, _ -> },
                     onConfirmAdd = {},
                     onDelete = {},
                     onEditEntry = { _, _ -> },
@@ -1093,8 +1163,10 @@ class LoadingScreenTest {
                         onOpenHistory = {},
                         onStartAdding = {},
                         onCancelAdding = {},
-                        onDriverSelected = {},
-                        onVehicleSelected = {},
+                        onPickerTabSelected = {},
+                        onFleteroPicked = { _, _ -> },
+                        onCasaPicked = { _, _ -> },
+                        onCasaVehiclePicked = { _, _ -> },
                         onConfirmAdd = {},
                         onDelete = {},
                         onEditEntry = { _, _ -> },
@@ -1131,8 +1203,10 @@ class LoadingScreenTest {
                     onOpenHistory = {},
                     onStartAdding = {},
                     onCancelAdding = {},
-                    onDriverSelected = {},
-                    onVehicleSelected = {},
+                    onPickerTabSelected = {},
+                    onFleteroPicked = { _, _ -> },
+                    onCasaPicked = { _, _ -> },
+                    onCasaVehiclePicked = { _, _ -> },
                     onConfirmAdd = {},
                     onDelete = {},
                     onEditEntry = { _, _ -> },
@@ -1142,7 +1216,7 @@ class LoadingScreenTest {
             }
         }
 
-        val openBtn = composeRule.onNodeWithText("Novo fletero").performScrollTo()
+        val openBtn = composeRule.onNodeWithText("+ Novo fletero").performScrollTo()
         openBtn.assertIsDisplayed()
         openBtn.performClick()
 
@@ -1154,33 +1228,23 @@ class LoadingScreenTest {
         assertEquals(Triple("Novo Fletero", "ABC-1234", "+55 (11) 98888-7777"), quickAdded)
     }
 
+    /**
+     * A driver already on the day is not offered again.
+     *
+     * The picker's list is the repository's own answer, so what this leg checks is that the screen draws
+     * that answer: with the only fletero of the fleet already assigned, the fleteros tab says there is
+     * nobody left instead of offering a second row the server would refuse as a duplicate.
+     */
     @Test
-    fun `already assigned driver for the day is excluded from driver selection in add form`() {
-        val assignedDriver = FakeLoadingApi.defaultDrivers().first { it.id == FakeLoadingApi.FLETERO_DRIVER_ID }
-        val stateWithAssigned = addingState().copy(
-            schedules = listOf(FakeLoadingApi.entry(id = 1, slot = "06:00").copy(driverId = assignedDriver.id)),
+    fun `a fletero already on the day is not offered again`() {
+        val assigned = FakeLoadingApi.defaultDrivers().first { it.id == FakeLoadingApi.FLETERO_DRIVER_ID }
+        renderPicker(
+            state = addingState().copy(
+                schedules = listOf(FakeLoadingApi.entry(id = 1, slot = "06:00").copy(driverId = assigned.id)),
+            ),
         )
-        composeRule.setContent {
-            TrindadeTheme {
-                LoadingScreen(
-                    state = stateWithAssigned,
-                    onBack = {},
-                    onOpenHistory = {},
-                    onStartAdding = {},
-                    onCancelAdding = {},
-                    onDriverSelected = {},
-                    onVehicleSelected = {},
-                    onConfirmAdd = {},
-                    onDelete = {},
-                    onEditEntry = { _, _ -> },
-                    onLoadExport = {},
-                )
-            }
-        }
 
-        // The casa driver is not assigned, so it is displayed
-        composeRule.onNodeWithText("Carlos").performScrollTo().assertIsDisplayed()
-        // The fletero driver is assigned to 06:00, so it is excluded from the available drivers list
+        composeRule.onNodeWithText("Nenhum motorista disponível.").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Fletero").assertDoesNotExist()
     }
 

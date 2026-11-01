@@ -186,7 +186,7 @@ class LoadingViewModelTest {
         val api = FakeLoadingApi()
         val model = viewModel(api)
         model.startAdding("04:00")
-        model.onDriverSelected(FakeLoadingApi.FLETERO_DRIVER_ID)
+        model.toggleFletero(FakeLoadingApi.FLETERO_DRIVER_ID, picked = true)
         model.confirmAdd()
 
         // The request cannot contradict the driver it names, because there is no control that could
@@ -198,18 +198,19 @@ class LoadingViewModelTest {
     }
 
     @Test
-    fun `requires a vehicle for a company driver`() {
+    fun `requires a plate for every company driver picked`() {
         val api = FakeLoadingApi()
         val model = viewModel(api)
         model.startAdding("04:00")
-        model.onDriverSelected(FakeLoadingApi.CASA_DRIVER_ID)
+        model.toggleCasa(FakeLoadingApi.CASA_DRIVER_ID, picked = true)
 
-        // The server rejects a casa assignment without one, so the form follows the same rule instead
-        // of letting the operator discover it as a 400.
-        assertTrue(model.state.value.needsVehicle)
+        // The server rejects a casa assignment without one, so the picker follows the same rule instead of
+        // letting the operator discover it as a 400 -- and it names the driver whose plate is missing,
+        // because a count leaves them hunting the list for the row that needs it.
+        assertEquals(listOf(FakeLoadingApi.CASA_DRIVER_ID), model.state.value.pickedCasaWithoutVehicle.map { it.id })
         assertFalse(model.state.value.canConfirm)
 
-        model.onVehicleSelected(FakeLoadingApi.VEHICLE_ID)
+        model.pickCasaVehicle(FakeLoadingApi.CASA_DRIVER_ID, FakeLoadingApi.VEHICLE_ID)
         assertTrue(model.state.value.canConfirm)
         model.confirmAdd()
 
@@ -222,23 +223,67 @@ class LoadingViewModelTest {
         val api = FakeLoadingApi()
         val model = viewModel(api)
         model.startAdding("04:00")
-        model.onDriverSelected(FakeLoadingApi.CASA_DRIVER_ID)
-        model.onVehicleSelected(FakeLoadingApi.VEHICLE_ID)
-
-        // Switching to an external driver has to drop the vehicle, or the request would carry a
-        // pairing the operator stopped meaning and the server would take it seriously.
-        model.onDriverSelected(FakeLoadingApi.FLETERO_DRIVER_ID)
-        assertFalse(model.state.value.needsVehicle)
+        model.toggleFletero(FakeLoadingApi.FLETERO_DRIVER_ID, picked = true)
         model.confirmAdd()
 
+        // An external driver brings their own vehicle, so the request must not fabricate a pairing: there is
+        // no plate field on the fleteros tab for one to come from.
         assertEquals(null, api.createdBody!!.vehicleId)
+    }
+
+    /**
+     * The reason the picker is a list: a slot carries as many drivers as the day needs.
+     *
+     * Two external drivers and one company driver, each with what its own tab asks for, must reach the
+     * server as three rows of the same slot -- and each row's type and plate must be the one that driver
+     * was given, not the first row's repeated.
+     */
+    @Test
+    fun `sends one row per picked driver, each with its own type and plate`() {
+        val api = FakeLoadingApi(
+            driversToReturn = FakeLoadingApi.defaultDrivers() + DriversResponseDriversInner(
+                id = 12,
+                name = "Outro fletero",
+                licensePlate = "DEF5678",
+                phone = null,
+                driverType = DriversResponseDriversInner.DriverType.fletero,
+            ),
+        )
+        val model = viewModel(api)
+        model.startAdding("04:00")
+        model.toggleFletero(FakeLoadingApi.FLETERO_DRIVER_ID, picked = true)
+        model.toggleFletero(12, picked = true)
+        model.toggleCasa(FakeLoadingApi.CASA_DRIVER_ID, picked = true)
+        model.pickCasaVehicle(FakeLoadingApi.CASA_DRIVER_ID, FakeLoadingApi.VEHICLE_ID)
+        model.confirmAdd()
+
+        assertEquals(3, api.createdBodies.size)
+        assertEquals(
+            setOf(11, 12),
+            api.createdBodies.filter { it.driverType.value == "fletero" }.map { it.driverId }.toSet(),
+        )
+        assertEquals(listOf(null, null), api.createdBodies.filter { it.driverType.value == "fletero" }.map { it.vehicleId })
+        assertEquals(10, api.createdBodies.single { it.driverType.value == "casa" }.driverId)
+        assertEquals(FakeLoadingApi.VEHICLE_ID, api.createdBodies.single { it.driverType.value == "casa" }.vehicleId)
+        assertTrue(api.createdBodies.all { it.timeSlot == "04:00" })
+    }
+
+    /** A plate belongs to a driver the operator actually picked. */
+    @Test
+    fun `a plate cannot be given to a company driver nobody picked`() {
+        val model = viewModel(FakeLoadingApi())
+
+        model.startAdding("04:00")
+        model.pickCasaVehicle(FakeLoadingApi.CASA_DRIVER_ID, FakeLoadingApi.VEHICLE_ID)
+
+        assertEquals(emptyMap<Int, Int?>(), model.state.value.pickedCasa)
     }
 
     @Test
     fun `closes the form and reloads after a successful add`() {
         val model = viewModel(FakeLoadingApi())
         model.startAdding("04:00")
-        model.onDriverSelected(FakeLoadingApi.FLETERO_DRIVER_ID)
+        model.toggleFletero(FakeLoadingApi.FLETERO_DRIVER_ID, picked = true)
         model.confirmAdd()
 
         assertEquals(null, model.state.value.addingToSlot)
@@ -250,12 +295,13 @@ class LoadingViewModelTest {
         val api = FakeLoadingApi(createResponse = Response.error(409, FakeLoadingApi.EMPTY_BODY))
         val model = viewModel(api)
         model.startAdding("04:00")
-        model.onDriverSelected(FakeLoadingApi.FLETERO_DRIVER_ID)
+        model.toggleFletero(FakeLoadingApi.FLETERO_DRIVER_ID, picked = true)
         model.confirmAdd()
 
-        // A duplicate is the operator's to resolve, so the form stays open with what they chose still
-        // in it rather than discarding their work.
+        // A duplicate is the operator's to resolve, so the picker stays open with what failed still in it
+        // rather than discarding their work.
         assertEquals("04:00", model.state.value.addingToSlot)
+        assertEquals(setOf(FakeLoadingApi.FLETERO_DRIVER_ID), model.state.value.pickedFleteros)
         assertNotNull(model.state.value.message)
         assertFalse(model.state.value.busy)
     }
@@ -288,7 +334,7 @@ class LoadingViewModelTest {
 
         // Selected, because the operator added it in order to use it; leaving them to find it in the
         // list again would be the kind of small friction that makes a form feel broken.
-        assertEquals("Novo", model.state.value.selectedDriver?.name)
+        assertEquals(listOf("Novo"), model.state.value.pickedFleteros.map { id -> model.state.value.drivers.single { it.id == id }.name })
         assertEquals(3, model.state.value.drivers.size)
     }
 
@@ -312,7 +358,7 @@ class LoadingViewModelTest {
         model.quickAddDriver("Novo Fletero", "ABC-1234", "+55 (11) 98888-7777")
 
         assertNull(model.state.value.addingToSlot)
-        assertNull(model.state.value.selectedDriverId)
+        assertEquals(emptySet<Int>(), model.state.value.pickedFleteros)
     }
 
     @Test
@@ -321,9 +367,10 @@ class LoadingViewModelTest {
         model.startAdding("04:00")
         model.quickAddDriver("Novo", "ABC1234", "+55 (11) 98888-7777", assignToSlot = false)
 
-        assertEquals("Novo", model.state.value.selectedDriver?.name)
-        assertEquals("ABC1234", model.state.value.selectedDriver?.licensePlate)
-        assertEquals("+55 (11) 98888-7777", model.state.value.selectedDriver?.phone)
+        val added = model.state.value.drivers.single { it.id in model.state.value.pickedFleteros }
+        assertEquals("Novo", added.name)
+        assertEquals("ABC1234", added.licensePlate)
+        assertEquals("+55 (11) 98888-7777", added.phone)
         assertEquals(3, model.state.value.drivers.size)
     }
 

@@ -265,6 +265,20 @@
     <string name="loading_pick_vehicle">Vehículo</string>
     <string name="loading_confirm">Confirmar</string>
     <string name="loading_cancel">Cancelar</string>
+    <!-- El selector de choferes: un diálogo por horario, con la división propia de la flota en dos
+         pestañas. Un horario puede llevar uno, dos o varios choferes, así que las pestañas son listas con
+         casillas en lugar de una elección única, y la fila de un chofer de la casa lleva la chapa que hay
+         que darle. -->
+    <string name="loading_picker_title">Choferes del horario %1$s</string>
+    <string name="loading_picker_hint">Seleccione uno o más choferes para este horario.</string>
+    <string name="loading_picker_tab_fleteros">Fleteros</string>
+    <string name="loading_picker_tab_casa">Choferes de la casa</string>
+    <string name="loading_picker_plate">Chapa</string>
+    <string name="loading_picker_selected">%1$d seleccionados</string>
+    <string name="loading_picker_plate_missing">Elija la chapa de %1$s para continuar.</string>
+    <string name="loading_picker_accept">Aceptar</string>
+    <string name="loading_picker_empty">Ningún chofer disponible.</string>
+    <string name="loading_picker_save_fletero">Guardar fletero</string>
     <!-- The loading edit surface, the web's own `LoadingEditPage`, which is a screen of its own rather
          than a mode inside the grid: it carries its own heading and names its own save. Both are the
          page's own `pt-BR` text out of the locale's `loading` block, as the strings above are:

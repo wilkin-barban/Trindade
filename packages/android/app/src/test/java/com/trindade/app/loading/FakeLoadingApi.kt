@@ -178,6 +178,15 @@ class FakeLoadingApi(
         private set
 
     /**
+     * Every body the screen sent, in the order it sent them.
+     *
+     * One slot may carry several drivers, so "what the picker sent" is a list rather than the last request:
+     * asserting on [createdBody] alone would let a picker that silently dropped the first of two drivers
+     * pass.
+     */
+    val createdBodies = mutableListOf<CreateScheduleRequest>()
+
+    /**
      * The last update's target and body, which is what the partial-update rule is asserted on.
      *
      * The body is kept as it arrived rather than summarized, because the claim is about the request the
@@ -311,6 +320,7 @@ class FakeLoadingApi(
 
     override suspend fun createSchedule(body: CreateScheduleRequest): Response<ScheduleResponse> {
         createdBody = body
+        createdBodies += body
         createResponse?.let { return it }
         return Response.success(ScheduleResponse(schedule = entry(id = 500, slot = body.timeSlot, type = SchedulesResponseSchedulesInner.DriverType.fletero)))
     }

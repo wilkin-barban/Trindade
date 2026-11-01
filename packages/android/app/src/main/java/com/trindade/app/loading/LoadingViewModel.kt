@@ -42,10 +42,20 @@ class LoadingViewModel @Inject constructor(
         val timeSlots: List<String> = emptyList(),
         val drivers: List<DriversResponseDriversInner> = emptyList(),
         val vehicles: List<VehiclesResponseVehiclesInner> = emptyList(),
-        /** The slot whose add form is open, or null when none is. */
+        /** The slot whose driver picker is open, or null when none is. */
         val addingToSlot: String? = null,
-        val selectedDriverId: Int? = null,
-        val selectedVehicleId: Int? = null,
+        /** Which of the picker's two lists is on screen. Switching tabs keeps what the other one picked. */
+        val pickerTab: LoadingPickerTab = LoadingPickerTab.FLETEROS,
+        /** The external drivers picked for [addingToSlot], by id. */
+        val pickedFleteros: Set<Int> = emptySet(),
+        /**
+         * The company drivers picked for [addingToSlot], each with the vehicle it drives.
+         *
+         * A null value is a driver the operator picked and has not given a plate to yet, which is why the
+         * values are nullable instead of the map holding only complete picks: the missing plate is drawn on
+         * that driver's own row, and dropping the pick would take the row -- and the correction -- away.
+         */
+        val pickedCasa: Map<Int, Int?> = emptyMap(),
         val busy: Boolean = false,
         val message: String? = null,
         /**
@@ -105,19 +115,31 @@ class LoadingViewModel @Inject constructor(
                 .filter { waMeNumber(it.phone.orEmpty()).isNotEmpty() }
         }
 
-        val selectedDriver: DriversResponseDriversInner?
-            get() = drivers.firstOrNull { it.id == selectedDriverId }
+        /** The drivers of the day the picker may still offer, split the way its two tabs are. */
+        val fleteroCandidates: List<DriversResponseDriversInner>
+            get() = availableDrivers.filter { it.driverType == DriversResponseDriversInner.DriverType.fletero }
+
+        val casaCandidates: List<DriversResponseDriversInner>
+            get() = availableDrivers.filter { it.driverType == DriversResponseDriversInner.DriverType.casa }
+
+        val pickedCount: Int
+            get() = pickedFleteros.size + pickedCasa.size
 
         /**
-         * A company driver must be paired with a vehicle; an external one brings their own, and the
-         * server rejects a `casa` assignment without one. The form follows the same rule rather than
-         * letting the operator discover it as a 400.
+         * The company drivers picked without a plate, named so the picker can say which one is missing.
+         *
+         * A company driver must be paired with a vehicle -- an external one brings their own, and the
+         * server rejects a `casa` assignment without one -- so the picker follows the same rule rather than
+         * letting the operator discover it as a 400. It names the drivers instead of only counting them
+         * because a list of five with one plate missing leaves the operator hunting for the row.
          */
-        val needsVehicle: Boolean
-            get() = selectedDriver?.driverType == DriversResponseDriversInner.DriverType.casa
+        val pickedCasaWithoutVehicle: List<DriversResponseDriversInner>
+            get() = pickedCasa.entries
+                .filter { it.value == null }
+                .mapNotNull { entry -> drivers.firstOrNull { it.id == entry.key } }
 
         val canConfirm: Boolean
-            get() = !busy && selectedDriverId != null && (!needsVehicle || selectedVehicleId != null)
+            get() = !busy && pickedCount > 0 && pickedCasa.values.none { it == null }
     }
 
     private val _state = MutableStateFlow(UiState())
@@ -184,8 +206,8 @@ class LoadingViewModel @Inject constructor(
                     drivers = emptyList(),
                     vehicles = emptyList(),
                     addingToSlot = null,
-                    selectedDriverId = null,
-                    selectedVehicleId = null,
+                    pickedFleteros = emptySet(),
+                    pickedCasa = emptyMap(),
                 )
             }
         }
@@ -238,58 +260,138 @@ class LoadingViewModel @Inject constructor(
     }
 
     fun startAdding(slot: String) = _state.update {
-        it.copy(addingToSlot = slot, selectedDriverId = null, selectedVehicleId = null, message = null)
+        it.copy(addingToSlot = slot, pickerTab = LoadingPickerTab.FLETEROS, message = null)
     }
 
     fun cancelAdding() = _state.update {
-        it.copy(addingToSlot = null, selectedDriverId = null, selectedVehicleId = null)
+        it.copy(
+            addingToSlot = null,
+            pickerTab = LoadingPickerTab.FLETEROS,
+            pickedFleteros = emptySet(),
+            pickedCasa = emptyMap(),
+        )
     }
 
-    fun onDriverSelected(driverId: Int) = _state.update { current ->
-        val driver = current.drivers.firstOrNull { it.id == driverId }
-        // Choosing an external driver clears the vehicle, because theirs is their own and the server
-        // takes no vehicle for it; leaving a stale one would send a pairing the operator did not mean.
-        val keepsVehicle = driver?.driverType == DriversResponseDriversInner.DriverType.casa
-        current.copy(selectedDriverId = driverId, selectedVehicleId = if (keepsVehicle) current.selectedVehicleId else null)
-    }
-
-    fun onVehicleSelected(vehicleId: Int) = _state.update { it.copy(selectedVehicleId = vehicleId) }
+    fun selectPickerTab(tab: LoadingPickerTab) = _state.update { it.copy(pickerTab = tab) }
 
     /**
-     * Adds the entry the form describes.
+     * Picks or drops one external driver.
      *
-     * The driver type comes from the chosen driver rather than from a control, so the request cannot
-     * contradict the driver it names. The date comes from the grid's own date, not from the form.
+     * There is no single selected driver any more: a slot carries one, two or several drivers, so the
+     * picker keeps a set and the answer to a tap is that set with this driver in it or out of it.
+     */
+    fun toggleFletero(driverId: Int, picked: Boolean) = _state.update { current ->
+        current.copy(
+            pickedFleteros = if (picked) current.pickedFleteros + driverId else current.pickedFleteros - driverId,
+        )
+    }
+
+    /** Picks or drops one company driver; dropping takes the plate that was given to it. */
+    fun toggleCasa(driverId: Int, picked: Boolean) = _state.update { current ->
+        current.copy(
+            pickedCasa = if (picked) {
+                // Re-selecting keeps the plate already chosen: the operator correcting a list must not lose
+                // the work of a row they did not touch.
+                current.pickedCasa + (driverId to current.pickedCasa[driverId])
+            } else {
+                current.pickedCasa - driverId
+            },
+        )
+    }
+
+    /** Gives one picked company driver its plate. A driver nobody picked cannot be given one. */
+    fun pickCasaVehicle(driverId: Int, vehicleId: Int) = _state.update { current ->
+        if (driverId !in current.pickedCasa) {
+            current
+        } else {
+            current.copy(pickedCasa = current.pickedCasa + (driverId to vehicleId))
+        }
+    }
+
+    /**
+     * Adds one entry per picked driver to the slot the picker was opened for.
+     *
+     * The driver type comes from each driver rather than from a control, so a request cannot contradict the
+     * driver it names. The date comes from the grid's own date, not from the picker.
+     *
+     * The rows are sent one at a time rather than in parallel: the server refuses a driver already on that
+     * date, so two sends racing on the same driver would turn a duplicate the operator can see into a
+     * conflict they cannot. A send that fails does not stop the rest -- the operator picked a list, and half
+     * a list silently dropped is worse than a message naming what failed. What saved leaves the picker and
+     * what failed stays in it, because offering a saved driver again is offering a conflict.
      */
     fun confirmAdd() {
         val current = state.value
         val slot = current.addingToSlot ?: return
-        val driver = current.selectedDriver ?: return
         if (!current.canConfirm) return
+
+        val requests = current.pickedFleteros.mapNotNull { id -> current.drivers.firstOrNull { it.id == id } }
+            .map { driver -> scheduleRequest(current.date, slot, driver, vehicleId = null) } +
+            current.pickedCasa.entries.mapNotNull { (driverId, vehicleId) ->
+                val driver = current.drivers.firstOrNull { it.id == driverId }
+                if (driver == null || vehicleId == null) {
+                    null
+                } else {
+                    scheduleRequest(current.date, slot, driver, vehicleId = vehicleId)
+                }
+            }
+        if (requests.isEmpty()) return
 
         _state.update { it.copy(busy = true, message = null) }
 
         viewModelScope.launch {
-            val request = CreateScheduleRequest(
-                scheduleDate = current.date,
-                timeSlot = slot,
-                driverType = requestDriverType(driver),
-                driverId = driver.id,
-                vehicleId = if (current.needsVehicle) current.selectedVehicleId else null,
-            )
+            val failed = mutableListOf<CreateScheduleRequest>()
+            var refusedStatus: Int? = null
+            var unreachable = false
 
-            when (val result = repository.createSchedule(request)) {
-                is ScheduleWriteResult.Saved -> {
-                    _state.update { it.copy(busy = false, addingToSlot = null, selectedDriverId = null, selectedVehicleId = null) }
-                    load()
+            for (request in requests) {
+                when (val result = repository.createSchedule(request)) {
+                    is ScheduleWriteResult.Saved -> Unit
+                    is ScheduleWriteResult.Refused -> {
+                        failed += request
+                        if (refusedStatus == null) refusedStatus = result.statusCode
+                    }
+                    ScheduleWriteResult.Unreachable -> {
+                        failed += request
+                        unreachable = true
+                    }
                 }
-                is ScheduleWriteResult.Refused ->
-                    _state.update { it.copy(busy = false, message = refusalMessage(result.statusCode)) }
-                ScheduleWriteResult.Unreachable ->
-                    _state.update { it.copy(busy = false, message = UNREACHABLE) }
             }
+
+            _state.update {
+                it.copy(
+                    busy = false,
+                    addingToSlot = if (failed.isEmpty()) null else it.addingToSlot,
+                    pickedFleteros = failed
+                        .filter { request -> request.driverType == CreateScheduleRequest.DriverType.fletero }
+                        .map { request -> request.driverId }
+                        .toSet(),
+                    pickedCasa = failed
+                        .filter { request -> request.driverType == CreateScheduleRequest.DriverType.casa }
+                        .associate { request -> request.driverId to request.vehicleId },
+                    message = when {
+                        unreachable -> UNREACHABLE
+                        refusedStatus != null -> refusalMessage(refusedStatus!!)
+                        else -> null
+                    },
+                )
+            }
+            if (failed.size != requests.size) load()
         }
     }
+
+    private fun scheduleRequest(
+        date: String,
+        slot: String,
+        driver: DriversResponseDriversInner,
+        vehicleId: Int?,
+    ) = CreateScheduleRequest(
+        scheduleDate = date,
+        timeSlot = slot,
+        driverType = requestDriverType(driver),
+        driverId = driver.id,
+        vehicleId = vehicleId,
+    )
 
     fun deleteEntry(id: Int) {
         _state.update { it.copy(busy = true, message = null) }
@@ -409,8 +511,8 @@ class LoadingViewModel @Inject constructor(
                             it.copy(
                                 busy = false,
                                 addingToSlot = null,
-                                selectedDriverId = null,
-                                selectedVehicleId = null,
+                                pickedFleteros = emptySet(),
+                                pickedCasa = emptyMap(),
                                 drivers = it.drivers + driver,
                             )
                         }
@@ -440,7 +542,7 @@ class LoadingViewModel @Inject constructor(
                     it.copy(
                         busy = false,
                         drivers = it.drivers + driver,
-                        selectedDriverId = driver.id,
+                        pickedFleteros = it.pickedFleteros + driver.id,
                     )
                 }
             }
@@ -481,3 +583,11 @@ class LoadingViewModel @Inject constructor(
         const val PDF_FAILED = "Não foi possível gerar o PDF. Tente de novo."
     }
 }
+
+/**
+ * The two lists the driver picker offers.
+ *
+ * The split is the fleet's own, not a preference: a `fletero` brings their own vehicle and a company driver
+ * has to be given one, so the plate belongs on one tab and has no meaning on the other.
+ */
+enum class LoadingPickerTab { FLETEROS, CASA }

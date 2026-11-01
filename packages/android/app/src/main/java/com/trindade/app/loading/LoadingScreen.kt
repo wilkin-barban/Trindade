@@ -5,24 +5,35 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -39,10 +50,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trindade.app.R
 import com.trindade.app.contract.models.DriversResponseDriversInner
 import com.trindade.app.contract.models.SchedulesResponseSchedulesInner
+import com.trindade.app.contract.models.VehiclesResponseVehiclesInner
 import com.trindade.app.ui.cleanPhone
 import com.trindade.app.ui.filterPhoneInput
 import com.trindade.app.ui.components.AdminDestructiveButton
@@ -79,8 +92,10 @@ fun LoadingScreen(
     onOpenHistory: () -> Unit,
     onStartAdding: (String) -> Unit,
     onCancelAdding: () -> Unit,
-    onDriverSelected: (Int) -> Unit,
-    onVehicleSelected: (Int) -> Unit,
+    onPickerTabSelected: (LoadingPickerTab) -> Unit,
+    onFleteroPicked: (Int, Boolean) -> Unit,
+    onCasaPicked: (Int, Boolean) -> Unit,
+    onCasaVehiclePicked: (Int, Int) -> Unit,
     onConfirmAdd: () -> Unit,
     onDelete: (Int) -> Unit,
     onEditEntry: (Int, String) -> Unit,
@@ -254,15 +269,27 @@ fun LoadingScreen(
                 exceeded = state.isExceeded(slot),
                 state = state,
                 onStartAdding = onStartAdding,
-                onCancelAdding = onCancelAdding,
-                onDriverSelected = onDriverSelected,
-                onVehicleSelected = onVehicleSelected,
-                onConfirmAdd = onConfirmAdd,
                 onDelete = onDelete,
                 onEditEntry = onEditEntry,
-                onQuickAdd = onQuickAdd,
             )
         }
+    }
+
+    // The picker is one dialog for the whole screen rather than one per slot: it is opened from a slot,
+    // but it is drawn above the grid like every other dialog here, so it does not scroll away with the
+    // row it was opened from.
+    state.addingToSlot?.let { slot ->
+        DriverPickerDialog(
+            slot = slot,
+            state = state,
+            onTabSelected = onPickerTabSelected,
+            onFleteroPicked = onFleteroPicked,
+            onCasaPicked = onCasaPicked,
+            onCasaVehiclePicked = onCasaVehiclePicked,
+            onConfirm = onConfirmAdd,
+            onCancel = onCancelAdding,
+            onQuickAdd = onQuickAdd,
+        )
     }
 
     if (showHelpDialog) {
@@ -292,13 +319,8 @@ private fun SlotBlock(
     exceeded: Boolean,
     state: LoadingViewModel.UiState,
     onStartAdding: (String) -> Unit,
-    onCancelAdding: () -> Unit,
-    onDriverSelected: (Int) -> Unit,
-    onVehicleSelected: (Int) -> Unit,
-    onConfirmAdd: () -> Unit,
     onDelete: (Int) -> Unit,
     onEditEntry: (Int, String) -> Unit,
-    onQuickAdd: (String, String?, String?) -> Unit = { _, _, _ -> },
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         FlowRow(
@@ -357,199 +379,334 @@ private fun SlotBlock(
             }
         }
 
-        if (state.addingToSlot == slot) {
-            AddEntryForm(
-                state = state,
-                onDriverSelected = onDriverSelected,
-                onVehicleSelected = onVehicleSelected,
-                onConfirm = onConfirmAdd,
-                onCancel = onCancelAdding,
-                onQuickAdd = onQuickAdd,
-            )
-        } else {
-            // Offered even when the window is exceeded. The limit is a display, and withholding this
-            // would turn it into a rule the server does not enforce.
-            AdminSecondaryButton(
-                onClick = { onStartAdding(slot) },
-                text = stringResource(R.string.loading_add_entry),
-                // Withheld while the day is in the air: the slot belongs to the grid that is being replaced,
-                // and the form it opens would be filled against a day nobody has read yet.
-                enabled = !state.busy && !state.loading,
-                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-            )
-        }
+        // Offered even when the window is exceeded. The limit is a display, and withholding this
+        // would turn it into a rule the server does not enforce. It is withheld while the day is in the
+        // air, because the slot belongs to the grid that is being replaced and the dialog it opens would
+        // be filled against a day nobody has read yet.
+        AdminSecondaryButton(
+            onClick = { onStartAdding(slot) },
+            text = stringResource(R.string.loading_add_entry),
+            enabled = !state.busy && !state.loading,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        )
         HorizontalDivider()
     }
 }
 
+/**
+ * The driver picker for one slot.
+ *
+ * The form used to sit inside the slot and add one driver at a time: a slot that carries two fleteros took
+ * two trips through it, and the plate a company driver needs had to be chosen from a list that only existed
+ * while the form was open. The picker is a dialog because choosing who loads a slot is a decision about one
+ * slot -- it belongs above the grid, not inside a row that scrolls away from it.
+ *
+ * The tabs are the fleet's own split, not a preference: a fletero brings their own vehicle, so the plate
+ * has no meaning on that tab, and a company driver cannot be assigned without one, so it is asked for on the
+ * row that needs it. Selections survive switching tabs, because the operator composing a slot with one of
+ * each would otherwise lose the first half of the answer.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AddEntryForm(
+private fun DriverPickerDialog(
+    slot: String,
     state: LoadingViewModel.UiState,
-    onDriverSelected: (Int) -> Unit,
-    onVehicleSelected: (Int) -> Unit,
+    onTabSelected: (LoadingPickerTab) -> Unit,
+    onFleteroPicked: (Int, Boolean) -> Unit,
+    onCasaPicked: (Int, Boolean) -> Unit,
+    onCasaVehiclePicked: (Int, Int) -> Unit,
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
-    onQuickAdd: (String, String?, String?) -> Unit = { _, _, _ -> },
+    onQuickAdd: (String, String?, String?) -> Unit,
 ) {
-    var showQuickAdd by remember { mutableStateOf(false) }
-    var quickName by remember { mutableStateOf("") }
-    var quickPlate by remember { mutableStateOf("") }
-    var quickPhone by remember { mutableStateOf("") }
-
-    Column(modifier = Modifier.fillMaxWidth().padding(start = 8.dp)) {
-        Text(text = stringResource(R.string.loading_pick_driver), style = MaterialTheme.typography.labelLarge)
-
-        if (state.availableDrivers.isEmpty()) {
-            Text(
-                text = "Nenhum motorista disponível.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(vertical = 4.dp),
-            )
-        }
-
-        state.availableDrivers.forEach { driver ->
-            // The whole row is the control and the radio beside the name is the picture of the choice,
-            // which is the shape the edit surface gives its slots and for the same reason: the name is what
-            // the operator aims at, and a circle handed its own click is a second, smaller target for one
-            // decision. The button is therefore given no click of its own.
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .defaultMinSize(minHeight = 48.dp)
-                    .selectable(
-                        selected = state.selectedDriverId == driver.id,
-                        role = Role.RadioButton,
-                        onClick = { onDriverSelected(driver.id) },
-                    ),
-                verticalAlignment = Alignment.CenterVertically,
+    BasicAlertDialog(
+        onDismissRequest = onCancel,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            shape = MaterialTheme.shapes.large,
+            // The same height every other dialog in the app is drawn at: a tonal surface plus elevation
+            // level 3 rather than plain white on a warm background, which reads as a hole in the screen.
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 6.dp,
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                RadioButton(
-                    selected = state.selectedDriverId == driver.id,
-                    onClick = null,
+                Text(
+                    text = stringResource(R.string.loading_picker_title, slot),
+                    style = MaterialTheme.typography.titleLarge,
                 )
-                Text(text = driver.name, style = MaterialTheme.typography.bodyMedium)
-            }
-        }
+                Text(
+                    text = stringResource(R.string.loading_picker_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
 
-        if (!showQuickAdd) {
-            Button(
-                onClick = { showQuickAdd = true },
-                modifier = Modifier
-                    .padding(vertical = 4.dp)
-                    .defaultMinSize(minHeight = 48.dp),
-            ) {
-                Text(stringResource(R.string.loading_new_fletero), style = MaterialTheme.typography.labelLarge)
-            }
-        } else {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 6.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-            ) {
-                Column(
-                    modifier = Modifier.padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Text(stringResource(R.string.loading_new_fletero), style = MaterialTheme.typography.titleSmall)
-                    OutlinedTextField(
-                        value = quickName,
-                        onValueChange = { quickName = it },
-                        label = { Text(stringResource(R.string.loading_fletero_name)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
+                val fleteros = state.pickerTab == LoadingPickerTab.FLETEROS
+                TabRow(selectedTabIndex = if (fleteros) 0 else 1) {
+                    Tab(
+                        selected = fleteros,
+                        onClick = { onTabSelected(LoadingPickerTab.FLETEROS) },
+                        text = { Text(stringResource(R.string.loading_picker_tab_fleteros)) },
                     )
-                    OutlinedTextField(
-                        value = quickPlate,
-                        onValueChange = { quickPlate = it },
-                        label = { Text(stringResource(R.string.loading_fletero_plate)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
+                    Tab(
+                        selected = !fleteros,
+                        onClick = { onTabSelected(LoadingPickerTab.CASA) },
+                        text = { Text(stringResource(R.string.loading_picker_tab_casa)) },
                     )
-                    OutlinedTextField(
-                        value = quickPhone,
-                        onValueChange = { quickPhone = filterPhoneInput(it) },
-                        label = { Text(stringResource(R.string.drivers_phone)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        AdminPrimaryButton(
-                            onClick = {
-                                if (quickName.isNotBlank()) {
-                                    onQuickAdd(
-                                        quickName.trim(),
-                                        quickPlate.trim().ifBlank { null },
-                                        cleanPhone(quickPhone).ifBlank { null },
-                                    )
-                                    showQuickAdd = false
-                                    quickName = ""
-                                    quickPlate = ""
-                                    quickPhone = ""
-                                }
-                            },
-                            text = "Salvar fletero",
-                            enabled = quickName.isNotBlank() && !state.busy,
-                        )
-                        AdminSecondaryButton(
-                            onClick = {
-                                showQuickAdd = false
-                                quickName = ""
-                                quickPlate = ""
-                                quickPhone = ""
-                            },
-                            text = stringResource(R.string.loading_cancel),
-                        )
-                    }
                 }
-            }
-        }
 
-        // Only for a company driver: an external one brings their own vehicle, and the server rejects
-        // a casa assignment without one.
-        if (state.needsVehicle) {
-            Text(text = stringResource(R.string.loading_pick_vehicle), style = MaterialTheme.typography.labelLarge)
-            state.vehicles.forEach { vehicle ->
-                // Same row as the drivers', with the description and plate as its own text.
-                Row(
+                // The list scrolls inside the dialog so the actions stay reachable: a day with twenty
+                // available fleteros is a real day, and a dialog that grew past the screen would put
+                // "Aceitar" where the operator cannot press it.
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .defaultMinSize(minHeight = 48.dp)
-                        .selectable(
-                            selected = state.selectedVehicleId == vehicle.id,
-                            role = Role.RadioButton,
-                            onClick = { onVehicleSelected(vehicle.id) },
-                        ),
-                    verticalAlignment = Alignment.CenterVertically,
+                        .heightIn(max = 300.dp)
+                        .verticalScroll(rememberScrollState()),
                 ) {
-                    RadioButton(
-                        selected = state.selectedVehicleId == vehicle.id,
-                        onClick = null,
-                    )
+                    if (fleteros) {
+                        if (state.fleteroCandidates.isEmpty()) {
+                            PickerEmptyLine()
+                        }
+                        state.fleteroCandidates.forEach { driver ->
+                            CandidateRow(
+                                name = driver.name,
+                                picked = driver.id in state.pickedFleteros,
+                                onPickedChange = { picked -> onFleteroPicked(driver.id, picked) },
+                            )
+                        }
+                        QuickAddFletero(state = state, onQuickAdd = onQuickAdd)
+                    } else {
+                        if (state.casaCandidates.isEmpty()) {
+                            PickerEmptyLine()
+                        }
+                        state.casaCandidates.forEach { driver ->
+                            val picked = driver.id in state.pickedCasa
+                            CandidateRow(
+                                name = driver.name,
+                                picked = picked,
+                                onPickedChange = { value -> onCasaPicked(driver.id, value) },
+                            ) {
+                                PlatePicker(
+                                    vehicles = state.vehicles,
+                                    chosenVehicleId = state.pickedCasa[driver.id],
+                                    // A plate belongs to a driver the operator picked: offering it on a row
+                                    // nobody selected would set one the request would then ignore.
+                                    enabled = picked,
+                                    onPick = { vehicleId -> onCasaVehiclePicked(driver.id, vehicleId) },
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Named rather than counted: with several company drivers picked, "falta uma chapa" leaves
+                // the operator hunting the list for the row that needs it.
+                state.pickedCasaWithoutVehicle.takeIf { it.isNotEmpty() }?.let { missing ->
                     Text(
-                        text = "${vehicle.description} · ${vehicle.licensePlate}",
-                        style = MaterialTheme.typography.bodyMedium,
+                        text = stringResource(
+                            R.string.loading_picker_plate_missing,
+                            missing.joinToString(", ") { it.name },
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.loading_picker_selected, state.pickedCount),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                    )
+                    AdminSecondaryButton(onClick = onCancel, text = stringResource(R.string.loading_cancel))
+                    AdminPrimaryButton(
+                        onClick = onConfirm,
+                        text = stringResource(R.string.loading_picker_accept),
+                        // Withheld while the day is being read for the same reason the slot's own button is:
+                        // the request would name a slot of a grid that is being replaced.
+                        enabled = state.canConfirm && !state.loading,
                     )
                 }
             }
         }
+    }
+}
 
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(top = 8.dp),
+@Composable
+private fun PickerEmptyLine() {
+    Text(
+        text = stringResource(R.string.loading_picker_empty),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(vertical = 8.dp),
+    )
+}
+
+/**
+ * One driver of the picker: a check box, the name, and whatever the row needs beside it.
+ *
+ * The whole row is the control, as in the report form's own checks: it is a 48 dp target tapped with
+ * gloves on, the name toggles it too, and a row that carries its own name is the one shape a screen reader
+ * can announce as a single named control. The check box is therefore drawn without a handler.
+ */
+@Composable
+private fun CandidateRow(
+    name: String,
+    picked: Boolean,
+    onPickedChange: (Boolean) -> Unit,
+    trailing: @Composable (() -> Unit)? = null,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = 48.dp)
+            .toggleable(value = picked, role = Role.Checkbox, onValueChange = onPickedChange),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Checkbox(checked = picked, onCheckedChange = null)
+        Text(text = name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        trailing?.invoke()
+    }
+}
+
+/**
+ * The plate a company driver will drive, chosen from the day's own vehicles.
+ *
+ * A menu rather than a list of radio rows: the vehicles belong to the fleet and the same plate may be given
+ * to several drivers of the slot, so the choice is a value on this driver's row and not a slot-wide
+ * selection. The button says "Chapa" until something is chosen, because an empty value has to be visible as
+ * missing rather than as a blank.
+ */
+@Composable
+private fun PlatePicker(
+    vehicles: List<VehiclesResponseVehiclesInner>,
+    chosenVehicleId: Int?,
+    enabled: Boolean,
+    onPick: (Int) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val chosen = vehicles.firstOrNull { it.id == chosenVehicleId }
+
+    Box {
+        OutlinedButton(onClick = { expanded = true }, enabled = enabled) {
+            Text(
+                text = chosen?.licensePlate ?: stringResource(R.string.loading_picker_plate),
+                style = MaterialTheme.typography.labelLarge,
+            )
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            vehicles.forEach { vehicle ->
+                DropdownMenuItem(
+                    text = { Text(vehicleChoiceLabel(vehicle)) },
+                    onClick = {
+                        onPick(vehicle.id)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
+}
+
+/** What a vehicle reads as in the plate menu: its plate first, since the plate is what was asked for. */
+internal fun vehicleChoiceLabel(vehicle: VehiclesResponseVehiclesInner): String {
+    val description = vehicle.description.trim()
+    return if (description.isEmpty()) vehicle.licensePlate else "${vehicle.licensePlate} · $description"
+}
+
+/**
+ * The quick add for a fletero nobody has registered yet.
+ *
+ * It stays inside the picker because that is where the operator discovers the name is missing, and the
+ * driver it creates is assigned to the open slot on the spot -- being sent back to the grid to pick them
+ * again would be the same trip the picker exists to remove.
+ */
+@Composable
+private fun QuickAddFletero(
+    state: LoadingViewModel.UiState,
+    onQuickAdd: (String, String?, String?) -> Unit,
+) {
+    var showForm by remember { mutableStateOf(false) }
+    var name by remember { mutableStateOf("") }
+    var plate by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
+
+    if (!showForm) {
+        TextButton(onClick = { showForm = true }, modifier = Modifier.defaultMinSize(minHeight = 48.dp)) {
+            Text(text = "+ " + stringResource(R.string.loading_new_fletero))
+        }
+        return
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            AdminPrimaryButton(
-                onClick = onConfirm,
-                // The form is complete on its own terms, and it is still not offered while the day is being
-                // read: confirming would name a slot of a day whose rows nobody has seen yet.
-                enabled = state.canConfirm && !state.loading,
-                text = stringResource(R.string.loading_confirm),
+            Text(stringResource(R.string.loading_new_fletero), style = MaterialTheme.typography.titleSmall)
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text(stringResource(R.string.loading_fletero_name)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
             )
-            AdminSecondaryButton(
-                onClick = onCancel,
-                text = stringResource(R.string.loading_cancel),
+            OutlinedTextField(
+                value = plate,
+                onValueChange = { plate = it },
+                label = { Text(stringResource(R.string.loading_fletero_plate)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
             )
+            OutlinedTextField(
+                value = phone,
+                onValueChange = { phone = filterPhoneInput(it) },
+                label = { Text(stringResource(R.string.drivers_phone)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AdminPrimaryButton(
+                    onClick = {
+                        if (name.isNotBlank()) {
+                            onQuickAdd(
+                                name.trim(),
+                                plate.trim().ifBlank { null },
+                                cleanPhone(phone).ifBlank { null },
+                            )
+                            showForm = false
+                            name = ""
+                            plate = ""
+                            phone = ""
+                        }
+                    },
+                    text = stringResource(R.string.loading_picker_save_fletero),
+                    enabled = name.isNotBlank() && !state.busy,
+                )
+                AdminSecondaryButton(
+                    onClick = {
+                        showForm = false
+                        name = ""
+                        plate = ""
+                        phone = ""
+                    },
+                    text = stringResource(R.string.loading_cancel),
+                )
+            }
         }
     }
 }
@@ -625,8 +782,10 @@ fun LoadingRoute(
         onOpenHistory = onOpenHistory,
         onStartAdding = viewModel::startAdding,
         onCancelAdding = viewModel::cancelAdding,
-        onDriverSelected = viewModel::onDriverSelected,
-        onVehicleSelected = viewModel::onVehicleSelected,
+        onPickerTabSelected = viewModel::selectPickerTab,
+        onFleteroPicked = viewModel::toggleFletero,
+        onCasaPicked = viewModel::toggleCasa,
+        onCasaVehiclePicked = viewModel::pickCasaVehicle,
         onConfirmAdd = viewModel::confirmAdd,
         onDelete = viewModel::deleteEntry,
         onEditEntry = onEditEntry,
