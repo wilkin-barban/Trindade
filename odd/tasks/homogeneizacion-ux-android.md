@@ -168,14 +168,14 @@ S11 — Emulador como verificación, verbatim:
 ## Tasks
 
 - T1 | S9 | inline | logs ERP: evento `test` de la integración y prefijo de procedencia `Android App / ERP` en el log compartido — commit: `507d5ad` (tests `AeroTestAuditTest` + `AeroDispatcherTest` verdes)
-- T2 | S6 | inline | histórico de estoque como superposición del módulo (el foco deja de caer en Dashboard) — commit: _pendiente_
-- T3 | S7 | inline | tarjetas de Compartir App a ancho completo — commit: _pendiente_
-- T4 | S8 | inline | componentes compartidos de histórico (`HistoryHeader`, `HistoryRecordCard`, `HistoryPagination`) y Massas como referencia migrada — commit: _pendiente_
-- T5 | S2, S8 | inline | histórico de Relatório sobre los componentes compartidos — commit: _pendiente_
-- T6 | S5, S8 | inline | histórico de Horário sobre los componentes compartidos — commit: _pendiente_
-- T7 | S6, S8 | inline | histórico de Estoque con el mismo encabezado y tarjetas — commit: _pendiente_
-- T8 | S1 | inline | interruptores por tipo de caja en "Montagem das Caixas" — commit: _pendiente_
-- T9 | S3 | inline | modal de motoristas con dos pestañas y chapa para los de la casa — commit: _pendiente_
+- T2 | S6 | inline | histórico de estoque como superposición del módulo (el foco deja de caer en Dashboard) — commit: `81676c0` (tests de navegación de estoque verdes)
+- T3 | S7 | inline | tarjetas de Compartir App a ancho completo — commit: `096db89` (`SectionCard` + `ShareAppSectionsTest`)
+- T4 | S8 | inline | componentes compartidos de histórico (`HistoryHeader`, `HistoryRecordCard`, `HistoryPager`, `HistoryStates`, `MonthPickerDialog`) y Massas como referencia migrada — commit: `31f9c89` (`HistoryComponentsTest`)
+- T5 | S2, S8 | inline | histórico de Relatório sobre los componentes compartidos — commit: `8d32764`
+- T6 | S5, S8 | inline | histórico de Horário sobre los componentes compartidos — commit: `ef21d56`
+- T7 | S6, S8 | inline | histórico de Estoque con el mismo encabezado y tarjetas — commit: `d2be2e4` (`StockHistoryScreenTest`)
+- T8 | S1 | inline | interruptores por tipo de caja en "Montagem das Caixas" — commit: `a255e1e` (`ReportBoxTypeSwitchTest`, `ReportFormTest`, `ReportGeneratorViewModelTest`)
+- T9 | S3 | inline | modal de motoristas con dos pestañas y chapa para los de la casa — commit: `ce68fa3` (`LoadingViewModelTest`, `LoadingScreenTest`; la chapa se elige por motorista y se nombra el que falta)
 - T10 | S4 | inline | tabla de motoristas del horario con papelera alineada — commit: _pendiente_
 - T11 | S8 | inline | pasada visual general (botones, iconos, espaciados) en el resto de las pantallas — commit: _pendiente_
 - T12 | S10, S11 | inline | `versionCode` 7003, build firmado, verificación en `emulator-5554`, reemplazo del release y despliegue — commit: _pendiente_
@@ -185,3 +185,6 @@ S11 — Emulador como verificación, verbatim:
 L1 — Pedido original, verbatim: ver S1–S11; pedido completo transcripto por secciones en `## Specs`, con luz verde explícita: "Tienes **luz verde para comenzar la implementación**. No te limites a analizar o proponer cambios: implementa, prueba en el emulador, corrige cualquier problema que encuentres y deja el proyecto funcionando y listo para la actualización."
 L2 — Diseño (skill `gentle-design`): `design/system.md` + `design/system.html` sincronizados desde `ui/theme/Theme.kt` y `res/values/colors.xml`; diseño `design/android-homogeneizacao-ux/` con cuatro tableros — `01-historico-unificado.html`, `02-modal-fleteros.html`, `03-casa-y-tabla.html`, `04-relatorio-caixas.html`. No son direcciones alternativas: el pedido fija la referencia (Histórico de Massas), así que cada tablero aplica ese lenguaje a una superficie distinta.
 L3 — T1 cerrada: `AeroAudit.testRequest` + prefijo `Android App / ERP · client=android · via=native`; el panel escribe una línea `test` por intento con dirección. Prueba unitaria verde; la prueba de extremo a extremo (línea real en `logs/aero-integration.log`) queda en T12 contra el emulador.
+L4 — T2–T8 cerradas; cada una con su commit en `main` y sus pruebas: foco del histórico de estoque dentro del módulo (`81676c0`), tarjetas a ancho completo (`096db89`), componentes compartidos de histórico y Massas migrado (`31f9c89`), Relatório (`8d32764`), Horário (`ef21d56`) y Estoque (`d2be2e4`) sobre esos componentes.
+L5 — T8: el interruptor de tipo de caja no se limita a ocultar; apaga y deshabilita el bloque y descarta lo ya respondido para ese tipo, porque el cuerpo del reporte lleva una entrada por tarea y una selección que quedaba en el mapa se habría guardado como caja montada. La fila completa de 48 dp es el control: el nombre se anuncia como el del interruptor y el `Switch` se dibuja sin manejador para no contestar dos veces el mismo toque.
+L6 — T9: el selector reemplaza al formulario en línea. Una pestaña por tipo de flota (el reparto es el de la flota, no una preferencia: el fletero trae su vehículo y el de la casa no puede asignarse sin chapa), casillas porque la respuesta es una lista, y la chapa es un menú en la fila del propio motorista de la casa. Al confirmar se envía una fila por elegido, de a una: el servidor rechaza un motorista repetido en la fecha, así que dos envíos en paralelo convertirían un duplicado visible en un conflicto invisible. Lo que se guardó sale del selector y lo que falló se queda con el mensaje del rechazo.
