@@ -4,10 +4,8 @@ import android.app.DatePickerDialog
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,18 +16,21 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -40,6 +41,7 @@ import com.trindade.app.ui.components.HistoryHeader
 import com.trindade.app.ui.components.HistoryLoading
 import com.trindade.app.ui.components.SectionCard
 import com.trindade.app.ui.filterPhoneDigits
+import com.trindade.app.ui.displayDate
 import com.trindade.app.ui.saoPauloLocalDate
 import java.time.LocalDate
 import java.util.Locale
@@ -122,37 +124,41 @@ internal fun StockHistoryContent(
             onBack = onBack,
         )
 
-        Row(
+        // The day the history is read for. It was a text field beside a "pick a date" button, and a field
+        // long enough for ten characters drew them at body size: the widest control on the screen held the
+        // smallest thing to read, next to a button that said what the field was for. One surface now does
+        // both jobs -- the day is the largest text in it, the field's own name sits above it at label size,
+        // and the whole panel opens the calendar, so the target is the panel and not a word inside it.
+        Surface(
+            onClick = onPickDate,
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         ) {
-            // The date is picked, not typed: a field that accepts any text is a parser waiting to explain
-            // itself, and the calendar below is already bounded to the window the history is for. Tapping the
-            // field opens the same calendar as the button, because a field that looks like a field is what an
-            // operator taps.
-            val interactionSource = remember { MutableInteractionSource() }
-            LaunchedEffect(interactionSource) {
-                interactionSource.interactions.collect { interaction ->
-                    if (interaction is PressInteraction.Release) onPickDate()
-                }
-            }
-            OutlinedTextField(
-                value = state.date,
-                onValueChange = {},
-                readOnly = true,
-                label = { Text(stringResource(R.string.stock_count_day)) },
-                placeholder = { Text("AAAA-MM-DD") },
-                singleLine = true,
-                enabled = true,
-                interactionSource = interactionSource,
-                modifier = Modifier.weight(1f),
-            )
-            Button(
-                onClick = onPickDate,
-                modifier = Modifier.defaultMinSize(minHeight = 48.dp),
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(stringResource(R.string.stock_pick_date), style = MaterialTheme.typography.labelLarge, maxLines = 1)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.stock_count_day),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = displayDate(state.date),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                    )
+                }
+                Icon(
+                    painter = painterResource(R.drawable.ic_calendar),
+                    contentDescription = stringResource(R.string.stock_pick_date),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
             }
         }
 

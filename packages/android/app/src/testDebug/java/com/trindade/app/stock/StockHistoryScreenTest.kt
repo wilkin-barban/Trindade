@@ -6,6 +6,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
@@ -122,8 +124,34 @@ class StockHistoryScreenTest {
         var picked = 0
         render(StockHistoryViewModel.UiState(date = "2026-10-23", day = day()), onPickDate = { picked++ })
 
-        composeRule.onNodeWithText(copy(R.string.stock_pick_date)).performClick()
-        composeRule.onNodeWithText("2026-10-23").performClick()
+        // The day is what the field shows and what is tapped: one panel, and tapping the day it already
+        // holds opens the calendar again rather than opening a keyboard.
+        composeRule.onNodeWithContentDescription(copy(R.string.stock_pick_date)).performClick()
+        composeRule.onNodeWithText("23/10/2026").performClick()
         org.junit.Assert.assertEquals(2, picked)
+    }
+
+    @Test
+    fun `the day field names itself above a day large enough to read`() {
+        render(StockHistoryViewModel.UiState(date = "2026-10-23", day = day()))
+
+        // Unmerged: the panel is one clickable surface, so in the merged tree both texts answer as the
+        // panel itself and a comparison between them would be a comparison of a thing with itself.
+        val name = composeRule.onNodeWithText(copy(R.string.stock_count_day), useUnmergedTree = true)
+            .assertIsDisplayed().getUnclippedBoundsInRoot()
+        val day = composeRule.onNodeWithText("23/10/2026", useUnmergedTree = true)
+            .assertIsDisplayed().getUnclippedBoundsInRoot()
+
+        // The complaint this replaces: a field long enough for ten characters drew them at the size of a
+        // sentence, so the widest control on the screen held the smallest text in it. The day is now the
+        // field's largest line and its name sits over it at label size.
+        org.junit.Assert.assertTrue(
+            "the field's own name must sit above the day it holds",
+            name.bottom.value <= day.top.value + 0.5f,
+        )
+        org.junit.Assert.assertTrue(
+            "the day must be the largest text of the field: ${day.bottom - day.top} vs ${name.bottom - name.top}",
+            (day.bottom.value - day.top.value) > (name.bottom.value - name.top.value),
+        )
     }
 }
