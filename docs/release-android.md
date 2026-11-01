@@ -37,6 +37,8 @@ versionCode = major * 1000000 + minor * 1000 + patch
 | `v1.2.3` | `1.2.3` | `1002003` |
 | `v2.0.0` | `2.0.0` | `2000000` |
 
+El tag `v0.7.0` deriva `7000`; la build publicada es `7003`, superior a la anterior, para que Android acepte la actualización.
+
 Reglas:
 
 - `versionCode` es lo que Android compara para decidir si un APK es una actualización. La fórmula ancha evita
@@ -66,21 +68,19 @@ Los dos números se calculan una sola vez en `build.gradle.kts` y alimentan tant
 | 0.6.1 | 6001 | Interna | Importación por asiento y día pasado en solo lectura |
 | 0.6.2 | 6002 | Interna | Códigos de error y atribución por asiento |
 | 0.6.3 | 6003 | Interna | Contrato del reporte y alta de operario |
-| 0.7.0 | 7000 | **Publicada** | Asset actual de GitHub Release `v0.7.0` (verificado el 2026-11-01) |
-| 0.7.0 | 7001 | No publicada | Build de respaldo; las notas de la release la mencionan, pero no es el asset |
-| 0.7.0 | 7002 | Distribución interna | APK servido por `GET /api/app/download-apk`; no es el asset de GitHub |
-| 0.7.0 | 7003 | En preparación | Homogeneización visual de Android |
+| 0.7.0 | 7000 | Reemplazada | Build histórica; fue el asset inicial de GitHub Release `v0.7.0` |
+| 0.7.0 | 7001 | No publicada | Build de respaldo; citada por notas anteriores |
+| 0.7.0 | 7002 | Reemplazada | Binario anterior de producción; nunca fue asset de GitHub |
+| 0.7.0 | 7003 | **Publicada** | Asset actual de GitHub Release `v0.7.0` y binario de producción |
 
 Las builds 0.6.x se distribuyeron por `GET /api/app/download-apk`, no por un tag de GitHub. Los hashes y las
 verificaciones completas están en [release-android-historial.md](release-android-historial.md).
 
-> **Discrepancia verificada el 2026-11-01.** El asset `trindade-0.7.0.apk` de GitHub se descarga y verifica como
-> `versionCode 7000`, sha256 `e8cee2d3857696e90094115ce7915258f79d7e883dd57bf85e221da373d28ffd`, 11.149.516 bytes.
-> Su sidecar publicado contiene ese mismo hash. Las notas de la release dicen `versionCode 7001` y sha256
-> `8f6156f2d5dfe8e5ad343ed01e52de629e4de5b8d9cd4c1304b38313435a8621`, que corresponden a la build 7001 guardada en
-> respaldos, no al asset. El APK que sirve producción es la build 7002, sha256
-> `bc038f2eeda605fb07bfdd26550c93cfc5a1a8b9c9b06408df0fe505c6ec2f4c`. El tag no se movió. Antes de publicar una
-> nueva release, corregir las notas o volver a subir el build que se quiera distribuir.
+> **Estado final del 2026-11-01.** La release `v0.7.0` se republicó con el build **7003**. El asset de GitHub, su
+> `.sha256`, `packages/backend/apk/trindade-0.7.0.apk` y `GET /api/app/download-apk` son el mismo binario:
+> `versionCode 7003`, 11.187.920 bytes, sha256
+> `82fce07f17e98206a0ad6916463c80053154a87b5991b3679d47e001747e5810`. Las builds 7000, 7001 y 7002 son
+> históricas. El tag `v0.7.0` no se movió.
 
 ## 4. Workflow de publicación
 

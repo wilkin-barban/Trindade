@@ -64,15 +64,17 @@ aapt2 dump badging trindade-0.7.0.apk | head -1
 Resultado esperado para el asset actual de `v0.7.0`:
 
 - `sha256sum -c` imprime `OK` y el digest es
-  `e8cee2d3857696e90094115ce7915258f79d7e883dd57bf85e221da373d28ffd`.
+  `82fce07f17e98206a0ad6916463c80053154a87b5991b3679d47e001747e5810`.
 - `apksigner` reporta `Verifies` con APK Signature Scheme v2 y un solo firmante.
 - El certificado SHA-256 es
   `ee0e404b211052b311ae0e0730606e9c7d5554315463d02f9ef33c9573c431f6`.
-- `aapt2` reporta `versionCode='7000'` y `versionName='0.7.0'`.
+- `aapt2` reporta `versionCode='7003'` y `versionName='0.7.0'`.
+- El tamaño es de `11.187.920` bytes.
 
-El APK servido por producción (`GET /api/app/download-apk`) es la build **7002**, con sha256
-`bc038f2eeda605fb07bfdd26550c93cfc5a1a8b9c9b06408df0fe505c6ec2f4c`; no es el mismo archivo que el asset de
-GitHub. Si las notas de la release indican otro `versionCode`, gana el APK: verificar siempre con `aapt2`.
+El APK servido por producción (`GET /api/app/download-apk`) es el **mismo build 7003**: el asset de GitHub, su
+`.sha256`, `packages/backend/apk/trindade-0.7.0.apk` y la descarga de producción comparten el digest
+`82fce07f17e98206a0ad6916463c80053154a87b5991b3679d47e001747e5810`. Verificar siempre con `aapt2`, no solo con
+el nombre del archivo.
 
 ## 3. Verificar la instalación en un dispositivo
 

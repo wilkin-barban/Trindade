@@ -72,16 +72,13 @@ hashes y verificaciones está en [docs/release-android-historial.md](docs/releas
   anónima de GitHub.
 - La tarjeta ERP apila título y acción por debajo de 420 dp para que quepan en pantalla de teléfono.
 
-### Distribución Android
+### Distribución Android (builds históricas)
 
-- Build **7000** es el asset actual de GitHub Release `v0.7.0` (`trindade-0.7.0.apk` y su `.sha256`), verificado
-  el 2026-11-01 con `versionCode 7000` y sha256 `e8cee2d3…`.
-- Build **7001** existe en respaldos y es la que mencionan las notas de la release, pero **no** es el asset
-  publicado.
-- Build **7002** es la que sirve `GET /api/app/download-apk` en producción, con sha256 `bc038f2e…`.
-- Build **7003** reemplazó a las anteriores como asset de la release y como binario servido por producción
-  (ver la entrada `0.7.0+7003`). El tag `v0.7.0` no se movió.
-- La discrepancia entre las notas y el asset está documentada en [docs/release-android-historial.md](docs/release-android-historial.md).
+- Build **7000** fue el asset inicial de GitHub Release `v0.7.0`; quedó reemplazada por la 7003.
+- Build **7001** existe en respaldos; no fue publicada.
+- Build **7002** fue el binario anterior de producción; quedó reemplazada por la 7003.
+- Build **7003** es el asset actual y el binario de producción (ver la entrada `0.7.0+7003`). El tag `v0.7.0`
+  no se movió.
 
 ---
 
