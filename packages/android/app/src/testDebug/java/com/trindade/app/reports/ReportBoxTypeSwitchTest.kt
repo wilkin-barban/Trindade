@@ -4,6 +4,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -160,29 +163,56 @@ class ReportBoxTypeSwitchTest {
     }
 
     /**
-     * The claim the switch exists for: a type that is off cannot report a box.
+     * The claim the switch exists for: a type that is off has no boxes to choose.
      *
-     * The two chips are tapped in the same form so the difference between them is the switch alone. The
-     * disabled one is found by the product's own name, which is the label the chip draws.
+     * The switch turns its type off for the report, so what is left on screen is the one decision and the
+     * boxes of the type that is actually mounted. The products of the off type are not drawn at all -- a
+     * checklist nobody can mark is not something to read past before marking the other one.
      */
     @Test
-    fun `a type switched off reports nothing when its product is tapped, and the other type still does`() {
-        val reported = mutableListOf<Triple<Int, String, Boolean>>()
+    fun `a type switched off draws no boxes of its own, and the other type does`() {
+        var reported: Triple<Int, String, Boolean>? = null
         render(
             form = ReportFormState(offers = offers, disabledBoxTypeIds = setOf(10)),
-            onProductToggle = { taskId, product, chosen -> reported += Triple(taskId, product, chosen) },
+            onProductToggle = { taskId, product, chosen -> reported = Triple(taskId, product, chosen) },
         )
 
         switchOf("Caixas Assai").performScrollTo().assertIsOff()
-        composeRule.onNodeWithText("Rolo 2kg").performScrollTo().performClick()
-        composeRule.waitForIdle()
-
-        assertEquals("A box type switched off must report no box", emptyList<Triple<Int, String, Boolean>>(), reported)
+        composeRule.onNodeWithText("Rolo 2kg").assertDoesNotExist()
 
         composeRule.onNodeWithText("Nhoque 400g").performScrollTo().performClick()
         composeRule.waitForIdle()
 
-        assertEquals(listOf(Triple(58, "Nhoque 400g", true)), reported)
+        assertEquals(Triple(58, "Nhoque 400g", true), reported)
+    }
+
+    @Test
+    fun `the boxes of a type appear when its switch is turned on`() {
+        var disabled by mutableStateOf(setOf(10))
+        composeRule.setContent {
+            TrindadeTheme {
+                Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                    CategoryForm(
+                        category = montagem,
+                        children = listOf(pequenas, assai),
+                        form = ReportFormState(offers = offers, disabledBoxTypeIds = disabled),
+                        readOnly = false,
+                        onCheckChange = { _, _ -> },
+                        onProductToggle = { _, _, _ -> },
+                        onTemperatureChange = { _, _, _ -> },
+                        onBoxTypeChange = { _, enabled ->
+                            disabled = if (enabled) emptySet() else setOf(10)
+                        },
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("Rolo 2kg").assertDoesNotExist()
+        switchOf("Caixas Assai").performScrollTo().performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText("Rolo 2kg").performScrollTo().assertIsDisplayed()
     }
 
     @Test

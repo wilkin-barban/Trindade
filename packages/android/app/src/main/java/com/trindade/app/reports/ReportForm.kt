@@ -128,17 +128,22 @@ fun CategoryForm(
                 depth = depth + 1,
             )
 
-            TaskBlocks(
-                category = child,
-                form = form,
-                // A type that is not mounted cannot be marked: the block stays on screen, so what the
-                // report already carries is still readable, and every control inside it is disabled.
-                readOnly = readOnly || !enabled,
-                onCheckChange = onCheckChange,
-                onProductToggle = onProductToggle,
-                onTemperatureChange = onTemperatureChange,
-                depth = depth + 1,
-            )
+            // A type that is not mounted has nothing to choose: its blocks are drawn only while its switch
+            // is on, so the operator reads the two types of box as two decisions and the products of the one
+            // they mounted. The boxes already recorded stay in the form's state -- switching a type off is
+            // how they are dropped from the report -- but a checklist that cannot be marked is a screenful of
+            // disabled controls, which is what this used to be.
+            if (enabled) {
+                TaskBlocks(
+                    category = child,
+                    form = form,
+                    readOnly = readOnly,
+                    onCheckChange = onCheckChange,
+                    onProductToggle = onProductToggle,
+                    onTemperatureChange = onTemperatureChange,
+                    depth = depth + 1,
+                )
+            }
         }
     }
 }
@@ -223,9 +228,8 @@ private fun CheckRow(
 /**
  * The switch that says whether one type of box is mounted in this report.
  *
- * The label is the category's own name and the switch sits beside it rather than replacing the blocks
- * under it: switching a type off greys its blocks instead of hiding them, so an operator correcting a
- * report that already recorded boxes sees what it recorded before deciding to drop it.
+ * The label is the category's own name and the switch sits above the blocks it governs: switching a type
+ * off hides the boxes of that type, because a type that is not mounted is not a list to read through.
  *
  * The whole row is the control, not just the switch: it is tapped with gloves on, so the target is 48 dp
  * tall and the label toggles it as well, and a row that carries its own name is the only shape a screen
