@@ -79,6 +79,7 @@ class DashboardScreenTest {
         onOpenReports: () -> Unit = {},
         onOpenLoading: () -> Unit = {},
         onOpenLoadingDay: (String) -> Unit = {},
+        onOpenShare: () -> Unit = {},
     ) {
         composeRule.setContent {
             TrindadeTheme {
@@ -89,8 +90,8 @@ class DashboardScreenTest {
                     onOpenLoading = onOpenLoading,
                     onOpenLoadingDay = onOpenLoadingDay,
                     onOpenStock = {},
-                    onOpenStockHistory = {},
                     onOpenAssai = {},
+                    onOpenShare = onOpenShare,
                     onShareActiveSchedule = {},
                 )
             }
@@ -274,6 +275,32 @@ class DashboardScreenTest {
         composeRule.onNodeWithText(copy(R.string.dashboard_reports_today)).assertDoesNotExist()
     }
 
+    /**
+     * The grid's two changes, asserted on the screen rather than on the source: the stock history is no
+     * longer a door here -- it is reached from the counter's own tab, where the work happens -- and
+     * Compartilhar App took its place, right after the last calculator.
+     */
+    @Test
+    fun `the stock history is no longer a door, and sharing the app follows the last calculator`() {
+        var openedShare = 0
+        render(state = state(), onOpenShare = { openedShare += 1 })
+
+        composeRule.onNodeWithText(copy(R.string.nav_stock_history)).assertDoesNotExist()
+
+        // Both positions are read after the scroll and in the same pass: scrolling one card into view moves
+        // the other, so a position captured earlier says nothing about the order.
+        composeRule.onNodeWithText(copy(R.string.nav_share)).performScrollTo()
+        val assai = composeRule.onNodeWithText(copy(R.string.nav_assai)).getUnclippedBoundsInRoot()
+        val share = composeRule.onNodeWithText(copy(R.string.nav_share)).getUnclippedBoundsInRoot()
+        assertTrue(
+            "Compartilhar App must sit below the last calculator, saw ${assai.bottom} then ${share.top}",
+            share.top >= assai.bottom,
+        )
+
+        card(copy(R.string.nav_share)).performClick()
+        assertEquals("The share card is a door to the tab, not a label", 1, openedShare)
+    }
+
     @Test
     fun `dashboard cards fill full width and meet minimum touch target height of at least 48dp`() {
         render(state = state())
@@ -304,8 +331,8 @@ class DashboardScreenTest {
                         onOpenLoading = {},
                         onOpenLoadingDay = {},
                         onOpenStock = {},
-                        onOpenStockHistory = {},
                         onOpenAssai = {},
+                        onOpenShare = {},
                         onShareActiveSchedule = {},
                     )
                 }

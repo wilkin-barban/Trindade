@@ -589,11 +589,8 @@ class MainActivity : ComponentActivity() {
                                     // Las tres calculadoras ya son pestañas: el acceso directo solo cambia de
                                     // pestaña, igual que el menú.
                                     onOpenStock = { tab = Tab.STOCK_COUNTER },
-                                    onOpenStockHistory = {
-                                        tab = Tab.STOCK_COUNTER
-                                        stockHistoryOpen = true
-                                    },
                                     onOpenAssai = { tab = Tab.ASSAI },
+                                    onOpenShare = { tab = Tab.SHARE },
                                     onOpenMassas = {
                                         tab = Tab.MASSAS_LAUNCH
                                         massasHistoryOpen = false

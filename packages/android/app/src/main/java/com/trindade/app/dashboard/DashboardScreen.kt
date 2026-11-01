@@ -78,8 +78,10 @@ fun DashboardScreen(
     // Los tres accesos directos a las calculadoras: las pestañas ya existen, así que la tarjeta
     // solo tiene que llevar a ellas.
     onOpenStock: () -> Unit,
-    onOpenStockHistory: () -> Unit,
     onOpenAssai: () -> Unit,
+    // La puerta de Compartilhar App, que es la que reemplaza al acceso al histórico de contagem: la
+    // pestaña existe y la tarjeta solo tiene que llevar a ella.
+    onOpenShare: () -> Unit,
     onShareActiveSchedule: () -> Unit,
     modifier: Modifier = Modifier,
     // Los tres accesos directos: la pantalla los ofrece y la ruta los entrega.
@@ -258,23 +260,25 @@ fun DashboardScreen(
                 // La tarjeta lleva a la misma pestaña que su texto nombra: el acceso directo y el menú
                 // dicen lo mismo porque usan la misma cadena.
                 DashboardCard(
-                    label = stringResource(R.string.nav_stock_history),
-                    onClick = onOpenStockHistory,
-                ) {
-                    Text(
-                        text = stringResource(R.string.dashboard_stock_history),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-                // La tarjeta lleva a la misma pestaña que su texto nombra: el acceso directo y el menú
-                // dicen lo mismo porque usan la misma cadena.
-                DashboardCard(
                     label = stringResource(R.string.nav_assai),
                     onClick = onOpenAssai,
                 ) {
                     Text(
                         text = stringResource(R.string.dashboard_assai),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+                // Compartilhar App, justo después de la última calculadora: es el otro trabajo que el
+                // encargado hace desde el teléfono -- poner la app en el aparato del que entra -- y hasta
+                // ahora solo estaba en el menú lateral. El histórico de contagem salió de esta grilla: se
+                // llega a él desde la pestaña de contagem, que es donde se trabaja.
+                DashboardCard(
+                    label = stringResource(R.string.nav_share),
+                    onClick = onOpenShare,
+                ) {
+                    Text(
+                        text = stringResource(R.string.dashboard_share_app),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
@@ -348,8 +352,8 @@ fun DashboardRoute(
     onOpenMassasHistory: () -> Unit = {},
     // Los tres accesos directos: la pantalla los ofrece y la ruta los entrega.
     onOpenStock: () -> Unit,
-    onOpenStockHistory: () -> Unit,
     onOpenAssai: () -> Unit,
+    onOpenShare: () -> Unit,
     viewModel: DashboardViewModel = hiltViewModel(key = sessionKey),
 ) {
     val state by viewModel.state.collectAsState()
@@ -366,8 +370,8 @@ fun DashboardRoute(
         onOpenMassas = onOpenMassas,
         onOpenMassasHistory = onOpenMassasHistory,
         onOpenStock = onOpenStock,
-        onOpenStockHistory = onOpenStockHistory,
         onOpenAssai = onOpenAssai,
+        onOpenShare = onOpenShare,
         onShareActiveSchedule = viewModel::shareActiveSchedule,
     )
 }
