@@ -46,7 +46,7 @@ S8 — Entrega, verbatim:
 - T5 | S3 | inline | cabecera de Compartir App con título y subtítulo, y acción «Compartir arquivo APK» — commit: `98f4415` (verde: `ShareAppViewModelTest` 12/12, `ServerApkSharerTest` 3/3, `ShareManagerTest` 10/10)
 - T6 | S6 | inline | Dashboard: fuera Histórico de Contagem, dentro Compartir App tras Calculadora de Assaí — commit: `491fab9` (verde: `DashboardScreenTest` 14/14)
 - T7 | S7 | inline | un solo cuadro de resumen con las tres cifras, el plantel y los dos pares `done/total` (sin fila para `reportsToday`: el rótulo «Relatórios Hoje» ya es el de la tarjeta de arriba) — commit: `1fb022f` (verde: `DashboardScreenTest` 15/15)
-- T8 | S8 | inline | `versionCode` 7004, build firmado, verificación en `emulator-5554`, despliegue y reemplazo del asset de `v0.7.0` — commit: `_pendiente_`
+- T8 | S8 | inline | `versionCode` 7004, build firmado, verificación en `emulator-5554`, despliegue y reemplazo del asset de `v0.7.0` — commit: `5f51d41` (7004 firmado, 11.194.408 bytes, sha256 `7622756d…`; `aapt2` reporta `versionCode='7004'` y `apksigner` verifica con el certificado `ee0e404b…`; recorrido en `emulator-5554` sobre las cinco superficies de T1–T7; `trindade-api-1` sirve el mismo digest por `/api/app/download-apk`; asset de GitHub reemplazado con `--clobber` y notas republicadas)
 
 ## Log
 
@@ -68,3 +68,7 @@ L2 — Corrección del usuario sobre T5 y T7, verbatim:
 > T7: además de las tres cifras y el día en curso, podés enriquecer el cuadro con reportsToday, higieneDone/Total y recepcionDone/Total; todo ya viene en DashboardSummary, sin tocar backend.
 
 Nota: `versionCode` 7004, release `v0.7.0` con reemplazo de asset y notas, despliegue a producción y docs.
+
+L3 — Cierre de T8 pedido por el usuario, verbatim:
+
+> Para la release: versionCode 7004, versionName 0.7.0, mismo tag v0.7.0. Al reemplazar el asset, actualizá también el sidecar .sha256, producción, Desktop, packages/backend/apk, CHANGELOG.md, docs/release-android.md, docs/release-android-historial.md y las notas de la release en español. Verificá en emulator-5554 y que el APK publicado y el de producción coincidan en hash.
