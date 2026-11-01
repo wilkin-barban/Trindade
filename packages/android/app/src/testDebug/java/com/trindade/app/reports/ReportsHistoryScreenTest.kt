@@ -85,7 +85,7 @@ class ReportsHistoryScreenTest {
         backNode.performClick()
         assertEquals(1, backed)
 
-        val clearNode = composeRule.onNodeWithText(copy(R.string.history_clear_filters))
+        val clearNode = composeRule.onNodeWithContentDescription(copy(R.string.history_clear_filters))
         clearNode.assertIsDisplayed()
         val clearBounds = clearNode.getUnclippedBoundsInRoot()
         assertTrue("Clear height >= 48dp", clearBounds.bottom - clearBounds.top >= 48.dp)

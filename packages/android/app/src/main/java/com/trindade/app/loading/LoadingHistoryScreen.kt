@@ -33,6 +33,7 @@ import com.trindade.app.ui.components.HistoryEmptyState
 import com.trindade.app.ui.components.HistoryErrorBanner
 import com.trindade.app.ui.components.HistoryDateLabel
 import com.trindade.app.ui.components.HistoryIconAction
+import com.trindade.app.ui.components.HistoryFilterBar
 import com.trindade.app.ui.components.HistoryHeader
 import com.trindade.app.ui.components.HistoryLoading
 import com.trindade.app.ui.components.HistoryPager
@@ -109,31 +110,21 @@ fun LoadingHistoryScreen(
         }
 
         item {
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                AdminSecondaryButton(
-                    onClick = { openDayPicker(context, state.date, onDateSelected) },
-                    text = state.date
-                        ?.let { stringResource(R.string.history_filter_day_value, displayDate(it)) }
-                        ?: stringResource(R.string.history_filter_day),
-                )
-                AdminSecondaryButton(
-                    onClick = { pickingMonth = true },
-                    text = state.month
-                        ?.let { stringResource(R.string.history_filter_month_value, displayMonth(it)) }
-                        ?: stringResource(R.string.history_filter_month),
-                )
+            // One line for the date the history is filtered by: two chips that name it and the way to
+            // drop it. The buttons this used to be took two rows of the tallest control on the screen,
+            // which is why the first record started below the fold.
+            HistoryFilterBar(
+                dayLabel = state.date?.let { displayDate(it) } ?: stringResource(R.string.history_filter_day),
+                daySelected = state.date != null,
+                onPickDay = { openDayPicker(context, state.date, onDateSelected) },
+                monthLabel = state.month?.let { displayMonth(it) } ?: stringResource(R.string.history_filter_month),
+                monthSelected = state.month != null,
+                onPickMonth = { pickingMonth = true },
                 // Offered only when there is a filter to clear: a control that does nothing when tapped
                 // is worse than one that is not there, because the operator cannot tell which it is.
-                if (state.date != null || state.month != null) {
-                    AdminSecondaryButton(
-                        onClick = onClearFilters,
-                        text = stringResource(R.string.history_clear_filters),
-                    )
-                }
-            }
+                onClear = if (state.date != null || state.month != null) onClearFilters else null,
+                clearLabel = stringResource(R.string.history_clear_filters),
+            )
         }
 
         state.message?.let { message ->
