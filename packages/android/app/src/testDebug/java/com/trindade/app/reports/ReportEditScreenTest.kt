@@ -203,6 +203,7 @@ class ReportEditScreenTest {
                     onCheckChange = { _, _ -> },
                     onProductToggle = { _, _, _ -> },
                     onTemperatureChange = { _, _, _ -> },
+                    onBoxTypeChange = { _, _ -> },
                     onSubmit = onSubmit,
                     onBack = {},
                 )
@@ -354,6 +355,7 @@ class ReportEditScreenTest {
                     onCheckChange = { _, _ -> },
                     onProductToggle = { _, _, _ -> },
                     onTemperatureChange = { _, _, _ -> },
+                    onBoxTypeChange = { _, _ -> },
                     onSubmit = { submitted++ },
                     onBack = { backed++ },
                 )

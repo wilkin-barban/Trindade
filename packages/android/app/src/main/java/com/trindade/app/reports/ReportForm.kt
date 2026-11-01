@@ -4,9 +4,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
@@ -14,10 +16,12 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.trindade.app.contract.models.CategoriesResponseCategoriesInner
@@ -40,6 +44,14 @@ data class ReportFormState(
     /** The product lists the server offered, or null while they have not arrived. */
     val offers: ProductsResponse? = null,
     /**
+     * The box types the operator said this report does not mount, by their category's id.
+     *
+     * Off by absence rather than by a `true`: a report already recorded with both types -- and every form
+     * the generator opens -- starts with both of them on, so the switch answers a question the operator
+     * asks rather than one it assumed. A type this set does not name is drawn and can be marked.
+     */
+    val disabledBoxTypeIds: Set<Int> = emptySet(),
+    /**
      * The readings the form still owes, as the two screens computed them.
      *
      * It travels in the form rather than being derived here because the rule is
@@ -57,6 +69,9 @@ data class ReportFormState(
      */
     fun missingIndices(taskId: Int): Set<Int> =
         missingReadings.filterTo(mutableSetOf()) { it.taskId == taskId }.mapTo(mutableSetOf()) { it.index }
+
+    /** Whether the box type with this category id is one this report mounts. */
+    fun boxTypeEnabled(categoryId: Int): Boolean = categoryId !in disabledBoxTypeIds
 }
 
 /**
@@ -76,12 +91,76 @@ fun CategoryForm(
     onCheckChange: (Int, Boolean) -> Unit,
     onProductToggle: (Int, String, Boolean) -> Unit,
     onTemperatureChange: (Int, Int, String) -> Unit,
+    onBoxTypeChange: (Int, Boolean) -> Unit = { _, _ -> },
     depth: Int = 0,
 ) {
     Column(modifier = Modifier.fillMaxWidth().padding(start = (depth * 16).dp)) {
         Text(text = category.namePt, style = MaterialTheme.typography.titleMedium)
         HorizontalDivider()
 
+        TaskBlocks(
+            category = category,
+            form = form,
+            readOnly = readOnly,
+            onCheckChange = onCheckChange,
+            onProductToggle = onProductToggle,
+            onTemperatureChange = onTemperatureChange,
+        )
+
+        // The children beside their parent, which is the shape the endpoint serves -- its order is
+        // `COALESCE(parent_category_id, id), sort_order, id` -- and the shape the web's own component
+        // draws. Each child is drawn as a type of box: its own name, the switch that says whether the
+        // report mounts it, and its products under it. The switch is drawn for every nested category,
+        // which in this endpoint is exactly "Montagem das Caixas" and its two types -- `Caixas pequenas`
+        // and `Caixas Assai` -- without matching a category by name: a section that nests children is a
+        // section of types, and one an administrator renames stays switchable.
+        //
+        // The child's own heading is the row below rather than a title with a switch under it: one name
+        // for one thing, and the switch on the line the operator is already reading.
+        children.forEach { child ->
+            val enabled = form.boxTypeEnabled(child.id)
+
+            BoxTypeSwitchRow(
+                label = child.namePt,
+                enabled = enabled,
+                readOnly = readOnly,
+                onEnabledChange = { onBoxTypeChange(child.id, it) },
+                depth = depth + 1,
+            )
+
+            TaskBlocks(
+                category = child,
+                form = form,
+                // A type that is not mounted cannot be marked: the block stays on screen, so what the
+                // report already carries is still readable, and every control inside it is disabled.
+                readOnly = readOnly || !enabled,
+                onCheckChange = onCheckChange,
+                onProductToggle = onProductToggle,
+                onTemperatureChange = onTemperatureChange,
+                depth = depth + 1,
+            )
+        }
+    }
+}
+
+/**
+ * The tasks of one category, drawn without its heading.
+ *
+ * Split out of [CategoryForm] because the form draws these twice with different headings: a root under
+ * its own title, and a nested box type under the row that carries its switch. The tasks are the same
+ * either way, and the switch is only ever about whether they may be marked.
+ */
+@Composable
+private fun TaskBlocks(
+    category: CategoriesResponseCategoriesInner,
+    form: ReportFormState,
+    readOnly: Boolean,
+    onCheckChange: (Int, Boolean) -> Unit,
+    onProductToggle: (Int, String, Boolean) -> Unit,
+    onTemperatureChange: (Int, Int, String) -> Unit,
+    depth: Int = 0,
+) {
+    Column(modifier = Modifier.fillMaxWidth().padding(start = (depth * 16).dp)) {
         category.tasks.forEach { task ->
             when (task.taskType) {
                 ReportCategoryTasksInner.TaskType.check ->
@@ -120,24 +199,6 @@ fun CategoryForm(
                     )
             }
         }
-
-        // The children beside their parent, which is the shape the endpoint serves -- its order is
-        // `COALESCE(parent_category_id, id), sort_order, id` -- and the shape the web's own component
-        // draws. Recursing rather than iterating twice is what keeps a deeper tree rendering as it is,
-        // with the indent as the only difference; each child is drawn with no children of its own because
-        // the endpoint sends one level, and the recursion would still be the one that decided otherwise.
-        children.forEach { child ->
-            CategoryForm(
-                category = child,
-                children = emptyList(),
-                form = form,
-                readOnly = readOnly,
-                onCheckChange = onCheckChange,
-                onProductToggle = onProductToggle,
-                onTemperatureChange = onTemperatureChange,
-                depth = depth + 1,
-            )
-        }
     }
 }
 
@@ -156,6 +217,48 @@ private fun CheckRow(
         // state a report is edited in, and a disabled control says that before the tap instead of after it.
         Checkbox(checked = checked, onCheckedChange = onCheckedChange, enabled = !readOnly)
         Text(text = label, style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
+/**
+ * The switch that says whether one type of box is mounted in this report.
+ *
+ * The label is the category's own name and the switch sits beside it rather than replacing the blocks
+ * under it: switching a type off greys its blocks instead of hiding them, so an operator correcting a
+ * report that already recorded boxes sees what it recorded before deciding to drop it.
+ *
+ * The whole row is the control, not just the switch: it is tapped with gloves on, so the target is 48 dp
+ * tall and the label toggles it as well, and a row that carries its own name is the only shape a screen
+ * reader can announce as one switch. The switch itself is drawn without a handler for that reason -- two
+ * toggle targets on one line would answer the same tap twice.
+ */
+@Composable
+private fun BoxTypeSwitchRow(
+    label: String,
+    enabled: Boolean,
+    readOnly: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
+    depth: Int = 0,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = (depth * 16).dp, top = 8.dp)
+            .defaultMinSize(minHeight = 48.dp)
+            // `enabled` is the server's read-only answer, not the switch's own value: the switch has to
+            // stay tappable to be switched back on, and only a report that may not be edited takes that
+            // away.
+            .toggleable(
+                value = enabled,
+                enabled = !readOnly,
+                role = Role.Switch,
+                onValueChange = onEnabledChange,
+            ),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(text = label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Switch(checked = enabled, onCheckedChange = null, enabled = !readOnly)
     }
 }
 

@@ -57,6 +57,7 @@ fun ReportGeneratorScreen(
     onCheckChange: (Int, Boolean) -> Unit,
     onProductToggle: (Int, String, Boolean) -> Unit,
     onTemperatureChange: (Int, Int, String) -> Unit,
+    onBoxTypeChange: (Int, Boolean) -> Unit,
     onNotesChange: (String) -> Unit,
     onSubmit: () -> Unit,
     onOpenHistory: () -> Unit,
@@ -134,6 +135,7 @@ fun ReportGeneratorScreen(
             temperatures = state.temperatures,
             selectedProducts = state.selectedProducts,
             offers = state.offers,
+            disabledBoxTypeIds = state.disabledBoxTypeIds,
             missingReadings = state.missingReadings,
         )
 
@@ -225,6 +227,7 @@ fun ReportGeneratorScreen(
                         onCheckChange = onCheckChange,
                         onProductToggle = onProductToggle,
                         onTemperatureChange = onTemperatureChange,
+                        onBoxTypeChange = onBoxTypeChange,
                     )
                 }
 
@@ -324,6 +327,7 @@ fun ReportGeneratorRoute(
         onCheckChange = viewModel::onCheckChange,
         onProductToggle = viewModel::onProductToggle,
         onTemperatureChange = viewModel::onTemperatureChange,
+        onBoxTypeChange = viewModel::onBoxTypeChange,
         onNotesChange = viewModel::onNotesChange,
         onSubmit = viewModel::submit,
         onOpenHistory = onOpenHistory,

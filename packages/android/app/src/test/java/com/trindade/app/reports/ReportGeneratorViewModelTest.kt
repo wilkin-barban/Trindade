@@ -515,6 +515,34 @@ class ReportGeneratorViewModelTest {
         assertEquals(true, model.state.value.canSubmit)
     }
 
+    /**
+     * The switch has to take the answers with it.
+     *
+     * The body carries one `items` entry per task and `reportItems` reads a selection out of the map, so a
+     * type left off with its products still in the map would be sent as if the operator had marked it --
+     * the saved report would claim boxes the switch says were not mounted. Clearing the map is what makes
+     * "this type was not used" the same statement in the form and on the wire.
+     */
+    @Test
+    fun `switching a box type off drops its answers, and switching it back on does not bring them back`() {
+        val model = viewModel()
+        fillTemperatures(model)
+        model.onCheckChange(CHECK_TASK_ID, true)
+        model.onProductToggle(PRODUCT_TASK_ID, "Rolo 2kg", true)
+
+        model.onBoxTypeChange(1, false)
+
+        assertEquals(setOf(1), model.state.value.disabledBoxTypeIds)
+        assertEquals(emptyMap<Int, Boolean>(), model.state.value.checks)
+        assertEquals(emptyMap<Int, Set<String>>(), model.state.value.selectedProducts)
+        assertEquals(emptyMap<Int, List<String>>(), model.state.value.temperatures)
+
+        model.onBoxTypeChange(1, true)
+
+        assertEquals(emptySet<Int>(), model.state.value.disabledBoxTypeIds)
+        assertEquals("The switch is not an undo", emptyMap<Int, Boolean>(), model.state.value.checks)
+    }
+
     @Test
     fun `a negative reading typed with a comma reaches the body as a negative decimal`() {
         val model = viewModel()

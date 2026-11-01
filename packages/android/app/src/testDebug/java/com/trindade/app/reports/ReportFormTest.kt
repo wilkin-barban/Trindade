@@ -294,8 +294,12 @@ class ReportFormTest {
             onCheckChange = { taskId, checked -> reported += taskId to checked },
         )
 
+        // Three toggleable controls in this fixture, in the order the form draws them: the parent's check
+        // box, then the switch of the one child category, then the child's own box. The parent's is index
+        // 0, and the assertion after the tap is on the task id rather than on the value alone -- a tap
+        // that reached the child's box, or the switch, would carry the wrong id and fail.
         val boxes = composeRule.onAllNodes(isToggleable())
-        boxes.assertCountEquals(2)
+        boxes.assertCountEquals(3)
 
         boxes[0].performScrollTo().performClick()
         composeRule.waitForIdle()

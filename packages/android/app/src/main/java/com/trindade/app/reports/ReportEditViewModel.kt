@@ -49,6 +49,13 @@ class ReportEditViewModel @Inject constructor(
         val checks: Map<Int, Boolean> = emptyMap(),
         /** One entry per `temperature` task, holding exactly `temperatureReadings` readings. */
         val temperatures: Map<Int, List<String>> = emptyMap(),
+        /**
+         * The box types the operator switched off, by their category's id.
+         *
+         * Absent means on, so a report that already recorded both types opens with both of them
+         * switchable rather than with one of them silently missing.
+         */
+        val disabledBoxTypeIds: Set<Int> = emptySet(),
         /** The names selected per product-check task. */
         val selectedProducts: Map<Int, Set<String>> = emptyMap(),
         val submitting: Boolean = false,
@@ -181,6 +188,38 @@ class ReportEditViewModel @Inject constructor(
     }
 
     // ---- The form's mutators, named as the generator names its own ----
+
+    /**
+     * Switches one type of box off, dropping what the form had answered for it.
+     *
+     * The answers go with the switch rather than staying behind a disabled block: the body this form
+     * builds sends one `items` entry per task, so a type left off with its products still selected would
+     * be sent as if it had been marked, and the saved report would claim boxes the operator said were not
+     * mounted. Switching it back on returns an empty block, which is what "this type was not used in this
+     * report" has to look like on the way out.
+     *
+     * The category's own tasks are the ones dropped, found by `categoryId` on the task rather than by
+     * position in the list, because a reload can serve the same categories in another order.
+     */
+    fun onBoxTypeChange(categoryId: Int, enabled: Boolean) =
+        _state.update { current ->
+            if (enabled) {
+                current.copy(disabledBoxTypeIds = current.disabledBoxTypeIds - categoryId)
+            } else {
+                val dropped = current.categories
+                    .asSequence()
+                    .filter { it.id == categoryId }
+                    .flatMap { it.tasks }
+                    .map { it.id }
+                    .toSet()
+                current.copy(
+                    disabledBoxTypeIds = current.disabledBoxTypeIds + categoryId,
+                    checks = current.checks - dropped,
+                    selectedProducts = current.selectedProducts - dropped,
+                    temperatures = current.temperatures - dropped,
+                )
+            }
+        }
 
     fun onCheckChange(taskId: Int, checked: Boolean) =
         _state.update { it.copy(checks = it.checks + (taskId to checked)) }

@@ -55,6 +55,7 @@ fun ReportEditScreen(
     onCheckChange: (Int, Boolean) -> Unit,
     onProductToggle: (Int, String, Boolean) -> Unit,
     onTemperatureChange: (Int, Int, String) -> Unit,
+    onBoxTypeChange: (Int, Boolean) -> Unit,
     onSubmit: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -68,6 +69,7 @@ fun ReportEditScreen(
         temperatures = state.temperatures,
         selectedProducts = state.selectedProducts,
         offers = state.offers,
+        disabledBoxTypeIds = state.disabledBoxTypeIds,
         missingReadings = state.missingReadings,
     )
 
@@ -128,6 +130,7 @@ fun ReportEditScreen(
                 onCheckChange = onCheckChange,
                 onProductToggle = onProductToggle,
                 onTemperatureChange = onTemperatureChange,
+                onBoxTypeChange = onBoxTypeChange,
             )
         }
 
@@ -207,6 +210,7 @@ fun ReportEditRoute(
         onCheckChange = viewModel::onCheckChange,
         onProductToggle = viewModel::onProductToggle,
         onTemperatureChange = viewModel::onTemperatureChange,
+        onBoxTypeChange = viewModel::onBoxTypeChange,
         onSubmit = viewModel::submit,
         onBack = onBack,
     )
