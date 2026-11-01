@@ -132,6 +132,60 @@ class HistoryComponentsTest {
     }
 
     @Test
+    fun `a record's date is drawn with the app's own calendar and not a printed emoji date`() {
+        composeRule.setContent {
+            TrindadeTheme {
+                Box(modifier = Modifier.width(411.dp)) {
+                    HistoryRecordCard(
+                        onClick = {},
+                        modifier = Modifier.testTag("record"),
+                        lines = { HistoryDateLabel(date = "30/10/2026") },
+                    )
+                }
+            }
+        }
+
+        // One date, and the one the record carries: the emoji this used to prefix drew a calendar page
+        // printing "JUL 17", so every card showed a second, identical date that no record had.
+        composeRule.onNodeWithText("30/10/2026", useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithText("📅 30/10/2026", useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun `a record's action is a text action that still reaches 48dp`() {
+        var deleted = 0
+        var deactivated = 0
+        composeRule.setContent {
+            TrindadeTheme {
+                Box(modifier = Modifier.width(411.dp)) {
+                    HistoryRecordCard(
+                        onClick = {},
+                        modifier = Modifier.testTag("record"),
+                        lines = { Text("Horário de 12/03") },
+                        footer = {
+                            HistoryActionButton(text = "Desativar", onClick = { deactivated++ })
+                            HistoryActionButton(text = "Excluir", onClick = { deleted++ }, destructive = true)
+                        },
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("Excluir", useUnmergedTree = true).performClick()
+        composeRule.onNodeWithText("Desativar", useUnmergedTree = true).performClick()
+        assertEquals(1, deleted)
+        assertEquals(1, deactivated)
+
+        for (label in listOf("Desativar", "Excluir")) {
+            // Measured on the button, not its label: the text is one line tall and the target that has to
+            // reach 48dp is the thing a thumb lands on.
+            val bounds = composeRule.onNodeWithText(label).getUnclippedBoundsInRoot()
+            val height = bounds.bottom - bounds.top
+            assertTrue("\"$label\" must stay reachable: $height is under the 48dp target", height >= 48.dp)
+        }
+    }
+
+    @Test
     fun `the pager says which page it is on and refuses one that is not there`() {
         composeRule.setContent {
             TrindadeTheme {

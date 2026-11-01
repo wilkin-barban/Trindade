@@ -144,7 +144,6 @@
     <string name="loading_history_filtered">Cargamentos de %1$s</string>
     <!-- Labelled, because the loading date is not the batch date above it on six days out of seven. -->
     <string name="loading_history_loading_date">Cargamento: %1$s</string>
-    <string name="loading_history_loadings">%1$d cargamentos</string>
     <string name="loading_history_empty">No se encontraron cargamentos para este período.</string>
     <!-- The batch's own date, so the confirmation names the day the operator is about to lose. -->
     <string name="loading_history_delete_confirm_title">¿Eliminar el cargamento de %1$s?</string>
@@ -596,7 +595,6 @@
     <string name="massas_worker_subtotal">Subtotal de %1$s</string>
     <string name="massas_close">Cerrar</string>
     <string name="massas_history_select_date">Seleccione la Fecha</string>
-    <string name="massas_history_days_count">%1$d días registrados</string>
     <string name="massas_back_to_history">Volver al Historial</string>
 
     <!-- Module Help Dialog Content Strings -->
@@ -952,4 +950,28 @@
     <string name="admin_integration_test">Probar conexión</string>
     <string name="admin_integration_save">Guardar</string>
     <string name="admin_integration_locked">Sólo el propietario cambia la dirección.</string>
+    <plurals name="loading_history_loadings">
+        <item quantity="one">%1$d carga</item>
+        <item quantity="other">%1$d cargas</item>
+    </plurals>
+    <plurals name="massas_history_days_count">
+        <item quantity="one">%1$d día registrado</item>
+        <item quantity="other">%1$d días registrados</item>
+    </plurals>
+    <plurals name="massas_history_boxes">
+        <item quantity="one">%1$d caja</item>
+        <item quantity="other">%1$d cajas</item>
+    </plurals>
+    <plurals name="massas_history_units">
+        <item quantity="one">%1$d unidad</item>
+        <item quantity="other">%1$d unidades</item>
+    </plurals>
+    <plurals name="massas_history_products">
+        <item quantity="one">%1$d producto lanzado</item>
+        <item quantity="other">%1$d productos lanzados</item>
+    </plurals>
+    <plurals name="massas_history_operators">
+        <item quantity="one">%1$d operador</item>
+        <item quantity="other">%1$d operadores</item>
+    </plurals>
 </resources>

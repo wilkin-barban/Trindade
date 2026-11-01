@@ -47,6 +47,10 @@ class LoadingHistoryScreenTest {
 
     private fun copy(id: Int, vararg args: Any): String = context.getString(id, *args)
 
+    /** One of the history's counted sentences; a plural is not reachable through [copy]'s resource id. */
+    private fun quantity(id: Int, count: Int): String =
+        context.resources.getQuantityString(id, count, count)
+
     @Test
     fun `navigation back and filter actions meet 48dp touch targets and invoke callbacks`() {
         var backed = 0
@@ -383,7 +387,7 @@ class LoadingHistoryScreenTest {
         val dateNode = composeRule.onNodeWithText(displayDate("2026-09-18"), substring = true).performScrollTo()
         assertWithinViewport(dateNode)
 
-        val loadingsNode = composeRule.onNodeWithText(copy(R.string.loading_history_loadings, 3)).performScrollTo()
+        val loadingsNode = composeRule.onNodeWithText(quantity(R.plurals.loading_history_loadings, 3)).performScrollTo()
         assertWithinViewport(loadingsNode)
 
         val inactiveNode = composeRule.onNodeWithText(copy(R.string.history_inactive)).performScrollTo()
@@ -453,7 +457,7 @@ class LoadingHistoryScreenTest {
         val dateNode = composeRule.onNodeWithText(displayDate("2026-09-18"), substring = true).performScrollTo()
         assertWithinViewport(dateNode)
 
-        val loadingsNode = composeRule.onNodeWithText(copy(R.string.loading_history_loadings, 3)).performScrollTo()
+        val loadingsNode = composeRule.onNodeWithText(quantity(R.plurals.loading_history_loadings, 3)).performScrollTo()
         assertWithinViewport(loadingsNode)
 
         val inactiveNode = composeRule.onNodeWithText(copy(R.string.history_inactive)).performScrollTo()

@@ -25,13 +25,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.trindade.app.ui.components.HistoryActionButton
 import com.trindade.app.R
 import com.trindade.app.contract.models.ReportsResponseReportsInner
-import com.trindade.app.ui.components.AdminDestructiveButton
 import com.trindade.app.ui.components.AdminDestructiveConfirmButton
 import com.trindade.app.ui.components.AdminSecondaryButton
 import com.trindade.app.ui.components.HistoryEmptyState
 import com.trindade.app.ui.components.HistoryErrorBanner
+import com.trindade.app.ui.components.HistoryDateLabel
 import com.trindade.app.ui.components.HistoryHeader
 import com.trindade.app.ui.components.HistoryLoading
 import com.trindade.app.ui.components.HistoryPager
@@ -154,16 +155,17 @@ fun ReportsHistoryScreen(
                         // `== true` inside those two predicates rather than a role decided here: this client
                         // does not know the caller's role, and the flag is the server's own answer to that.
                         if (offersDeactivate(report)) {
-                            AdminSecondaryButton(
+                            HistoryActionButton(
                                 onClick = { onDeactivate(report.id) },
                                 enabled = !state.busy,
                                 text = stringResource(R.string.history_deactivate),
                             )
                         }
                         if (offersDelete(report)) {
-                            AdminDestructiveButton(
+                            HistoryActionButton(
                                 onClick = { confirmingDelete = report.id },
                                 enabled = !state.busy,
+                                destructive = true,
                                 text = stringResource(R.string.history_delete),
                             )
                         }
@@ -176,10 +178,7 @@ fun ReportsHistoryScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
                     ) {
-                        Text(
-                            text = "📅 " + displayDate(report.reportDate),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
+                        HistoryDateLabel(date = displayDate(report.reportDate))
                         Text(text = turnoLabel(report.turno), style = MaterialTheme.typography.bodyMedium)
                         // `== false`, and not `!= true`: the badge is a claim that the report is inactive,
                         // and an absent flag is not a claim about anything. The five lifecycle flags are

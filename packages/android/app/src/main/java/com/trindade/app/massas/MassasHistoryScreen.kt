@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -19,6 +20,7 @@ import com.trindade.app.R
 import com.trindade.app.ui.components.HelpSection
 import com.trindade.app.ui.components.HistoryEmptyState
 import com.trindade.app.ui.components.HistoryErrorBanner
+import com.trindade.app.ui.components.HistoryDateLabel
 import com.trindade.app.ui.components.HistoryHeader
 import com.trindade.app.ui.components.HistoryLoading
 import com.trindade.app.ui.components.HistoryRecordCard
@@ -64,7 +66,7 @@ fun MassasHistoryScreen(
         // says it is loading, and one that can fail on its own.
         HistoryHeader(
             title = stringResource(R.string.massas_history_title),
-            subtitle = stringResource(R.string.massas_history_days_count, state.days.size),
+            subtitle = pluralStringResource(R.plurals.massas_history_days_count, state.days.size, state.days.size),
             onBack = onBack,
             onHelp = { viewModel.toggleHelpDialog(true) },
         )
@@ -91,17 +93,39 @@ fun MassasHistoryScreen(
                         onClick = { onSelectDate(day.date) },
                         action = "Abrir ›",
                         lines = {
-                            Text(
-                                text = "📅 " + brazilianDate(day.date),
+                            HistoryDateLabel(
+                                date = brazilianDate(day.date),
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                             )
                             Text(
-                                text = "${day.totalBoxes} caixas · ${day.totalUnits} unidades",
+                                text = listOf(
+                                    pluralStringResource(
+                                        R.plurals.massas_history_boxes,
+                                        day.totalBoxes,
+                                        day.totalBoxes,
+                                    ),
+                                    pluralStringResource(
+                                        R.plurals.massas_history_units,
+                                        day.totalUnits,
+                                        day.totalUnits,
+                                    ),
+                                ).joinToString(" · "),
                                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                                 color = MaterialTheme.colorScheme.primary,
                             )
                             Text(
-                                text = "${day.productsCount} produtos lançados · ${day.operatorsCount} operadores",
+                                text = listOf(
+                                    pluralStringResource(
+                                        R.plurals.massas_history_products,
+                                        day.productsCount,
+                                        day.productsCount,
+                                    ),
+                                    pluralStringResource(
+                                        R.plurals.massas_history_operators,
+                                        day.operatorsCount,
+                                        day.operatorsCount,
+                                    ),
+                                ).joinToString(" · "),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )

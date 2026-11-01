@@ -21,16 +21,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.trindade.app.ui.components.HistoryActionButton
 import com.trindade.app.R
 import com.trindade.app.contract.models.ScheduleHistoryResponseItemsInner
-import com.trindade.app.ui.components.AdminDestructiveButton
 import com.trindade.app.ui.components.AdminDestructiveConfirmButton
 import com.trindade.app.ui.components.AdminSecondaryButton
 import com.trindade.app.ui.components.HistoryEmptyState
 import com.trindade.app.ui.components.HistoryErrorBanner
+import com.trindade.app.ui.components.HistoryDateLabel
 import com.trindade.app.ui.components.HistoryHeader
 import com.trindade.app.ui.components.HistoryLoading
 import com.trindade.app.ui.components.HistoryPager
@@ -241,16 +243,17 @@ private fun BatchCard(
                 // `canDelete` is known to overstate a Trabalhador on this route, which is why the refusal
                 // has a sentence of its own rather than being folded into "it failed".
                 if (offersDeactivate(batch)) {
-                    AdminSecondaryButton(
+                    HistoryActionButton(
                         onClick = onDeactivate,
                         enabled = !busy,
                         text = stringResource(R.string.history_deactivate),
                     )
                 }
                 if (offersDelete(batch)) {
-                    AdminDestructiveButton(
+                    HistoryActionButton(
                         onClick = onDelete,
                         enabled = !busy,
+                        destructive = true,
                         text = stringResource(R.string.history_delete),
                     )
                 }
@@ -263,12 +266,13 @@ private fun BatchCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
             ) {
+                HistoryDateLabel(date = displayDate(batch.batchDate))
                 Text(
-                    text = "📅 " + displayDate(batch.batchDate),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Text(
-                    text = stringResource(R.string.loading_history_loadings, batch.totalLoadings),
+                    text = pluralStringResource(
+                        R.plurals.loading_history_loadings,
+                        batch.totalLoadings,
+                        batch.totalLoadings,
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 // Plain negation rather than the report history's `== false`: this contract declares
