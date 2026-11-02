@@ -272,6 +272,63 @@ test.describe('Loading Schedule — Fletero Assignment and Quota', () => {
     }
   });
 
+  /**
+   * A refused row is reported inside the picker, not in a second modal over it.
+   *
+   * The server is the one that refuses -- a plate taken from the tablet a minute ago, a day that moved to the
+   * history -- so the refusal is faked here at the network and the surface is what is asserted: one dialog,
+   * one line with the row and its reason, and the two actions the result step has.
+   */
+  test('4.2 reports a refused batch in a step inside the picker', async ({ page }) => {
+    const date = today();
+    const stamp = Date.now();
+    const refused = await apiPost(page, '/loading/drivers', { name: `Refused ${stamp}` });
+    const accepted = await apiPost(page, '/loading/drivers', { name: `Accepted ${stamp}` });
+
+    let posts = 0;
+    await page.route('**/api/loading/schedules', async (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      posts += 1;
+      if (posts === 1) {
+        return route.fulfill({
+          status: 409,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            error: 'Vehicle already scheduled',
+            code: 'DRIVER_ALREADY_SCHEDULED',
+            field: 'driver_id',
+            existing: { time_slot: '04:00' },
+          }),
+        });
+      }
+      return route.continue();
+    });
+
+    await page.reload();
+    await page.waitForSelector('[data-testid="schedule-grid"]', { timeout: 10000 });
+    await page.locator('[data-testid="add-fletero-05-00"]').click();
+    const modal = page.locator('[data-testid="driver-select-05-00"]');
+    await expect(modal).toBeVisible();
+
+    await page.locator(`[data-testid="driver-option-${refused.data.driver.id}"] input[type="checkbox"]`).check();
+    await page.locator(`[data-testid="driver-option-${accepted.data.driver.id}"] input[type="checkbox"]`).check();
+    await page.locator('[data-testid="driver-select-accept"]').click();
+
+    // One dialog, still open, with the refused row named: the slot is half done and the retry has it alone.
+    await expect(page.locator('[data-testid="driver-select-failures"]')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('dialog')).toHaveCount(1);
+    await expect(page.locator(`[data-testid="driver-select-failure-${refused.data.driver.id}"]`)).toContainText(
+      `Refused ${stamp}`
+    );
+    await expect(page.locator('[data-testid="driver-select-retry"]')).toBeVisible();
+    await expect(page.locator('[data-testid="driver-select-accept"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="schedule-grid"]')).toBeVisible();
+
+    await page.unroute('**/api/loading/schedules');
+    await page.locator('[data-testid="driver-select-retry"]').click();
+    await expect(modal).toBeHidden({ timeout: 15000 });
+  });
+
   test('4.2 can create a new fletero via quick-add form', async ({ page }) => {
     // Click add fletero on 04:00 slot
     await page.locator('[data-testid="add-fletero-04-00"]').click();

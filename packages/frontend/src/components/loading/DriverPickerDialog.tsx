@@ -30,7 +30,6 @@ export interface DriverPickerDialogProps {
   busy: readonly { id: number; name: string; timeSlot: string }[];
   /** How many plates the plant has at all, which is what tells an empty fleet from a full day. */
   fleetSize: number;
-  error: string;
   /** The rows the last batch could not send, each with the reason the server gave for that row. */
   failures: readonly { driverId: number; name: string; message: string }[];
   onRetry: () => void;
@@ -67,7 +66,6 @@ export function DriverPickerDialog({
   plateRepeated,
   busy,
   fleetSize,
-  error,
   failures,
   onRetry,
   assigning,
@@ -130,12 +128,6 @@ export function DriverPickerDialog({
         </div>
 
         <div className="px-4 py-2 overflow-y-auto min-h-0" role="tabpanel">
-          {error && (
-            <p className="mb-2 text-sm text-red-600" role="alert" data-testid="driver-select-error">
-              {error}
-            </p>
-          )}
-
           {/* One sentence per refused row, with the name in it: a batch that half landed owes the operator
               the specific rows that did not, not a count to hunt for in the list. */}
           {failures.length > 0 && (
@@ -285,18 +277,28 @@ export function DriverPickerDialog({
               {t('loading.pickerRetry')}
             </Button>
           )}
-          <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={assigning} data-testid="driver-select-close">
-            {t('ui.cancel')}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            onClick={onAccept}
-            disabled={assigning || picked.size === 0}
-            data-testid="driver-select-accept"
-          >
-            {assigning ? t('ui.loading') : t('loading.pickerAccept')}
-          </Button>
+          {/* While rows are owed the footer is the result step's: send those rows again, or close. Accepting
+              here would send exactly what the retry sends -- the picks left are the refused ones. */}
+          {failures.length > 0 ? (
+            <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={assigning} data-testid="driver-select-close">
+              {t('ui.close')}
+            </Button>
+          ) : (
+            <>
+              <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={assigning} data-testid="driver-select-close">
+                {t('ui.cancel')}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={onAccept}
+                disabled={assigning || picked.size === 0}
+                data-testid="driver-select-accept"
+              >
+                {assigning ? t('ui.loading') : t('loading.pickerAccept')}
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </Dialog>

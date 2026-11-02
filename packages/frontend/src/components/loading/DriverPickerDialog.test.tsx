@@ -118,10 +118,35 @@ describe('DriverPickerDialog', () => {
     expect(screen.getByTestId('driver-select-plate-missing')).toHaveTextContent('Silvana Casa');
   });
 
-  it('shows the refusal the batch came back with, over the list it belongs to', () => {
-    renderDialog({ error: 'Vehículo ya programado en esta fecha.' });
 
-    expect(screen.getByTestId('driver-select-error')).toHaveTextContent('Vehículo ya programado');
+  /**
+   * The result of a batch is a step inside this dialog, not a modal over a modal.
+   *
+   * A second dialog for a half-sent slot buries the list the operator just used and stacks two overlays with
+   * two closers: closing the top one lands on a stale copy of the same batch.
+   */
+  it('lists every refused row with its name and reason, in one dialog', () => {
+    renderDialog({
+      failures: [
+        { driverId: 4, name: 'Silvana Casa', message: 'Vehículo ya programado en esta fecha.' },
+        { driverId: 5, name: 'Joana Casa', message: 'Motorista ya programado en este lote.' },
+      ],
+    });
+
+    expect(screen.getByTestId('driver-select-failure-4')).toHaveTextContent('Silvana Casa');
+    expect(screen.getByTestId('driver-select-failure-4')).toHaveTextContent('Vehículo ya programado');
+    expect(screen.getByTestId('driver-select-failure-5')).toHaveTextContent('Joana Casa');
+    expect(screen.getByTestId('driver-select-failure-5')).toHaveTextContent('Motorista ya programado');
+    expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+  });
+
+  it('offers the retry and the close, and no second accept, while rows are owed', () => {
+    renderDialog({ failures: [{ driverId: 4, name: 'Silvana Casa', message: 'Vehículo ya programado.' }] });
+
+    expect(screen.getByTestId('driver-select-retry')).toBeInTheDocument();
+    expect(screen.getByTestId('driver-select-close')).toBeInTheDocument();
+    // Accepting again would send exactly what the retry sends: two controls, one effect.
+    expect(screen.queryByTestId('driver-select-accept')).toBeNull();
   });
 
   it('names each refused row beside the retry that sends only those', () => {

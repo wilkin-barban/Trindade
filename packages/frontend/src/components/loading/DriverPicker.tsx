@@ -62,7 +62,6 @@ export function DriverPicker({
   const [showForm, setShowForm] = useState(false);
   const [picked, setPicked] = useState<PickedPlates>(new Map());
   const [assigning, setAssigning] = useState(false);
-  const [error, setError] = useState('');
   const [plateMissing, setPlateMissing] = useState<string[]>([]);
   const [plateRepeated, setPlateRepeated] = useState<string[]>([]);
   const [failures, setFailures] = useState<Refused[]>([]);
@@ -105,7 +104,6 @@ export function DriverPicker({
     setPicked((current) => togglePick(current, driver.id));
     setPlateMissing([]);
     setPlateRepeated([]);
-    setError('');
   }
 
   function pickVehicle(driverId: number, raw: string) {
@@ -116,7 +114,6 @@ export function DriverPicker({
 
   async function send(rows: ReturnType<typeof batchRows>) {
     setAssigning(true);
-    setError('');
     setFailures([]);
 
     const refused: Refused[] = [];
@@ -217,7 +214,6 @@ export function DriverPicker({
       plateRepeated={plateRepeated}
       busy={alreadyThere}
       fleetSize={vehicles.length}
-      error={error}
       failures={failures}
       onRetry={retry}
       assigning={assigning}

@@ -531,6 +531,12 @@ Cada tarea declara objetivo, archivos, tests exactos, aceptación, commit espera
 - **Aceptación**: una tanda con dos rechazos muestra dos líneas y un solo modal.
 - **Commit**: `feat(web): show batch refusals in one result step` (~220 líneas).
 - **Depende de**: T15, T16.
+- **Estado.** Hecho: el paso de resultado vive dentro del `DriverPickerDialog` (una línea por fila rechazada) y
+  el pie pasa a Reintentar + Cerrar mientras queden filas; el estado `error` muerto se eliminó junto con su
+  prop y su bloque. Tests: `DriverPickerDialog` (`lists every refused row with its name and reason, in one
+  dialog`, `offers the retry and the close, and no second accept, while rows are owed`) y
+  `loading-schedule.spec.ts` (`4.2 reports a refused batch in a step inside the picker`); 111 vitest y 13/13
+  e2e en verde.
 
 #### T19 — Resultado en ventana (Android)
 - **Specs**: S45.
