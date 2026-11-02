@@ -125,7 +125,10 @@ export function LoadingSchedulePage() {
   }
 
   // ---- Loading state ----
-  if (loading) {
+  // The spinner is for the first read of the day, not for every reload: a batch that lands reloads the grid
+  // while the modal is open, and replacing the page with a spinner would close the modal and take with it the
+  // rows the server refused -- the ones the operator still has to send.
+  if (loading && schedules.length === 0) {
     return (
       <div className="flex items-center justify-center py-16">
         <LoadingSpinner />

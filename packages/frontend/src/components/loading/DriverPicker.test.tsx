@@ -112,6 +112,28 @@ describe('DriverPicker', () => {
     expect(post.mock.calls[0][1]).toMatchObject({ driver_id: 4, vehicle_id: 11 });
   });
 
+  it('sends the fletero registered in the modal as part of the same batch', async () => {
+    post.mockImplementation(async (url: string, body: { driver_id?: number; name?: string }) => {
+      if (url === '/loading/drivers') {
+        return { driver: { id: 77, name: body.name, license_plate: null, phone: null } };
+      }
+      return { schedule: { id: 100 + (body.driver_id ?? 0) } };
+    });
+    const { onClose } = await renderPicker();
+
+    // Registering him is a step of the same batch: he joins the list, comes back picked, and is sent with it.
+    fireEvent.click(screen.getByTestId('add-new-fletero-btn'));
+    fireEvent.change(screen.getByTestId('driver-form-name'), { target: { value: 'Novo Fletero' } });
+    fireEvent.click(screen.getByTestId('driver-form-submit'));
+    await waitFor(() => expect(screen.getByTestId('driver-option-77')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId('driver-select-accept'));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(post.mock.calls.map((call) => call[0])).toEqual(['/loading/drivers', '/loading/schedules']);
+    expect(post.mock.calls[1][1]).toMatchObject({ driver_id: 77, vehicle_id: null });
+  });
+
   it('withholds the batch while a picked company driver has no plate', async () => {
     await renderPicker();
 

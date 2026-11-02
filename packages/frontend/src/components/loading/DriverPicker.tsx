@@ -61,6 +61,9 @@ export function DriverPicker({
   const [error, setError] = useState('');
   const [plateMissing, setPlateMissing] = useState<string[]>([]);
   const [failures, setFailures] = useState<Refused[]>([]);
+  // A fletero registered from inside the modal. The day is not reloaded for him: that would replace the grid
+  // the modal is drawn over and close it, and the only thing that changed is one row of this list.
+  const [registered, setRegistered] = useState<PickerDriver[]>([]);
   const [vehicles, setVehicles] = useState<PickerVehicle[]>([]);
   const [vehiclesError, setVehiclesError] = useState(false);
 
@@ -78,7 +81,14 @@ export function DriverPicker({
     loadVehicles();
   }, [loadVehicles]);
 
-  const available = drivers.filter((driver) => !assignedIds.includes(driver.id));
+  // The day's drivers plus the ones registered from inside the modal. One list for both uses: the rows that
+  // are drawn and the rows the batch is built from -- reading only the props for the batch is what left a
+  // freshly registered fletero picked, listed and never sent.
+  const pool = [
+    ...drivers,
+    ...registered.filter((fresh) => !drivers.some((driver) => driver.id === fresh.id)),
+  ];
+  const available = pool.filter((driver) => !assignedIds.includes(driver.id));
 
   function pick(driver: PickerDriver) {
     setPicked((current) => togglePick(current, driver.id));
@@ -122,11 +132,11 @@ export function DriverPicker({
   }
 
   function retry() {
-    void send(batchRows(picked, drivers));
+    void send(batchRows(picked, pool));
   }
 
   function accept() {
-    const rows = batchRows(picked, drivers);
+    const rows = batchRows(picked, pool);
     const withoutPlate = rowsWithoutPlate(rows);
     if (withoutPlate.length > 0) {
       setPlateMissing(withoutPlate.map((row) => row.name));
@@ -135,12 +145,12 @@ export function DriverPicker({
     if (rows.length > 0) void send(rows);
   }
 
-  function driverSaved(driver: { id: number }) {
-    // A fletero registered here is one the operator wants on this slot: he is picked straight away and the
-    // list behind the form reloads so his row is drawn like any other.
+  function driverSaved(driver: { id: number; name: string; license_plate: string | null }) {
+    // A fletero registered here is one the operator wants on this slot: he joins the list and is picked
+    // straight away, so registering him is one step of the same batch instead of a detour.
+    setRegistered((current) => [...current, { ...driver, driver_type: 'fletero' }]);
     setPicked((current) => new Map(current).set(driver.id, null));
     setShowForm(false);
-    onRefresh();
   }
 
   const quickAdd = showForm ? (

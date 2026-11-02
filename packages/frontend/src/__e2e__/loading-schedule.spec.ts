@@ -177,11 +177,16 @@ test.describe('Loading Schedule — Fletero Assignment and Quota', () => {
     await page.locator('[data-testid="add-fletero-05-00"]').click();
     await expect(page.locator(`[data-testid="driver-option-${driverId}"]`)).not.toBeVisible();
 
+    // The picker is a modal now, so the day is not clickable behind it: the entry is removed first and the
+    // modal is opened again, which is the same claim -- a driver removed from the day is offered again.
+    await page.locator('[data-testid="driver-select-close"]').click();
+
     const removeButton = page.locator(`[data-testid="delete-entry-${scheduleId}"]`);
     await expect(removeButton).toBeVisible();
     await removeButton.click();
 
     await expect(page.locator(`[data-testid="entry-${scheduleId}"]`)).not.toBeVisible();
+    await page.locator('[data-testid="add-fletero-05-00"]').click();
     await expect(page.locator(`[data-testid="driver-option-${driverId}"]`)).toBeVisible();
   });
 
@@ -218,6 +223,55 @@ test.describe('Loading Schedule — Fletero Assignment and Quota', () => {
     await expect(page.locator(`[data-testid="driver-option-${driverId}"]`)).toBeVisible();
   });
 
+  /**
+   * One opening for the whole slot.
+   *
+   * Thirteen loads are thirteen drivers, and the panel this replaced asked for the slot to be reopened for
+   * each one. The test opens the modal once, picks three fleteros and accepts: the grid has to show all three
+   * without a second opening, and the modal has to be gone once the batch landed.
+   */
+  test('4.2 assigns three fleteros from a single opening of the modal', async ({ page }) => {
+    const date = today();
+    const existing = await apiGet<{ schedules: Array<{ id: number; driver_name: string | null }> }>(
+      page,
+      `/loading/schedules?date=${date}`
+    );
+    for (const entry of existing.schedules) {
+      if (entry.id && entry.driver_name?.startsWith('Batch')) {
+        await apiDelete(page, `/loading/schedules/${entry.id}`);
+      }
+    }
+
+    const stamp = Date.now();
+    const names = [1, 2, 3].map((i) => `Batch ${stamp} ${i}`);
+    const ids: number[] = [];
+    for (const [index, name] of names.entries()) {
+      const created = await apiPost(page, '/loading/drivers', {
+        name,
+        license_plate: `BT-${index}${stamp % 1000}`,
+      });
+      ids.push(created.data.driver.id);
+    }
+
+    await page.reload();
+    await page.waitForSelector('[data-testid="schedule-grid"]', { timeout: 10000 });
+    await page.locator('[data-testid="add-fletero-04-00"]').click();
+    const modal = page.locator('[data-testid="driver-select-04-00"]');
+    await expect(modal).toBeVisible();
+
+    for (const id of ids) {
+      await page.locator(`[data-testid="driver-option-${id}"] input[type="checkbox"]`).check();
+    }
+    // The counter is read by its number and not by its sentence: the suite runs in more than one language.
+    await expect(page.locator('[data-testid="driver-select-count"]')).toHaveText(/^3\b/);
+    await page.locator('[data-testid="driver-select-accept"]').click();
+
+    await expect(modal).toBeHidden({ timeout: 15000 });
+    for (const name of names) {
+      await expect(page.locator('[data-testid="time-slot-04-00"]')).toContainText(name);
+    }
+  });
+
   test('4.2 can create a new fletero via quick-add form', async ({ page }) => {
     // Click add fletero on 04:00 slot
     await page.locator('[data-testid="add-fletero-04-00"]').click();
@@ -236,12 +290,11 @@ test.describe('Loading Schedule — Fletero Assignment and Quota', () => {
     // Submit
     await page.locator('[data-testid="driver-form-submit"]').click();
 
-    // Driver should be assigned and driver select should close
-    // Grid should refresh — the new driver assignment should appear
-    // Wait for the driver select to disappear (assignment + grid refresh)
-    await page.waitForSelector('[data-testid="driver-select-04-00"]', { state: 'detached', timeout: 10000 }).catch(() => {
-      // might already be gone
-    });
+    // The newly registered fletero comes back picked, waiting for the same accept as the rest of the batch:
+    // registering him is not assigning him, and the modal does not close until the batch is sent.
+    await expect(page.locator('[data-testid="driver-select-count"]')).toHaveText(/^1\b/);
+    await page.locator('[data-testid="driver-select-accept"]').click();
+    await page.waitForSelector('[data-testid="driver-select-04-00"]', { state: 'detached', timeout: 15000 });
 
     // The quota indicator should now show at least 1/3
     const quota = page.locator('[data-testid="quota-04-00"]');
