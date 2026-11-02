@@ -238,7 +238,19 @@
     "shareCopied": "Texto copiado para compartir.",
     "shareUnavailable": "Este navegador no puede compartir ni copiar.",
     "driverAlreadyScheduled": "Conductor ya programado en este lote de carga.",
-    "vehicleAlreadyScheduled": "Vehículo ya programado en esta fecha."
+    "vehicleAlreadyScheduled": "Vehículo ya programado en esta fecha.",
+    "pickerTitle": "Conductores del horario {{slot}}",
+    "pickerHint": "Elegí uno o más conductores para este horario.",
+    "pickerTabFleteros": "Fleteros",
+    "pickerTabCasa": "Conductores de casa",
+    "pickerPlate": "Chapa",
+    "pickerPlateFor": "Chapa de {{name}}",
+    "pickerSelected": "{{count}} seleccionados",
+    "pickerPlateMissing": "Falta la chapa de {{names}} para continuar.",
+    "pickerAccept": "Aceptar",
+    "pickerRetry": "Reintentar",
+    "pickerEmpty": "Ningún conductor disponible.",
+    "pickerFailureFor": "No se pudo asignar a {{name}}: {{message}}"
   },
   "admin": {
     "title": "Administración",

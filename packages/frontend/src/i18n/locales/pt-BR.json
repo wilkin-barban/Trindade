@@ -238,7 +238,19 @@
     "shareCopied": "Texto copiado para compartilhar.",
     "shareUnavailable": "Este navegador não consegue compartilhar nem copiar.",
     "driverAlreadyScheduled": "Motorista já agendado neste lote de carregamento.",
-    "vehicleAlreadyScheduled": "Veículo já agendado nesta data."
+    "vehicleAlreadyScheduled": "Veículo já agendado nesta data.",
+    "pickerTitle": "Motoristas do horário {{slot}}",
+    "pickerHint": "Selecione um ou mais motoristas para este horário.",
+    "pickerTabFleteros": "Fleteros",
+    "pickerTabCasa": "Motoristas da casa",
+    "pickerPlate": "Chapa",
+    "pickerPlateFor": "Chapa de {{name}}",
+    "pickerSelected": "{{count}} selecionados",
+    "pickerPlateMissing": "Escolha a chapa de {{names}} para continuar.",
+    "pickerAccept": "Aceitar",
+    "pickerRetry": "Tentar de novo",
+    "pickerEmpty": "Nenhum motorista disponível.",
+    "pickerFailureFor": "Não foi possível agendar {{name}}: {{message}}"
   },
   "admin": {
     "title": "Administração",
