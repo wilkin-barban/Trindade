@@ -311,6 +311,14 @@ S19 — D5/D7, verbatim:
   vuelve al día por defecto. Verificado en 390×844 y en escritorio (S18).
 - **Commit esperado.** `feat(web): give the stock history a day picker and recent days` · ~200 líneas.
 - **Depende.** T6.
+- **Hecho.** `3868188`. En vez de un diálogo de calendario propio se extendió `DateField` con la variante
+  `panel`: el calendario sigue siendo el del sistema, que es lo que el teléfono usa (`DatePickerDialog`), y no
+  se duplica la lógica de `showPicker()` que T6 ya resolvió. Los chips son el segundo control que la tarea
+  pedía; el "limpiar" no aplica porque el día por defecto es ayer y el chip de ayer está siempre a un toque.
+  - Evidencia: `npm run test:node` 480/480, `npm run test:unit` 15/15, `stock-history.spec.ts` 2/2 en 390×844
+    y 1280×800, backend 667/667 (por el registro de rutas de contagem en el servidor e2e).
+  - Hallazgo: el servidor e2e no registraba `stockRoutes`, así que esta pantalla respondía 404 en las pruebas
+    de navegador; ahora las sirve como producción. Verificado en capturas a 390×844 y 1280×900.
 
 ### T9 · Web: historiales de Reportes y Cargas recargan al elegir fecha
 
@@ -679,7 +687,7 @@ recorta alcance **con aprobación explícita**, nunca moviéndolas a otro ODD po
 | T5 | A | `feat(aero): record the paths that were operating without a trace` | `aero-audit.test.ts`, `MassasLaunchViewModelTest.kt` |
 | T6 | B | `fix(web): make the date control open its calendar on a desktop click` | `DateField.test.tsx`, `date-field.spec.ts` |
 | T7 | B, S2 | `e676cf0` `feat(massas): elegir el día del histórico desde una lista` + `01c5b01` `test(massas): cubrir la elección de día del histórico` | `MassasHistoryPage.test.tsx` 5/5, `massas-history.spec.ts` 2/2 |
-| T8 | B | `feat(web): give the stock history a day picker and recent days` | `StockHistoryPage.test.tsx`, `stock-history.spec.ts` |
+| T8 | B | `3868188` `feat(stock): elegir el día del histórico desde un panel y los días contados` | `StockHistoryPage.test.tsx` 3/3, `stock-history.spec.ts` 2/2 |
 | T9 | B | `fix(web): reload the report and loading histories when the day changes` | `ReportHistoryPage.test.tsx`, `LoadingHistoryPage.test.tsx` |
 | T10 | C, S3 | `feat(web): read the dashboard as six cards and one summary panel` | `DashboardPage.test.tsx`, `dashboard.spec.ts` |
 | T11 | D | `feat(web): switch a box type off together with its tasks` | `CategorySection.test.tsx` |
