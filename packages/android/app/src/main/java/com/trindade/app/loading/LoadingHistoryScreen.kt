@@ -27,7 +27,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trindade.app.R
 import com.trindade.app.contract.models.ScheduleHistoryResponseItemsInner
+import com.trindade.app.ui.components.ActionResultDialog
 import com.trindade.app.ui.components.AdminDestructiveConfirmButton
+import com.trindade.app.ui.components.AdminPrimaryButton
 import com.trindade.app.ui.components.AdminSecondaryButton
 import com.trindade.app.ui.components.HistoryEmptyState
 import com.trindade.app.ui.components.HistoryErrorBanner
@@ -41,6 +43,7 @@ import com.trindade.app.ui.components.HistoryRecordCard
 import com.trindade.app.ui.components.MonthPickerDialog
 import com.trindade.app.ui.displayDate
 import com.trindade.app.ui.displayMonth
+import com.trindade.app.ui.resolve
 import com.trindade.app.ui.saoPauloLocalDate
 import java.time.LocalDate
 import java.util.Locale
@@ -74,7 +77,9 @@ fun LoadingHistoryScreen(
     onNext: () -> Unit,
     onRetry: () -> Unit,
     onDeactivate: (String) -> Unit,
+    onActivate: (String) -> Unit = {},
     onDelete: (String) -> Unit,
+    onDismissResult: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -90,6 +95,15 @@ fun LoadingHistoryScreen(
      * asks twice.
      */
     var confirmingDelete by remember { mutableStateOf<String?>(null) }
+
+    /**
+     * The batch a reactivation is waiting to be confirmed for, as its date, or null when nothing is.
+     *
+     * Reactivating is the reverse of deactivating and lands in front of every tablet that opens the day, so
+     * the tap asks before it acts -- the same reason the delete does, for an effect that is visible to the
+     * whole shift rather than destructive.
+     */
+    var confirmingActivate by remember { mutableStateOf<String?>(null) }
 
     LazyColumn(
         modifier = modifier.fillMaxSize().padding(16.dp),
@@ -150,6 +164,7 @@ fun LoadingHistoryScreen(
                 busy = state.busy,
                 onOpen = { onOpenBatch(batch) },
                 onDeactivate = { onDeactivate(batch.batchDate) },
+                onActivate = { confirmingActivate = batch.batchDate },
                 onDelete = { confirmingDelete = batch.batchDate },
             )
         }
@@ -181,6 +196,36 @@ fun LoadingHistoryScreen(
                 pickingMonth = false
                 onMonthSelected(it)
             },
+        )
+    }
+
+    confirmingActivate?.let { batchDate ->
+        AlertDialog(
+            onDismissRequest = { confirmingActivate = null },
+            title = { Text(stringResource(R.string.loading_history_activate_confirm_title, displayDate(batchDate))) },
+            text = { Text(stringResource(R.string.loading_history_activate_confirm_body)) },
+            confirmButton = {
+                AdminPrimaryButton(
+                    onClick = {
+                        confirmingActivate = null
+                        onActivate(batchDate)
+                    },
+                    text = stringResource(R.string.history_activate),
+                )
+            },
+            dismissButton = {
+                AdminSecondaryButton(onClick = { confirmingActivate = null }, text = stringResource(R.string.loading_cancel))
+            },
+        )
+    }
+
+    // The activation's own answer, in the window the rest of the app answers through. Drawn from the
+    // state rather than remembered here, so a reload that redraws the card cannot swallow it.
+    state.resultMessage?.let { result ->
+        ActionResultDialog(
+            message = result.resolve(),
+            isSuccess = true,
+            onDismiss = onDismissResult,
         )
     }
 
@@ -221,12 +266,13 @@ private fun BatchCard(
     busy: Boolean,
     onOpen: () -> Unit,
     onDeactivate: () -> Unit,
+    onActivate: () -> Unit,
     onDelete: () -> Unit,
 ) {
     HistoryRecordCard(
         onClick = onOpen,
         enabled = !busy,
-        actions = if (offersDeactivate(batch) || offersDelete(batch)) {
+        actions = if (offersDeactivate(batch) || offersActivate(batch) || offersDelete(batch)) {
             {
                 // Each action is drawn only where the server said it would be accepted, which is the
                 // `== true` inside those two predicates rather than a role decided here: this client does
@@ -238,6 +284,14 @@ private fun BatchCard(
                         iconRes = R.drawable.ic_deactivate,
                         label = stringResource(R.string.history_deactivate),
                         onClick = onDeactivate,
+                        enabled = !busy,
+                    )
+                }
+                if (offersActivate(batch)) {
+                    HistoryIconAction(
+                        iconRes = R.drawable.ic_activate,
+                        label = stringResource(R.string.history_activate),
+                        onClick = onActivate,
                         enabled = !busy,
                     )
                 }
@@ -352,7 +406,9 @@ fun LoadingHistoryRoute(
         onPrevious = viewModel::previous,
         onNext = viewModel::next,
         onDeactivate = viewModel::deactivateBatch,
+        onActivate = viewModel::activateBatch,
         onDelete = viewModel::deleteBatch,
+        onDismissResult = viewModel::dismissResult,
         onRetry = { viewModel.load() },
     )
 }

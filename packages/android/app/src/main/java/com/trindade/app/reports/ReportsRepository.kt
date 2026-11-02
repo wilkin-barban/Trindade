@@ -108,6 +108,9 @@ class ReportsRepository @Inject constructor(
      */
     suspend fun deactivate(id: Int): ReportLifecycleResult = lifecycle { api.deactivate(id) }
 
+    /** Brings a deactivated report back. See [deactivate] for the failure split, which is the same one. */
+    suspend fun activate(id: Int): ReportLifecycleResult = lifecycle { api.activate(id) }
+
     /** Removes a report. See [deactivate] for the failure split, which is deliberately the same one. */
     suspend fun delete(id: Int): ReportLifecycleResult = lifecycle { api.delete(id) }
 

@@ -127,8 +127,12 @@
     <string name="history_turno_noite">Noche</string>
     <string name="history_inactive">Inactivo</string>
     <string name="history_deactivate">Desactivar</string>
+    <string name="history_activate">Reactivar</string>
     <string name="history_delete">Eliminar</string>
     <!-- The only action on this screen that asks twice: the deletion is irreversible on the server. -->
+    <string name="history_activate_confirm_title">¿Reactivar este reporte?</string>
+    <string name="history_activate_confirm_body">El reporte vuelve para todos como estaba.</string>
+    <string name="history_activated">Reporte reactivado.</string>
     <string name="history_delete_confirm_title">¿Eliminar este reporte?</string>
     <string name="history_delete_confirm_body">No se puede deshacer: se elimina para todos, no solo de esta pantalla.</string>
     <string name="history_empty">No se encontraron reportes para este período.</string>
@@ -146,6 +150,9 @@
     <string name="loading_history_loading_date">Cargamento: %1$s</string>
     <string name="loading_history_empty">No se encontraron cargamentos para este período.</string>
     <!-- The batch's own date, so the confirmation names the day the operator is about to lose. -->
+    <string name="loading_history_activate_confirm_title">¿Reactivar el cargamento de %1$s?</string>
+    <string name="loading_history_activate_confirm_body">El día vuelve para todos como estaba, con los mismos registros.</string>
+    <string name="loading_history_activated">Lote reactivado.</string>
     <string name="loading_history_delete_confirm_title">¿Eliminar el cargamento de %1$s?</string>
     <string name="loading_history_delete_confirm_body">No se puede deshacer: todos los registros de este día se eliminan para todos, no solo de esta pantalla.</string>
 

@@ -3,6 +3,7 @@ package com.trindade.app.loading
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trindade.app.contract.models.ScheduleHistoryResponseItemsInner
+import com.trindade.app.ui.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -69,6 +70,15 @@ class LoadingHistoryViewModel @Inject constructor(
          */
         val loaded: Boolean = false,
         val message: String? = null,
+        /**
+         * What an activation answered, drawn in a window the operator dismisses.
+         *
+         * A success has nowhere else to go on this screen: the error banner is a sentence about something
+         * that failed, and the re-read that follows the activation redraws the card as active without
+         * saying that anything happened. The window is the same one every other action in the app answers
+         * through, so the operator reads "it worked" in the place they already look for it.
+         */
+        val resultMessage: UiText? = null,
     ) {
         /**
          * The pagination's own bounds, and nothing invented on top of them.
@@ -204,6 +214,24 @@ class LoadingHistoryViewModel @Inject constructor(
     fun deactivateBatch(batchDate: String) =
         lifecycle(batchDate, offered = ::offersDeactivate) { repository.deactivateBatch(batchDate) }
 
+    /**
+     * Brings a deactivated batch back, keeping it in the history.
+     *
+     * The offer is the item's own `canActivate`, decided by the server for this caller and this day, and
+     * nothing else: reactivating a batch touches what every tablet draws, so it is not a decision this
+     * screen can take on its own.
+     */
+    fun activateBatch(batchDate: String) = lifecycle(
+        batchDate,
+        offered = ::offersActivate,
+        success = UiText.of(com.trindade.app.R.string.loading_history_activated),
+    ) { repository.activateBatch(batchDate) }
+
+    /** Closes the window that reported an activation. */
+    fun dismissResult() {
+        _state.update { it.copy(resultMessage = null) }
+    }
+
     /** Deletes every entry of a batch. See [lifecycle] for what may be refused. */
     fun deleteBatch(batchDate: String) =
         lifecycle(batchDate, offered = ::offersDelete) { repository.deleteBatch(batchDate) }
@@ -228,6 +256,7 @@ class LoadingHistoryViewModel @Inject constructor(
     private fun lifecycle(
         batchDate: String,
         offered: (ScheduleHistoryResponseItemsInner) -> Boolean,
+        success: UiText? = null,
         call: suspend () -> ScheduleLifecycleResult,
     ) {
         if (state.value.busy) return
@@ -239,7 +268,7 @@ class LoadingHistoryViewModel @Inject constructor(
         viewModelScope.launch {
             when (val result = call()) {
                 ScheduleLifecycleResult.Changed -> {
-                    _state.update { it.copy(busy = false) }
+                    _state.update { it.copy(busy = false, resultMessage = success) }
                     // The page on screen rather than the first one: the row that changed is on it, and a
                     // jump to page one would move the operator away from where they were reading. If the
                     // change emptied the last page, [load] steps back to the page that still has rows.
@@ -288,3 +317,12 @@ internal fun offersDeactivate(item: ScheduleHistoryResponseItemsInner): Boolean 
 
 /** Whether the server offered to delete this batch. See [offersDeactivate]. */
 internal fun offersDelete(item: ScheduleHistoryResponseItemsInner): Boolean = item.canDelete == true
+
+/**
+ * Whether the server offered to reactivate this batch.
+ *
+ * The third of the same three, and the one that is only ever true on a batch that is *not* active: the
+ * server answers it from the row's own state and the caller's role, so an active batch draws no action and
+ * a Trabalhador sees none either. See [offersDeactivate] for why an absent flag is not a permission.
+ */
+internal fun offersActivate(item: ScheduleHistoryResponseItemsInner): Boolean = item.canActivate == true

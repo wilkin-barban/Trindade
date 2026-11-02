@@ -110,6 +110,10 @@ interface ReportsApi {
     @PATCH("api/reports/{id}/deactivate")
     suspend fun deactivate(@Path("id") id: Int): Response<SuccessResponse>
 
+    /** Brings a deactivated report back. The mirror of [deactivate], with the same refusals. */
+    @PATCH("api/reports/{id}/activate")
+    suspend fun activate(@Path("id") id: Int): Response<SuccessResponse>
+
     /**
      * Removes a report for good.
      *

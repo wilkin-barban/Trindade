@@ -27,7 +27,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trindade.app.R
 import com.trindade.app.contract.models.ReportsResponseReportsInner
+import com.trindade.app.ui.components.ActionResultDialog
 import com.trindade.app.ui.components.AdminDestructiveConfirmButton
+import com.trindade.app.ui.components.AdminPrimaryButton
 import com.trindade.app.ui.components.AdminSecondaryButton
 import com.trindade.app.ui.components.HistoryEmptyState
 import com.trindade.app.ui.components.HistoryErrorBanner
@@ -42,6 +44,7 @@ import com.trindade.app.ui.components.MonthPickerDialog
 import com.trindade.app.ui.displayDate
 import com.trindade.app.ui.displayMonth
 import com.trindade.app.ui.notesPreview
+import com.trindade.app.ui.resolve
 import com.trindade.app.ui.saoPauloLocalDate
 import java.time.LocalDate
 import java.util.Locale
@@ -69,7 +72,9 @@ fun ReportsHistoryScreen(
     onNext: () -> Unit,
     onRetry: () -> Unit,
     onDeactivate: (Int) -> Unit,
+    onActivate: (Int) -> Unit = {},
     onDelete: (Int) -> Unit,
+    onDismissResult: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -84,6 +89,14 @@ fun ReportsHistoryScreen(
      * the only action here that asks twice.
      */
     var confirmingDelete by remember { mutableStateOf<Int?>(null) }
+
+    /**
+     * The report a reactivation is waiting to be confirmed for, or null when nothing is.
+     *
+     * The reverse of the deactivate, and it lands in front of everyone who opens the history, so the tap
+     * asks before it acts -- not because it can be undone, but because it is a change every operator sees.
+     */
+    var confirmingActivate by remember { mutableStateOf<Int?>(null) }
 
     LazyColumn(
         modifier = modifier.fillMaxSize().padding(16.dp),
@@ -140,7 +153,7 @@ fun ReportsHistoryScreen(
             HistoryRecordCard(
                 onClick = { onOpenReport(report.id) },
                 enabled = !state.busy,
-                actions = if (offersDeactivate(report) || offersDelete(report)) {
+                actions = if (offersDeactivate(report) || offersActivate(report) || offersDelete(report)) {
                     {
                         // Each action is drawn only where the server said it would be accepted, which is the
                         // `== true` inside those two predicates rather than a role decided here: this client
@@ -150,6 +163,14 @@ fun ReportsHistoryScreen(
                                 iconRes = R.drawable.ic_deactivate,
                                 label = stringResource(R.string.history_deactivate),
                                 onClick = { onDeactivate(report.id) },
+                                enabled = !state.busy,
+                            )
+                        }
+                        if (offersActivate(report)) {
+                            HistoryIconAction(
+                                iconRes = R.drawable.ic_activate,
+                                label = stringResource(R.string.history_activate),
+                                onClick = { confirmingActivate = report.id },
                                 enabled = !state.busy,
                             )
                         }
@@ -227,6 +248,38 @@ fun ReportsHistoryScreen(
                 pickingMonth = false
                 onMonthSelected(it)
             },
+        )
+    }
+
+    confirmingActivate?.let { reportId ->
+        AlertDialog(
+            onDismissRequest = { confirmingActivate = null },
+            title = { Text(stringResource(R.string.history_activate_confirm_title)) },
+            text = { Text(stringResource(R.string.history_activate_confirm_body)) },
+            confirmButton = {
+                AdminPrimaryButton(
+                    onClick = {
+                        confirmingActivate = null
+                        onActivate(reportId)
+                    },
+                    text = stringResource(R.string.history_activate),
+                )
+            },
+            dismissButton = {
+                AdminSecondaryButton(
+                    onClick = { confirmingActivate = null },
+                    text = stringResource(R.string.loading_cancel),
+                )
+            },
+        )
+    }
+
+    // The activation's own answer, drawn from the state so the reload that follows cannot swallow it.
+    state.resultMessage?.let { result ->
+        ActionResultDialog(
+            message = result.resolve(),
+            isSuccess = true,
+            onDismiss = onDismissResult,
         )
     }
 
@@ -313,7 +366,9 @@ fun ReportsHistoryRoute(
         onPrevious = viewModel::previous,
         onNext = viewModel::next,
         onDeactivate = viewModel::deactivate,
+        onActivate = viewModel::activate,
         onDelete = viewModel::delete,
+        onDismissResult = viewModel::dismissResult,
         onRetry = { viewModel.load() },
     )
 }

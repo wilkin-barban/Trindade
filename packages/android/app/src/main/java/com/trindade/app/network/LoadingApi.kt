@@ -105,6 +105,16 @@ interface LoadingApi {
     @PATCH("api/loading/schedules/batch/{date}/deactivate")
     suspend fun deactivateBatch(@Path("date") date: String): Response<SuccessResponse>
 
+    /**
+     * Brings a deactivated batch back, with every entry it had.
+     *
+     * The mirror of `deactivateBatch`, and the only way back: an inactive batch is not deleted, so the day
+     * still exists in the history and reactivating it is a state change rather than a new batch. Answers
+     * `SuccessResponse` and refuses with 403 and 404 exactly like its pair.
+     */
+    @PATCH("api/loading/schedules/batch/{date}/activate")
+    suspend fun activateBatch(@Path("date") date: String): Response<SuccessResponse>
+
     @DELETE("api/loading/schedules/batch/{date}")
     suspend fun deleteBatch(@Path("date") date: String): Response<Unit>
 

@@ -3,6 +3,7 @@ package com.trindade.app.reports
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trindade.app.contract.models.ReportsResponseReportsInner
+import com.trindade.app.ui.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -54,6 +55,8 @@ class ReportsHistoryViewModel @Inject constructor(
          */
         val loaded: Boolean = false,
         val message: String? = null,
+        /** What an activation answered, drawn in a window the operator dismisses. See [activate]. */
+        val resultMessage: UiText? = null,
     ) {
         /**
          * The pagination's own bounds, and nothing invented on top of them.
@@ -175,13 +178,32 @@ class ReportsHistoryViewModel @Inject constructor(
     /** Deactivates a report, keeping it in the history. See [lifecycle] for what may be refused. */
     fun deactivate(id: Int) = lifecycle(id, offered = ::offersDeactivate) { repository.deactivate(id) }
 
+    /**
+     * Brings a deactivated report back.
+     *
+     * Offered from the report's own `canActivate`, which the server computes per caller and per report, and
+     * reported through the same window every other action answers in: the reload that follows redraws the
+     * card as active, and a redraw alone does not tell the operator that the tap did something.
+     */
+    fun activate(id: Int) = lifecycle(
+        id,
+        offered = ::offersActivate,
+        success = UiText.of(com.trindade.app.R.string.history_activated),
+    ) { repository.activate(id) }
+
+    /** Closes the window that reported an activation. */
+    fun dismissResult() {
+        _state.update { it.copy(resultMessage = null) }
+    }
+
     /** Deletes a report. See [lifecycle] for what may be refused. */
     fun delete(id: Int) = lifecycle(id, offered = ::offersDelete) { repository.delete(id) }
 
     /**
      * Runs one lifecycle call, but only for a row the server offered it for.
      *
-     * The offer is the item's own flag, read as `== true` by [offersDeactivate] and [offersDelete] and
+     * The offer is the item's own flag, read as `== true` by [offersDeactivate], [offersActivate] and
+     * [offersDelete] and
      * never as `!= false`. The contract marks all five lifecycle flags optional even though the server
      * always emits them, so the generated type carries them as `Boolean? = null`, and `!= false` would
      * read an absent flag as permission -- drawing an action whose only possible answer is the 403 the
@@ -195,6 +217,7 @@ class ReportsHistoryViewModel @Inject constructor(
     private fun lifecycle(
         id: Int,
         offered: (ReportsResponseReportsInner) -> Boolean,
+        success: UiText? = null,
         call: suspend () -> ReportLifecycleResult,
     ) {
         if (state.value.busy) return
@@ -206,7 +229,7 @@ class ReportsHistoryViewModel @Inject constructor(
         viewModelScope.launch {
             when (val result = call()) {
                 ReportLifecycleResult.Changed -> {
-                    _state.update { it.copy(busy = false) }
+                    _state.update { it.copy(busy = false, resultMessage = success) }
                     // The page on screen rather than the first one: the row that changed is on it, and a
                     // jump to page one would move the operator away from where they were reading. If the
                     // change emptied the last page, [load] steps back to the page that still has rows.
@@ -254,3 +277,11 @@ internal fun offersDeactivate(item: ReportsResponseReportsInner): Boolean = item
 
 /** Whether the server offered to delete this report. See [offersDeactivate]. */
 internal fun offersDelete(item: ReportsResponseReportsInner): Boolean = item.canDelete == true
+
+/**
+ * Whether the server offered to reactivate this report.
+ *
+ * False on an active report by construction, because that is what the server answers, so the card of a live
+ * report draws no activate action at all. See [offersDeactivate] for why an absent flag is not a permission.
+ */
+internal fun offersActivate(item: ReportsResponseReportsInner): Boolean = item.canActivate == true

@@ -108,6 +108,9 @@ class LoadingRepository @Inject constructor(
      */
     suspend fun deactivateBatch(date: String): ScheduleLifecycleResult = lifecycle { api.deactivateBatch(date) }
 
+    /** Brings a deactivated batch back. See [deactivateBatch] for the refusal split. */
+    suspend fun activateBatch(date: String): ScheduleLifecycleResult = lifecycle { api.activateBatch(date) }
+
     /** Removes every entry of one batch. See [deactivateBatch] for the refusal split. */
     suspend fun deleteBatch(date: String): ScheduleLifecycleResult = lifecycle { api.deleteBatch(date) }
 
