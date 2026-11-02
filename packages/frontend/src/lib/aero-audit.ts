@@ -1,4 +1,4 @@
-import { api } from '../api/client';
+import { api, ApiClientError } from '../api/client';
 
 /**
  * One line of the company integration's audit trail.
@@ -252,16 +252,37 @@ export function aeroSyncRefusedEvent(args: {
 }
 
 /**
- * Sends the event and reports whether the server kept it.
+ * What happened to one audit line.
+ *
+ * A boolean was not enough: `false` read the same whether the server refused the body or the network was
+ * gone, and nothing in the browser said so, so a log with a hole looked like a log with nothing to say.
+ */
+export interface AeroAuditPostResult {
+  ok: boolean;
+  /** The HTTP status the server answered with, or null when no answer arrived. */
+  status: number | null;
+  /** The server's own code for the refusal, when it sent one. */
+  code: string | null;
+}
+
+/**
+ * Sends the event, reports a refusal in the console and says what happened.
  *
  * Never throws: the audit trail describes the operation, it is not part of it. A launch that reached
  * the company ERP and then failed to be logged must still read as a successful launch to the operator.
+ * The failure does not vanish though: it is written once, with the event, the status and the code, which
+ * are the three fields a person reading the console needs to find the missing line.
  */
-export async function postAeroAuditEvent(event: AeroAuditEvent): Promise<boolean> {
+export async function postAeroAuditEvent(event: AeroAuditEvent): Promise<AeroAuditPostResult> {
   try {
     await api.post('/integration/aero/log', buildAeroAuditBody(event));
-    return true;
-  } catch {
-    return false;
+    return { ok: true, status: 200, code: null };
+  } catch (error) {
+    const status = error instanceof ApiClientError ? error.status : null;
+    const code = error instanceof ApiClientError ? error.code ?? null : null;
+    console.error(
+      `[aero-audit] ${event.event} was not stored: status=${status ?? 'none'} code=${code ?? 'none'}`,
+    );
+    return { ok: false, status, code };
   }
 }

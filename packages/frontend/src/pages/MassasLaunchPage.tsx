@@ -53,7 +53,13 @@ import {
   saveAeroSettings,
   type AeroSettings,
 } from '../lib/aero-integration';
-import { aeroImportAuditEvent, postAeroAuditEvent } from '../lib/aero-audit';
+import { aeroImportAuditEvent, newAeroAttempt, postAeroAuditEvent } from '../lib/aero-audit';
+import {
+  clearAeroPendingAttempt,
+  loadAeroPendingAttempt,
+  type AeroPendingAction,
+  saveAeroPendingAttempt,
+} from '../lib/aero-pending-attempt';
 import {
   aeroTestNoVerdictEvent,
   aeroTestResultEvent,
@@ -423,10 +429,18 @@ export function MassasLaunchPage() {
       });
       if (!trip) return;
 
+      // The bridge leaves the page, so the identifier that pairs this line with the answer the shortcut
+      // brings back has to be written down before leaving. A batch and a single entry are different trips.
+      const action: AeroPendingAction = payloads.length === 1 ? 'entrada' : 'entrada_lote';
+      const attempt = newAeroAttempt();
+      saveAeroPendingAttempt({ action, ...attempt });
+
       void postAeroAuditEvent({
         event: 'launch_sync',
         phase: 'requested',
         destinationUrl: aeroEndpoint(aeroSettings.wsUrl, 'entradasitem'),
+        client: 'web',
+        ...attempt,
         // One line per trip: the products are in the payload, and a log that grows with the plant's output
         // is unreadable exactly when it is needed.
         payload: payloads.length === 1 ? payloads[0] : payloads,
@@ -508,12 +522,17 @@ export function MassasLaunchPage() {
       callbackUrl: aeroBridgeCallbackFor('movimentos'),
     });
 
+    const attempt = newAeroAttempt();
+    saveAeroPendingAttempt({ action: 'movimentos', ...attempt });
+
     void postAeroAuditEvent({
       event: 'read_history',
       phase: 'requested',
       destinationUrl: aeroEndpoint(aeroSettings.wsUrl, 'movimentoitem'),
+      client: 'web',
       payload: JSON.parse(envelope.body),
       note: 'via=bridge',
+      ...attempt,
     });
 
     window.location.href = buildAeroBridgeTriggerUrl({ name: aeroSettings.shortcutName, envelope });
@@ -528,6 +547,13 @@ export function MassasLaunchPage() {
    */
   const handleMovementsCallback = useCallback(
     async (data: unknown) => {
+      // The page returned from the shortcut: the request line is already on disk with this identifier.
+      const attempt = loadAeroPendingAttempt('movimentos');
+      clearAeroPendingAttempt();
+      const pairing = attempt
+        ? { attemptId: attempt.attemptId, startedAt: attempt.startedAt, client: 'web' as const }
+        : { client: 'web' as const };
+
       const read = readAeroMovements(data);
       if (read.status === 'error') {
         setSyncResult({ feedback: movementsSyncFeedback({ status: 'error', count: 0 }), detail: read.message });
@@ -537,6 +563,7 @@ export function MassasLaunchPage() {
           destinationUrl: aeroEndpoint(aeroSettings.wsUrl, 'movimentoitem'),
           error: read.message ?? 'movements_unreadable',
           note: 'via=bridge',
+          ...pairing,
         });
         setMirror({
           loading: false,
@@ -553,6 +580,7 @@ export function MassasLaunchPage() {
         // The bridge reports what the ERP answered, not an HTTP status: the page never saw the socket, and
         // a 200 invented here would read as an ERP answer in a log where the whole point is who said what.
         note: `seats=${read.movements.length} skipped=${read.skipped} · via=bridge`,
+        ...pairing,
       });
 
       try {
@@ -809,6 +837,11 @@ export function MassasLaunchPage() {
       // Un lote vuelve como un array, en el orden en que se envió: cada posición es un producto y las que
       // falten son productos sin confirmar, no un lote que terminó antes.
       if (parsed.action === 'entrada_lote') {
+        const attempt = loadAeroPendingAttempt('entrada_lote');
+        clearAeroPendingAttempt();
+        const pairing = attempt
+          ? { attemptId: attempt.attemptId, startedAt: attempt.startedAt, client: 'web' as const }
+          : { client: 'web' as const };
         const queue = readAeroQueue();
         const sent = queue?.inFlight ?? [];
         const expected = sent.length > 0 ? sent.length : Array.isArray(parsed.data) ? parsed.data.length : 1;
@@ -823,6 +856,7 @@ export function MassasLaunchPage() {
           response: `${batch.ok}/${batch.total} ok`,
           error: batch.failed > 0 ? batch.message ?? 'batch_item_failed' : null,
           note: `batch ok=${batch.ok} failed=${batch.failed} · via=bridge`,
+          ...pairing,
         });
 
         const feedback = batchSyncFeedback(batch);
@@ -881,6 +915,13 @@ export function MassasLaunchPage() {
 
       // El puente devuelve la respuesta del ERP sin interpretarla: acá se decide qué significa.
       const outcome = readAeroBridgeResult(parsed.data);
+      // Only `entrada` is a launch this page opened; a `saida` comes back from another screen and must not
+      // borrow the identifier of a launch still in flight.
+      const attempt = parsed.action === 'entrada' ? loadAeroPendingAttempt('entrada') : null;
+      clearAeroPendingAttempt();
+      const pairing = attempt
+        ? { attemptId: attempt.attemptId, startedAt: attempt.startedAt, client: 'web' as const }
+        : { client: 'web' as const };
       void postAeroAuditEvent({
         event: 'launch_sync',
         phase: 'result',
@@ -889,6 +930,7 @@ export function MassasLaunchPage() {
         response: outcome.message,
         error: outcome.status === 'error' ? outcome.message ?? 'bridge_unreadable' : null,
         note: `action=${parsed.action} · via=bridge`,
+        ...pairing,
       });
 
       // Sólo la entrada es un lanzamiento que esta página tiene que cerrar. Una baja o una consulta vuelven

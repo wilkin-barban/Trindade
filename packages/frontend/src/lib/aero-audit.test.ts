@@ -69,7 +69,7 @@ describe('postAeroAuditEvent', () => {
         attemptId: 'attempt-1',
       });
 
-      assert.equal(kept, true);
+      assert.equal(kept.ok, true);
       assert.equal(stub.calls.length, 1);
       assert.equal(stub.calls[0]!.url, '/api/integration/aero/log');
       assert.equal(stub.calls[0]!.init.method, 'POST');
@@ -84,6 +84,36 @@ describe('postAeroAuditEvent', () => {
       assert.equal(sent.attemptId, 'attempt-1');
       assert.equal(typeof sent.durationMs, 'number');
     } finally {
+      stub.restore();
+    }
+  });
+
+  test('reports a failed audit post with its status and code instead of swallowing it', async () => {
+    const stub = stubFetch(
+      new Response(JSON.stringify({ error: 'Evento inválido', code: 'INVALID_AERO_LOG' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    const logged: string[] = [];
+    const original = console.error;
+    console.error = (...args: unknown[]) => logged.push(args.map(String).join(' '));
+    try {
+      const result = await postAeroAuditEvent({
+        event: 'read_history',
+        phase: 'result',
+        destinationUrl: 'http://192.168.1.50:8000/api/entradasitem',
+      });
+
+      // A line the server refused is a lost line, and the console is the only place left to say so.
+      assert.equal(result.ok, false);
+      assert.equal(result.status, 400);
+      assert.equal(result.code, 'INVALID_AERO_LOG');
+      assert.equal(logged.length, 1);
+      assert.ok(logged[0]!.includes('INVALID_AERO_LOG'), logged[0]);
+      assert.ok(logged[0]!.includes('read_history'), logged[0]);
+    } finally {
+      console.error = original;
       stub.restore();
     }
   });
@@ -159,17 +189,21 @@ describe('postAeroAuditEvent', () => {
     }
   });
 
-  test('answers false instead of throwing when the audit trail is unavailable', async () => {
+  test('answers a failed result instead of throwing when the audit trail is unavailable', async () => {
     const stub = stubFetch(new TypeError('Failed to fetch'));
+    const original = console.error;
+    console.error = () => {};
     try {
-      const kept = await postAeroAuditEvent({
+      const result = await postAeroAuditEvent({
         event: 'test_connection',
         destinationUrl: 'http://192.168.1.50:8000/api/usuarios/',
         error: 'blocked: mixed_content',
       });
 
-      assert.equal(kept, false, 'a launch must never fail because the audit trail failed');
+      assert.equal(result.ok, false, 'a launch must never fail because the audit trail failed');
+      assert.equal(result.status, 0, 'no answer is a status of zero, not a made-up HTTP code');
     } finally {
+      console.error = original;
       stub.restore();
     }
   });

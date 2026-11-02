@@ -38,6 +38,32 @@ describe('aero bridge wiring: the panel asks for three things and dispatches the
     assert.equal(panel.includes('testShortcutName'), false);
   });
 
+  it('pairs the request and the answer of each bridge trip with one attempt', () => {
+    // The page leaves for the shortcut and comes back with an answer: anything held in React state is gone
+    // by then, so the identifier is written down before leaving and read back on return. Without it the log
+    // holds two lines about one action and no way to tell they belong together.
+    assert.match(
+      launch,
+      /saveAeroPendingAttempt\(\{ action: 'movimentos', \.\.\.attempt \}\)/,
+      'the movements read must remember its attempt before leaving the page',
+    );
+    assert.match(
+      launch,
+      /loadAeroPendingAttempt\('movimentos'\)/,
+      'the movements answer must close the line the page opened',
+    );
+    assert.match(
+      launch,
+      /loadAeroPendingAttempt\('entrada_lote'\)/,
+      'a batch answer must close the batch line, not the movements one',
+    );
+    // Both lines of a pair carry `client: 'web'` and the same identifier: the first from memory, the second
+    // from storage.
+    assert.match(launch, /client: 'web',\s*\.\.\.attempt,/);
+    assert.match(launch, /client: 'web' as const \}/);
+    assert.match(launch, /\.\.\.pairing,/);
+  });
+
   it('reads the verdict the shortcut brought back to this tab', () => {
     // The panel that asked is the one that must answer: reading the callback here is what makes the trip
     // through the shortcut end on the screen the operator left.

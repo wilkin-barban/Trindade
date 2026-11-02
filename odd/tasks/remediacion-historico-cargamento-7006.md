@@ -385,6 +385,10 @@ Cada tarea declara objetivo, archivos, tests exactos, aceptación, commit espera
 - **Aceptación**: un día pasado no cambia en `aero_movements`; hoy se sincroniza igual que antes; el cliente Android recibe `409` + `MASSAS_HISTORY_FROZEN` y no un `null` indistinguible.
 - **Commit**: `fix(backend): refuse an ERP snapshot for a closed massas day` (~100 líneas).
 - **Depende de**: Q3.
+- **Estado.** Backend hecho (**b9e5a58**, 204 líneas): el rechazo vive en el servicio, la ruta lo audita con
+  `sync_refused` y el 409 quedó documentado. El puerto Android ya devuelve `AeroSnapshotSave` con
+  `Saved`/`Refused(status, code)`/`Unreachable` y `AeroFailure` lleva `serverStatus`/`serverCode`; RED observado en
+  `AeroAdaptersTest` (2 de 3 fallando) y GREEN en curso.
 
 #### T6 — Auditoría ERP web real
 - **Specs**: S49.
@@ -394,6 +398,10 @@ Cada tarea declara objetivo, archivos, tests exactos, aceptación, commit espera
 - **Aceptación**: tras un ciclo, `logs/aero-integration.log` tiene líneas `client=web` con pares correlacionados.
 - **Commit**: `fix(web): make every ERP audit event reach the log with its pair` (~180 líneas).
 - **Depende de**: ninguna.
+- **Estado.** Hecho: `postAeroAuditEvent` devuelve `{ ok, status, code }` y escribe el fallo en consola con el
+  evento; el intento del puente se persiste en `aero-pending-attempt.ts` antes de salir y el `result` lo lee de
+  vuelta, así `read_history` y `launch_sync` comparten `attemptId`, `client: 'web'` y `durationMs`. Tests: 532
+  node en verde, `aero-pending-attempt.test.ts` y el caso de par en `aero-bridge-wiring.test.ts`.
 
 ### Fase 2 — Android históricos
 
