@@ -5,6 +5,8 @@ import com.trindade.app.aero.AeroErpAdapter
 import com.trindade.app.aero.AeroErpPort
 import com.trindade.app.aero.AeroMirrorAdapter
 import com.trindade.app.aero.AeroMirrorPort
+import com.trindade.app.aero.AeroReachability
+import com.trindade.app.aero.AeroReachabilityPort
 import com.trindade.app.aero.AeroSettingsPort
 import com.trindade.app.aero.AeroSettingsStore
 import com.trindade.app.aero.TabletAckPort
@@ -41,6 +43,10 @@ object AeroModule {
     @Provides
     @Singleton
     fun provideTabletAckPort(store: TabletAckStore): TabletAckPort = store
+
+    @Provides
+    @Singleton
+    fun provideReachabilityPort(reachability: AeroReachability): AeroReachabilityPort = reachability
 
     @Provides
     @Singleton

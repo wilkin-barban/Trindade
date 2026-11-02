@@ -11,6 +11,7 @@ import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.trindade.app.R
+import com.trindade.app.ui.UiText
 import com.trindade.app.ui.theme.TrindadeTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -40,7 +41,7 @@ class AdminIntegrationCardTest {
         get() = ApplicationProvider.getApplicationContext()
 
     private fun state(
-        message: String? = null,
+        message: UiText? = null,
         messageIsError: Boolean = false,
     ) = IntegrationSettingsViewModel.UiState(
         wsUrl = "http://10.0.0.10:8080",
@@ -54,6 +55,7 @@ class AdminIntegrationCardTest {
     private fun render(
         state: IntegrationSettingsViewModel.UiState = state(),
         onDismissMessage: () -> Unit = {},
+        onSave: () -> Unit = {},
     ) {
         composeRule.setContent {
             TrindadeTheme {
@@ -63,7 +65,7 @@ class AdminIntegrationCardTest {
                     onUsernameChange = {},
                     onPasswordChange = {},
                     onTest = {},
-                    onSave = {},
+                    onSave = onSave,
                     onDismissMessage = onDismissMessage,
                 )
             }
@@ -88,12 +90,19 @@ class AdminIntegrationCardTest {
     @Test
     fun `an answer from the plant is a dialog with a way out`() {
         var dismissed = 0
-        render(state(message = "Conectado ao ERP: WILKIN.", messageIsError = false), onDismissMessage = { dismissed++ })
+        render(
+            state(
+                message = UiText.of(R.string.admin_integration_probe_ok, "WILKIN"),
+                messageIsError = false,
+            ),
+            onDismissMessage = { dismissed++ },
+        )
 
         composeRule.onNode(isDialog()).assertExists()
-        composeRule.onNodeWithText("Conectado ao ERP: WILKIN.").assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.admin_integration_probe_ok, "WILKIN")).assertIsDisplayed()
         // And exactly once: the dialog replaced the line under the buttons rather than joining it.
-        composeRule.onAllNodesWithText("Conectado ao ERP: WILKIN.").assertCountEquals(1)
+        composeRule.onAllNodesWithText(string(R.string.admin_integration_probe_ok, "WILKIN"))
+            .assertCountEquals(1)
 
         composeRule.onNodeWithText(string(R.string.action_result_close)).performClick()
         assertEquals(1, dismissed)
@@ -101,9 +110,22 @@ class AdminIntegrationCardTest {
 
     @Test
     fun `a refusal is told apart from an answer`() {
-        render(state(message = "Wi-Fi desconectado.", messageIsError = true))
+        render(state(message = UiText.of(R.string.admin_integration_no_wifi), messageIsError = true))
 
         composeRule.onNodeWithText(string(R.string.action_result_error)).assertIsDisplayed()
+    }
+
+    @Test
+    fun `the save press says it is saving and cannot be pressed twice`() {
+        var saves = 0
+        render(
+            state().copy(isSaving = true),
+            onSave = { saves++ },
+        )
+
+        composeRule.onNodeWithText(string(R.string.admin_integration_saving)).assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.admin_integration_saving)).performClick()
+        assertEquals("el segundo toque no llega", 0, saves)
     }
 
     private fun string(resId: Int, vararg args: Any): String = context.getString(resId, *args)

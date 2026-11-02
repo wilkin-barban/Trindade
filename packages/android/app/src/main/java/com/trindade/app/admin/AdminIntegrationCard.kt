@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trindade.app.R
 import com.trindade.app.ui.components.ActionResultDialog
+import com.trindade.app.ui.resolve
 import com.trindade.app.ui.components.AdminPrimaryButton
 import com.trindade.app.ui.components.AdminSecondaryButton
 
@@ -87,7 +88,7 @@ fun AdminIntegrationCard(
     // is about to correct.
     state.message?.let { message ->
         ActionResultDialog(
-            message = message,
+            message = message.resolve(),
             isSuccess = !state.messageIsError,
             onDismiss = onDismissMessage,
         )
@@ -166,9 +167,13 @@ fun AdminIntegrationCard(
                     enabled = !state.isTesting && state.ready,
                 )
                 AdminPrimaryButton(
-                    text = stringResource(R.string.admin_integration_save),
+                    // The press that used to end in silence now says it is working and, a line later, what
+                    // it achieved: the dialog above carries the answer.
+                    text = stringResource(
+                        if (state.isSaving) R.string.admin_integration_saving else R.string.admin_integration_save,
+                    ),
                     onClick = onSave,
-                    enabled = state.ready,
+                    enabled = state.ready && !state.isSaving,
                 )
             }
         }

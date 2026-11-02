@@ -31,10 +31,24 @@ import kotlinx.coroutines.withContext
  * This never replaces the request's own failure handling. It runs before the request to produce a sentence,
  * and a probe that says "reachable" does not promise the ERP will accept the payload.
  */
+/**
+ * The network question, as the screens need it.
+ *
+ * A port because the answer depends on a `Context` and the decision it feeds does not: the admin screen has
+ * to be able to prove, in a JVM test, that a save reports what happened, and building a `Context` for that is
+ * the difference between a test that runs in a second and one that needs a device.
+ */
+interface AeroReachabilityPort {
+    suspend fun diagnose(
+        wsUrl: String?,
+        timeoutMillis: Int = AeroReachability.DEFAULT_TIMEOUT_MS,
+    ): AeroReachability.Diagnosis
+}
+
 @Singleton
 class AeroReachability @Inject constructor(
     @ApplicationContext private val context: Context,
-) {
+) : AeroReachabilityPort {
 
     /** The two answers, as data, so the screen owns the words. */
     data class Diagnosis(
@@ -72,7 +86,7 @@ class AeroReachability @Inject constructor(
         }
     }
 
-    suspend fun diagnose(wsUrl: String?, timeoutMillis: Int = DEFAULT_TIMEOUT_MS): Diagnosis {
+    override suspend fun diagnose(wsUrl: String?, timeoutMillis: Int): Diagnosis {
         val wifi = wifiConnected()
         if (!wifi) return Diagnosis(wifiConnected = false, hostReachable = null)
         return Diagnosis(wifiConnected = true, hostReachable = hostReachable(wsUrl, timeoutMillis))

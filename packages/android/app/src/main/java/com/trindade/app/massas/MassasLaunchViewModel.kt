@@ -402,7 +402,16 @@ class MassasLaunchViewModel @Inject constructor(
      */
     private suspend fun dispatchToErp(created: List<MassaIndividualLaunch>, items: List<MassaConfirmItem>) {
         val settings = state.value.aeroSettings
-        if (!settings.ready || created.isEmpty()) return
+        if (created.isEmpty()) return
+        if (!settings.ready) {
+            // The rows are stored and the dialog has already said so; what it must not leave unsaid is that the
+            // company never saw them. A launch that stayed on the phone looked exactly like one the ERP took.
+            _state.value = _state.value.copy(
+                resultDialogMessage = UiText.of(R.string.massas_aero_dispatch_local_only),
+                resultDialogIsSuccess = false,
+            )
+            return
+        }
 
         val unitsByCode = items.associate { it.productCode to it.units }
         val namesByCode = items.associate { it.productCode to it.productName }

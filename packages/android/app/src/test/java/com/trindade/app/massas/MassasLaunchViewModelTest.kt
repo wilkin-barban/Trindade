@@ -377,6 +377,48 @@ class MassasLaunchViewModelTest {
         assertEquals(3, fakeRepo.lastCreatedItems?.first()?.boxes)
     }
 
+    /**
+     * A launch that stays on the phone must not read as a launch the plant received.
+     *
+     * The row is written locally and the dialog announces it; the ERP trip is a second, separate thing. Until
+     * this test existed, a phone without the integration returned from the dispatch in silence and the dialog
+     * kept its happy sentence, so the only difference between "the company has it" and "nobody has it" was a
+     * pending column the operator had no reason to open.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun confirmLaunch_withoutIntegration_saysTheLaunchStayedOnThePhone() = runTest {
+        val fakeRepo = FakeMassasRepository(massasApi)
+        // The write produced a row, which is what gives the dispatch something to send.
+        fakeRepo.createLaunchResult = MassasWriteResult.Saved(
+            view = MassasLaunchDayView(date = "2026-10-21", totalUnits = 30, totalBoxes = 3),
+            created = listOf(
+                MassaIndividualLaunch(
+                    id = 7,
+                    productCode = "1045",
+                    boxes = 3,
+                    units = 30,
+                    userId = 1,
+                ),
+            ),
+        )
+        // Configured, but without the password: the ERP cannot be reached and nothing is sent.
+        settingsPort.settings = AeroSettings(wsUrl = AERO_DEFAULT_WS_URL, username = "WILKIN", password = "")
+        val testVm = newViewModel(fakeRepo)
+
+        testVm.onQuantityChange("1045", "3")
+        testVm.requestLaunchConfirmation()
+        testVm.confirmLaunch()
+        testScheduler.runCurrent()
+
+        assertEquals(
+            R.string.massas_aero_dispatch_local_only,
+            testVm.state.value.resultDialogMessage?.resId,
+        )
+        assertFalse("el aviso no es un éxito", testVm.state.value.resultDialogIsSuccess)
+        assertTrue("el envío al ERP no salió", erpPort.payloads.isEmpty())
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun confirmLaunch_onSuccess_setsResultDialogAndClearsQuantities() = runTest {

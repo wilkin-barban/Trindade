@@ -5,12 +5,15 @@ import androidx.lifecycle.viewModelScope
 import com.trindade.app.aero.AeroErpClient
 import com.trindade.app.aero.AeroMirrorPort
 import com.trindade.app.aero.AeroReachability
+import com.trindade.app.aero.AeroReachabilityPort
 import com.trindade.app.aero.AeroSettings
 import com.trindade.app.aero.AeroSettingsPort
 import com.trindade.app.aero.AeroSettingsPermissions
 import com.trindade.app.aero.AeroTestResult
 import com.trindade.app.aero.aeroSettingsEditable
 import com.trindade.app.aero.AeroAudit
+import com.trindade.app.R
+import com.trindade.app.ui.UiText
 import com.trindade.app.auth.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -31,7 +34,7 @@ import kotlinx.coroutines.launch
 class IntegrationSettingsViewModel @Inject constructor(
     private val store: AeroSettingsPort,
     private val client: AeroErpClient,
-    private val reachability: AeroReachability,
+    private val reachability: AeroReachabilityPort,
     private val authRepository: AuthRepository,
     /**
      * The shared audit log, because a probe is a query to the ERP like a launch is.
@@ -51,8 +54,13 @@ class IntegrationSettingsViewModel @Inject constructor(
         val currentUser: String = "",
         val isConfigured: Boolean = false,
         val isSaving: Boolean = false,
-        /** What the last action answered, already resolved to the operator's language. */
-        val message: String? = null,
+        /**
+         * What the last action answered, as the resource the screen resolves.
+         *
+         * It travelled as a Portuguese `String` before, which meant a Spanish operator read the panel in
+         * Spanish and its answers in Portuguese.
+         */
+        val message: UiText? = null,
         val messageIsError: Boolean = false,
         /** True while a probe is in flight, so the button can say so. */
         val isTesting: Boolean = false,
@@ -104,13 +112,19 @@ class IntegrationSettingsViewModel @Inject constructor(
     fun clearMessage() = _state.update { it.copy(message = null, messageIsError = false) }
 
     /**
-     * Stores what the form holds.
+     * Stores what the form holds, and says so.
      *
      * A locked address keeps the stored one instead of the typed one: the field is disabled, so the only way a
      * different value could arrive here is a stale composition, and saving it would move every future launch.
+     *
+     * The press used to end in silence -- `isSaving` existed and was never written -- which on a screen whose
+     * only other feedback is a probe leaves the operator unsure whether the credentials were kept at all. The
+     * write is short, so what is shown is the outcome: a sentence when it worked and a different one when the
+     * device refused, never a spinner that outlives the write.
      */
     fun save() {
         val current = _state.value
+        if (current.isSaving) return
         val stored = store.load()
         val target = AeroSettings(
             wsUrl = if (current.permissions.canEditWsUrl) current.wsUrl else stored.wsUrl,
@@ -118,15 +132,36 @@ class IntegrationSettingsViewModel @Inject constructor(
             password = current.password,
             userCode = current.userCode.trim(),
         )
-        store.save(target)
-        _state.value = current.copy(
-            wsUrl = target.wsUrl,
-            username = target.username,
-            userCode = target.userCode,
-            isConfigured = true,
-            message = null,
-            messageIsError = false,
-        )
+
+        // The button is disabled without the three fields, so this is the belt to that suspender: a stale
+        // composition can still reach the press, and a half-filled integration is worse than none.
+        if (!target.ready) {
+            _state.value = current.copy(
+                message = UiText.of(R.string.admin_integration_incomplete),
+                messageIsError = true,
+            )
+            return
+        }
+
+        _state.value = current.copy(isSaving = true, message = null, messageIsError = false)
+        viewModelScope.launch {
+            // `AeroSettingsStore` writes through `SharedPreferences.apply()`, which is what makes this cheap:
+            // the operator's answer is the sentence, not a progress bar over a call that returns immediately.
+            val failure = runCatching { store.save(target) }.exceptionOrNull()
+            _state.value = _state.value.copy(
+                wsUrl = target.wsUrl,
+                username = target.username,
+                userCode = target.userCode,
+                isConfigured = failure == null,
+                isSaving = false,
+                message = if (failure == null) {
+                    UiText.of(R.string.admin_integration_saved)
+                } else {
+                    UiText.of(R.string.admin_integration_save_failed)
+                },
+                messageIsError = failure != null,
+            )
+        }
     }
 
     /**
@@ -211,29 +246,33 @@ class IntegrationSettingsViewModel @Inject constructor(
 }
 
 /**
- * The one sentence a probe earns, in the operator's language.
+ * The one sentence a probe earns, as the resource the screen resolves.
  *
- * Resolved here as a plain string because this view model has no `UiText` seam and the section is admin-only:
- * the strings it returns are the ones the screen shows verbatim.
+ * The operator's language is decided by the screen's locale and not here: this view model has no `Context`, and
+ * a Portuguese sentence handed to a Spanish operator is a translation nobody notices is missing.
  */
 private fun describe(
     diagnosis: AeroReachability.Diagnosis,
     answer: AeroErpClient.Probe?,
-): String = when {
-    !diagnosis.wifiConnected -> "Sem conexão com a rede da fábrica."
-    diagnosis.hostReachable != true -> "O ERP não respondeu no endereço configurado."
-    answer == null -> "Preencha endereço, usuário e senha."
+): UiText = when {
+    !diagnosis.wifiConnected -> UiText.of(R.string.admin_integration_no_wifi)
+    diagnosis.hostReachable != true -> UiText.of(R.string.admin_integration_no_host)
+    answer == null -> UiText.of(R.string.admin_integration_incomplete)
     answer is AeroErpClient.Probe.Unreachable -> when (answer.reason) {
-        AeroErpClient.ProbeFailure.TIMEOUT -> "O ERP demorou demais para responder."
-        AeroErpClient.ProbeFailure.NO_ROUTE -> "Não há caminho até o ERP."
-        AeroErpClient.ProbeFailure.REFUSED -> "O ERP recusou a conexão."
-        AeroErpClient.ProbeFailure.UNKNOWN -> "Não foi possível falar com o ERP."
+        AeroErpClient.ProbeFailure.TIMEOUT -> UiText.of(R.string.admin_integration_timeout)
+        AeroErpClient.ProbeFailure.NO_ROUTE -> UiText.of(R.string.admin_integration_no_route)
+        AeroErpClient.ProbeFailure.REFUSED -> UiText.of(R.string.admin_integration_refused)
+        AeroErpClient.ProbeFailure.UNKNOWN -> UiText.of(R.string.admin_integration_unknown)
     }
     answer is AeroErpClient.Probe.Answered -> when (val test = answer.test) {
-        is com.trindade.app.aero.AeroTestResult.Ok -> "Conectado ao ERP: ${test.userName.ifBlank { test.userCode.toString() }}."
-        is com.trindade.app.aero.AeroTestResult.Failed -> test.message ?: "O ERP recusou o usuário ou a senha."
+        is com.trindade.app.aero.AeroTestResult.Ok ->
+            UiText.of(R.string.admin_integration_probe_ok, test.userName.ifBlank { test.userCode.toString() })
+        // The server's own refusal is already a sentence: it names the field the plant did not accept, and a
+        // generic replacement would throw away the only explanation the operator has.
+        is com.trindade.app.aero.AeroTestResult.Failed ->
+            test.message?.let { UiText.literal(it) } ?: UiText.of(R.string.admin_integration_probe_refused)
     }
-    else -> "Conectado ao ERP."
+    else -> UiText.of(R.string.admin_integration_probe_ok, "")
 }
 
 /** `MutableStateFlow.update` without the import gymnastics in every setter. */

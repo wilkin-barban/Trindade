@@ -575,6 +575,7 @@
     <string name="massas_aero_batch_sent">%1$d masas sincronizadas con éxito</string>
     <string name="massas_aero_batch_partial">%1$d de %2$d masas sincronizadas; %3$d siguen pendientes.</string>
     <string name="massas_aero_dispatch_refused">El ERP rechazó %1$d lanzamiento(s). Revisá el producto y reenvialo desde la tabla.</string>
+    <string name="massas_aero_dispatch_local_only">Lanzamientos guardados en este dispositivo. La integración con el ERP no está configurada, así que no fueron a la fábrica: reenvialos desde la tabla después de configurarla.</string>
     <string name="massas_aero_pending_hint">%1$d pendiente(s): enviá desde la tabla cuando vuelva la red de la fábrica.</string>
     <string name="massas_aero_not_configured">Configurá la integración con el ERP en Administración antes de sincronizar.</string>
     <string name="massas_aero_unreachable">Sin conexión con la red de la fábrica.</string>
@@ -961,6 +962,18 @@
     <string name="admin_integration_test">Probar conexión</string>
     <string name="admin_integration_save">Guardar</string>
     <string name="admin_integration_locked">Sólo el propietario cambia la dirección.</string>
+    <string name="admin_integration_saving">Guardando…</string>
+    <string name="admin_integration_saved">Configuración guardada en este dispositivo.</string>
+    <string name="admin_integration_save_failed">No se pudo guardar la configuración en este dispositivo. Probá de nuevo.</string>
+    <string name="admin_integration_incomplete">Completá la dirección, el usuario y la contraseña.</string>
+    <string name="admin_integration_no_wifi">Sin conexión con la red de la fábrica.</string>
+    <string name="admin_integration_no_host">El ERP no respondió en la dirección configurada.</string>
+    <string name="admin_integration_timeout">El ERP tardó demasiado en responder.</string>
+    <string name="admin_integration_no_route">No hay camino hasta el ERP.</string>
+    <string name="admin_integration_refused">El ERP rechazó la conexión.</string>
+    <string name="admin_integration_unknown">No se pudo hablar con el ERP.</string>
+    <string name="admin_integration_probe_ok">Conectado al ERP: %1$s.</string>
+    <string name="admin_integration_probe_refused">El ERP rechazó el usuario o la contraseña.</string>
     <plurals name="loading_history_loadings">
         <item quantity="one">%1$d carga</item>
         <item quantity="other">%1$d cargas</item>
