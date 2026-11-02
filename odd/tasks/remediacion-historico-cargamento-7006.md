@@ -482,6 +482,9 @@ Cada tarea declara objetivo, archivos, tests exactos, aceptación, commit espera
 - **Aceptación**: cambiar de día rápido nunca pinta el día anterior; hoy no aparece en los chips.
 - **Commit**: `fix(web): drop stale history answers and hide today from the chips` (~150 líneas).
 - **Depende de**: ninguna.
+- **Estado.** Hecho: ambas páginas guardan el token de la última lectura y descartan la respuesta vieja; el
+  `catch` limpia `dayView`/`day`; los chips de Contagem se cortan en ayer. Tests: `MassasHistoryPage`,
+  `StockHistoryPage` (12 en verde, RED verificado con las páginas revertidas) y `stock-history.spec.ts` (2/2).
 
 ### Fase 4 — Selección
 
