@@ -76,6 +76,10 @@ class FakeAckPort(initial: Set<Int> = emptySet()) : TabletAckPort {
     override fun ack(launchId: Int) {
         acked += launchId
     }
+
+    override fun unack(launchId: Int) {
+        acked -= launchId
+    }
 }
 
 /**

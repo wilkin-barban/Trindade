@@ -109,6 +109,39 @@ class AeroQueueTest {
     }
 
     @Test
+    fun `veinte pendientes se drenan en tres tandas de ocho, ocho y cuatro`() {
+        // La cola se drena entera al abrir el día: una sola tanda dejaba dieciséis asientos esperando al
+        // próximo arranque de la app, y el operario que ya volvió al Wi-Fi de la planta los veía pendientes.
+        val queue = AeroQueue(
+            createdAt = 1_700_000_000_000L,
+            date = "2026-02-10",
+            items = (1..20).map { item(it) },
+        )
+
+        assertEquals(listOf(8, 8, 4), queue.drainBatches().map { it.size })
+        assertEquals((1..20).toList(), queue.drainBatches().flatten().flatMap { it.launchIds })
+    }
+
+    @Test
+    fun `una cola vacía no produce ninguna tanda`() {
+        // Sin esto el drenaje devolvería una tanda vacía y el envío contaría un viaje que nunca ocurrió.
+        val queue = AeroQueue(createdAt = 1_700_000_000_000L, date = "2026-02-10")
+
+        assertTrue(queue.drainBatches().isEmpty())
+    }
+
+    @Test
+    fun `una cola más corta que la tanda viaja en una sola`() {
+        val queue = AeroQueue(
+            createdAt = 1_700_000_000_000L,
+            date = "2026-02-10",
+            items = (1..3).map { item(it) },
+        )
+
+        assertEquals(listOf(3), queue.drainBatches().map { it.size })
+    }
+
+    @Test
     fun `encolar el mismo lanzamiento otra vez no lo duplica`() {
         // El reintento de una fila y la apertura del día pueden encolar el mismo asiento: la cola es un conjunto
         // de trabajo pendiente, no un registro de intentos.

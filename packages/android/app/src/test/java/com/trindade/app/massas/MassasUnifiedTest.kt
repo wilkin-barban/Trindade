@@ -4,6 +4,7 @@ import com.trindade.app.aero.AeroErpMovement
 import com.trindade.app.network.MassaIndividualLaunch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -48,6 +49,7 @@ class MassasUnifiedTest {
         entryDate: String = "2026-10-30",
         movementType: String = "E",
         ownerUserId: Int? = null,
+        ownerStatus: String? = null,
     ) = AeroErpMovement(
         entLan = entLan,
         productCode = productCode,
@@ -57,6 +59,7 @@ class MassasUnifiedTest {
         operatorName = operatorName,
         movementType = movementType,
         ownerUserId = ownerUserId,
+        ownerStatus = ownerStatus,
     )
 
     private val products = listOf(
@@ -344,6 +347,67 @@ class MassasUnifiedTest {
         assertFalse(row.importable)
         assertFalse(canImportRow(row, viewerId = 12, isAdmin = false))
         assertFalse(canImportRow(row, viewerId = 1, isAdmin = true))
+    }
+
+    @Test
+    fun `a seat that does not fill whole boxes says why it offers no import`() {
+        // La fila está en la pantalla porque la planta la registró. Dejarla sin una palabra es lo que hacía
+        // que el operario llamara a la oficina para preguntar por qué no podía importarla.
+        val rows = massasUnifiedRows(
+            MassasUnifiedInput(
+                launches = emptyList(),
+                movements = listOf(seat(entLan = 35940, quantity = 15.0, ownerUserId = 12)),
+                products = products,
+            ),
+        )
+        val row = rows.single()
+
+        assertFalse(row.importable)
+        assertEquals(MassasImportHint.NOT_WHOLE_BOXES, massasImportHint(row, products))
+    }
+
+    @Test
+    fun `a seat of a product the catalogue does not have says that instead`() {
+        val orphan = seat(entLan = 35941, productCode = "9999", quantity = 20.0, ownerUserId = 12)
+        val rows = massasUnifiedRows(
+            MassasUnifiedInput(launches = emptyList(), movements = listOf(orphan), products = products),
+        )
+        // Sin entrada de catálogo no hay asiento en la tabla: el filtro de insumos lo descarta antes.
+        assertTrue(rows.isEmpty())
+    }
+
+    @Test
+    fun `an importable seat has no hint, because the button already speaks`() {
+        val rows = massasUnifiedRows(
+            MassasUnifiedInput(
+                launches = emptyList(),
+                movements = listOf(seat(entLan = 35942, quantity = 24.0, ownerUserId = 12)),
+                products = products,
+            ),
+        )
+        val row = rows.single()
+
+        assertTrue(row.importable)
+        assertNull(massasImportHint(row, products))
+    }
+
+    @Test
+    fun `a seat whose operator the backend calls inactive does not offer creation, even before the local list catches up`() {
+        // El estado del backend manda: la tabla de vínculos puede estar vacía en esta tablet mientras el
+        // servidor ya sabe que ese nombre es una cuenta dada de baja.
+        val rows = massasUnifiedRows(
+            MassasUnifiedInput(
+                launches = emptyList(),
+                movements = listOf(
+                    seat(entLan = 35943, quantity = 24.0, ownerUserId = null, ownerStatus = "inactive"),
+                ),
+                products = products,
+            ),
+        )
+        val row = rows.single()
+
+        assertEquals("inactive", row.ownerStatus)
+        assertFalse(canCreateOperatorRow(row, isAdmin = true))
     }
 
     @Test

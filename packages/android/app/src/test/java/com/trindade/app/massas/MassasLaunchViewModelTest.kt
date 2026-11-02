@@ -1170,6 +1170,77 @@ class MassasLaunchViewModelTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
+    fun undoAcknowledgeLaunch_bringsTheButtonBackWithoutTouchingTheLaunch() = runTest {
+        val repo = DayRepository(massasApi, dayWith(launch(5)))
+        val testVm = newViewModel(repo)
+        testScheduler.runCurrent()
+        val row = testVm.state.value.unifiedRows.first { 5 in it.launchIds }
+
+        testVm.acknowledgeLaunch(row)
+        testScheduler.runCurrent()
+        testVm.undoAcknowledgeLaunch(row)
+        testScheduler.runCurrent()
+
+        // El ack es la palabra de una persona sobre una tableta de papel, y una persona puede señalar la fila
+        // equivocada. Deshacerlo devuelve el botón y no toca el lanzamiento ni el ERP.
+        assertTrue(ackPort.acked.isEmpty())
+        assertFalse(testVm.state.value.unifiedRows.first { 5 in it.launchIds }.tabletAcked)
+        assertEquals(listOf(5), testVm.state.value.unifiedRows.first { 5 in it.launchIds }.launchIds)
+    }
+
+    /** Una cola fresca de hoy: los pendientes de un turno anterior, con su producto y su operario. */
+    private fun queueWith(ids: List<Int>, date: String) = AeroQueue(
+        createdAt = System.currentTimeMillis(),
+        date = date,
+        items = ids.map { id ->
+            AeroQueueItem(
+                productCode = "001045",
+                productName = "MASSA CASEIRA",
+                quantity = 30.0,
+                operatorName = "JAIME",
+                launchIds = listOf(id),
+                date = date,
+            )
+        },
+    )
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `el reintento manual manda toda la cola, no la primera tanda`() = runTest {
+        val today = MassasLaunchViewModel.saopauloToday()
+        queuePort = FakeQueuePort(queueWith((3011..3020).toList(), today))
+        val repo = DayRepository(massasApi, dayWith())
+        val testVm = newViewModel(repo)
+        advanceUntilIdle()
+
+        // Diez pendientes de un turno anterior: nueve caben en la primera tanda de ocho y dos esperarían al
+        // próximo arranque. El reintento manual los manda todos porque el operario ya está en el Wi-Fi.
+        testVm.retryPendingLaunches()
+        advanceUntilIdle()
+
+        assertEquals(10, erpPort.payloads.size)
+        assertEquals(null, queuePort.stored)
+        assertEquals(0, testVm.state.value.queuedLaunches)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `el drenaje se corta en el primer fallo y deja el resto guardado`() = runTest {
+        val today = MassasLaunchViewModel.saopauloToday()
+        queuePort = FakeQueuePort(queueWith((3031..3040).toList(), today))
+        // El ERP acepta el primero y rechaza el segundo: lo que sigue no viaja a un servidor que ya dijo que no.
+        erpPort.writeResults.addAll(listOf(AeroWriteResult.Ok(null), AeroWriteResult.Failed("sin saldo")))
+        val repo = DayRepository(massasApi, dayWith())
+        val testVm = newViewModel(repo)
+        advanceUntilIdle()
+
+        assertEquals(2, erpPort.payloads.size)
+        assertEquals(9, queuePort.stored?.items?.size)
+        assertEquals(9, testVm.state.value.queuedLaunches)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
     fun syncAeroDay_whenThePlantDoesNotAnswer_keepsThePreviousSnapshot() = runTest {
         val repo = DayRepository(massasApi, dayWith())
         erpPort.movementsResult = com.trindade.app.aero.AeroMovementsResult.Failed(null)

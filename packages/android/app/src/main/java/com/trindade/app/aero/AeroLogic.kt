@@ -286,6 +286,14 @@ data class AeroErpMovement(
      * snapshot answers it. Null is "unknown", and unknown is not a worker's seat.
      */
     val ownerUserId: Int? = null,
+    /**
+     * What the backend knows about that account: `active`, `inactive` or `missing`.
+     *
+     * The id alone cannot tell a worker who took another shift from a name nobody here has ever had, and the
+     * screen offers different things for each: nothing for the first, a new operator for the second. Null is
+     * "the phone read this seat straight from the ERP", where no account has been resolved yet.
+     */
+    val ownerStatus: String? = null,
 )
 
 /** What came back from a movements query: the seats, or the reason there are none. */

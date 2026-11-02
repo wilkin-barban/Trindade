@@ -76,6 +76,7 @@ class AeroMirrorAdapter @Inject constructor(
         entryDate = entryDate,
         operatorName = operatorName,
         movementType = movementType,
+        ownerStatus = ownerStatus,
     )
 
     private companion object {
@@ -98,4 +99,5 @@ fun AeroStoredMovement.toLogic(): AeroErpMovement = AeroErpMovement(
     operatorName = operatorName,
     movementType = movementType,
     ownerUserId = ownerUserId,
+    ownerStatus = ownerStatus,
 )

@@ -53,7 +53,36 @@ data class MassasUnifiedRow(
      * "unknown", and unknown is never the worker's.
      */
     val ownerUserId: Int? = null,
+    /** `active`, `inactive` or `missing`, when the backend resolved the owner of this seat. */
+    val ownerStatus: String? = null,
 )
+
+/**
+ * Why an ERP seat cannot become a launch, when it cannot.
+ *
+ * The row is already on the screen: the plant recorded it and Trindade did not. Hiding it would be worse, and
+ * leaving it without a word is what made the operator ask the office. These are the three reasons the answer
+ * can wait on, and each has its own sentence.
+ */
+enum class MassasImportHint {
+    /** The quantity does not fill whole boxes, which is the only unit a launch here counts. */
+    NOT_WHOLE_BOXES,
+
+    /** The plant has no catalogue entry for the code, so the boxes cannot be computed at all. */
+    UNKNOWN_PRODUCT,
+
+    /** A stock exit: product leaving the plant, not production. */
+    NOT_AN_ENTRY,
+}
+
+/** The reason this seat has no import action, or null when it has one. */
+fun massasImportHint(row: MassasUnifiedRow, products: List<AeroImportProduct>): MassasImportHint? {
+    if (row.state != MassasRowState.ERP_ONLY || row.importable) return null
+    val product = productFor(products, row.productCode) ?: return MassasImportHint.UNKNOWN_PRODUCT
+    if (product.unitsPerBox <= 0) return MassasImportHint.UNKNOWN_PRODUCT
+    if (row.units <= 0) return MassasImportHint.NOT_AN_ENTRY
+    return MassasImportHint.NOT_WHOLE_BOXES
+}
 
 /**
  * Whether this viewer may import this seat.
@@ -79,7 +108,11 @@ fun canCreateOperatorRow(
     isAdmin: Boolean,
     isInactive: Boolean = false,
 ): Boolean {
-    return isAdmin && row.state == MassasRowState.ERP_ONLY && row.ownerUserId == null && !isInactive
+    // The seat's own `owner_status` is the authority: the link table may still be locally empty while the
+    // backend already knows this name belongs to an inactive worker, and offering to create that account is
+    // offering to fail.
+    val inactive = isInactive || row.ownerStatus == "inactive"
+    return isAdmin && row.state == MassasRowState.ERP_ONLY && row.ownerUserId == null && !inactive
 }
 
 /**
@@ -278,6 +311,7 @@ fun massasUnifiedRows(input: MassasUnifiedInput, operatorFilter: String = ""): L
                 importable = plan != null,
                 tabletAcked = false,
                 ownerUserId = seat.ownerUserId,
+                ownerStatus = seat.ownerStatus,
             ),
         )
     }

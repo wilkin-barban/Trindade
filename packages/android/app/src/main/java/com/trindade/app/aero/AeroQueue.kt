@@ -67,6 +67,18 @@ data class AeroQueue(
         val batch = items.take(size.coerceAtLeast(0))
         return batch to copy(items = items.drop(batch.size))
     }
+
+    /**
+     * The queue cut into the trips it takes to empty it: twenty entries are 8 + 8 + 4.
+     *
+     * [takeBatch] answers one trip, which is right for a background retry that must not hold the screen. A
+     * shift's leftovers deserve the whole road in one go, and the caller still walks the trips one at a time
+     * so a failure in the second leaves the third saved instead of lost.
+     */
+    fun drainBatches(size: Int = AERO_QUEUE_BATCH): List<List<AeroQueueItem>> {
+        val step = size.coerceAtLeast(1)
+        return items.chunked(step)
+    }
 }
 
 /** Long enough for a shift, short enough that yesterday's leftovers never fire. */

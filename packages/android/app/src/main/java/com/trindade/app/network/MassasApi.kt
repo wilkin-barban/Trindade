@@ -116,6 +116,8 @@ data class AeroStoredMovement(
     @SerialName("movement_type") val movementType: String,
     /** The account the seat belongs to, or null when the name on it belongs to nobody here. */
     @SerialName("owner_user_id") val ownerUserId: Int? = null,
+    /** `active`, `inactive` or `missing`: an inactive account is not a name to create. */
+    @SerialName("owner_status") val ownerStatus: String? = null,
 )
 
 @Serializable

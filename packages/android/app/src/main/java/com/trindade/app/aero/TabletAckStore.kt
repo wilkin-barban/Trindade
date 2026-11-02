@@ -24,6 +24,15 @@ import kotlinx.serialization.json.Json
 interface TabletAckPort {
     fun ackedIds(): Set<Int>
     fun ack(launchId: Int)
+
+    /**
+     * Takes the ack back.
+     *
+     * It is the operator's word, and a word can be said twice: the row is still pending, and somebody who
+     * acknowledged the wrong line needs a way to say so. Removing an id that was never there is not an error,
+     * because the row is the same either way.
+     */
+    fun unack(launchId: Int)
 }
 
 @Singleton
@@ -53,6 +62,12 @@ class TabletAckStore @Inject constructor(
     override fun ack(launchId: Int) {
         if (launchId <= 0) return
         write(ackedIds() + launchId)
+    }
+
+    override fun unack(launchId: Int) {
+        val stored = ackedIds()
+        if (launchId !in stored) return
+        write(stored - launchId)
     }
 
     fun clear() {

@@ -112,6 +112,8 @@ class MassasLaunchViewModel @Inject constructor(
         val ackedLaunchIds: Set<Int> = emptySet(),
         /** Operators whose seats were rejected because the account is inactive. */
         val inactiveOperators: Set<String> = emptySet(),
+        /** How many launches are still waiting in the persisted queue, for the retry button to say. */
+        val queuedLaunches: Int = 0,
     ) {
         /** True when a launch can be sent to the plant without asking the operator anything else. */
         val aeroReady: Boolean get() = aeroSettings.ready
@@ -255,6 +257,7 @@ class MassasLaunchViewModel @Inject constructor(
             // preguntar por lo que la planta todavía no tiene. Va después del espejo a propósito: la guarda de
             // un asiento ya registrado se lee de ahí y no del reloj del teléfono.
             flushPendingQueue()
+            refreshQueuedCount()
         }
     }
 
@@ -462,6 +465,8 @@ class MassasLaunchViewModel @Inject constructor(
                 is AeroDispatchOutcome.Failed -> if (firstFailure == null) firstFailure = outcome.failure
             }
         }
+        // Lo que quedó en la cola después del lote es lo que el botón de reintento tiene para ofrecer.
+        refreshQueuedCount()
 
         // One answer for the batch, not one per row: the dialog is already open, and three outcomes replacing
         // each other would leave the operator reading whichever arrived last.
@@ -588,6 +593,7 @@ class MassasLaunchViewModel @Inject constructor(
                 is AeroDispatchOutcome.Failed ->
                     _state.value = _state.value.copy(errorMessage = outcome.failure.describe())
             }
+            refreshQueuedCount()
         }
     }
 
@@ -630,27 +636,33 @@ class MassasLaunchViewModel @Inject constructor(
             return
         }
 
-        val (batch, rest) = queue.takeBatch()
-        queue = rest
         var sent = 0
-        for (item in batch) {
-            val request = AeroDispatchRequest(
-                launchId = item.launchIds.first(),
-                productCode = item.productCode,
-                productName = item.productName,
-                units = item.quantity,
-                date = item.date,
-                operatorName = item.operatorName,
-            )
-            when (aeroDispatcher.dispatch(settings, request)) {
-                is AeroDispatchOutcome.Sent -> {
-                    sent++
-                    queue = queue.settle(item.launchIds)
+        // Toda la cola, en tandas de ocho. Antes se mandaba una sola tanda y el resto esperaba a la próxima
+        // apertura: veinte cajas pendientes eran tres turnos para lo que la planta hace en un minuto. Se corta
+        // en el primer fallo porque los siguientes viajarían al mismo ERP que acaba de no contestar.
+        for (batch in queue.drainBatches()) {
+            var failed = false
+            for (item in batch) {
+                val request = AeroDispatchRequest(
+                    launchId = item.launchIds.first(),
+                    productCode = item.productCode,
+                    productName = item.productName,
+                    units = item.quantity,
+                    date = item.date,
+                    operatorName = item.operatorName,
+                )
+                when (aeroDispatcher.dispatch(settings, request)) {
+                    is AeroDispatchOutcome.Sent -> {
+                        sent++
+                        queue = queue.settle(item.launchIds)
+                    }
+                    // El motivo no se guarda: lo que la cola conserva es el trabajo, no el diagnóstico. La
+                    // próxima apertura lo vuelve a intentar y, si el problema sigue, la fila ya lo explica.
+                    is AeroDispatchOutcome.Failed -> failed = true
                 }
-                // El motivo no se guarda: lo que la cola conserva es el trabajo, no el diagnóstico. La próxima
-                // apertura lo vuelve a intentar y, si el problema sigue, la fila de la tabla ya lo explica.
-                is AeroDispatchOutcome.Failed -> Unit
+                if (failed) break
             }
+            if (failed) break
         }
         aeroQueueStore.write(queue)
 
@@ -674,6 +686,37 @@ class MassasLaunchViewModel @Inject constructor(
         // The rows are derived from the state, and the ack is part of that derivation: the copy is what
         // removes the button from this row without touching the launch itself.
         _state.value = _state.value.copy(ackedLaunchIds = _state.value.ackedLaunchIds + id)
+    }
+
+    /**
+     * Takes back the acknowledgement of a row, so the button comes back.
+     *
+     * The ack is a person's word about a paper tablet, and a person can point at the wrong line. Without this
+     * the row stayed silent for the rest of the device's life and the only way out was clearing the app.
+     */
+    fun undoAcknowledgeLaunch(row: MassasUnifiedRow) {
+        val id = row.launchIds.firstOrNull() ?: return
+        tabletAckStore.unack(id)
+        _state.value = _state.value.copy(ackedLaunchIds = _state.value.ackedLaunchIds - id)
+    }
+
+    /**
+     * Sends what is still waiting in the queue, right now.
+     *
+     * The queue retries on its own when the day is opened, and that is the wrong moment for the operator who
+     * has just walked back into the plant's Wi-Fi and is looking at a row that says pending. The answer is the
+     * same one the open does, so there is no second set of rules.
+     */
+    fun retryPendingLaunches() {
+        if (state.value.isSubmitting) return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isSubmitting = true, errorMessage = null, noticeMessage = null)
+            flushPendingQueue()
+            val refreshed = repository.day(state.value.date)
+            if (refreshed != null) _state.value = _state.value.copy(dayView = refreshed)
+            _state.value = _state.value.copy(isSubmitting = false)
+            refreshQueuedCount()
+        }
     }
 
     /**
@@ -859,6 +902,19 @@ class MassasLaunchViewModel @Inject constructor(
 
     /** Los lanzamientos que el ERP ya asentó, tal como los ve la tabla del día. */
     private fun settledLaunchIds(): Set<Int> = reconciledLaunchIds(state.value.unifiedRows)
+
+    /**
+     * Reads how much work the queue is holding.
+     *
+     * The queue is the authority and the screen is a copy: counting the items on every write keeps the button
+     * from promising zero pending launches while a restart is still owed three.
+     */
+    private fun refreshQueuedCount() {
+        val queued = aeroQueueStore.read()?.items?.size ?: 0
+        if (queued != state.value.queuedLaunches) {
+            _state.value = _state.value.copy(queuedLaunches = queued)
+        }
+    }
 
     fun canEdit(launch: MassaIndividualLaunch): Boolean {
         if (state.value.isReadOnly) return false
