@@ -824,6 +824,22 @@ S19 — D5/D7, verbatim:
   revierte sin perder datos.
 - **Commit esperado.** `feat(android): send ERP launches in eights and retry only what failed` · ~300 líneas.
 - **Depende.** T24, T23.
+- **Cerrada.** `c1c2c0c` (lógica y view model) + `bb6ac45` (pantalla y textos).
+  - La cola se drena **entera** en tandas de ocho y se corta en el primer fallo: 20 pendientes son 8+8+4 en
+    una sola apertura, no tres arranques de la app, y lo que sigue no viaja a un servidor que acaba de no
+    contestar.
+  - `retryPendingLaunches()` da el reintento manual que el operador necesita al volver al Wi-Fi, y el botón de
+    la pantalla muestra cuántos quedan (`queuedLaunches`).
+  - El ack es reversible: `TabletAckPort.unack`, `TabletAckStore.unack`, `undoAcknowledgeLaunch` y la fila
+    marcada ofrece deshacer en vez de volver a marcarse.
+  - `owner_status` se lee del backend (`AeroErpMovement`, `AeroStoredMovement`, `MassasUnifiedRow`) y manda
+    sobre la tabla local de vínculos: una cuenta dada de baja no se ofrece para crear.
+  - El asiento sin cajas enteras explica el motivo (`MassasImportHint`) con el tamaño de caja de la fila.
+  - Tests: `AeroQueueTest` 12/12 (drenaje 20 → 8+8+4, cola vacía y cola corta), `MassasUnifiedTest` 23/23
+    (motivo, hint nulo cuando se puede importar, `inactive` que no ofrece alta), `MassasLaunchViewModelTest`
+    41/41 (reintento que manda todo, corte en el primer fallo con lo pendiente guardado, ack reversible),
+    `MassasUnifiedTableTest` nuevo en Robolectric (motivo dibujado, deshacer, marcar) y
+    `LocaleStringsParityTest` en verde.
 
 ### T27 · Release 7005, despliegue y verificación
 
@@ -931,7 +947,7 @@ recorta alcance **con aprobación explícita**, nunca moviéndolas a otro ODD po
 | T23 | H P0-4, P0-6 | `feat(android): keep the ERP queue across restarts and refuse duplicated seats` | `AeroQueueTest.kt`, `MassasLaunchViewModelTest.kt` |
 | T24 | H P0-7, S17 | `08cc333` + `2249394` `feat(massas): let each seat carry its own operator` | `massas.service.test.ts` 18/18, `massas.routes.test.ts` 26/26, `aero-mirror.test.ts` 19/19, `MassasImportPayloadTest.kt` |
 | T25 | G | `fix(web): stop masking ERP failures with a successful-looking answer` | `aero-integration.test.ts`, `aero-queue.test.ts` |
-| T26 | H P1 | `feat(android): send ERP launches in eights and retry only what failed` | `MassasLaunchViewModelTest.kt`, `MassasDayHeaderTest.kt` |
+| T26 | H P1 | `c1c2c0c` + `bb6ac45` `feat(android): send ERP launches in eights and retry only what failed` | `AeroQueueTest.kt` 12/12, `MassasUnifiedTest.kt` 23/23, `MassasLaunchViewModelTest.kt` 41/41, `MassasUnifiedTableTest.kt` 3/3 |
 | T27 | S9, S10 | `chore(android): hand the plant the 7005 build as the v0.7.0 asset` | `apksigner`, `aapt2`, `sha256sum -c`, e2e web |
 
 ## Log
