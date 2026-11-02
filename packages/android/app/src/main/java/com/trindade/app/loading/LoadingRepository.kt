@@ -141,7 +141,7 @@ class LoadingRepository @Inject constructor(
         return if (response.isSuccessful) {
             ScheduleLifecycleResult.Changed
         } else {
-            ScheduleLifecycleResult.Refused(response.code())
+            ScheduleLifecycleResult.Refused(response.code(), refusalCode(response))
         }
     }
 
@@ -220,7 +220,16 @@ sealed interface ScheduleWriteResult {
  */
 sealed interface ScheduleLifecycleResult {
     data object Changed : ScheduleLifecycleResult
-    data class Refused(val statusCode: Int) : ScheduleLifecycleResult
+
+    /**
+     * The server answered and said no, with the reason it named when it named one.
+     *
+     * The status code says how the answer was framed -- unauthorized, forbidden, not there, in conflict --
+     * and the code says which fact it is when the status covers more than one. A client that read only the
+     * status would have to guess between a duplicate and a frozen day, and the two sentences it could
+     * print are not interchangeable.
+     */
+    data class Refused(val statusCode: Int, val code: String? = null) : ScheduleLifecycleResult
     data object Unreachable : ScheduleLifecycleResult
 }
 

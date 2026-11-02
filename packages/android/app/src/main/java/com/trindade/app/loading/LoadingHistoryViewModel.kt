@@ -111,6 +111,26 @@ class LoadingHistoryViewModel @Inject constructor(
      */
     private var newestLoad = 0
 
+    /**
+     * The lifecycle call still owed, when the retry button should repeat a write rather than a read.
+     *
+     * Held as the call itself instead of the batch date and an enum: the route is the thing that has to
+     * be repeated exactly, and a second description of it here would be a second place for the two to
+     * disagree. Cleared as soon as the server agrees, because a write that landed is not owed again.
+     */
+    private var pendingWrite: (suspend () -> ScheduleLifecycleResult)? = null
+
+    /** The sentence the owed write would print on success, kept beside it so a retry can still say it. */
+    private var pendingSuccess: UiText? = null
+
+    /**
+     * Whether the last lifecycle call landed and only its reload failed.
+     *
+     * This is the whole difference between the two retries: repeating a deactivation that already
+     * applied is a second write of the same action, and repeating a read is not.
+     */
+    private var lastWriteApplied = false
+
     init {
         load()
     }
@@ -152,48 +172,73 @@ class LoadingHistoryViewModel @Inject constructor(
         val filters = state.value
         val load = ++newestLoad
         _state.update { it.copy(loading = true, message = null) }
+        viewModelScope.launch { readPage(filters, page, load) }
+    }
 
-        viewModelScope.launch {
-            val history = repository.history(
-                date = filters.date,
-                month = filters.month,
-                page = page,
-                pageSize = null,
-            )
-
-            // A superseded answer is dropped whole: not the items, not the page, not the message. Half of
-            // it written over a newer answer would be worse than none, because the page and the list would
-            // then describe different requests.
-            if (load != newestLoad) return@launch
-
-            if (history == null) {
-                // Null is "the server did not answer", not "there are no batches". An empty list drawn
-                // over a failed read would report a network fault as a fact about the history.
-                _state.update { it.copy(loading = false, message = UNREACHABLE) }
-                return@launch
-            }
-
-            // A page past the end answers an empty list with a well-formed pagination instead of an
-            // error, and above the first page that means the page just lost its last row -- which is what
-            // deleting a batch does. Stepping back one page is what keeps the operator off a blank screen
-            // still labelled "Página 2 de 2"; one page at a time is enough, because that is as far as the
-            // single deletion that caused it could have moved the end.
-            if (history.items.isEmpty() && page > FIRST_PAGE) {
-                load(page - 1)
-                return@launch
-            }
-
-            _state.update {
-                it.copy(
-                    loading = false,
-                    items = history.items,
-                    page = history.pagination.page,
-                    totalPages = history.pagination.totalPages,
-                    total = history.pagination.total,
-                    loaded = true,
-                )
-            }
+    /**
+     * Repeats what failed, and only that.
+     *
+     * The banner offers one button and the operator has no way to tell the two failures apart, so the
+     * view model is the one that remembers: a write that landed and whose reload failed is repeated as a
+     * read, because repeating it as a write would deactivate a batch a second time; a write that never
+     * landed is repeated as itself. See [pendingWrite] and [lastWriteApplied].
+     */
+    fun retry() {
+        val write = pendingWrite
+        when {
+            lastWriteApplied -> load()
+            write != null -> runLifecycle(pendingSuccess, write)
+            else -> load()
         }
+    }
+
+    /**
+     * Reads one page, under a token the caller already claimed, and answers whether it was the newest.
+     *
+     * The filters travel in rather than being read here: the answer is the answer to the filter that was
+     * on screen when the read was asked for, and a filter chosen while it was in the air belongs to the
+     * request that follows, not to this one.
+     */
+    private suspend fun readPage(filters: UiState, page: Int, load: Int): Boolean {
+        val history = repository.history(
+            date = filters.date,
+            month = filters.month,
+            page = page,
+            pageSize = null,
+        )
+
+        // A superseded answer is dropped whole: not the items, not the page, not the message. Half of
+        // it written over a newer answer would be worse than none, because the page and the list would
+        // then describe different requests.
+        if (load != newestLoad) return false
+
+        if (history == null) {
+            // Null is "the server did not answer", not "there are no batches". An empty list drawn
+            // over a failed read would report a network fault as a fact about the history.
+            _state.update { it.copy(loading = false, message = UNREACHABLE) }
+            return false
+        }
+
+        // A page past the end answers an empty list with a well-formed pagination instead of an
+        // error, and above the first page that means the page just lost its last row -- which is what
+        // deleting a batch does. Stepping back one page is what keeps the operator off a blank screen
+        // still labelled "Página 2 de 2"; one page at a time is enough, because that is as far as the
+        // single deletion that caused it could have moved the end.
+        if (history.items.isEmpty() && page > FIRST_PAGE) {
+            return readPage(filters, page - 1, load)
+        }
+
+        _state.update {
+            it.copy(
+                loading = false,
+                items = history.items,
+                page = history.pagination.page,
+                totalPages = history.pagination.totalPages,
+                total = history.pagination.total,
+                loaded = true,
+            )
+        }
+        return true
     }
 
     /**
@@ -263,20 +308,45 @@ class LoadingHistoryViewModel @Inject constructor(
         val item = state.value.items.firstOrNull { it.batchDate == batchDate } ?: return
         if (!offered(item)) return
 
+        runLifecycle(success, call)
+    }
+
+    /**
+     * Runs one lifecycle call and keeps the screen honest about what it did.
+     *
+     * Busy is cleared at the end, after the reload and not before it: a second tap while the page is in
+     * the air would otherwise start a second write of an action the server has already applied. The
+     * sentence of the action is kept in `resultMessage`, which the reload does not touch, so a reload
+     * that fails leaves both facts on screen -- the write landed, and the page could not be re-read --
+     * instead of replacing the first with the second.
+     */
+    private fun runLifecycle(success: UiText?, call: suspend () -> ScheduleLifecycleResult) {
+        if (state.value.busy) return
+
         _state.update { it.copy(busy = true, message = null) }
+        pendingWrite = call
+        pendingSuccess = success
+        lastWriteApplied = false
 
         viewModelScope.launch {
             when (val result = call()) {
                 ScheduleLifecycleResult.Changed -> {
-                    _state.update { it.copy(busy = false, resultMessage = success) }
+                    // The write is no longer owed: it landed. What the retry owes now is the read.
+                    pendingWrite = null
+                    lastWriteApplied = true
+                    _state.update { it.copy(resultMessage = success) }
+
                     // The page on screen rather than the first one: the row that changed is on it, and a
                     // jump to page one would move the operator away from where they were reading. If the
-                    // change emptied the last page, [load] steps back to the page that still has rows.
-                    load()
+                    // change emptied the last page, [readPage] steps back to the page that still has rows.
+                    val load = ++newestLoad
+                    _state.update { it.copy(loading = true) }
+                    readPage(state.value, state.value.page, load)
+                    _state.update { it.copy(busy = false, loading = false) }
                 }
 
                 is ScheduleLifecycleResult.Refused ->
-                    _state.update { it.copy(busy = false, message = refusalMessage(result.statusCode)) }
+                    _state.update { it.copy(busy = false, message = refusalMessage(result.statusCode, result.code)) }
 
                 ScheduleLifecycleResult.Unreachable ->
                     _state.update { it.copy(busy = false, message = UNREACHABLE) }
@@ -284,7 +354,17 @@ class LoadingHistoryViewModel @Inject constructor(
         }
     }
 
-    private fun refusalMessage(statusCode: Int): String = when (statusCode) {
+    /**
+     * What a refused lifecycle call says, by the reason the server named when it named one.
+     *
+     * The status is the frame and the code the fact: a 409 on these routes is a day that is closed to
+     * writes, and the sentence has to say that rather than "it failed". A 5xx is the server answering at
+     * all, which is not the same as no answer: telling the operator the connection is down would send
+     * them to check a network that is fine.
+     */
+    private fun refusalMessage(statusCode: Int, code: String? = null): String = when (statusCode) {
+        // The session is gone, not the network. The app's own sign-in is the way back.
+        401 -> SESSION_EXPIRED
         // Both routes check for Administrador, and on the batch routes this is the pair where the
         // server's own flag overstates the caller: the history drew a delete action for a Trabalhador
         // because `canDelete` said so, and the route answers 403. Naming the role the server checks is
@@ -292,6 +372,9 @@ class LoadingHistoryViewModel @Inject constructor(
         // here.
         403 -> ADMIN_ONLY
         404 -> GONE
+        // A day that is closed to writes: the massas history's own refusal, which these routes share.
+        409 -> if (code == HISTORY_FROZEN) FROZEN else GENERIC
+        in 500..599 -> SERVER_FAILED
         else -> GENERIC
     }
 
@@ -300,6 +383,14 @@ class LoadingHistoryViewModel @Inject constructor(
         const val GENERIC = "Não foi possível concluir. Tente de novo."
         const val ADMIN_ONLY = "Só um administrador pode fazer isso."
         const val GONE = "Esse carregamento não existe mais."
+        const val SESSION_EXPIRED = "Sua sessão expirou. Entre de novo."
+        const val SERVER_FAILED = "O servidor não conseguiu concluir. Tente de novo em instantes."
+
+        /** The server's code for "this day is closed to writes", which a 409 also uses for other facts. */
+        const val HISTORY_FROZEN = "LOADING_HISTORY_FROZEN"
+
+        /** The sentence a closed day gets, verbatim from the server's own text for the same refusal. */
+        const val FROZEN = "Este dia de carregamento já está fechado. Apenas consulta."
     }
 }
 

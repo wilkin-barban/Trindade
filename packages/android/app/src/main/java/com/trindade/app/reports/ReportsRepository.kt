@@ -16,6 +16,7 @@ import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import retrofit2.Response
 
 /**
  * The reports data layer.
@@ -128,9 +129,22 @@ class ReportsRepository @Inject constructor(
         return if (response.isSuccessful) {
             ReportLifecycleResult.Changed
         } else {
-            ReportLifecycleResult.Refused(response.code())
+            ReportLifecycleResult.Refused(response.code(), refusalCode(response))
         }
     }
+
+    /**
+     * The machine-readable reason a refusal named, when it named one.
+     *
+     * A 409 here means the report moved out from under the operator -- someone else closed it, or the
+     * day it belongs to was closed -- and the sentence the server wrote is the one that says which. The
+     * status alone cannot, so it is kept rather than collapsed. Null when the body is not the envelope.
+     */
+    private fun refusalCode(response: Response<*>): String? =
+        runCatching { response.errorBody()?.string() }.getOrNull()
+            ?.takeIf { it.isNotBlank() }
+            ?.let { body -> runCatching { refusalJson.decodeFromString<RefusalEnvelope>(body) }.getOrNull() }
+            ?.code
 
     suspend fun report(id: Int): ReportResponseReport? =
         runCatchingCancellable { api.report(id) }.getOrNull()
@@ -260,7 +274,12 @@ sealed interface ReportWriteResult {
  * keeps the rest of the envelope, `details` included, harmless here.
  */
 @Serializable
-internal data class RefusalEnvelope(val error: String? = null, val message: String? = null)
+internal data class RefusalEnvelope(
+    val error: String? = null,
+    val message: String? = null,
+    /** The machine-readable reason, when the route names one: a 409 covers more than one fact. */
+    val code: String? = null,
+)
 
 /** The decoder for [RefusalEnvelope]: no options matter to two optional strings, and none are shared. */
 private val refusalJson = Json { ignoreUnknownKeys = true }
@@ -276,7 +295,9 @@ private val refusalJson = Json { ignoreUnknownKeys = true }
  */
 sealed interface ReportLifecycleResult {
     data object Changed : ReportLifecycleResult
-    data class Refused(val statusCode: Int) : ReportLifecycleResult
+
+    /** The server answered and said no, with the code it named when it named one. See the loading layer. */
+    data class Refused(val statusCode: Int, val code: String? = null) : ReportLifecycleResult
     data object Unreachable : ReportLifecycleResult
 }
 

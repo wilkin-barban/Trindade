@@ -369,6 +369,6 @@ fun ReportsHistoryRoute(
         onActivate = viewModel::activate,
         onDelete = viewModel::delete,
         onDismissResult = viewModel::dismissResult,
-        onRetry = { viewModel.load() },
+        onRetry = { viewModel.retry() },
     )
 }

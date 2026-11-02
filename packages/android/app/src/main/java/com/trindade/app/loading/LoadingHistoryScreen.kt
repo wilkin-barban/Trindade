@@ -409,6 +409,6 @@ fun LoadingHistoryRoute(
         onActivate = viewModel::activateBatch,
         onDelete = viewModel::deleteBatch,
         onDismissResult = viewModel::dismissResult,
-        onRetry = { viewModel.load() },
+        onRetry = { viewModel.retry() },
     )
 }
