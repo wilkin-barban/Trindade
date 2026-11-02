@@ -877,6 +877,8 @@ cerrar la tarea, con el hash que quedó en el historial.
 | T1 | `440d882` | `aero.routes.test.ts`: 8/8 (2 nuevos: cuerpo Android 200 con `client`/`attemptId`/`durationMs`; `error` > 1024 y `client` desconocido siguen 400). `aero.log.service.test.ts`: 6/6. Contrato regenerado. De paso corrige el fixture de `receipts.service.test.ts` que dejaba `tsc --noEmit` rojo en `main` desde `9427d7b`. |
 | T2 | `3f6c472` | `aero.log.contract.test.ts`: 25/25 (9 cuerpos reales web/Android aceptados, 16 bordes estrictos). Backend completo: 667/667. `:app:testDebugUnitTest --tests AeroTestAuditTest`: 7/7 en `ghcr.io/cirruslabs/android-sdk:35`. |
 
+| T3 | `0e68273` | `node:test`: 475/475 (9 en `aero-audit.test.ts`: `client=web`, `attemptId`, `durationMs`, prefijo `AERO_*`, recorte de `note` 256 y `error` 1024, y que `read_history` ya no invente `httpStatus 200`). `tsc --noEmit` limpio. `npm run test:unit`: verde. |
+| T4 | `d65b1d4` | `:app:testDebugUnitTest --tests "com.trindade.app.aero.*"` en `ghcr.io/cirruslabs/android-sdk:35`: BUILD SUCCESSFUL (11m). `AeroTestAuditTest` 11/11 (4 nuevos: `client=android` + `attemptId` por intento, correlación pedido/resultado, `error` recortado a 1024 y `note` a 256, y `rejection()` con el código del backend). `AeroMirrorAdapterTest` nuevo (Robolectric + MockWebServer): el cuerpo en el cable lleva `client`, `attemptId` y `durationMs`, y un 400 no lanza. |
 ## Reglas de trabajo
 
 - Primero solo el ODD. No toques código ni abras ramas.
