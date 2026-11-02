@@ -78,8 +78,19 @@ class AeroDispatcher(
     ): AeroDispatchOutcome {
         val normalized = settings.normalizedWsUrl
         if (normalized == null || !settings.ready) {
-            // Nothing is sent and nothing is logged against the ERP: the log line would name a destination
-            // that was never called, and the operator has to configure the integration first.
+            // Nothing is sent to the plant, and the line says so: a launch that stayed local and a launch
+            // that was refused used to read the same in the log -- both silent -- and the operator had no
+            // way to tell whether the phone ever tried. The destination is marked as unconfigured instead
+            // of naming an endpoint that was never called.
+            mirror.log(
+                AeroAudit.request(
+                    event = AeroAudit.Event.DISPATCH,
+                    destinationUrl = UNCONFIGURED,
+                    phase = "requested",
+                    detail = "launch #${request.launchId} · integração não configurada",
+                    error = ERROR_NOT_CONFIGURED,
+                ),
+            )
             return AeroDispatchOutcome.Refused("not-configured")
         }
 
@@ -141,7 +152,18 @@ class AeroDispatcher(
      */
     suspend fun syncDay(settings: AeroSettings, date: String): AeroSyncOutcome {
         val normalized = settings.normalizedWsUrl
-        if (normalized == null || !settings.ready) return AeroSyncOutcome.Failed("not-configured")
+        if (normalized == null || !settings.ready) {
+            mirror.log(
+                AeroAudit.request(
+                    event = AeroAudit.Event.SYNC,
+                    destinationUrl = UNCONFIGURED,
+                    phase = "requested",
+                    detail = "date=$date · integração não configurada",
+                    error = ERROR_NOT_CONFIGURED,
+                ),
+            )
+            return AeroSyncOutcome.Failed("not-configured")
+        }
 
         val startedAt = System.currentTimeMillis()
         val read = erp.readMovements(settings, date)
@@ -182,5 +204,40 @@ class AeroDispatcher(
                 if (read.message == null) AeroSyncOutcome.Unreachable else AeroSyncOutcome.Failed(read.message)
             }
         }
+    }
+
+    /**
+     * Records a seat that became a local launch, with no ERP call to observe.
+     *
+     * Importing writes to Trindade and never back to the company, so there is no answer from Aero32 and no
+     * duration to report. What is worth keeping is which seat was taken, in how many boxes, and whether the
+     * backend kept it -- `ent_lan` is the only field that pairs this launch with the company's own record.
+     */
+    suspend fun logImport(
+        date: String,
+        entLan: Int,
+        productCode: String,
+        boxes: Int,
+        error: String? = null,
+    ) {
+        mirror.log(
+            AeroAudit.request(
+                event = AeroAudit.Event.IMPORT,
+                destinationUrl = IMPORT_DESTINATION,
+                phase = "response",
+                detail = "date=$date · ent_lan=$entLan · product=$productCode · boxes=$boxes",
+                error = error,
+            ),
+        )
+    }
+
+    private companion object {
+        /** Where an import goes when the integration was never configured: our own API, not the plant. */
+        const val UNCONFIGURED = "unconfigured"
+
+        /** The local route an imported seat is written to. */
+        const val IMPORT_DESTINATION = "/api/massas-launch"
+
+        const val ERROR_NOT_CONFIGURED = "AERO_NOT_CONFIGURED"
     }
 }

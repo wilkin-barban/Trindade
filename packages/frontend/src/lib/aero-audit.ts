@@ -19,7 +19,14 @@ import { api } from '../api/client';
 export type AeroAuditClient = 'web' | 'android' | 'shortcut' | 'bridge';
 
 export interface AeroAuditEvent {
-  event: 'test_connection' | 'launch_sync' | 'read_history';
+  /**
+   * The event names the log accepts, which is the union of the three vocabularies the server keeps.
+   *
+   * The web says `launch_sync` and `read_history`, the phone says `dispatch` and `sync`, and `import`
+   * belongs to whichever client brought a seat in. They are one column because a reader filters the log
+   * by event, not by app; `client` is the field that says who wrote the line.
+   */
+  event: 'test_connection' | 'launch_sync' | 'read_history' | 'dispatch' | 'sync' | 'test' | 'import';
   phase?: 'requested' | 'result';
   destinationUrl: string;
   httpStatus?: number | null;
@@ -169,6 +176,79 @@ export function buildAeroAuditBody(event: AeroAuditEvent, now: number = Date.now
   if (event.note !== undefined) body.note = truncate(event.note, AERO_NOTE_MAX);
 
   return body;
+}
+
+/**
+ * The line the Recebimento block writes when the day came back from the bridge.
+ *
+ * The section stores the same snapshot the launch screen stores, so the read is the same `read_history`
+ * the page already writes; what the note adds is which lens consumed it. Without that word the log holds
+ * two identical reads of one day and a reader cannot tell whether the supplies were ever answered for.
+ */
+export function aeroReceiptsAuditEvent(args: {
+  date: string;
+  insumos: number;
+  destinationUrl: string;
+  error?: string | null;
+  attemptId?: string;
+}): AeroAuditEvent {
+  const note = args.error
+    ? `lens=recebimento · date=${args.date} · via=bridge`
+    : `lens=recebimento · date=${args.date} · insumos=${args.insumos} · via=bridge`;
+  return {
+    event: 'read_history',
+    phase: 'result',
+    destinationUrl: args.destinationUrl,
+    note,
+    error: args.error ?? null,
+    ...(args.attemptId ? { attemptId: args.attemptId } : {}),
+  };
+}
+
+/**
+ * The line an ERP seat leaves when it becomes a local launch, or when it does not.
+ *
+ * Importing writes to Trindade and never back to the company, so there is no HTTP answer from Aero32 to
+ * report: what is worth recording is which seat was taken, with how many boxes, and whether the backend
+ * kept it. `ent_lan` is the only field that pairs this launch with the company's own record.
+ */
+export function aeroImportAuditEvent(args: {
+  date: string;
+  entLan: number;
+  productCode: string;
+  boxes: number;
+  error?: string | null;
+  attemptId?: string;
+}): AeroAuditEvent {
+  return {
+    event: 'import',
+    phase: 'result',
+    destinationUrl: '/api/massas-launch',
+    note: `date=${args.date} · ent_lan=${args.entLan} · product=${args.productCode} · boxes=${args.boxes}`,
+    error: args.error ?? null,
+    ...(args.attemptId ? { attemptId: args.attemptId } : {}),
+  };
+}
+
+/**
+ * The line a screen writes when it could not start the bridge at all.
+ *
+ * A button that fires nothing because the device has no company access, and a button that fires an
+ * envelope the ERP refuses, used to look the same in the log: neither wrote anything. This is the first
+ * one, named, so silence stops being an answer.
+ */
+export function aeroSyncRefusedEvent(args: {
+  date: string;
+  destinationUrl: string;
+  reason?: string;
+}): AeroAuditEvent {
+  return {
+    event: 'read_history',
+    phase: 'requested',
+    destinationUrl: args.destinationUrl,
+    note: `date=${args.date} · via=bridge`,
+    error: args.reason ?? 'AERO_NOT_CONFIGURED',
+  };
 }
 
 /**

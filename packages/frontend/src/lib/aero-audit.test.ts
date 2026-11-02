@@ -32,7 +32,13 @@ globalThis.window = {
   removeEventListener: () => {},
 } as any;
 
-const { aeroErrorCode, postAeroAuditEvent } = await import('./aero-audit');
+const {
+  aeroErrorCode,
+  aeroImportAuditEvent,
+  aeroReceiptsAuditEvent,
+  aeroSyncRefusedEvent,
+  postAeroAuditEvent,
+} = await import('./aero-audit');
 
 interface Call {
   url: string;
@@ -188,5 +194,52 @@ describe('aeroErrorCode', () => {
   test('answers null for no failure at all', () => {
     assert.equal(aeroErrorCode(null), null);
     assert.equal(aeroErrorCode('   '), null);
+  });
+});
+
+describe('the paths that were operating without a trace', () => {
+  test('a receipts read names its lens so it is not confused with the launch screen read', () => {
+    const ok = aeroReceiptsAuditEvent({ date: '2026-10-28', insumos: 3, destinationUrl: 'http://erp/movimentoitem' });
+    assert.equal(ok.event, 'read_history');
+    assert.equal(ok.phase, 'result');
+    assert.equal(ok.error, null);
+    assert.ok(ok.note?.includes('lens=recebimento'));
+    assert.ok(ok.note?.includes('insumos=3'));
+  });
+
+  test('a snapshot the backend refused keeps the row and names the code', () => {
+    const refused = aeroReceiptsAuditEvent({
+      date: '2026-10-28',
+      insumos: 0,
+      destinationUrl: 'http://erp/movimentoitem',
+      error: 'AERO_SNAPSHOT_REFUSED',
+    });
+    assert.equal(refused.error, 'AERO_SNAPSHOT_REFUSED');
+    assert.equal(refused.note?.includes('insumos='), false, 'a refused store has no count to report');
+  });
+
+  test('an import records the seat it took, which is what pairs it with the company', () => {
+    const imported = aeroImportAuditEvent({ date: '2026-10-28', entLan: 3010, productCode: '000123', boxes: 4 });
+    assert.equal(imported.event, 'import');
+    assert.equal(imported.destinationUrl, '/api/massas-launch');
+    assert.equal(imported.error, null);
+    assert.ok(imported.note?.includes('ent_lan=3010'));
+    assert.ok(imported.note?.includes('boxes=4'));
+
+    const refused = aeroImportAuditEvent({
+      date: '2026-10-28',
+      entLan: 3010,
+      productCode: '000123',
+      boxes: 4,
+      error: 'AERO_IMPORT_REFUSED',
+    });
+    assert.equal(refused.error, 'AERO_IMPORT_REFUSED');
+  });
+
+  test('a sync that never started is written instead of passing as silence', () => {
+    const refused = aeroSyncRefusedEvent({ date: '2026-10-28', destinationUrl: '/movimentoitem' });
+    assert.equal(refused.event, 'read_history');
+    assert.equal(refused.phase, 'requested');
+    assert.equal(refused.error, 'AERO_NOT_CONFIGURED');
   });
 });

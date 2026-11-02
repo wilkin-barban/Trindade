@@ -197,6 +197,44 @@ class MassasLaunchViewModelTest {
         assertEquals(listOf("1045"), sent.items.map { it.productCode })
     }
 
+    /**
+     * La importación también deja su línea en el log compartido.
+     *
+     * No hay llamada al ERP que observar: la importación escribe en Trindade. Lo que la línea guarda es el
+     * asiento que se tomó y si el backend lo aceptó, que es lo único que empareja este lanzamiento con el
+     * registro de la empresa.
+     */
+    @Test
+    fun `importing a seat leaves the seat in the shared log`() = runTest {
+        val stored = com.trindade.app.network.AeroMovementsStoredDay(
+            date = MassasLaunchViewModel.saopauloToday(),
+            movements = listOf(
+                com.trindade.app.network.AeroStoredMovement(
+                    entLan = 35937,
+                    productCode = "1045",
+                    productDesc = "MASSA CASEIRA",
+                    quantity = 30.0,
+                    entryDate = MassasLaunchViewModel.saopauloToday(),
+                    operatorName = "VICTOR",
+                    movementType = "E",
+                ),
+            ),
+        )
+        val repo = DayRepository(massasApi, dayWith(), stored)
+        val testVm = newViewModel(repo)
+        testVm.refresh()
+        advanceUntilIdle()
+
+        testVm.importErpSeat(testVm.state.value.unifiedRows.single())
+        advanceUntilIdle()
+
+        val line = mirrorPort.logs.single { it.event == "import" }
+        assertEquals("android", line.client)
+        assertEquals(null, line.error)
+        assertTrue(line.note!!.contains("ent_lan=35937"))
+        assertTrue(line.note!!.contains("boxes=3"))
+    }
+
     private fun newViewModel(
         repository: MassasRepository,
         usersRepository: UsersRepository? = null,

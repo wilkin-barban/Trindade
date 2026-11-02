@@ -15,6 +15,8 @@ import {
   readAeroMovements,
 } from '../../lib/aero-integration';
 import { triggerAeroMovementsSync } from '../../lib/aero-mirror';
+import { aeroReceiptsAuditEvent, postAeroAuditEvent } from '../../lib/aero-audit';
+import { aeroEndpoint } from '../../lib/aero-integration';
 import { readReportReceiptsDay, type ReportReceiptsDay } from '../../lib/receipts';
 
 interface ReceiptsSectionProps {
@@ -93,7 +95,16 @@ export function ReceiptsSection({
   const finishSync = useCallback(
     async (data: unknown) => {
       const read = readAeroMovements(data);
+      // The section stores the day and the log says so: without this line a journey's supply reading is
+      // invisible, because the only thing that reached the log was the launch screen's read.
+      const passport = {
+        date,
+        destinationUrl: aeroEndpoint(settings.wsUrl, 'movimentoitem'),
+      };
       if (read.status === 'error') {
+        void postAeroAuditEvent(
+          aeroReceiptsAuditEvent({ ...passport, insumos: 0, error: read.message ?? 'aero_receipts_unreadable' }),
+        );
         setSyncResult({
           feedback: receiptsSyncFeedback({ status: 'error', count: 0 }),
           detail: read.message,
@@ -108,18 +119,22 @@ export function ReceiptsSection({
         );
         await load();
         onSynced?.();
+        void postAeroAuditEvent(aeroReceiptsAuditEvent({ ...passport, insumos: stored?.insumos ?? 0 }));
         setSyncResult({
           feedback: receiptsSyncFeedback({ status: 'ok', count: stored?.insumos ?? 0 }),
           detail: null,
         });
       } catch {
+        // The ERP answered and the backend would not store it: a different failure from an unreachable
+        // plant, and one the log has to name or the day looks read and is gone.
+        void postAeroAuditEvent(aeroReceiptsAuditEvent({ ...passport, insumos: 0, error: 'AERO_SNAPSHOT_REFUSED' }));
         setSyncResult({
           feedback: receiptsSyncFeedback({ status: 'error', count: 0 }),
           detail: t('reports.receiptsError'),
         });
       }
     },
-    [date, load, t],
+    [date, load, onSynced, settings.wsUrl, t],
   );
 
   useEffect(() => {

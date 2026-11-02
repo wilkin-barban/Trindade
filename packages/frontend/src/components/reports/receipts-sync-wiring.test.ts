@@ -31,6 +31,15 @@ describe('receipts sync wiring', () => {
     assert.equal(/read\.movements\.length/.test(section), false, 'the raw seat count must never reach the dialog');
   });
 
+  it('leaves a line in the shared log when the day it stored is receipts', () => {
+    // Both blocks store the same snapshot; without the lens word the log holds two identical reads of one
+    // day and nobody can tell whether the supplies were ever answered for.
+    assert.ok(section.includes('aeroReceiptsAuditEvent('));
+    assert.ok(section.includes('postAeroAuditEvent(aeroReceiptsAuditEvent({ ...passport, insumos: stored?.insumos ?? 0 }))'));
+    // A store the backend refused is a different failure from an unreachable plant, and it is named.
+    assert.ok(section.includes("error: 'AERO_SNAPSHOT_REFUSED'"));
+  });
+
   it('keeps the sync and refresh controls at the 44px touch floor', () => {
     assert.ok(section.includes('data-testid="receipts-sync"'));
     assert.equal((section.match(/min-h-\[44px\]/g) ?? []).length >= 2, true);

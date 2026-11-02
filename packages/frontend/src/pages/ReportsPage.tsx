@@ -17,8 +17,9 @@ import { hasTemperatureTasks } from '../lib/report-sections';
 import { MassasReportSection } from '../components/reports/MassasReportSection';
 import { ERP_RECEIPT_CATEGORY_ID, usesErpReceipts } from '../lib/receipts';
 import { saoPauloToday } from '../lib/date';
-import { aeroSettingsReady, loadAeroSettings } from '../lib/aero-integration';
+import { aeroEndpoint, aeroSettingsReady, loadAeroSettings } from '../lib/aero-integration';
 import { triggerAeroMovementsSync } from '../lib/aero-mirror';
+import { aeroSyncRefusedEvent, postAeroAuditEvent } from '../lib/aero-audit';
 
 
 interface PendingPhoto {
@@ -66,7 +67,17 @@ export function ReportsPage() {
 
   const handleSyncErpMovements = useCallback(() => {
     const fired = triggerAeroMovementsSync(aeroSettings, { date: reportDate, callbackPath: location.pathname });
-    if (!fired) setMovementsRefreshKey((key) => key + 1);
+    if (!fired) {
+      // A device without company access refreshes what it already read, and says so in the log: the
+      // operator pressed a button, and a press that reached nothing is not the same as one never made.
+      void postAeroAuditEvent(
+        aeroSyncRefusedEvent({
+          date: reportDate,
+          destinationUrl: aeroEndpoint(aeroSettings.wsUrl, 'movimentoitem'),
+        }),
+      );
+      setMovementsRefreshKey((key) => key + 1);
+    }
   }, [aeroSettings, location.pathname, reportDate]);
 
   const handleMovementsSynced = useCallback(() => {

@@ -51,7 +51,7 @@ import {
   saveAeroSettings,
   type AeroSettings,
 } from '../lib/aero-integration';
-import { postAeroAuditEvent } from '../lib/aero-audit';
+import { aeroImportAuditEvent, postAeroAuditEvent } from '../lib/aero-audit';
 import {
   aeroTestNoVerdictEvent,
   aeroTestResultEvent,
@@ -570,6 +570,14 @@ export function MassasLaunchPage() {
     date: string;
   }) => {
     setImportingEntLan(request.entLan);
+    // The line is written here, before the network, so an import that never answers still leaves the seat
+    // it tried to take. `ent_lan` is the only field that pairs this launch with the company's record.
+    const audit = {
+      date: request.date,
+      entLan: request.entLan,
+      productCode: request.productCode,
+      boxes: request.boxes,
+    };
     try {
       // The seat and the operator the tablet wrote travel with the boxes: without them the launch belongs
       // to whoever pressed Importar and can only be paired by name, which is how a seat never settled.
@@ -581,9 +589,11 @@ export function MassasLaunchPage() {
           request.date,
         ),
       );
+      void postAeroAuditEvent(aeroImportAuditEvent(audit));
       setNotice({ type: 'success', message: t('massas.erp.imported') });
       await Promise.all([load(date), loadMirror(date)]);
     } catch (err) {
+      void postAeroAuditEvent(aeroImportAuditEvent({ ...audit, error: 'AERO_IMPORT_REFUSED' }));
       setNotice({
         type: 'error',
         message: err instanceof Error ? err.message : t('massas.erp.importError'),

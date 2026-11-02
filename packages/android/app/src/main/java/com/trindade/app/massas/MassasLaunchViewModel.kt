@@ -591,6 +591,17 @@ class MassasLaunchViewModel @Inject constructor(
                 entLan = seat.entLan,
                 operatorName = seat.operatorName,
             )
+            // The seat and the boxes travel to the log with the same values the request carried: an import
+            // that failed is the row an operator will retry, and without the line nobody knows it was tried.
+            suspend fun audit(error: String?) {
+                aeroDispatcher.logImport(
+                    date = state.value.date,
+                    entLan = seat.entLan,
+                    productCode = plan.productCode,
+                    boxes = plan.boxes,
+                    error = error,
+                )
+            }
             when (result) {
                 is MassasWriteResult.Saved -> {
                     _state.value = _state.value.copy(
@@ -598,6 +609,7 @@ class MassasLaunchViewModel @Inject constructor(
                         dayView = result.view,
                         noticeMessage = UiText.of(R.string.massas_aero_imported),
                     )
+                    audit(null)
                 }
                 is MassasWriteResult.Refused -> {
                     val isInactive = result.errorCode == "MASSAS_OPERATOR_INACTIVE"
@@ -606,12 +618,14 @@ class MassasLaunchViewModel @Inject constructor(
                         errorMessage = refusalMessage(result, R.string.massas_error_create_refused),
                         inactiveOperators = if (isInactive) _state.value.inactiveOperators + row.operatorName else _state.value.inactiveOperators,
                     )
+                    audit(result.errorCode ?: "AERO_IMPORT_REFUSED")
                 }
                 is MassasWriteResult.Unreachable -> {
                     _state.value = _state.value.copy(
                         isSubmitting = false,
                         errorMessage = UiText.of(R.string.massas_error_offline),
                     )
+                    audit("AERO_IMPORT_UNREACHABLE")
                 }
             }
         }

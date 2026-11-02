@@ -140,13 +140,64 @@ class AeroDispatcherTest {
     }
 
     @Test
-    fun `an unconfigured integration sends nothing and logs nothing against the plant`() = runTest {
+    fun `an unconfigured integration calls nothing and writes the line that says so`() = runTest {
         val recorder = Recorder()
 
         val outcome = dispatcher(recorder).dispatch(AeroSettings(), request)
 
         assertEquals(AeroDispatchOutcome.Refused("not-configured"), outcome)
-        assertEquals(emptyList<String>(), recorder.calls)
+        // The ERP is never touched, and that is the point: no entry payload, no read, nothing against the plant.
+        assertEquals(emptyList<String>(), recorder.payloads.map { it.productCode })
+        // And it is no longer silent: the log keeps the attempt, the launch it was about and the reason.
+        val line = recorder.logs.single()
+        assertEquals(AeroAudit.Event.DISPATCH, line.event)
+        assertEquals("AERO_NOT_CONFIGURED", line.error)
+        assertEquals("unconfigured", line.destinationUrl)
+        assertTrue(line.note!!.contains("#42"))
+    }
+
+    @Test
+    fun `an unconfigured sync writes its own line and reads nothing`() = runTest {
+        val recorder = Recorder()
+
+        val outcome = dispatcher(recorder).syncDay(AeroSettings(), "2026-10-30")
+
+        assertEquals(AeroSyncOutcome.Failed("not-configured"), outcome)
+        assertEquals(emptyList<String>(), recorder.calls.filter { it.startsWith("erp:") })
+        val line = recorder.logs.single()
+        assertEquals(AeroAudit.Event.SYNC, line.event)
+        assertEquals("AERO_NOT_CONFIGURED", line.error)
+        assertTrue(line.note!!.contains("date=2026-10-30"))
+    }
+
+    @Test
+    fun `an imported seat is recorded with the seat and the boxes it took`() = runTest {
+        val recorder = Recorder()
+
+        dispatcher(recorder).logImport(date = "2026-10-30", entLan = 3010, productCode = "001192", boxes = 4)
+
+        val line = recorder.logs.single()
+        assertEquals(AeroAudit.Event.IMPORT, line.event)
+        assertEquals("/api/massas-launch", line.destinationUrl)
+        assertEquals(null, line.error)
+        assertEquals("android", line.client)
+        assertTrue(line.note!!.contains("ent_lan=3010"))
+        assertTrue(line.note!!.contains("boxes=4"))
+    }
+
+    @Test
+    fun `an import the backend refused keeps the code it answered`() = runTest {
+        val recorder = Recorder()
+
+        dispatcher(recorder).logImport(
+            date = "2026-10-30",
+            entLan = 3010,
+            productCode = "001192",
+            boxes = 4,
+            error = "MASSAS_OPERATOR_INACTIVE",
+        )
+
+        assertEquals("MASSAS_OPERATOR_INACTIVE", recorder.logs.single().error)
     }
 
     @Test
