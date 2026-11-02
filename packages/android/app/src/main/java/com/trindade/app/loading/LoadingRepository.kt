@@ -3,12 +3,15 @@ package com.trindade.app.loading
 import com.trindade.app.contract.models.CreateDriverRequest
 import com.trindade.app.contract.models.CreateScheduleRequest
 import com.trindade.app.contract.models.DriversResponseDriversInner
+import com.trindade.app.contract.models.ErrorEnvelope
 import com.trindade.app.contract.models.ScheduleHistoryResponse
 import com.trindade.app.contract.models.SchedulesResponseSchedulesInner
 import com.trindade.app.contract.models.UpdateScheduleRequest
 import com.trindade.app.contract.models.VehiclesResponseVehiclesInner
 import com.trindade.app.network.LoadingApi
 import com.trindade.app.network.runCatchingCancellable
+import kotlinx.serialization.json.Json
+import retrofit2.Response
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -29,11 +32,22 @@ class LoadingRepository @Inject constructor(
     private val api: LoadingApi,
 ) {
 
-    suspend fun schedules(date: String): List<SchedulesResponseSchedulesInner>? =
-        runCatchingCancellable { api.schedules(date) }.getOrNull()
+    /**
+     * One day of the grid: its rows and whether the day itself is still active.
+     *
+     * The envelope is kept rather than unwrapped into a list because `dayActive` is half the answer. A
+     * deactivated day read without it is indistinguishable from a day nobody scheduled anything on, and
+     * the two need different screens: one is read-only with a way back, the other invites a first entry.
+     *
+     * The rows are asked for with `includeInactive=1` always. The grid is the whole day by definition --
+     * a deactivated entry is still part of what happened -- and asking conditionally would mean asking
+     * twice for the case this read exists to show.
+     */
+    suspend fun schedules(date: String): LoadingDay? =
+        runCatchingCancellable { api.schedules(date, includeInactive = true) }.getOrNull()
             ?.takeIf { it.isSuccessful }
             ?.body()
-            ?.schedules
+            ?.let { LoadingDay(rows = it.schedules, active = it.dayActive) }
 
     /**
      * One page of the loading history, or null when the server cannot be asked.
@@ -153,13 +167,40 @@ class LoadingRepository @Inject constructor(
         val response = runCatchingCancellable { call() }.getOrNull() ?: return ScheduleWriteResult.Unreachable
         val schedule = response.body()?.schedule
         if (response.isSuccessful && schedule != null) return ScheduleWriteResult.Saved(schedule)
-        return ScheduleWriteResult.Refused(response.code())
+        return ScheduleWriteResult.Refused(response.code(), refusalCode(response))
     }
+
+    /**
+     * The machine-readable reason a write was refused, when the server named one.
+     *
+     * A 409 covers two facts that read the same to the operator and need different sentences: the driver
+     * is already in the slot, or the whole day was deactivated and has to be reactivated first. The status
+     * code cannot tell them apart and the prose can, but prose is what changes; the code is the contract.
+     * Null when the body is not the envelope -- an old server, or a proxy's own error page.
+     */
+    private fun refusalCode(response: Response<*>): String? =
+        runCatching {
+            response.errorBody()?.string()
+                ?.takeIf { it.isNotBlank() }
+                ?.let { body -> errorJson.decodeFromString<ErrorEnvelope>(body).code }
+        }.getOrNull()
 }
+
+/**
+ * One day of the grid: its rows and whether the day itself still has an active entry.
+ *
+ * A deactivated day keeps its rows -- they are what happened -- so the two facts travel together rather
+ * than being asked for separately, where a read that answered one and not the other could draw a full
+ * day as an empty one.
+ */
+data class LoadingDay(
+    val rows: List<SchedulesResponseSchedulesInner>,
+    val active: Boolean,
+)
 
 sealed interface ScheduleWriteResult {
     data class Saved(val schedule: SchedulesResponseSchedulesInner) : ScheduleWriteResult
-    data class Refused(val statusCode: Int) : ScheduleWriteResult
+    data class Refused(val statusCode: Int, val code: String? = null) : ScheduleWriteResult
     data object Unreachable : ScheduleWriteResult
 }
 
@@ -182,3 +223,11 @@ sealed interface ScheduleLifecycleResult {
     data class Refused(val statusCode: Int) : ScheduleLifecycleResult
     data object Unreachable : ScheduleLifecycleResult
 }
+
+/**
+ * The envelope's parser, built once.
+ *
+ * Unknown keys are ignored because the envelope is additive by contract: a server that learns a new field
+ * for a refusal must not stop this client from reading the code that was already there.
+ */
+private val errorJson = Json { ignoreUnknownKeys = true }

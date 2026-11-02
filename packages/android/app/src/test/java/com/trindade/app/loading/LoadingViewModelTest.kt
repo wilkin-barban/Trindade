@@ -6,6 +6,8 @@ import com.trindade.app.contract.models.SchedulesResponseSchedulesInner
 import com.trindade.app.export.PdfGenerator
 import com.trindade.app.export.ShareManager
 import com.trindade.app.network.LoadingApi
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.ResponseBody.Companion.toResponseBody
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -15,6 +17,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -81,6 +84,37 @@ class LoadingViewModelTest {
         assertEquals(1, model.state.value.schedules.size)
         assertEquals(3, model.state.value.timeSlots.size)
         assertFalse(model.state.value.loading)
+    }
+
+    @Test
+    fun `opens an inactive day with its rows and dayActive false`() {
+        // Both rows come back, active and deactivated alike: a day whose batch was switched off is still
+        // the day that happened, and a read that returned only the live rows would draw a full day as an
+        // empty one -- the failure this whole read exists to avoid.
+        val api = FakeLoadingApi(
+            schedulesToReturn = listOf(
+                FakeLoadingApi.entry(1, "04:00"),
+                FakeLoadingApi.entry(2, "04:00").copy(isActive = false),
+            ),
+            dayActive = false,
+        )
+        val model = viewModel(api)
+
+        assertEquals(2, model.state.value.schedules.size)
+        assertFalse(model.state.value.dayActive)
+        assertTrue("the day's own bit is what makes it read-only", model.state.value.readOnly)
+        assertEquals("the deactivated rows are asked for, always", true, api.lastIncludeInactive)
+    }
+
+    @Test
+    fun `opens an active day with its add actions`() {
+        // The other direction of the same bit: a day nobody switched off keeps every action, so the
+        // banner cannot be something the grid simply always draws.
+        val api = FakeLoadingApi(schedulesToReturn = listOf(FakeLoadingApi.entry(1, "04:00")))
+        val model = viewModel(api)
+
+        assertTrue(model.state.value.dayActive)
+        assertFalse(model.state.value.readOnly)
     }
 
     @Test
@@ -307,6 +341,32 @@ class LoadingViewModelTest {
     }
 
     @Test
+    fun `surfaces the deactivated batch instead of a duplicate`() {
+        // A 409 covers two facts that read nothing alike, and the status code cannot tell them apart. The
+        // code can: the day was switched off, so the operator is told to reactivate it rather than that
+        // the driver is already there -- which would send them looking for an entry that is not there.
+        val api = FakeLoadingApi(
+            createResponse = Response.error(
+                409,
+                FakeLoadingApi.BATCH_DEACTIVATED_BODY.toResponseBody("application/json".toMediaType()),
+            ),
+        )
+        val model = viewModel(api)
+        assertFalse("the day reads as open until the server says otherwise", model.state.value.readOnly)
+        model.startAdding("04:00")
+        model.toggleFletero(FakeLoadingApi.FLETERO_DRIVER_ID, picked = true)
+        model.confirmAdd()
+
+        assertEquals(LoadingViewModel.BATCH_DEACTIVATED_MESSAGE, model.state.value.message)
+        assertTrue("the refusal is the day's own answer, so the grid turns read-only", model.state.value.readOnly)
+        assertNotEquals(
+            "a duplicate's sentence would send them hunting for an entry that does not exist",
+            "Esse motorista ou veículo já está nessa data.",
+            model.state.value.message,
+        )
+    }
+
+    @Test
     fun `removes an entry and reloads`() {
         val api = FakeLoadingApi(schedulesToReturn = listOf(FakeLoadingApi.entry(7, "04:00")))
         val model = viewModel(api)
@@ -439,7 +499,10 @@ class LoadingViewModelTest {
     fun `a failed forced arrival reports no success and the next forced arrival retries`() = runTest {
         var reads = 0
         val api = object : LoadingApi by FakeLoadingApi() {
-            override suspend fun schedules(date: String): Response<SchedulesResponse> {
+            override suspend fun schedules(
+                date: String,
+                includeInactive: Boolean?,
+            ): Response<SchedulesResponse> {
                 reads++
                 if (reads == 2) return Response.error(500, FakeLoadingApi.EMPTY_BODY)
                 val slot = if (reads == 1) "04:00" else "04:30"

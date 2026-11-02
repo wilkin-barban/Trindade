@@ -270,6 +270,7 @@
     <string name="mandatory_update_banner">Actualización obligatoria pendiente. Descargue e instale la nueva versión para desbloquear los demás módulos.</string>
     <string name="loading_retry">Intentar de nuevo</string>
     <string name="loading_title">Cronograma de carga</string>
+    <string name="loading_batch_deactivated">El lote de este día está desactivado. Reactivalo en el histórico para volver a cargar.</string>
     <string name="loading_fleteros">%1$d/%2$d fleteros</string>
     <string name="loading_add_entry">Agregar</string>
     <string name="loading_pick_driver">Chofer</string>

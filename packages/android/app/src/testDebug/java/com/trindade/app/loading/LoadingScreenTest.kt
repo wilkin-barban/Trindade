@@ -369,6 +369,27 @@ class LoadingScreenTest {
         repeat(day.size) { index -> removals[index].assertIsNotEnabled() }
     }
 
+    /**
+     * The turn the day's own bit makes: a deactivated day is drawn whole, dimmed, and with nothing to
+     * press that would write.
+     *
+     * Every row is asserted present before the absences are, because a screen that drew no rows at all
+     * would pass a count of zero actions. The add actions are counted per configured slot rather than
+     * asserted absent by one, so a screen that withheld them in one slot and offered them in the next is
+     * caught. The sentence is the server's own, copied verbatim: it is what names the way back.
+     */
+    @Test
+    fun `draws the read-only banner and no add action on a deactivated day`() {
+        renderState(state().copy(dayActive = false))
+
+        day.forEach { displayed(it.driverName.orEmpty()) }
+        composeRule.onNodeWithText(copy(R.string.loading_batch_deactivated)).performScrollTo().assertIsDisplayed()
+
+        composeRule.onAllNodesWithText(copy(R.string.loading_add_entry)).assertCountEquals(0)
+        composeRule.onAllNodesWithContentDescription(copy(R.string.report_photo_remove)).assertCountEquals(0)
+        composeRule.onAllNodesWithText(copy(R.string.report_edit)).assertCountEquals(0)
+    }
+
     // ---- Rendering ----
 
     /** What the grid reported, in the order it reported it: the row's id and the day it sits on. */
@@ -800,7 +821,10 @@ class LoadingScreenTest {
         val asked = mutableListOf<String>()
         private var successfulReads = 0
 
-        override suspend fun schedules(date: String): Response<SchedulesResponse> {
+        override suspend fun schedules(
+            date: String,
+            includeInactive: Boolean?,
+        ): Response<SchedulesResponse> {
             asked += date
             if (asked.size == failsOnRead) return Response.error(500, FakeLoadingApi.EMPTY_BODY)
 

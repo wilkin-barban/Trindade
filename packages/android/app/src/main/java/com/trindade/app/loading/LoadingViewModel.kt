@@ -39,6 +39,14 @@ class LoadingViewModel @Inject constructor(
         val date: String = saoPauloToday(),
         val loading: Boolean = true,
         val schedules: List<SchedulesResponseSchedulesInner> = emptyList(),
+        /**
+         * Whether the day still has at least one active entry, as the server reported it.
+         *
+         * True before the first answer, because a day nobody has described yet is not a day that was
+         * switched off: opening the grid with the read-only banner on a day that turns out to be open
+         * would accuse the operator's day of something it did not do. The answer settles it.
+         */
+        val dayActive: Boolean = true,
         val timeSlots: List<String> = emptyList(),
         val drivers: List<DriversResponseDriversInner> = emptyList(),
         val vehicles: List<VehiclesResponseVehiclesInner> = emptyList(),
@@ -70,6 +78,15 @@ class LoadingViewModel @Inject constructor(
         val loadingExport: Boolean = false,
         val exportingPdf: Boolean = false,
     ) {
+        /**
+         * True when nothing on this day can be written: no add, no edit, no removal.
+         *
+         * Derived from the server's bit rather than stored, because the rows keep their own per-entry
+         * `readOnly` flag and the two must agree: a day that is off is off for every row on it, and a
+         * second copy of that fact here is a second place for the two to disagree.
+         */
+        val readOnly: Boolean get() = !dayActive
+
         /**
          * The slots to draw: the configured ones, plus any slot an entry already sits in.
          *
@@ -229,7 +246,7 @@ class LoadingViewModel @Inject constructor(
         _state.update { it.copy(date = date, loading = true, message = null, exportText = null) }
 
         return viewModelScope.async {
-            val schedules = repository.schedules(date)
+            val day = repository.schedules(date)
             val slots = repository.timeSlots()
             val drivers = repository.drivers()
             val vehicles = repository.vehicles()
@@ -243,7 +260,8 @@ class LoadingViewModel @Inject constructor(
             _state.update {
                 it.copy(
                     loading = false,
-                    schedules = schedules.orEmpty(),
+                    schedules = day?.rows.orEmpty(),
+                    dayActive = day?.active ?: true,
                     timeSlots = slots.orEmpty(),
                     drivers = drivers.orEmpty(),
                     vehicles = vehicles.orEmpty(),
@@ -252,10 +270,10 @@ class LoadingViewModel @Inject constructor(
                     // driver cannot be added at all. The slot list is the exception the screen already
                     // handles -- a missing one still leaves the day's entries in their own slots -- and
                     // a failure that said nothing left the picker silently empty.
-                    message = if (schedules == null || drivers == null || vehicles == null) UNREACHABLE else null,
+                    message = if (day == null || drivers == null || vehicles == null) UNREACHABLE else null,
                 )
             }
-            schedules != null
+            day != null
         }
     }
 
@@ -341,7 +359,7 @@ class LoadingViewModel @Inject constructor(
 
         viewModelScope.launch {
             val failed = mutableListOf<CreateScheduleRequest>()
-            var refusedStatus: Int? = null
+            var refused: ScheduleWriteResult.Refused? = null
             var unreachable = false
 
             for (request in requests) {
@@ -349,7 +367,7 @@ class LoadingViewModel @Inject constructor(
                     is ScheduleWriteResult.Saved -> Unit
                     is ScheduleWriteResult.Refused -> {
                         failed += request
-                        if (refusedStatus == null) refusedStatus = result.statusCode
+                        if (refused == null) refused = result
                     }
                     ScheduleWriteResult.Unreachable -> {
                         failed += request
@@ -361,6 +379,10 @@ class LoadingViewModel @Inject constructor(
             _state.update {
                 it.copy(
                     busy = false,
+                    // The refusal is proof the day is off, so the grid turns read-only here instead of
+                    // asking the server what it has just been told. Reloading would also clear the
+                    // sentence below, which is the one thing this answer exists to say.
+                    dayActive = if (refused?.code == BATCH_DEACTIVATED) false else it.dayActive,
                     addingToSlot = if (failed.isEmpty()) null else it.addingToSlot,
                     pickedFleteros = failed
                         .filter { request -> request.driverType == CreateScheduleRequest.DriverType.fletero }
@@ -371,7 +393,7 @@ class LoadingViewModel @Inject constructor(
                         .associate { request -> request.driverId to request.vehicleId },
                     message = when {
                         unreachable -> UNREACHABLE
-                        refusedStatus != null -> refusalMessage(refusedStatus!!)
+                        refused != null -> refusalMessage(refused.statusCode, refused.code)
                         else -> null
                     },
                 )
@@ -559,12 +581,15 @@ class LoadingViewModel @Inject constructor(
         CreateScheduleRequest.DriverType.entries.firstOrNull { it.value == driver.driverType.value }
             ?: CreateScheduleRequest.DriverType.fletero
 
-    private fun refusalMessage(statusCode: Int): String = when (statusCode) {
-        // The same driver, or the same vehicle, already on that date.
-        409 -> "Esse motorista ou veículo já está nessa data."
+    private fun refusalMessage(statusCode: Int, code: String? = null): String = when {
+        // A 409 is one of two different facts, and only the code tells them apart: the whole day was
+        // switched off, so nothing can be added until it is reactivated, or the driver or vehicle is
+        // already in that slot. The first one names the way out; the second would be advice nobody asked for.
+        code == BATCH_DEACTIVATED -> BATCH_DEACTIVATED_MESSAGE
+        statusCode == 409 -> "Esse motorista ou veículo já está nessa data."
         // Validation: a casa driver without a vehicle, an inactive driver or vehicle, a missing date.
-        400 -> "Verifique os dados e tente de novo."
-        404 -> "O motorista ou o veículo não existe mais."
+        statusCode == 400 -> "Verifique os dados e tente de novo."
+        statusCode == 404 -> "O motorista ou o veículo não existe mais."
         else -> GENERIC
     }
 
@@ -577,6 +602,13 @@ class LoadingViewModel @Inject constructor(
 
     companion object {
         const val UNREACHABLE = "Sem conexão com o servidor. Verifique a rede e tente de novo."
+
+        /** The server's code for "this day's batch is deactivated", as `POST /loading/schedules` reports it. */
+        const val BATCH_DEACTIVATED = "LOADING_BATCH_DEACTIVATED"
+
+        /** The sentence the deactivated batch gets, verbatim from S27: it names the way out, not the fault. */
+        const val BATCH_DEACTIVATED_MESSAGE =
+            "O lote deste dia está desativado. Reative-o no histórico para carregar de novo."
         const val GENERIC = "Não foi possível concluir. Tente de novo."
         const val EXPORT_FAILED = "Não foi possível gerar o texto agora. Tente de novo."
         const val SHARE_FAILED = "Não foi possível compartilhar. Tente de novo."

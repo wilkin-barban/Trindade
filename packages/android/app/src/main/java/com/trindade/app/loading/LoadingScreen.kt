@@ -49,6 +49,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -167,6 +168,19 @@ fun LoadingScreen(
                         Text(stringResource(R.string.export_load), style = MaterialTheme.typography.labelLarge)
                     }
                 }
+            }
+        }
+
+        if (state.readOnly) {
+            item {
+                // The day is off, and the sentence is the server's own (S27) copied verbatim: it says what
+                // happened and where the way out is. It is not an error -- nothing failed -- so it is not
+                // painted in the error colour, and it carries no retry: there is nothing to ask again.
+                Text(
+                    text = stringResource(R.string.loading_batch_deactivated),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
 
@@ -357,13 +371,16 @@ private fun SlotBlock(
         // Offered even when the window is exceeded. The limit is a display, and withholding this
         // would turn it into a rule the server does not enforce. It is withheld while the day is in the
         // air, because the slot belongs to the grid that is being replaced and the dialog it opens would
-        // be filled against a day nobody has read yet.
-        AdminSecondaryButton(
-            onClick = { onStartAdding(slot) },
-            text = stringResource(R.string.loading_add_entry),
-            enabled = !state.busy && !state.loading,
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        )
+        // be filled against a day nobody has read yet -- and withheld on a deactivated day, where the
+        // server refuses every write: an offer that can only be refused is not an offer.
+        if (!state.readOnly) {
+            AdminSecondaryButton(
+                onClick = { onStartAdding(slot) },
+                text = stringResource(R.string.loading_add_entry),
+                enabled = !state.busy && !state.loading,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            )
+        }
         HorizontalDivider()
     }
 }
@@ -394,8 +411,14 @@ private fun SlotTableRow(
     onDelete: (Int) -> Unit,
     onEditEntry: (Int, String) -> Unit,
 ) {
+    // A row on a day that is off, or a row the server closed on a day that is not, is drawn dimmed
+    // rather than hidden: it is part of what the day was. Dimming is the whole difference between "this
+    // happened and cannot be touched" and "this is not here", and the actions above already tell the
+    // second half of that sentence.
+    val dimmed = state.readOnly || entry.isReadOnly()
+
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).alpha(if (dimmed) 0.55f else 1f),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f).padding(horizontal = 4.dp)) {
@@ -431,7 +454,7 @@ private fun SlotTableRow(
             // rule: an action that is drawn but refuses is still an offer. The day travels with the id
             // because that screen reads the row out of its day (`GET /api/loading/schedules?date=`),
             // and the day this grid is showing is written down here and nowhere else.
-            if (!entry.isReadOnly() && !state.loading) {
+            if (!state.readOnly && !entry.isReadOnly() && !state.loading) {
                 TextButton(
                     onClick = { onEditEntry(entry.id, state.date) },
                     modifier = Modifier.heightIn(min = SlotActionTarget).widthIn(min = SlotActionTarget),
@@ -447,17 +470,19 @@ private fun SlotTableRow(
             // The removal keeps the 48dp a finger needs while drawing a 20dp glyph inside it: a word as
             // wide as the row's own text made the target of the row's smallest action the biggest thing
             // on it. Its name survives as the description a screen reader announces.
-            IconButton(
-                onClick = { onDelete(entry.id) },
-                modifier = Modifier.size(SlotActionTarget),
-                enabled = !state.busy && !state.loading,
-            ) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_delete),
-                    contentDescription = stringResource(R.string.report_photo_remove),
-                    tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(20.dp),
-                )
+            if (!state.readOnly) {
+                IconButton(
+                    onClick = { onDelete(entry.id) },
+                    modifier = Modifier.size(SlotActionTarget),
+                    enabled = !state.busy && !state.loading,
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_delete),
+                        contentDescription = stringResource(R.string.report_photo_remove),
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
             }
         }
     }

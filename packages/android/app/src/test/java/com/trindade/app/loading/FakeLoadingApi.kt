@@ -53,6 +53,8 @@ class FakeLoadingApi(
      * drawn -- without the token it would put "sem conexão" over a day that loaded fine.
      */
     private val failForDate: String? = null,
+    /** The bit every schedule answer carries, so a test can open a day whose batch was switched off. */
+    private val dayActive: Boolean = true,
     /** Null makes the history call fail, the same convention as [schedulesToReturn] and for the same reason. */
     private val historyToReturn: ScheduleHistoryResponse? = defaultHistory(),
     /**
@@ -220,8 +222,16 @@ class FakeLoadingApi(
     var deletedIds = mutableListOf<Int>()
         private set
 
-    override suspend fun schedules(date: String): Response<SchedulesResponse> {
+    /** Whether the last read of the day asked for the deactivated rows too, as the grid always does. */
+    var lastIncludeInactive: Boolean? = null
+        private set
+
+    override suspend fun schedules(
+        date: String,
+        includeInactive: Boolean?,
+    ): Response<SchedulesResponse> {
         lastSchedulesDate = date
+        lastIncludeInactive = includeInactive
 
         if (gateSchedules) {
             val gate = CompletableDeferred<Unit>()
@@ -234,7 +244,7 @@ class FakeLoadingApi(
         if (date == failForDate) return Response.error(500, EMPTY_BODY)
 
         val schedules = schedulesToReturn ?: return Response.error(500, EMPTY_BODY)
-        return Response.success(SchedulesResponse(schedules = schedules, dayActive = true))
+        return Response.success(SchedulesResponse(schedules = schedules, dayActive = dayActive))
     }
 
     override suspend fun history(
@@ -399,6 +409,13 @@ class FakeLoadingApi(
 
     companion object {
         const val NOT_USED = "this fake does not implement that call; add it when a test needs it"
+
+        /**
+         * A deactivated day's refusal, as the server writes it: the status alone cannot say which 409 this
+         * is, and the code is the half a client reads.
+         */
+        const val BATCH_DEACTIVATED_BODY =
+            """{"error":"O lote deste dia está desativado. Reative-o no histórico para carregar de novo.","code":"LOADING_BATCH_DEACTIVATED"}"""
 
         /** The server's own default, which is what a page of the live history holds. */
         const val PAGE_SIZE = 30

@@ -271,6 +271,9 @@
     <string name="mandatory_update_banner">Atualização obrigatória pendente. Baixe e instale a nova versão para desbloquear os demais módulos.</string>
     <string name="loading_retry">Tentar de novo</string>
     <string name="loading_title">Cronograma de carregamento</string>
+    <!-- A day whose batch was deactivated, as the grid draws it: the rows stay, because they are what
+         happened, and one sentence says why nothing on this day can be added until it is reactivated. -->
+    <string name="loading_batch_deactivated">O lote deste dia está desativado. Reative-o no histórico para carregar de novo.</string>
     <string name="loading_fleteros">%1$d/%2$d fleteros</string>
     <string name="loading_add_entry">Adicionar</string>
     <string name="loading_pick_driver">Motorista</string>

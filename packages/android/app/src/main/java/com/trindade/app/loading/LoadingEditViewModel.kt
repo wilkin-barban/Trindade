@@ -172,15 +172,17 @@ class LoadingEditViewModel @Inject constructor(
         _state.update { it.copy(loading = true, message = null, saved = false, submitting = false) }
 
         reading = viewModelScope.launch {
-            val schedules = repository.schedules(date)
+            // The rows of the day, deactivated ones included: a row that was switched off is still the
+            // row this screen was opened for, and a read that hid it would report it as gone.
+            val day = repository.schedules(date)
             val slots = repository.timeSlots()
-            val row = schedules?.firstOrNull { it.id == scheduleId }
+            val row = day?.rows?.firstOrNull { it.id == scheduleId }
 
             _state.update { current ->
                 current.copy(
                     loading = false,
                     entry = row,
-                    offers = if (row == null) emptyList() else slotOffers(schedules.orEmpty(), row, slots.orEmpty()),
+                    offers = if (day == null || row == null) emptyList() else slotOffers(day.rows, row, slots.orEmpty()),
                     timeSlot = row?.timeSlot,
                     // Only a read that was refused is worth a sentence of its own, and the two refusals
                     // are not the same one: a day the server answered without this row is a row that is
@@ -188,7 +190,7 @@ class LoadingEditViewModel @Inject constructor(
                     // all. A missing slot list is the second case rather than a third: the form cannot
                     // offer a destination, which is exactly what no connection to the server means here.
                     message = when {
-                        schedules == null -> UNREACHABLE
+                        day == null -> UNREACHABLE
                         row == null -> NOT_FOUND
                         slots == null -> UNREACHABLE
                         else -> null

@@ -35,8 +35,19 @@ import retrofit2.http.Query
  */
 interface LoadingApi {
 
+    /**
+     * One day's entries, and whether the day is still active.
+     *
+     * `includeInactive=1` is what makes a deactivated day readable at all: without it the server filters
+     * the rows out, and a day whose batch was deactivated comes back as an empty day -- which reads as
+     * "nobody loaded anything" rather than "this day was switched off". The server answers `dayActive`
+     * either way, and that one bit is what tells the two apart.
+     */
     @GET("api/loading/schedules")
-    suspend fun schedules(@Query("date") date: String): Response<SchedulesResponse>
+    suspend fun schedules(
+        @Query("date") date: String,
+        @Query("includeInactive") includeInactive: Boolean? = null,
+    ): Response<SchedulesResponse>
 
     /**
      * One page of the loading history, grouped by batch date and filtered by one date, one month, or
