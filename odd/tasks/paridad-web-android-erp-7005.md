@@ -811,6 +811,18 @@ S19 — D5/D7, verbatim:
   el detalle de la sincronización sobrevive hasta el aviso. Verificado en 390×844 y en escritorio (S18).
 - **Commit esperado.** `fix(web): stop masking ERP failures with a successful-looking answer` · ~150 líneas.
 - **Depende.** T3.
+- **Cerrada.** `1be3908`.
+  - `readAeroTestResult` deja de rellenar `WILKIN`: una conexión verificada sin nombre viaja como `null` y el
+    panel usa la clave nueva `massas.aero.testOkNoUser`, que dice lo único que se probó.
+  - La importación de un asiento ya no dibuja el texto del servidor: resuelve por código
+    (`resolveApiErrorKey`) y cae al genérico. El alta rápida de operario aplica la misma regla.
+  - Lo que T25 pedía y ya estaba cubierto por T5/T19: `ReceiptsSection` pasa `read.message` como detalle,
+    `MassasLaunchPage` usa `read.message ?? t('massas.erp.error')` cuando el espejo no trae frase, y
+    `batchFeedback` conserva sus `params` (`aero-feedback.test.ts:184`). Se deja constancia en vez de
+    reescribirlo.
+  - Tests: `aero-integration.test.ts` 86/86 (dos formas de respuesta sin usuario), `aero-connection.test.ts`
+    10/10 (probe sin nombre), `aero-probe-copy.test.ts` nuevo 3/3, lane node 526/526, vitest 84/84,
+    `tsc --noEmit` limpio.
 
 ### T26 · Android: P1 de lote, `owner_status`, hints y ack reversible
 
@@ -946,7 +958,7 @@ recorta alcance **con aprobación explícita**, nunca moviéndolas a otro ODD po
 | T22 | H P0-2, P0-3 | `refactor(android): one failure model and a real Wi-Fi message` | `AeroFailureTest.kt`, `AeroLogicTest.kt` |
 | T23 | H P0-4, P0-6 | `feat(android): keep the ERP queue across restarts and refuse duplicated seats` | `AeroQueueTest.kt`, `MassasLaunchViewModelTest.kt` |
 | T24 | H P0-7, S17 | `08cc333` + `2249394` `feat(massas): let each seat carry its own operator` | `massas.service.test.ts` 18/18, `massas.routes.test.ts` 26/26, `aero-mirror.test.ts` 19/19, `MassasImportPayloadTest.kt` |
-| T25 | G | `fix(web): stop masking ERP failures with a successful-looking answer` | `aero-integration.test.ts`, `aero-queue.test.ts` |
+| T25 | G | `1be3908` `fix(web): stop reporting a nameless connection as a known operator` | `aero-integration.test.ts` 86/86, `aero-connection.test.ts` 10/10, `aero-probe-copy.test.ts` 3/3, node 526/526 |
 | T26 | H P1 | `c1c2c0c` + `bb6ac45` `feat(android): send ERP launches in eights and retry only what failed` | `AeroQueueTest.kt` 12/12, `MassasUnifiedTest.kt` 23/23, `MassasLaunchViewModelTest.kt` 41/41, `MassasUnifiedTableTest.kt` 3/3 |
 | T27 | S9, S10 | `chore(android): hand the plant the 7005 build as the v0.7.0 asset` | `apksigner`, `aapt2`, `sha256sum -c`, e2e web |
 
