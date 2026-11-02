@@ -432,7 +432,14 @@ Cada tarea declara objetivo, archivos, tests exactos, aceptación, commit espera
 - **Trabajo**: abrir el día con `includeInactive=1` cuando el lote está inactivo o el día es pasado; banner; ocultar añadir/editar/borrar/desactivar; mensaje `batchIsDeactivated` al intentar crear.
 - **Tests**: `LoadingViewModelTest.kt`: `opens an inactive day with its rows and dayActive=false`; `does not offer adding to a closed day`; `surfaces LOADING_BATCH_DEACTIVATED instead of scheduleAlreadyExists`; `LoadingScreenTest.kt`: `draws the read-only banner and no add action`.
 - **Aceptación**: un lote inactivo se ve completo y atenuado; no hay acciones de contenido; el alta explica que hay que reactivar.
-- **Commit**: `feat(android): show a deactivated day whole and read only` (~280 líneas).
+- **Estado.** Hecho en **dc1930e** (273 líneas, un slice). El día se pide siempre con `includeInactive=1`
+  y la respuesta se conserva entera como `LoadingDay(rows, active)`: la grilla es el día completo por
+  definición, y pedir las inactivas sólo a veces obligaba a dos lecturas para el caso que esta lectura
+  existe para mostrar. `UiState.readOnly` se deriva de `dayActive` en vez de guardarse, para que no haya
+  una segunda copia del hecho que pueda contradecir a las banderas de cada fila.
+  Cuando el alta choca con `LOADING_BATCH_DEACTIVATED`, el propio 409 apaga el día en el estado en lugar
+  de recargar: la negativa ya es la respuesta, y recargar borraba la frase que este caso existe para decir.
+- **Commit**: `feat(android): show a deactivated day whole and read only` (273 líneas).
 - **Depende de**: T1, T7.
 
 #### T9 — Errores tipados y mensaje que sobrevive
