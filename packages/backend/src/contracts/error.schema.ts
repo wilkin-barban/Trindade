@@ -9,12 +9,15 @@ import { z } from 'zod';
  * it as diagnostic text for a human, never as something to parse against.
  *
  * `message` is present only on routes that echo a localised business message alongside the
- * error code, which the loading module does for duplicate schedules.
+ * error code, which the loading module does for duplicate schedules. `code` is the machine-readable
+ * companion: 409 is also how a duplicate driver answers, and a client that only reads the text cannot
+ * tell the day's refusal from the row's.
  */
 export const ErrorEnvelopeSchema = z
   .object({
     error: z.string(),
     details: z.unknown().optional(),
     message: z.string().optional(),
+    code: z.string().optional(),
   })
   .strict();
