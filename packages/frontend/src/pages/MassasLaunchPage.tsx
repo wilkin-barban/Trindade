@@ -37,6 +37,7 @@ import { saoPauloToday } from '../lib/date';
 import { isClosedDay } from '../lib/massas-day';
 import {
   aeroBridgeCallbackFor,
+  aeroMissingSetup,
   aeroSettingsReady,
   aeroEndpoint,
   buildAeroBridgeEnvelope,
@@ -88,6 +89,21 @@ import {
   readAeroMovementsSnapshot,
   type AeroMovementSnapshot,
 } from '../lib/aero-mirror';
+
+/**
+ * What to say when an action needed the ERP and could not reach it.
+ *
+ * A configured phone whose tab lost the password is not a phone that needs configuring, and the difference is
+ * the whole instruction: retype the secret for this session, or finish the setup in Admin.
+ */
+function erpNotReadyMessage(
+  t: (key: string, options?: Record<string, unknown>) => string,
+  settings: { wsUrl: string; username: string; password: string } | null | undefined,
+): string {
+  return aeroMissingSetup(settings) === 'password'
+    ? t('massas.aero.passwordNeeded')
+    : t('massas.aero.syncNeedsSetup');
+}
 
 export function MassasLaunchPage() {
   const { t } = useTranslation();
@@ -324,6 +340,9 @@ export function MassasLaunchPage() {
       if (wantsSync) {
         // The switch said "send it to the company" and the entry stayed home. The operator's launch is safe,
         // but the reason belongs in the log: at this point the configuration itself is what is missing.
+        // And it belongs on screen too: the day's record is complete, the company's is not, and nobody is
+        // told otherwise.
+        setNotice({ type: 'error', message: erpNotReadyMessage(t, aeroSettings) });
         void postAeroAuditEvent({
           event: 'launch_sync',
           phase: 'requested',
@@ -431,7 +450,12 @@ export function MassasLaunchPage() {
    */
   const handleSendPendingLaunch = useCallback(
     (row: MassasUnifiedRow) => {
-      if (!aeroSettingsReady(aeroSettings)) return;
+      // It used to return here without a word: a tab that had lost the password looked like a button that
+      // does nothing. The row stays pending and the reason is said.
+      if (!aeroSettingsReady(aeroSettings)) {
+        setNotice({ type: 'error', message: erpNotReadyMessage(t, aeroSettings) });
+        return;
+      }
       const item = pendingLaunchQueueItem({
         productCode: row.productCode,
         productName: row.productName,
@@ -469,7 +493,10 @@ export function MassasLaunchPage() {
    * actually asked for.
    */
   const handleSyncFromErp = () => {
-    if (!aeroSettingsReady(aeroSettings)) return;
+    if (!aeroSettingsReady(aeroSettings)) {
+      setNotice({ type: 'error', message: erpNotReadyMessage(t, aeroSettings) });
+      return;
+    }
 
     const envelope = aeroMovementsEnvelope({
       wsUrl: aeroSettings.wsUrl,
@@ -1081,7 +1108,11 @@ export function MassasLaunchPage() {
                     {t('massas.aero.syncLabel')}
                   </span>
                   <span className="block text-[11px] text-gray-500 leading-tight">
-                    {aeroSettingsReady(aeroSettings) ? t('massas.aero.syncHint') : t('massas.aero.syncNeedsSetup')}
+                    {aeroSettingsReady(aeroSettings)
+                      ? t('massas.aero.syncHint')
+                      : aeroMissingSetup(aeroSettings) === 'password'
+                        ? t('massas.aero.passwordPending')
+                        : t('massas.aero.syncNeedsSetup')}
                   </span>
                 </div>
                 <button

@@ -8,6 +8,7 @@ import {
   aeroBridgeCallbackFor,
   aeroConnectionBlocker,
   aeroEndpoint,
+  aeroMissingSetup,
   aeroSettingsReady,
   buildAeroBridgeEnvelope,
   buildAeroBridgeTriggerUrl,
@@ -82,6 +83,7 @@ export function AeroIntegrationPanel({
   const [draft, setDraft] = useState({
     wsUrl: settings.wsUrl,
     username: settings.username,
+    // The tab's own secret, if it already typed one; never a value read from the device.
     password: settings.password,
   });
   const [busy, setBusy] = useState<'save' | 'test' | null>(null);
@@ -96,6 +98,9 @@ export function AeroIntegrationPanel({
   const [shortcutOpen, setShortcutOpen] = useState(false);
 
   const ready = aeroSettingsReady(settings);
+  // A configured integration whose tab has no secret yet is not «sin configurar»: the address and the user are
+  // saved, and the only thing missing is the password, which lives in the memory of this tab and nowhere else.
+  const missing = aeroMissingSetup({ ...settings, password: draft.password });
 
   const normalizedUrl = useMemo(() => normalizeAeroWsUrl(draft.wsUrl), [draft.wsUrl]);
   const destination = useMemo(
@@ -111,7 +116,9 @@ export function AeroIntegrationPanel({
   const handleSave = () => {
     setNotice(null);
     setProbe(null);
-    if (!normalizedUrl || !draft.username.trim() || !draft.password) {
+    // The password is not part of what has to be saved: it is asked again when the session opens, and
+    // demanding it here would keep the address hostage to a secret the device deliberately does not keep.
+    if (!normalizedUrl || !draft.username.trim()) {
       setNotice({ tone: 'error', text: t('massas.aero.invalid') });
       return;
     }
@@ -315,9 +322,14 @@ export function AeroIntegrationPanel({
             className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
               ready ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
             }`}
+            data-testid="aero-state"
           >
             {ready && <ShieldCheck className="h-3 w-3" />}
-            {ready ? t('massas.aero.configured') : t('massas.aero.notConfigured')}
+            {ready
+              ? t('massas.aero.configured')
+              : missing === 'password'
+                ? t('massas.aero.passwordPending')
+                : t('massas.aero.notConfigured')}
           </span>
         </span>
       </div>
@@ -396,6 +408,12 @@ export function AeroIntegrationPanel({
         </div>
 
         <p className="text-xs text-gray-500 leading-relaxed">{t('massas.aero.fieldsHint')}</p>
+
+        {/* Said here, next to the field, and not only in a release note: the password disappears on reload on
+            purpose, and a person who does not know that reads it as the app forgetting the configuration. */}
+        <p className="text-[11px] text-gray-500 leading-relaxed" data-testid="aero-pass-notice">
+          {t('massas.aero.passwordEverySession')}
+        </p>
 
         {probeMessage && (
           <p

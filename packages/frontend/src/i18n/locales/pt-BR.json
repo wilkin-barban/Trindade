@@ -662,7 +662,10 @@
       "shortcutStepEndIf": "Ação 19 — «Fim do Se»: fecha a condição do passo 6.",
       "urlEditable": "O único admin autorizado a mudar o endereço da fábrica.",
       "urlLocked": "Endereço fixo da fábrica. Só o admin autorizado pode mudá-lo.",
-      "deviceLocked": "Só para editar no iPhone com Atalhos ou no app Android."
+      "deviceLocked": "Só para editar no iPhone com Atalhos ou no app Android.",
+      "passwordPending": "Falta a senha desta sessão",
+      "passwordEverySession": "A senha não é guardada neste dispositivo: ela é pedida ao abrir a sessão.",
+      "passwordNeeded": "Falta a senha do ERP nesta sessão: abra Admin → Integração e digite-a para continuar."
     },
     "historyShort": "Histórico",
     "todayShort": "Hoje",

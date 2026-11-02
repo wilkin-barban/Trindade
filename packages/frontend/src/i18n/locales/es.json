@@ -662,7 +662,10 @@
       "shortcutStepEndIf": "Acción 19 — «Fin del Si»: cierra la condición del paso 6.",
       "urlEditable": "El único admin autorizado a cambiar la dirección de la planta.",
       "urlLocked": "Dirección fija de la planta. Solo el admin autorizado puede cambiarla.",
-      "deviceLocked": "Sólo se puede editar desde el iPhone con Atajos o desde la app Android."
+      "deviceLocked": "Sólo se puede editar desde el iPhone con Atajos o desde la app Android.",
+      "passwordPending": "Falta la contraseña de esta sesión",
+      "passwordEverySession": "La contraseña no se guarda en este dispositivo: se pide al abrir la sesión.",
+      "passwordNeeded": "Falta la contraseña del ERP en esta sesión: abrí Admin → Integración y escribila para continuar."
     },
     "historyShort": "Historial",
     "todayShort": "Hoy",
