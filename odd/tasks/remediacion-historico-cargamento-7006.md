@@ -319,6 +319,16 @@ Cada tarea declara objetivo, archivos, tests exactos, aceptación, commit espera
 - **Aceptación**: los seis casos en verde; una fila de ayer no cambia en base tras `POST`/`PATCH`/`DELETE`; hoy sigue funcionando; `GET` sin `includeInactive` devuelve exactamente lo de antes.
 - **Commit**: `feat(backend): freeze past loading days and read inactive batches whole` (~220 líneas).
 - **Depende de**: Q2 y Q4 aprobadas.
+- **Estado.** Hecho, en dos commits de 363 y 399 líneas cambiadas.
+  - **fe4a921** — `feat(loading): freeze past loading days and read a closed day whole`. Código de
+    `loading.service.ts`/`loading.routes.ts`/`loading.schema.ts`/`openapi.ts`: `closedDayRefusal`
+    (409 `LOADING_HISTORY_FROZEN`) en `create`/`update`/`remove`/`removeBatch`, rechazo de mover a un día
+    pasado, `listByDate` + `readDay` con `includeInactive` y `dayActive`, y
+    `LOADING_BATCH_DEACTIVATED` (409) para el alta sobre un lote desactivado. Tests nuevos del ciclo de vida
+    en `loading.service.test.ts` y del mensaje bilingüe en `loading.routes.validation.test.ts`.
+  - **46cd532** — `test(loading): date the route suites from the operators' today`. Las suites de rutas,
+    export y contrato usaban fechas fijas de 2026, ya cerradas: cada fixture de escritura calcula su propio
+    día y el export deriva de él el texto del día de la semana que espera. 683 tests de backend en verde.
 
 #### T2 — Endpoints de reactivación
 - **Specs**: S24, S31 (contrato), S25.
@@ -331,6 +341,13 @@ Cada tarea declara objetivo, archivos, tests exactos, aceptación, commit espera
 - **Aceptación**: ciclo desactivar → reactivar → el lote vuelve a `is_active = 1`; dos reactivaciones seguidas no fallan; la auditoría tiene una línea por acción.
 - **Commit**: `feat(backend): let an administrator reactivate a batch or a report` (~170 líneas).
 - **Depende de**: T1.
+- **Estado.** Hecho en un commit (**b2fa299**), 264 líneas insertadas. `activate`/`activateBatch` en
+  `loading.service.ts`, `activateReport` en `reports.lifecycle.service.ts`, las tres rutas con rol
+  Administrador y su `audit_log` (`action: 'activate'`, `scheduleDate` en el lote), y las tres operaciones
+  nuevas del contrato con su entrada en `EXPECTED_PATHS`. Los tests fijan la idempotencia (dos
+  reactivaciones seguidas, 200 las dos), el 403 del Trabalhador sin tocar la fila, el 404 de fecha o fila
+  inexistente, el 400 de id inválido, la reactivación de un día pasado y una línea de auditoría por acción.
+  691 tests de backend en verde.
 
 #### T3 — Proyección de permisos con la fecha
 - **Specs**: S25, S37.
@@ -614,8 +631,8 @@ Los pasos 2, 3 y 4 son **publicación**: se ejecutan solo con autorización expl
 
 | Tarea | Specs | Commit | Test de cierre | Estado |
 | --- | --- | --- | --- | --- |
-| T1 | S22, S23, S25, S26, S27 | — | `loading.routes.mutations.test.ts`, `loading.service.test.ts` | pendiente |
-| T2 | S24, S31 | — | `loading.routes.mutations.test.ts`, `reports.routes.test.ts` | pendiente |
+| T1 | S22, S23, S25, S26, S27 | `fe4a921`, `46cd532` | `loading.routes.mutations.test.ts`, `loading.service.test.ts` | hecho |
+| T2 | S24, S31 | `b2fa299` | `loading.routes.mutations.test.ts`, `reports.routes.test.ts` | hecho |
 | T3 | S25, S37 | — | `history-permissions.test.ts` | pendiente |
 | T4 | S28 | — | `loading.routes.schedules.test.ts` | pendiente |
 | T5 | S29, S53 | — | `aero.movements.service.test.ts`, `AeroAdaptersTest` | pendiente |
