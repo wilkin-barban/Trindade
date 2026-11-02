@@ -35,9 +35,9 @@
     "higieneCount": "Hig. y Org. -> {{done}} Tareas",
     "loadingError": "Error al cargar el panel de control",
     "overview": "Vista General",
-    "recepcionCount": "Recepción -> {{done}} Mercancías",
+    "recepcionCount": "Recepción -> {{done}} Mercaderías",
     "reportsToday": "Reportes de Hoy",
-    "reportsTotal": "Relatorios Totales",
+    "reportsTotal": "Reportes totales",
     "schedulesTomorrow": "Cargas de Mañana",
     "schedulesTotal": "Historial de Cargamento Total",
     "shareSchedule": "Enviar por WhatsApp",
@@ -49,7 +49,15 @@
     "stockHistory": "Historial de conteo",
     "stockHistoryHint": "Ver los días contados",
     "title": "Panel de Control",
-    "viewSchedule": "Ver cronograma"
+    "viewSchedule": "Ver cronograma",
+    "summaryTitle": "Resumen",
+    "higieneLabel": "Hig. y Org.",
+    "recepcionLabel": "Recepción",
+    "taskProgress": "{{done}}/{{total}} tareas",
+    "goodsProgress": "{{done}}/{{total}} mercaderías",
+    "shareApp": "Compartir App",
+    "shareAppHint": "Enviar la app y los accesos al próximo celular",
+    "massasLaunchNow": "Lanzar ahora"
   },
   "nav": {
     "adminPanel": "Panel de Administración",

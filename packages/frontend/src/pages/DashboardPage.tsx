@@ -28,33 +28,53 @@ interface SummaryCardProps {
   title: string;
   value: React.ReactNode;
   icon: string;
+  /** The card's single door, when it has one. Never combined with links inside `value`. */
   to?: string;
+  testId?: string;
 }
 
-function SummaryCard({ title, value, icon, to }: SummaryCardProps) {
-  const cardContent = (
-    <Card className={to ? "transition-all duration-200 hover:scale-[1.02] hover:shadow-md cursor-pointer border hover:border-gray-300" : ""}>
-      <CardContent className="pt-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-gray-500">{title}</p>
-            <div className="mt-1">{value}</div>
-          </div>
-          <span className="text-3xl">{icon}</span>
+/**
+ * One card of the dashboard, with at most one way in.
+ *
+ * A card that wraps its body in a link and then carries another link inside is a link inside a link: the
+ * browser flattens the anchors and the inner one stops being its own target, which is how the masas card used
+ * to hand the same destination to "Ver historial" as to the card itself. So a card is either a single door --
+ * `to` -- or a plain surface whose body holds the two doors it needs, and never both.
+ */
+function SummaryCard({ title, value, icon, to, testId }: SummaryCardProps) {
+  const body = (
+    <CardContent className="pt-6">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-gray-500">{title}</p>
+          <div className="mt-1">{value}</div>
         </div>
-      </CardContent>
-    </Card>
+        <span className="text-3xl" aria-hidden="true">{icon}</span>
+      </div>
+    </CardContent>
   );
 
   if (to) {
     return (
-      <Link to={to} className="block no-underline">
-        {cardContent}
-      </Link>
+      <Card className="border transition-all duration-200 hover:scale-[1.02] hover:border-gray-300 hover:shadow-md" data-testid={testId}>
+        <Link to={to} className="block no-underline">
+          {body}
+        </Link>
+      </Card>
     );
   }
 
-  return cardContent;
+  return <Card data-testid={testId}>{body}</Card>;
+}
+
+/** One count of the summary panel: a name and its number, at the same size, one per line. */
+function SummaryRow({ label, value, testId }: { label: string; value: string; testId: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 text-sm" data-testid={testId}>
+      <span className="text-gray-600">{label}</span>
+      <span className="font-semibold tabular-nums text-gray-900">{value}</span>
+    </div>
+  );
 }
 
 export function DashboardPage() {
@@ -146,14 +166,18 @@ export function DashboardPage() {
         />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+      {/* Seis tarjetas, en el orden del teléfono: lo que se hace hoy, el cronograma que corre, las masas, las
+          dos calculadoras y la app que se comparte. Y tres columnas en escritorio, no cinco: seis tarjetas en
+          una grilla de cinco dejan una sola huérfana en la segunda fila. */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <SummaryCard
           title={t('dashboard.reportsToday')}
+          testId="dashboard-card-reports"
           value={
             summary ? (
-              <div className="text-xs sm:text-sm font-medium text-gray-700 space-y-0.5">
-                <div>{t('dashboard.higieneCount', { done: summary.higieneDone, total: summary.higieneTotal })}</div>
-                <div>{t('dashboard.recepcionCount', { done: summary.recepcionDone, total: summary.recepcionTotal })}</div>
+              <div className="space-y-0.5 text-xs font-medium text-gray-700 sm:text-sm">
+                <div>{t('dashboard.higieneCount', { done: summary.higieneDone })}</div>
+                <div>{t('dashboard.recepcionCount', { done: summary.recepcionDone })}</div>
               </div>
             ) : (
               <span className="text-3xl font-bold text-blue-600">--</span>
@@ -164,6 +188,7 @@ export function DashboardPage() {
         />
         <SummaryCard
           title={t('dashboard.activeSchedule')}
+          testId="dashboard-card-schedule"
           value={
             <div className="space-y-1">
               <span className="text-3xl font-bold text-green-600">{summary?.activeScheduleCount ?? 0}</span>
@@ -201,58 +226,96 @@ export function DashboardPage() {
           }
           icon="🚛"
         />
+        {/* Las masas: la tarjeta no es un enlace porque tiene dos puertas. Envolverla en una y dejar la del
+            histórico adentro era un ancla dentro de otra, y el navegador se queda con la de afuera. */}
         <SummaryCard
           title={t('dashboard.massasLaunch')}
+          testId="dashboard-card-massas"
           value={
             <div className="space-y-1">
               <span className="text-sm text-gray-500">{t('dashboard.massasLaunchHint')}</span>
-              <div className="pt-1">
+              <div className="flex flex-wrap items-center gap-3 pt-1">
+                <Link
+                  to="/massas-launch"
+                  className="text-xs font-medium text-amber-700 hover:underline"
+                  data-testid="dashboard-massas-launch"
+                >
+                  {t('dashboard.massasLaunchNow')}
+                </Link>
                 <Link
                   to="/massas-history"
-                  className="text-xs text-amber-700 hover:underline font-medium"
+                  className="text-xs font-medium text-amber-700 hover:underline"
+                  data-testid="dashboard-massas-history"
                 >
-                  {t('dashboard.massasHistory')} →
+                  {t('dashboard.massasHistory')}
                 </Link>
               </div>
             </div>
           }
           icon="🍝"
-          to="/massas-launch"
         />
         <SummaryCard
           title={t('dashboard.stock')}
+          testId="dashboard-card-stock"
           value={<span className="text-sm text-gray-500">{t('dashboard.stockHint')}</span>}
           icon="📦"
           to="/stock-calculator"
         />
         <SummaryCard
-          title={t('dashboard.stockHistory')}
-          value={<span className="text-sm text-gray-500">{t('dashboard.stockHistoryHint')}</span>}
-          icon="🗓️"
-          to="/stock-history"
-        />
-        <SummaryCard
           title={t('dashboard.assai')}
+          testId="dashboard-card-assai"
           value={<span className="text-sm text-gray-500">{t('dashboard.assaiHint')}</span>}
           icon="🧮"
           to="/assai-calculator"
         />
+        {/* La puerta de Compartir App: el trabajo de dejar la app en el teléfono del que entra, que en la web
+            solo vivía en el menú lateral. Reemplaza a la tarjeta del histórico de contagem, que se alcanza
+            desde la calculadora, que es donde se trabaja. */}
         <SummaryCard
-          title={t('dashboard.activeUsers')}
-          value={<span className="text-3xl font-bold text-purple-600">{summary?.activeUsers ?? 0}</span>}
-          icon="👥"
-        />
-        <SummaryCard
-          title={t('dashboard.reportsTotal')}
-          value={<span className="text-3xl font-bold text-indigo-600">{summary?.reportsTotal ?? 0}</span>}
-          icon="📊"
-        />
-        <SummaryCard
-          title={t('dashboard.schedulesTotal')}
-          value={<span className="text-3xl font-bold text-teal-600">{summary?.schedulesTotal ?? 0}</span>}
-          icon="📂"
+          title={t('dashboard.shareApp')}
+          testId="dashboard-card-share-app"
+          value={<span className="text-sm text-gray-500">{t('dashboard.shareAppHint')}</span>}
+          icon="📲"
+          to="/compartir"
         />
       </div>
+
+      {/* Un panel con todas las cuentas, en vez de una tarjeta por número: los tres totales y los dos pares de
+          tareas son lo que se lee, no puertas a otro lado, y una tercera parte de la pantalla para cinco
+          números era lo que hacía este panel más largo que el trabajo que anuncia. */}
+      <Card className="mt-4" data-testid="dashboard-summary">
+        <CardContent className="space-y-3 pt-6">
+          <h4 className="text-sm font-semibold text-gray-800">{t('dashboard.summaryTitle')}</h4>
+          <SummaryRow
+            label={t('dashboard.schedulesTotal')}
+            value={String(summary?.schedulesTotal ?? 0)}
+            testId="dashboard-summary-schedules"
+          />
+          <SummaryRow
+            label={t('dashboard.reportsTotal')}
+            value={String(summary?.reportsTotal ?? 0)}
+            testId="dashboard-summary-reports"
+          />
+          <SummaryRow
+            label={t('dashboard.activeUsers')}
+            value={String(summary?.activeUsers ?? 0)}
+            testId="dashboard-summary-users"
+          />
+          <SummaryRow
+            label={t('dashboard.higieneLabel')}
+            value={t('dashboard.taskProgress', { done: summary?.higieneDone ?? 0, total: summary?.higieneTotal ?? 0 })}
+            testId="dashboard-summary-higiene"
+          />
+          <SummaryRow
+            label={t('dashboard.recepcionLabel')}
+            value={t('dashboard.goodsProgress', {
+              done: summary?.recepcionDone ?? 0,
+              total: summary?.recepcionTotal ?? 0,
+            })}
+            testId="dashboard-summary-recepcion"
+          />
+        </CardContent>
+      </Card>
 
       {/* Deferred modules notice */}
       <div className="mt-8 p-6 bg-white rounded-lg shadow-sm border border-dashed border-gray-300">

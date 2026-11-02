@@ -49,7 +49,15 @@
     "stockHistory": "Histórico de Contagem",
     "stockHistoryHint": "Ver os dias contados",
     "title": "Dashboard",
-    "viewSchedule": "Ver cronograma"
+    "viewSchedule": "Ver cronograma",
+    "summaryTitle": "Resumo",
+    "higieneLabel": "Hig. & Org.",
+    "recepcionLabel": "Recepção",
+    "taskProgress": "{{done}}/{{total}} tarefas",
+    "goodsProgress": "{{done}}/{{total}} mercadorias",
+    "shareApp": "Compartilhar App",
+    "shareAppHint": "Envie o aplicativo e os acessos para o próximo celular",
+    "massasLaunchNow": "Lançar agora"
   },
   "nav": {
     "adminPanel": "Painel Admin",
