@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import i18n from '../i18n/config';
@@ -155,6 +155,51 @@ describe('MassasHistoryPage', () => {
     // The name is the table's own header and its rows: what matters is that the day it shows changed.
     expect((await screen.findAllByText('MASSA DE QUEIJO')).length).toBeGreaterThan(0);
     await waitFor(() => expect(currentUrl).toBe('/massas-history?date=2026-10-26'));
+  });
+
+  it('drops a stale answer that arrives after a newer one', async () => {
+    const resolvers: Record<string, (view: MassasLaunchDayView) => void> = {};
+    get.mockImplementation((url: string) => {
+      if (url.startsWith('/massas-launch/history')) {
+        return Promise.resolve({
+          days: [
+            { date: '2026-10-27', productsCount: 1, totalBoxes: 3, totalUnits: 30, operatorsCount: 1 },
+            { date: '2026-10-26', productsCount: 1, totalBoxes: 3, totalUnits: 30, operatorsCount: 1 },
+          ],
+        });
+      }
+      if (url.startsWith('/massas-launch?')) {
+        const date = url.split('date=')[1];
+        if (date === '2026-10-27' || date === '2026-10-26') {
+          return new Promise<MassasLaunchDayView>((resolve) => {
+            resolvers[date] = resolve;
+          });
+        }
+        return Promise.resolve(dayView(date, 'MASSA DE PASTEL'));
+      }
+      return Promise.resolve({ date: '2026-10-27', movements: [] });
+    });
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getByTestId('massas-history-day-2026-10-27')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('massas-history-day-2026-10-27'));
+    // Both reads are in flight before either answers: that is the race the screen has to survive.
+    await waitFor(() => expect(resolvers['2026-10-27']).toBeDefined());
+    fireEvent.click(screen.getByTestId('massas-history-day-2026-10-26'));
+    await waitFor(() => expect(resolvers['2026-10-26']).toBeDefined());
+
+    // The second tap answers first; the first one lands afterwards carrying a day the operator already left.
+    resolvers['2026-10-26'](dayView('2026-10-26', 'MASSA DE QUEIJO'));
+    expect((await screen.findAllByText('MASSA DE QUEIJO')).length).toBeGreaterThan(0);
+
+    resolvers['2026-10-27'](dayView('2026-10-27', 'MASSA DE PASTEL VELHA'));
+    // Let the late answer run everything it wanted to run, and then look: it asked for a day nobody is on.
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.queryByText('MASSA DE PASTEL VELHA')).toBeNull();
+    expect(screen.queryAllByText('MASSA DE QUEIJO').length).toBeGreaterThan(0);
   });
 
   it('opens the day named in the URL', async () => {

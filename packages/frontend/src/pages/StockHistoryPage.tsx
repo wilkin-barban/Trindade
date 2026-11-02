@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
@@ -63,12 +63,21 @@ export function StockHistoryPage() {
     };
   }, []);
 
+  /** The last read asked for: two chips tapped quickly leave two answers racing, and the older one loses. */
+  const readToken = useRef(0);
+
   const load = useCallback(
     async (target: string) => {
+      const token = ++readToken.current;
       setError('');
       try {
-        setDay(await api.get<StockDay>(`/stock?date=${target}`));
+        const loaded = await api.get<StockDay>(`/stock?date=${target}`);
+        if (readToken.current !== token) return;
+        setDay(loaded);
       } catch {
+        if (readToken.current !== token) return;
+        // The count of the previous day cannot survive its own read failing: it would read as this day's.
+        setDay(null);
         setError(t('stock.loadError'));
       }
     },
@@ -161,7 +170,10 @@ export function StockHistoryPage() {
         max={saoPauloYesterday()}
         testIdPrefix="stock-history"
         groupLabel={t('stock.history')}
-        days={days.map((counted) => ({ date: counted.date, units: counted.units }))}
+        // Today belongs to the count in progress, not to the archive: the chips stop at yesterday.
+        days={days
+          .filter((counted) => counted.date <= saoPauloYesterday())
+          .map((counted) => ({ date: counted.date, units: counted.units }))}
       />
 
       {error !== '' && (

@@ -6,9 +6,10 @@ import { getE2EIdentities, goToProtected } from './auth-helpers';
  * desktop.
  *
  * The spec writes one count for today through the counter's own API -- the only day whose numbers can still
- * change -- so the chip row has something real to list. Two gestures are asserted, because they are the two
- * the screen is: the panel opens the native calendar when it is pressed, and a chip moves the summary to its
- * day without opening anything.
+ * change -- and then asserts the line the archive draws: today is not offered as a chip, because a day still
+ * being counted belongs to the counter. Three gestures are asserted, because they are the three the screen
+ * is: the panel opens the native calendar when it is pressed, a past chip moves the summary to its day
+ * without opening anything, and the chip row never lists today.
  */
 const API_BASE = 'http://localhost:3099/api';
 
@@ -53,9 +54,9 @@ test.describe('Stock history days', () => {
 
       await goToProtected(page, '/stock-history');
 
-      const chip = page.getByTestId(`stock-history-day-${today}`);
-      await expect(chip).toBeVisible();
-      await expect(chip).toContainText('·');
+      // Today is the counter's business: the archive lists only days before it, even when today has counts.
+      await expect(page.getByTestId('stock-history-total')).toBeVisible();
+      await expect(page.getByTestId(`stock-history-day-${today}`)).toHaveCount(0);
 
       await page.getByTestId('stock-history-date').locator('..').click();
       await expect
@@ -66,9 +67,19 @@ test.describe('Stock history days', () => {
         )
         .toBeGreaterThan(0);
 
-      await chip.click();
-      await expect(chip).toBeDisabled();
-      await expect(page.getByTestId('stock-history-total')).toBeVisible();
+      const pastChips = page.locator('[data-testid^="stock-history-day-"]');
+      const chipCount = await pastChips.count();
+      for (let index = 0; index < chipCount; index += 1) {
+        const testId = await pastChips.nth(index).getAttribute('data-testid');
+        expect(testId!.replace('stock-history-day-', '') < today).toBe(true);
+      }
+      if (chipCount > 0) {
+        const chip = pastChips.first();
+        await expect(chip).toContainText('·');
+        await chip.click();
+        await expect(chip).toBeDisabled();
+        await expect(page.getByTestId('stock-history-total')).toBeVisible();
+      }
     });
   }
 });

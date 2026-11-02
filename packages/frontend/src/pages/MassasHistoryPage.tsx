@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
@@ -95,16 +95,30 @@ export function MassasHistoryPage() {
   const [phone, setPhone] = useState('');
   const [copyNote, setCopyNote] = useState('');
 
+  /**
+   * The last read asked for, so an older answer cannot paint over a newer day.
+   *
+   * The chips are a row of targets: tapping two of them quickly leaves two reads in flight, and the slower
+   * one used to land last and show the day the operator had already left.
+   */
+  const readToken = useRef(0);
+
   const loadDay = useCallback(
     async (targetDate: string) => {
+      const token = ++readToken.current;
       setError('');
       try {
         const loaded = await api.get<MassasLaunchDayView>(`/massas-launch?date=${targetDate}`);
+        if (readToken.current !== token) return;
         setDayView(loaded);
       } catch (err) {
+        if (readToken.current !== token) return;
+        // A failure has to clear the day, or the table of the previous day stays under the error message and
+        // reads as the day that failed.
+        setDayView(null);
         setError(err instanceof Error ? err.message : t('massas.loadError'));
       } finally {
-        setLoading(false);
+        if (readToken.current === token) setLoading(false);
       }
     },
     [t]

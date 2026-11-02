@@ -111,4 +111,46 @@ describe('StockHistoryPage', () => {
     expect(screen.queryByTestId('stock-history-days')).not.toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
+
+  it('does not offer today in the day chips', async () => {
+    const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+    const yesterdayDate = new Date(`${today}T12:00:00Z`);
+    yesterdayDate.setUTCDate(yesterdayDate.getUTCDate() - 1);
+    const yesterday = yesterdayDate.toISOString().slice(0, 10);
+
+    get.mockImplementation(async (url: string) => {
+      if (url === '/stock/history') {
+        return {
+          days: [
+            { date: today, products: 1, boxes: 1, units: 10 },
+            { date: yesterday, products: 1, boxes: 2, units: 20 },
+          ],
+        };
+      }
+      return stockDay(url.split('date=')[1], 20);
+    });
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getByTestId(`stock-history-day-${yesterday}`)).toBeInTheDocument());
+    // Today belongs to the count in progress: the archive stops at yesterday, like the massas history.
+    expect(screen.queryByTestId(`stock-history-day-${today}`)).toBeNull();
+  });
+
+  it('clears the day view when the read fails', async () => {
+    get.mockImplementation(async (url: string) => {
+      if (url === '/stock/history') return { days: [{ date: '2026-10-26', products: 1, boxes: 1, units: 8 }] };
+      if (url === '/stock?date=2026-10-26') throw new Error('offline');
+      return stockDay('2026-10-27', 12);
+    });
+
+    renderPage();
+
+    expect((await screen.findAllByText('PRODUTO A')).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByTestId('stock-history-day-2026-10-26'));
+
+    // The count of the day that failed cannot stay under the alert: it would read as the day just chosen.
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('PRODUTO A')).toBeNull());
+  });
 });
