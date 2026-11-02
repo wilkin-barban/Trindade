@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { LucidePlus, LucideX, LucideClock } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { LucideAlertTriangle, LucidePencil, LucidePlus, LucideX, LucideClock } from 'lucide-react';
 import { DriverPicker } from './DriverPicker';
 import { countInWindow, isQuotaExceeded, toMinutes } from '../../lib/loading-quota';
 
@@ -172,17 +173,29 @@ export function ScheduleGrid({
                         </span>
                       )}
                     </div>
+                    {/* Both actions are 48 pixels tall and wide: a day is edited on a phone, in a warehouse,
+                        and a target the size of the glyph is a target a thumb misses. */}
+                    {entry.canEdit && (
+                      <Link
+                        to={`/loading/edit?date=${date}&edit=${entry.id}`}
+                        className="inline-flex min-h-12 min-w-12 items-center justify-center gap-1 rounded text-blue-600 hover:bg-blue-50 transition-colors"
+                        aria-label={t('loading.editEntry')}
+                        data-testid={`edit-entry-${entry.id}`}
+                      >
+                        <LucidePencil className="h-4 w-4" />
+                      </Link>
+                    )}
                     {entry.canDelete && (
                       <button
                         type="button"
                         onClick={() => handleDelete(entry.id)}
                         disabled={deleting === entry.id}
-                        className="inline-flex items-center gap-1 rounded px-2 py-1 text-sm text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                        className="inline-flex min-h-12 min-w-12 items-center justify-center gap-1 rounded px-2 text-sm text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
                         aria-label={t('loading.deleteEntry')}
                         data-testid={`delete-entry-${entry.id}`}
                       >
                         <LucideX className="h-4 w-4" />
-                        {t('loading.deleteEntry')}
+                        <span className="hidden sm:inline">{t('loading.deleteEntry')}</span>
                       </button>
                     )}
                   </div>
@@ -217,8 +230,15 @@ export function ScheduleGrid({
                     {t('loading.addFletero')}
                   </button>
                   {isExceeded && (
-                    <p className="text-xs text-red-500 py-0.5" data-testid={`maxed-${slot.replace(':', '-')}`}>
-                      ⚠️ {t('loading.quotaError')}
+                    // The warning is a sentence, not an emoji glued to one: an emoji here is read out loud by
+                    // a screen reader in the middle of the sentence, and it is the same glyph in both
+                    // languages anyway. The triangle is decoration and says so.
+                    <p
+                      className="flex items-start gap-1 text-xs text-red-500 py-0.5"
+                      data-testid={`maxed-${slot.replace(':', '-')}`}
+                    >
+                      <LucideAlertTriangle className="h-3.5 w-3.5 mt-px shrink-0" aria-hidden="true" />
+                      {t('loading.quotaError')}
                     </p>
                   )}
                 </div>

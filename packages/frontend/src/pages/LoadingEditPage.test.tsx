@@ -39,9 +39,9 @@ function schedule(id: number, time_slot: string, name: string) {
   };
 }
 
-function renderPage() {
+function renderPage(entry = '/loading/edit?date=2026-11-02') {
   return render(
-    <MemoryRouter initialEntries={['/loading/edit?date=2026-11-02']}>
+    <MemoryRouter initialEntries={[entry]}>
       <LoadingEditPage />
     </MemoryRouter>
   );
@@ -73,6 +73,20 @@ describe('LoadingEditPage', () => {
     // Two fleteros share the shift, so putting the first one back on its own hour keeps the count at two.
     const ownOption = screen.getByTestId('slot-select-1').querySelector('option[value="04:00"]');
     expect(ownOption?.textContent).toBe('04:00 (2/3)');
+  });
+
+  it('opens the row the grid sent it to, without hunting it in the list', async () => {
+    get.mockImplementation(async (url: string) => {
+      if (url.startsWith('/loading/schedules')) {
+        return { schedules: [schedule(1, '04:00', 'A'), schedule(2, '04:30', 'B')] };
+      }
+      return { timeSlots: ['04:00', '04:30'] };
+    });
+    renderPage('/loading/edit?date=2026-11-02&edit=2');
+
+    // The pencil in the grid is a shortcut to this row's own move, so the row arrives already open.
+    await waitFor(() => expect(screen.getByTestId('slot-select-2')).toBeInTheDocument());
+    expect(screen.queryByTestId('slot-select-1')).toBeNull();
   });
 
   it('offers the hour a row already holds when the day no longer lists it', async () => {

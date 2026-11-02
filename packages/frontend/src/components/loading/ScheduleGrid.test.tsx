@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import i18n from '../../i18n/config';
 
@@ -16,15 +17,17 @@ const NOOP = () => {};
 
 function renderGrid(schedules: Parameters<typeof ScheduleGrid>[0]['schedules'], timeSlots = ['04:00', '04:30']) {
   return render(
-    <ScheduleGrid
-      schedules={schedules}
-      timeSlots={timeSlots}
-      date="2026-11-02"
-      drivers={[]}
-      loading={false}
-      onDelete={async () => {}}
-      onRefresh={NOOP}
-    />
+    <MemoryRouter>
+        <ScheduleGrid
+        schedules={schedules}
+        timeSlots={timeSlots}
+        date="2026-11-02"
+        drivers={[]}
+        loading={false}
+        onDelete={async () => {}}
+        onRefresh={NOOP}
+      />
+    </MemoryRouter>
   );
 }
 
@@ -72,6 +75,33 @@ describe('ScheduleGrid quota', () => {
    * booked from the app, was drawn nowhere -- it counted against the quota and nobody could see it or remove
    * it without going through the API.
    */
+  /**
+   * Two rows of a day are often edited on a phone, in a warehouse, with one hand.
+   *
+   * The actions were 16-pixel icons inside a padding-less button: the target measured the glyph, so a thumb
+   * hit the row behind it or missed entirely. 48 is the number the app's other icon actions already use.
+   */
+  it('gives each row action a target a thumb can hit', () => {
+    renderGrid([{ ...fletero(1, '04:00'), canEdit: true }]);
+
+    expect(screen.getByTestId('delete-entry-1')).toHaveClass('min-h-12', 'min-w-12');
+    expect(screen.getByTestId('edit-entry-1')).toHaveClass('min-h-12', 'min-w-12');
+  });
+
+  it('sends the pencil to the day it belongs to, with the row already open', () => {
+    renderGrid([{ ...fletero(1, '04:00'), canEdit: true }]);
+
+    // The grid knows the row; the edit screen is where a row moves. The link carries both, so the operator
+    // lands on the day with that row already in edit instead of hunting it in the list.
+    expect(screen.getByTestId('edit-entry-1')).toHaveAttribute('href', '/loading/edit?date=2026-11-02&edit=1');
+  });
+
+  it('offers no pencil on a row the server did not offer it for', () => {
+    renderGrid([{ ...fletero(1, '04:00'), canEdit: false }]);
+
+    expect(screen.queryByTestId('edit-entry-1')).toBeNull();
+  });
+
   it('draws an hour the list does not know, so it can still be seen and emptied', () => {
     renderGrid([fletero(1, '23:30')], ['04:00']);
 

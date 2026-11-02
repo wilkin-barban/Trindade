@@ -22,6 +22,9 @@ export function LoadingEditPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const dateParam = searchParams.get('date');
+  // The grid's pencil points at a row of its own day: the row arrives open instead of the operator having to
+  // find it again in a list that grows with every load.
+  const editParam = Number(searchParams.get('edit') ?? '');
 
   const date = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)
     ? dateParam
@@ -109,6 +112,14 @@ export function LoadingEditPage() {
   }, [error]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  useEffect(() => {
+    if (!Number.isFinite(editParam) || editParam <= 0) return;
+    const target = schedules.find((entry) => entry.id === editParam);
+    if (!target || editingId === editParam) return;
+    setEditingId(target.id);
+    setEditSlot(target.time_slot);
+  }, [schedules, editParam, editingId]);
 
   function startEdit(entry: ScheduleRow) {
     setEditingId(entry.id);
