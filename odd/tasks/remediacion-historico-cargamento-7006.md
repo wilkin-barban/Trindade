@@ -647,7 +647,7 @@ Cada tarea declara objetivo, archivos, tests exactos, aceptación, commit espera
 | 6 | T6 | `fix(web): make every ERP audit event reach the log with its pair` | 180 |
 | 7 | T7 | `feat(android): reactivate a deactivated batch from the history` | 300 |
 | 8 | T8 | `feat(android): show a deactivated day whole and read only` | 280 |
-| 9 | T9 | `fix(android): keep the lifecycle result and name the refusal` | 250 |
+| 9 | T9 | `fix(android): keep the lifecycle result and name the refusal` | 250 (277 + 228 en dos commits) |
 | 10 | T10 | `fix(android): use the shared history button on the report form` | 40 |
 | 11 | T11 | `feat(android): open a past loading day in read only` | 200 |
 | 12 | T12 | `feat(web): stop opening a past loading day in the editor` | 200 |
@@ -709,7 +709,7 @@ Los pasos 2, 3 y 4 son **publicación**: se ejecutan solo con autorización expl
 | T6 | S49 | — | `aero-audit.test.ts`, `aero-bridge-wiring.test.ts` | pendiente |
 | T7 | S24, S31 | — | `LoadingHistoryViewModelTest.kt` | pendiente |
 | T8 | S26, S27, S32 | — | `LoadingViewModelTest.kt` | pendiente |
-| T9 | S30, S33, S34 | — | `LoadingHistoryViewModelTest.kt` | pendiente |
+| T9 | S30, S33, S34 | `5e82d44`, `83d0773` | `LoadingHistoryViewModelTest.kt`, `ReportsHistoryViewModelTest.kt` | hecho |
 | T10 | S52 | — | `ReportGeneratorScreenTest.kt` | pendiente |
 | T11 | S22, S32 | — | `LoadingScreenTest.kt` | pendiente |
 | T12 | S35, S37 | — | `LoadingHistoryPage.test.tsx`, `LoadingEditPage.test.tsx` | pendiente |
@@ -753,3 +753,11 @@ Los pasos 2, 3 y 4 son **publicación**: se ejecutan solo con autorización expl
 Lectura directa del código para no heredar afirmaciones del brief: `loading.routes.ts:37-48,64-72`, `reports.routes.ts:192-204`, `history-permissions.ts:89-100`, `loading.service.ts:20-56,110-139,338-371`, `massas.service.ts:288-293`, `aero.movements.service.ts:70-109`, `LoadingRepository.kt:45-60,118-155`, `LoadingHistoryViewModel.kt:130-170,220-300`, `ReportsHistoryViewModel.kt:190-240`, `ReportGeneratorScreen.kt:103-106`, `ModuleHelpDialog.kt:150-172`, `LoadingHistoryPage.tsx:160-200`, `LoadingEditPage.tsx:92-110,255-270`, `StockHistoryPage.tsx:60-85`, `loading-picker.ts:45-125`, `DriverPicker.tsx:55-95,180-200`, `DriverPickerDialog.tsx:200-235`, `ScheduleGrid.tsx:60-100`, `aero-audit.ts:150-170`, `aero.log.contract.test.ts:30-75`, `wc -l logs/aero-integration.log` = 92 líneas, 0 `client=web`, 3 `client=android`.
 
 Correcciones que esta verificación introduce sobre el brief: el hallazgo B está parcialmente desactualizado (el resultado tipado ya existe); `refusalMessage` ya distingue 403/404; `create` ya devuelve `code` pero con el texto en portugués como valor; `canDelete` no mira el día; y los tests actuales fijan el borrado de días pasados.
+
+**L6 (cierre de T9, evidencia)**
+
+- `LoadingHistoryViewModel` y `ReportsHistoryViewModel` comparten ahora la misma forma: `readPage` recibe el token de quien lo pidió, de modo que la recarga posterior a una acción no puede quedar fuera de orden con la lectura que la precedió; `busy` se apaga al final de la recarga y no antes; `resultMessage` no lo toca la recarga, así que una escritura que aterrizó se sigue leyendo como aterrizada aunque la relectura falle.
+- Reintento con memoria: `pendingWrite`, `pendingSuccess` y `lastWriteApplied` en ambos VM. Una escritura aplicada se reintenta como lectura (`load()`), una escritura rechazada se reintenta como sí misma (`runLifecycle`).
+- Rechazos nombrados: 401 `SESSION_EXPIRED`, 403 `ADMIN_ONLY`, 404 `GONE`, 409 por código (`LOADING_HISTORY_FROZEN` → `FROZEN`, el resto `GENERIC`), 5xx `SERVER_FAILED`, transporte caído `UNREACHABLE`.
+- Los fakes ganaron `historyFailsFromRead` y `gateHistoryFromRead` (la primera lectura que falla o se retiene, contada desde uno) y sus respuestas de ciclo de vida pasaron a `var`. El desplazamiento importa: la primera versión usaba `>` y el fallo caía en la lectura siguiente, lo que hacía pasar el test por la razón equivocada.
+- Evidencia: `LoadingHistoryViewModelTest` 28/28 y `ReportsHistoryViewModelTest` 24/24 en verde; suite completa `:app:testDebugUnitTest` 1305 tests, 0 fallos, 0 saltados (`BUILD SUCCESSFUL in 12m 8s`).
