@@ -587,7 +587,7 @@
       "urlPlaceholder": "http://192.168.1.50:8000/api",
       "userLabel": "Usuário da empresa",
       "passwordLabel": "Senha da empresa",
-      "fieldsHint": "Só esses três são obrigatórios: URL, usuário e senha. Salvando, a sincronização já pode ser ativada.",
+      "fieldsHint": "Só a URL e o usuário são obrigatórios: eles ficam guardados no dispositivo.",
       "save": "Salvar configuração",
       "saved": "Configuração salva neste iPhone",
       "invalid": "Confira a URL (http:// ou https://), o usuário e a senha",
