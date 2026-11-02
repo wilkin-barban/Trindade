@@ -889,6 +889,8 @@ S19 — D5/D7, verbatim:
     `~/Desktop` y `https://trindademasas.duckdns.org/api/app/download-apk` → `87f9a6a3…`.
   - Documentación: `CHANGELOG.md` (`0.7.0+7005`), `docs/release-android.md` (fila + estado final),
     `docs/release-android-historial.md` (fila con el digest) y las notas de la release en GitHub.
+  - Regresión e2e: `npx playwright test` → **103/103** en 8m 37s (móvil y escritorio, con las superficies del
+    ciclo: masas, cronograma, recepciones, historiales, panel de administración y exportación).
   - **No verificado en este entorno:** el emulador no tenía `adb` en la ruta histórica (`~/android-sdk`); se usó
     la real (`~/Android/Sdk/platform-tools/adb`). No hubo prueba con el ERP de la fábrica porque el VPS no tiene
     ruta a su LAN (S11): el diálogo de la prueba de conexión se capturó contra una dirección inalcanzable, que es
