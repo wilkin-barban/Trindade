@@ -3,18 +3,19 @@ import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { Card, CardContent } from '../components/ui/card';
-import { MassasDayList, type MassasHistoryDay } from '../components/massas/MassasDayList';
+import { HistoryDayPanel, type HistoryDay } from '../components/ui/HistoryDayPanel';
+
 import { LoadingSpinner } from '../components/ui/loading-spinner';
 import { toWhatsAppNumber } from '../lib/phone';
 import { shareOrCopy, waMeLink } from '../lib/whatsapp';
-import { massasMessage, type MassasLaunchDayView } from '../lib/massas';
+import { massasMessage, type MassasHistoryDay, type MassasLaunchDayView } from '../lib/massas';
 import { ArrowLeft } from 'lucide-react';
 import { ModuleHelpModal } from '../components/ui/ModuleHelpModal';
 import { MassasCollectiveTable } from './massas/MassasCollectiveTable';
 import { readAeroMovementsSnapshot, type AeroMovementSnapshot } from '../lib/aero-mirror';
 import { massasUnifiedRows, type MassasUnifiedRow } from '../lib/massas-unified';
 import { MassasWhatsAppShare } from './massas/MassasWhatsAppShare';
-import { saoPauloYesterday } from '../lib/date';
+import { saoPauloDaysAgo, saoPauloYesterday } from '../lib/date';
 
 /**
  * A past day of launching, read and shared but not edited.
@@ -71,6 +72,22 @@ export function MassasHistoryPage() {
     failed: false,
     list: [],
   });
+
+  /**
+   * The days as chips: one per day that has launches, plus yesterday when the endpoint never listed it.
+   *
+   * Yesterday is always offered because it is the day the operator usually means, and the page opens on it
+   * by default; when the history does not carry it there is no count to print, so its chip shows the day
+   * alone. Today is left out on purpose: today is still being launched and belongs to the launch screen.
+   */
+  const dayChips = useMemo<HistoryDay[]>(() => {
+    if (days.loading) return [];
+    const listed = days.list
+      .filter((day) => day.date <= yesterday)
+      .map((day) => ({ date: day.date, units: day.totalUnits }));
+    if (listed.some((day) => day.date === yesterday)) return listed;
+    return [{ date: yesterday, units: null }, ...listed];
+  }, [days, yesterday]);
 
   // Edit / Delete state for Administrador
 
@@ -234,13 +251,22 @@ export function MassasHistoryPage() {
           {notice.message}
         </div>
       )}
-      <MassasDayList
-        days={days.list}
+      {/* El día, con el mismo panel del conteo: el campo grande abre el calendario y los días con
+          lanzamientos van como chips al costado, para que el día más buscado -- ayer -- no cueste abrir
+          nada. Antes esto era una tarjeta de botones de dos líneas: el mismo control dibujado de otra
+          forma, que es justo lo que ya no puede pasar. */}
+      <HistoryDayPanel
+        id="massas-history-date"
+        label={t('massas.date')}
         value={date}
         onChange={setDate}
-        yesterday={yesterday}
-        loading={days.loading}
+        min={saoPauloDaysAgo(30)}
+        max={yesterday}
+        testIdPrefix="massas-history"
+        groupLabel={t('massas.historyDaysLabel')}
+        days={dayChips}
         failed={days.failed}
+        failedMessage={t('massas.historyDaysUnavailable')}
       />
 
       {/* Un día sin lanzamientos es un día vacío, no un error: la tabla no dibuja nada y sin esta línea

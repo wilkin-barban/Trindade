@@ -597,7 +597,7 @@
       "test": "Testar Conexão",
       "testing": "Testando...",
       "testOk": "Conectado como {{name}}. A empresa informa o código {{code}}, que não precisa ser digitado.",
-        "testOkNoUser": "Conectado. A empresa informa o código {{code}}, que não precisa ser digitado.",
+      "testOkNoUser": "Conectado. A empresa informa o código {{code}}, que não precisa ser digitado.",
       "testHttpError": "O WebService respondeu {{status}}: {{message}}",
       "testNoCors": "A rede respondeu, mas o WebService não libera CORS. Use o Atalho do iPhone.",
       "testBlockedMixed": "O Safari bloqueia HTTP a partir de uma página HTTPS. Use o Atalho do iPhone.",
@@ -759,12 +759,7 @@
       "difference": "Diferença"
     },
     "historyDaysLabel": "Dias do histórico",
-    "historyDaysTitle": "Escolha o dia",
-    "historyDaysLoading": "Lendo os dias…",
-    "historyDaysUnavailable": "Não foi possível ler os dias com lançamentos; você pode abrir hoje ou ontem.",
-    "historyToday": "Hoje",
-    "historyYesterday": "Ontem",
-    "historyDayTotals": "{{boxes}} cx · {{units}} un · {{products}} prod · {{operators}} oper",
+    "historyDaysUnavailable": "Não foi possível ler os dias com lançamentos; você pode abrir ontem.",
     "historyEmptyDay": "Não há lançamentos registrados nesse dia."
   },
   "moduleHelp": {

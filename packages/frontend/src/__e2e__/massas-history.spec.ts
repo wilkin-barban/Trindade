@@ -2,15 +2,15 @@ import { expect, test, type Page } from '@playwright/test';
 import { goToProtected } from './auth-helpers';
 
 /**
- * The massas history picks its day from a list, and the day it picks is the day the URL carries.
+ * The massas history picks its day the way the count does, and the day it picks is the day the URL carries.
  *
  * The e2e database is frozen in the past -- the history refuses writes to any day that is not today -- so
- * no day here has launches. What is asserted is everything the screen does without them: yesterday is
- * always offered and is the day it opens by default, a day named in `?date=` is the day it opens, pressing
- * yesterday from another day moves the page there and drops the query, and a day with nothing reads as an
- * empty day instead of a failed read.
+ * no day here has launches. What is asserted is everything the screen does without them: the panel field
+ * is there with the archive window, yesterday is always offered as a chip and is the day it opens by
+ * default, a day named in `?date=` is the day it opens, pressing yesterday from another day moves the page
+ * there and drops the query, and a day with nothing reads as an empty day instead of a failed read.
  *
- * The day with launches -- the list showing its totals and the table switching when it is pressed -- is
+ * The day with launches -- the chip showing its units and the table switching when it is pressed -- is
  * covered in `src/pages/MassasHistoryPage.test.tsx`, where the API answers any day.
  */
 function shiftDays(iso: string, days: number): string {
@@ -38,12 +38,19 @@ test.describe('Massas history days', () => {
       const today = await saoPauloToday(page);
       const yesterday = shiftDays(today, -1);
       const older = shiftDays(today, -3);
-      const list = page.getByTestId('massas-day-list');
-      const yesterdayChip = page.getByTestId(`massas-day-${yesterday}`);
+      const field = page.getByTestId('massas-history-date');
+      const strip = page.getByTestId('massas-history-days');
+      const yesterdayChip = page.getByTestId(`massas-history-day-${yesterday}`);
 
-      // Yesterday is the day the page opens on, and the only one it always offers.
-      await expect(list).toBeVisible();
+      // The same panel the count uses, with its window closed on both ends.
+      await expect(field).toHaveAttribute('type', 'date');
+      await expect(field).toHaveAttribute('max', yesterday);
+      // Yesterday is the day the page opens on, and the only one it always offers -- alone, with no count.
+      await expect(strip).toBeVisible();
       await expect(yesterdayChip).toHaveAttribute('aria-pressed', 'true');
+      await expect(yesterdayChip).toHaveText(/^\d{2}\/\d{2}$/);
+      // The card this screen used to draw is gone: one control, not two designs.
+      await expect(page.getByText('Escolha o dia')).toHaveCount(0);
 
       // A day in the URL is the day that opens.
       await goToProtected(page, `/massas-history?date=${older}`);

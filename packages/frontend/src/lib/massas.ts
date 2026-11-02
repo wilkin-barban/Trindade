@@ -22,6 +22,22 @@ export interface MassaIndividualLaunch {
   updated_at: string;
 }
 
+/**
+ * One day the plant launched, as `/massas-launch/history` reports it.
+ *
+ * The totals are the reason the day is recognisable without opening it: boxes, units, products and how
+ * many operators launched. The history screen reads them to label its chips; nothing else on the web
+ * needs this shape, which is why it lives beside the day view instead of in the component that used to
+ * draw the list.
+ */
+export interface MassasHistoryDay {
+  date: string;
+  productsCount: number;
+  totalBoxes: number;
+  totalUnits: number;
+  operatorsCount: number;
+}
+
 export interface MassasLaunchDayView {
   date: string;
   products: MassaProductTotal[];

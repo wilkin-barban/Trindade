@@ -3,17 +3,19 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import i18n from '../i18n/config';
 import type { MassasLaunchDayView } from '../lib/massas';
+import { saoPauloDaysAgo, saoPauloYesterday } from '../lib/date';
 
 /**
- * The history picks its day from a list, not from a calendar.
+ * The history picks its day the way the count does: a panel and a strip of the days that have launches.
  *
- * Three things are asserted here because they are the three ways this screen can lie to the operator: the
- * list has to show the day that has launches (with its totals, which is how a person recognises a day), a
- * click has to change the table it governs, and the chosen day has to survive in the URL so a link -- the
- * launch screen and the report both build one -- opens the day it names.
+ * Four things are asserted here because they are the four ways this screen can lie to the operator: the
+ * strip has to show the days that have launches with their units (which is how a person recognises a day),
+ * a chip has to change the table it governs, the chosen day has to survive in the URL so a link -- the
+ * launch screen and the report both build one -- opens the day it names, and yesterday has to be offered
+ * even when the endpoint never listed it, because a day with nothing is still a day worth opening.
  *
- * A day with nothing is asserted too: an empty day and a failed read are different sentences, and the page
- * used to render neither.
+ * A day with nothing is asserted too: an empty day and a failed read are different sentences, and a failed
+ * day list must not take the day field down with it.
  */
 const get = vi.fn();
 
@@ -77,7 +79,7 @@ beforeEach(async () => {
 });
 
 describe('MassasHistoryPage', () => {
-  it('lists the days that have launches instead of a calendar', async () => {
+  it('offers the day through the same panel the count uses, with one chip per day', async () => {
     get.mockImplementation(async (url: string) => {
       if (url.startsWith('/massas-launch/history')) {
         return {
@@ -93,11 +95,39 @@ describe('MassasHistoryPage', () => {
 
     renderPage();
 
-    const list = await screen.findByTestId('massas-day-list');
-    expect(list).toBeInTheDocument();
-    // Yesterday is always offered; the day with launches carries its own totals.
-    expect(await screen.findByText('7 caj · 70 u · 2 prod · 3 oper')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Ayer/ })).toBeInTheDocument();
+    // The panel field carries the archive window: thirty days back, and never today.
+    const field = await screen.findByTestId('massas-history-date');
+    expect(field).toHaveAttribute('type', 'date');
+    const todayInSaoPaulo = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+    const yesterdayInSaoPaulo = new Date(`${todayInSaoPaulo}T12:00:00Z`);
+    yesterdayInSaoPaulo.setUTCDate(yesterdayInSaoPaulo.getUTCDate() - 1);
+    expect(field).toHaveAttribute('max', yesterdayInSaoPaulo.toISOString().slice(0, 10));
+    expect(field).toHaveAttribute('min', saoPauloDaysAgo(30));
+
+    // One chip per day, day and units, the way the count writes them.
+    expect(await screen.findByTestId('massas-history-days')).toBeInTheDocument();
+    expect(screen.getByTestId('massas-history-day-2026-10-27')).toHaveTextContent('27/10 · 70');
+    expect(screen.getByTestId('massas-history-day-2026-10-26')).toHaveTextContent('26/10 · 20');
+
+    // The two-line card that used to live here is gone, not renamed.
+    expect(screen.queryByText('Escolha o dia')).not.toBeInTheDocument();
+  });
+
+  it('offers yesterday even when the endpoint never listed it, without claiming it was empty', async () => {
+    get.mockImplementation(async (url: string) => {
+      if (url.startsWith('/massas-launch/history')) return { days: [] };
+      if (url.startsWith('/massas-launch?')) return dayView(url.split('date=')[1], 'MASSA DE PASTEL');
+      return { date: '2026-10-27', movements: [] };
+    });
+
+    renderPage();
+
+    const yesterday = saoPauloYesterday();
+    const chip = await screen.findByTestId(`massas-history-day-${yesterday}`);
+    // A day nobody read has no count: printing 0 would state a fact the endpoint never gave.
+    expect(chip).toHaveTextContent(/^\d{2}\/\d{2}$/);
+    expect(chip).toHaveAttribute('aria-pressed', 'true');
+    expect(chip).toBeDisabled();
   });
 
   it('changes the table when another day is clicked, and keeps the day in the URL', async () => {
@@ -119,8 +149,8 @@ describe('MassasHistoryPage', () => {
 
     renderPage();
 
-    await waitFor(() => expect(screen.getByTestId('massas-day-2026-10-26')).toBeInTheDocument());
-    fireEvent.click(screen.getByTestId('massas-day-2026-10-26'));
+    await waitFor(() => expect(screen.getByTestId('massas-history-day-2026-10-26')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('massas-history-day-2026-10-26'));
 
     // The name is the table's own header and its rows: what matters is that the day it shows changed.
     expect((await screen.findAllByText('MASSA DE QUEIJO')).length).toBeGreaterThan(0);
@@ -167,8 +197,10 @@ describe('MassasHistoryPage', () => {
 
     renderPage();
 
+    // The panel survives the failure: the field is still the way to reach any day.
     expect(await screen.findByText(/No se pudieron leer los días/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Ayer/ })).toBeInTheDocument();
+    expect(screen.getByTestId('massas-history-date')).toBeInTheDocument();
+    expect(screen.getByTestId(`massas-history-day-${saoPauloYesterday()}`)).toBeInTheDocument();
     expect((await screen.findAllByText('MASSA DE PASTEL')).length).toBeGreaterThan(0);
   });
 });

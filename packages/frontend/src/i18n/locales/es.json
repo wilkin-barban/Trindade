@@ -597,7 +597,7 @@
       "test": "Probar conexión",
       "testing": "Probando...",
       "testOk": "Conectado como {{name}}. La empresa informa el código {{code}}, que no hace falta cargar.",
-        "testOkNoUser": "Conectado. La empresa informa el código {{code}}, que no hace falta cargar.",
+      "testOkNoUser": "Conectado. La empresa informa el código {{code}}, que no hace falta cargar.",
       "testHttpError": "El WebService respondió {{status}}: {{message}}",
       "testNoCors": "La red respondió, pero el WebService no libera CORS. Usá el Atajo del iPhone.",
       "testBlockedMixed": "Safari bloquea HTTP desde una página HTTPS. Usá el Atajo del iPhone.",
@@ -759,12 +759,7 @@
       "difference": "Diferencia"
     },
     "historyDaysLabel": "Días del historial",
-    "historyDaysTitle": "Elegí el día",
-    "historyDaysLoading": "Leyendo los días…",
-    "historyDaysUnavailable": "No se pudieron leer los días con lanzamientos; podés abrir hoy o ayer.",
-    "historyToday": "Hoy",
-    "historyYesterday": "Ayer",
-    "historyDayTotals": "{{boxes}} caj · {{units}} u · {{products}} prod · {{operators}} oper",
+    "historyDaysUnavailable": "No se pudieron leer los días con lanzamientos; podés abrir ayer.",
     "historyEmptyDay": "No hay lanzamientos registrados en ese día."
   },
   "moduleHelp": {

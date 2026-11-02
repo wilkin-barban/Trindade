@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { DateField } from '../components/ui/date-field';
+import { HistoryDayPanel } from '../components/ui/HistoryDayPanel';
 import { Input } from '../components/ui/input';
 import {
   mailtoLink,
@@ -14,7 +14,7 @@ import {
   type StockDay,
   type StockHistoryDay,
 } from '../lib/stock';
-import { formatDateLabel, saoPauloDaysAgo, saoPauloYesterday } from '../lib/date';
+import { saoPauloDaysAgo, saoPauloYesterday } from '../lib/date';
 import { formatPhoneMask, toWhatsAppNumber } from '../lib/phone';
 import { shareOrCopy, waMeLink } from '../lib/whatsapp';
 import { ModuleHelpModal } from '../components/ui/ModuleHelpModal';
@@ -149,51 +149,20 @@ export function StockHistoryPage() {
 
       {/* El día, como en el teléfono: el panel entero abre el calendario y el día es el texto más grande,
           así el control más ancho no sostiene el dato más chico. Dos topes: la última noche cerrada hacia
-          atrás y treinta días de archivo. */}
-      <div className="space-y-2">
-        <DateField
-          id="stock-history-date"
-          label={t('stock.date')}
-          value={date}
-          onChange={setDate}
-          min={saoPauloDaysAgo(30)}
-          max={saoPauloYesterday()}
-          testId="stock-history-date"
-          variant="panel"
-        />
-        {/* Los días contados, para no abrir un calendario cuando el día que se busca es el de al lado: cada
-            chip dice el día y lo contado en unidades, que es lo que distingue una jornada de otra. */}
-        {days.length > 0 && (
-          <div
-            role="group"
-            aria-label={t('stock.history')}
-            data-testid="stock-history-days"
-            className="flex gap-2 overflow-x-auto pb-1"
-          >
-            {days.map((counted) => {
-              const active = counted.date === date;
-              return (
-                <button
-                  key={counted.date}
-                  type="button"
-                  onClick={() => setDate(counted.date)}
-                  disabled={active}
-                  aria-pressed={active}
-                  data-testid={`stock-history-day-${counted.date}`}
-                  className={
-                    'inline-flex h-11 shrink-0 items-center rounded-lg border px-3 text-sm font-medium tabular-nums transition-colors ' +
-                    (active
-                      ? 'border-blue-600 bg-blue-50 text-blue-900'
-                      : 'border-gray-300 bg-white text-gray-800 hover:bg-gray-50')
-                  }
-                >
-                  {`${formatDateLabel(counted.date).slice(0, 5)} · ${counted.units}`}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
+          atrás y treinta días de archivo. Los días contados van como chips debajo, para no abrir un
+          calendario cuando el día que se busca es el de al lado. El bloque es compartido con el histórico
+          de masas: eran dos dibujos del mismo control y el de masas había derivado en una tarjeta. */}
+      <HistoryDayPanel
+        id="stock-history-date"
+        label={t('stock.date')}
+        value={date}
+        onChange={setDate}
+        min={saoPauloDaysAgo(30)}
+        max={saoPauloYesterday()}
+        testIdPrefix="stock-history"
+        groupLabel={t('stock.history')}
+        days={days.map((counted) => ({ date: counted.date, units: counted.units }))}
+      />
 
       {error !== '' && (
         <p role="alert" className="p-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg">
