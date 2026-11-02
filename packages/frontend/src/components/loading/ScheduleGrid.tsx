@@ -149,7 +149,7 @@ export function ScheduleGrid({
             <div className="divide-y divide-gray-100">
               {entries.length === 0 ? (
                 <div className="px-4 py-3 text-sm text-gray-400 italic">
-                  {t('loading.emptyDay').split('.')[0]}
+                  {t('loading.emptySlot')}
                 </div>
               ) : (
                 entries.map((entry) => (

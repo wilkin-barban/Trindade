@@ -114,6 +114,21 @@ describe('ScheduleGrid quota', () => {
     ]);
   });
 
+  /**
+   * An empty slot said the day had no loads at all.
+   *
+   * The sentence was the day's, borrowed and cut at the first full stop: on a day with four trucks at 04:00,
+   * the 04:30 card still read «Nenhum carregamento agendado para este dia». The slot's own sentence is the
+   * one that is true there.
+   */
+  it('says the hour is empty, not the whole day', () => {
+    renderGrid([fletero(1, '04:00')], ['04:00', '05:00']);
+
+    const empty = screen.getByTestId('time-slot-05-00');
+    expect(empty).toHaveTextContent('Ninguna carga en este horario');
+    expect(empty).not.toHaveTextContent('para este día');
+  });
+
   it('shows an hour that holds nobody as zero, not as the shift next door', () => {
     renderGrid([fletero(1, '04:00')], ['04:00', '05:00']);
 

@@ -253,7 +253,8 @@
     "pickerFailureFor": "Não foi possível agendar {{name}}: {{message}}",
     "historyBatchCount_one": "{{count}} carregamento",
     "historyBatchCount_other": "{{count}} carregamentos",
-    "historyLoadingDay": "Carregamento: {{date}}"
+    "historyLoadingDay": "Carregamento: {{date}}",
+    "emptySlot": "Nenhum carregamento neste horário."
   },
   "admin": {
     "title": "Administração",

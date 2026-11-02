@@ -253,7 +253,8 @@
     "pickerFailureFor": "No se pudo asignar a {{name}}: {{message}}",
     "historyBatchCount_one": "{{count}} carga",
     "historyBatchCount_other": "{{count}} cargas",
-    "historyLoadingDay": "Carga: {{date}}"
+    "historyLoadingDay": "Carga: {{date}}",
+    "emptySlot": "Ninguna carga en este horario."
   },
   "admin": {
     "title": "Administración",
