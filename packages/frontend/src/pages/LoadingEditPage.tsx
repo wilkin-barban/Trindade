@@ -9,6 +9,8 @@ import { ScheduleExportView } from '../components/loading/ScheduleExportView';
 import { exportScheduleTextAsPdf } from '../lib/schedule-pdf';
 import type { ScheduleRow } from '../components/loading/ScheduleGrid';
 import { countInWindow, isQuotaExceeded, quotaIfMoved, toMinutes } from '../lib/loading-quota';
+import { isClosedDay } from '../lib/massas-day';
+import { saoPauloToday } from '../lib/date';
 
 
 
@@ -42,11 +44,17 @@ export function LoadingEditPage() {
         const day = parts.find(p => p.type === 'day')?.value || '';
         return `${year}-${month}-${day}`;
       })();
+  // A day the plant already closed is history: the screen shows it and stops there. The rule is the same one
+  // the backend applies, so the operator learns it before pressing anything, not after a refused save.
+  const dayIsClosed = isClosedDay(date, saoPauloToday());
   const [schedules, setSchedules] = useState<ScheduleRow[]>([]);
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [editingId, setEditingId] = useState<number | null>(null);
+  // `?edit=` is a deep link into a row, and a closed day has no row to edit: the parameter is ignored there.
+  const [editingId, setEditingId] = useState<number | null>(
+    dayIsClosed || !Number.isInteger(editParam) || editParam <= 0 ? null : editParam
+  );
   const [editSlot, setEditSlot] = useState('');
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<number | null>(null);
@@ -182,6 +190,16 @@ export function LoadingEditPage() {
         <p className="text-sm text-gray-500">{formatDisplayDate(date)}</p>
       </div>
 
+      {dayIsClosed && (
+        <div
+          className="mb-4 p-3 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md"
+          role="status"
+          data-testid="loading-edit-readonly-banner"
+        >
+          {t('loading.closedDayReadOnly')}
+        </div>
+      )}
+
       {error && (
         <div className="mb-4 p-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md">
           {error}
@@ -193,7 +211,7 @@ export function LoadingEditPage() {
       ) : (
         <div className="space-y-2" data-testid="edit-schedule-list">
           {schedules.map((entry) => {
-            const isEditing = editingId === entry.id;
+            const isEditing = editingId === entry.id && !dayIsClosed;
             const currentQuota = countInWindow(schedules, entry.time_slot);
 
             return (
@@ -264,7 +282,7 @@ export function LoadingEditPage() {
                       )}
                     </div>
                     <div className="flex items-center gap-1">
-                      {entry.canEdit && (
+                      {entry.canEdit && !dayIsClosed && (
                         <button
                           type="button"
                           onClick={() => startEdit(entry)}
@@ -275,7 +293,7 @@ export function LoadingEditPage() {
                           <LucidePencil className="h-4 w-4" />
                         </button>
                       )}
-                      {entry.canDelete && (
+                      {entry.canDelete && !dayIsClosed && (
                         <button
                           type="button"
                           onClick={() => deleteEntry(entry.id)}

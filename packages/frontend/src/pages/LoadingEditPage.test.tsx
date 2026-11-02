@@ -22,10 +22,21 @@ vi.mock('../api/client', () => ({
 
 const { LoadingEditPage } = await import('./LoadingEditPage');
 
+// The screen closes a day by the calendar, so a row written on a fixed past date would be read-only and the
+// test would prove the opposite of what it claims. The fixture follows today in São Paulo instead.
+function saoPauloDay(offsetDays = 0): string {
+  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(
+    new Date(Date.now() + offsetDays * 86_400_000),
+  );
+}
+
+const today = saoPauloDay();
+const yesterday = saoPauloDay(-1);
+
 function schedule(id: number, time_slot: string, name: string) {
   return {
     id,
-    schedule_date: '2026-11-02',
+    schedule_date: today,
     time_slot,
     driver_type: 'fletero' as const,
     driver_id: id,
@@ -39,7 +50,7 @@ function schedule(id: number, time_slot: string, name: string) {
   };
 }
 
-function renderPage(entry = '/loading/edit?date=2026-11-02') {
+function renderPage(entry = `/loading/edit?date=${today}`) {
   return render(
     <MemoryRouter initialEntries={[entry]}>
       <LoadingEditPage />
@@ -82,7 +93,7 @@ describe('LoadingEditPage', () => {
       }
       return { timeSlots: ['04:00', '04:30'] };
     });
-    renderPage('/loading/edit?date=2026-11-02&edit=2');
+    renderPage(`/loading/edit?date=${today}&edit=2`);
 
     // The pencil in the grid is a shortcut to this row's own move, so the row arrives already open.
     await waitFor(() => expect(screen.getByTestId('slot-select-2')).toBeInTheDocument());
@@ -106,5 +117,35 @@ describe('LoadingEditPage', () => {
     expect(screen.getByTestId('slot-select-1')).toHaveValue('23:30');
     const option = screen.getByTestId('slot-select-1').querySelector('option[value="23:30"]');
     expect(option).not.toBeNull();
+  });
+
+  it('shows the read-only banner and ignores edit= on a past day', async () => {
+    get.mockImplementation(async (url: string) => {
+      if (url.startsWith('/loading/schedules')) {
+        return { schedules: [schedule(1, '04:00', 'A')], dayActive: true };
+      }
+      return { timeSlots: ['04:00'] };
+    });
+    renderPage(`/loading/edit?date=${yesterday}&edit=1`);
+
+    // The day the plant already reported is history: the screen says so and does not open the row, whatever
+    // the address asked for.
+    await waitFor(() => expect(screen.getByTestId('loading-edit-readonly-banner')).toBeInTheDocument());
+    expect(screen.getByTestId('loading-edit-readonly-banner').textContent).toBe('Día cerrado: solo lectura.');
+    expect(screen.queryByTestId('slot-select-1')).toBeNull();
+    expect(screen.queryByTestId('edit-btn-1')).toBeNull();
+  });
+
+  it('keeps today editable, without the banner', async () => {
+    get.mockImplementation(async (url: string) => {
+      if (url.startsWith('/loading/schedules')) {
+        return { schedules: [schedule(1, '04:00', 'A')], dayActive: true };
+      }
+      return { timeSlots: ['04:00'] };
+    });
+    renderPage();
+
+    await waitFor(() => expect(screen.getByTestId('edit-btn-1')).toBeInTheDocument());
+    expect(screen.queryByTestId('loading-edit-readonly-banner')).toBeNull();
   });
 });

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { LucideBan, LucideCalendar, LucideTrash2, LucideTruck } from 'lucide-react';
+import { LucideBan, LucideCalendar, LucideRotateCcw, LucideTrash2, LucideTruck } from 'lucide-react';
 import { api } from '../api/client';
 import { saoPauloToday } from '../lib/date';
 import { Button } from '../components/ui/button';
@@ -20,10 +20,12 @@ interface LoadingBatchHistoryItem {
   created_at: string | null;
   updated_at: string | null;
   isActive: boolean;
+  isClosedDay: boolean;
   readOnly: boolean;
   canEdit: boolean;
   canDeactivate: boolean;
   canDelete: boolean;
+  canActivate: boolean;
   creator?: { id: number; display_name: string } | null;
 }
 
@@ -105,6 +107,12 @@ export function LoadingHistoryPage() {
     await runAction(batchDate, () => api.patch(`/loading/schedules/batch/${batchDate}/deactivate`, {}));
   }
 
+  // The answer the server offered on the card: reopening a day kept only as history is the other half of the
+  // deactivate button, and the row already said whether this operator may do it.
+  async function activateBatch(batchDate: string) {
+    await runAction(batchDate, () => api.patch(`/loading/schedules/batch/${batchDate}/activate`, {}));
+  }
+
   async function deleteBatch(batchDate: string) {
     await runAction(batchDate, () => api.del(`/loading/schedules/batch/${batchDate}`));
   }
@@ -164,23 +172,38 @@ export function LoadingHistoryPage() {
         <div className="space-y-3">
           {items.map((batch) => {
             const affordances = historyAffordances(batch);
+            // A past day is read-only: the summary is not a link, so the operator never lands on a form the
+            // server is going to refuse. The rest of the card keeps its count and its read-only mark.
+            const summary = (
+              <>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-sm font-semibold">{formatDate(batch.batch_date)}</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100" data-testid={`loading-history-count-${batch.batch_date}`}>
+                    {t('loading.historyBatchCount', { count: batch.total_loadings })}
+                  </span>
+                  {!batch.isActive && <span className="text-xs text-amber-700">{t('history.inactive')}</span>}
+                  {affordances.closedDay && (
+                    <span className="text-xs text-gray-500" data-testid={`loading-history-closed-${batch.batch_date}`}>
+                      {t('loading.closedDayReadOnly')}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500">
+                  <LucideCalendar className="h-3 w-3 inline mr-1" />
+                  {t('loading.historyLoadingDay', { date: formatDate(batch.loading_date) })} —{' '}
+                  {batch.creator?.display_name ?? t('history.legacy')}
+                </p>
+              </>
+            );
             return (
             <Card key={batch.batch_date} className={`p-4 ${!batch.isActive ? 'opacity-70' : ''}`} data-testid={`loading-history-card-${batch.batch_date}`}>
               <div className="flex items-center justify-between gap-3">
-                <Link to={`/loading/edit?date=${batch.batch_date}`} className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-semibold">{formatDate(batch.batch_date)}</span>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100" data-testid={`loading-history-count-${batch.batch_date}`}>
-                      {t('loading.historyBatchCount', { count: batch.total_loadings })}
-                    </span>
-                    {!batch.isActive && <span className="text-xs text-amber-700">{t('history.inactive')}</span>}
-                  </div>
-                  <p className="text-xs text-gray-500">
-                    <LucideCalendar className="h-3 w-3 inline mr-1" />
-                    {t('loading.historyLoadingDay', { date: formatDate(batch.loading_date) })} —{' '}
-                    {batch.creator?.display_name ?? t('history.legacy')}
-                  </p>
-                </Link>
+                {affordances.closedDay ? (
+                  <div className="min-w-0 flex-1">{summary}</div>
+                ) : (
+                  <Link to={`/loading/edit?date=${batch.batch_date}`} className="min-w-0 flex-1">{summary}</Link>
+                )}
+                {affordances.showReactivate && <button onClick={() => activateBatch(batch.batch_date)} disabled={busyKey === batch.batch_date} aria-label={t('history.reactivateLoading', { date: formatDate(batch.batch_date) })} className="inline-flex min-h-12 min-w-12 items-center justify-center rounded text-emerald-600 hover:bg-emerald-50 disabled:opacity-50" data-testid={`activate-loading-batch-${batch.batch_date}`}><LucideRotateCcw className="h-4 w-4" /></button>}
                 {affordances.showEdit && <Link to={`/loading/edit?date=${batch.batch_date}`}><Button variant="outline" size="sm">{t('loading.editEntry')}</Button></Link>}
                 {affordances.showDeactivate && <button onClick={() => deactivateBatch(batch.batch_date)} disabled={busyKey === batch.batch_date} aria-label={t('history.deactivateLoading', { date: formatDate(batch.batch_date) })} className="inline-flex min-h-12 min-w-12 items-center justify-center rounded text-amber-600 hover:bg-amber-50 disabled:opacity-50" data-testid={`deactivate-loading-batch-${batch.batch_date}`}><LucideBan className="h-4 w-4" /></button>}
                 {affordances.showDelete && <button onClick={() => setPendingDelete(batch)} disabled={busyKey === batch.batch_date} aria-label={t('history.deleteLoading', { date: formatDate(batch.batch_date) })} className="inline-flex min-h-12 min-w-12 items-center justify-center rounded text-red-600 hover:bg-red-50 disabled:opacity-50" data-testid={`delete-loading-batch-${batch.batch_date}`}><LucideTrash2 className="h-4 w-4" /></button>}

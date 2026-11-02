@@ -11,23 +11,34 @@
  */
 export interface HistoryServerPermissions {
   isActive?: boolean;
+  /** The day is before today in São Paulo: the calendar closes it, no role reopens it. */
+  isClosedDay?: boolean;
   readOnly?: boolean;
   canEdit?: boolean;
   canDeactivate?: boolean;
   canDelete?: boolean;
+  canActivate?: boolean;
 }
 
 export interface HistoryAffordances {
   showEdit: boolean;
   showDeactivate: boolean;
   showDelete: boolean;
+  showReactivate: boolean;
+  /** Whether the row is a past day, so the card must not link to the editor at all. */
+  closedDay: boolean;
 }
 
 export function historyAffordances(row: HistoryServerPermissions): HistoryAffordances {
+  const closedDay = row.isClosedDay === true;
   return {
-    showEdit: row.canEdit === true,
-    showDeactivate: row.canDeactivate === true,
-    showDelete: row.canDelete === true,
+    // A closed day hides every content action even if a stale server said otherwise: a day the plant already
+    // reported is read-only, and the card must not offer a trip that the editor is going to refuse.
+    showEdit: row.canEdit === true && !closedDay,
+    showDeactivate: row.canDeactivate === true && !closedDay,
+    showDelete: row.canDelete === true && !closedDay,
+    showReactivate: row.isActive === false && row.canActivate === true,
+    closedDay,
   };
 }
 

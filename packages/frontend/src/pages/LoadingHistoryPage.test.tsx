@@ -12,8 +12,15 @@ import i18n from '../i18n/config';
  */
 const get = vi.fn();
 
+const patch = vi.fn();
+const del = vi.fn();
+
 vi.mock('../api/client', () => ({
-  api: { get: (...args: unknown[]) => get(...args) },
+  api: {
+    get: (...args: unknown[]) => get(...args),
+    patch: (...args: unknown[]) => patch(...args),
+    del: (...args: unknown[]) => del(...args),
+  },
   ApiClientError: class ApiClientError extends Error {},
 }));
 
@@ -27,10 +34,12 @@ function batch(batch_date: string, overrides: Record<string, unknown> = {}) {
     created_at: null,
     updated_at: null,
     isActive: true,
+    isClosedDay: false,
     readOnly: false,
     canEdit: true,
     canDeactivate: true,
     canDelete: true,
+    canActivate: false,
     creator: { id: 7, display_name: 'Wilkin' },
     ...overrides,
   };
@@ -52,6 +61,8 @@ function historyUrls(): string[] {
 
 beforeEach(async () => {
   get.mockReset();
+  patch.mockReset();
+  del.mockReset();
   get.mockImplementation(async (url: string) => {
     if (url.startsWith('/users/options')) {
       return { users: [{ id: 7, display_name: 'Wilkin' }] };
@@ -110,6 +121,33 @@ describe('LoadingHistoryPage', () => {
     expect(card.textContent).not.toContain('Carregamento:');
     // One load is one carga, not «1 cargamentos».
     expect(screen.getByTestId('loading-history-card-2026-11-04')).toHaveTextContent('1 carga');
+  });
+
+  it('does not link a past day to the editor', async () => {
+    get.mockImplementation(async (url: string) => {
+      if (url.startsWith('/users/options')) return { users: [] };
+      return { items: [batch('2026-10-30', { isClosedDay: true, readOnly: true })], pagination: { page: 1, pageSize: 30, total: 1, totalPages: 1 } };
+    });
+    renderPage();
+
+    // The day the plant already closed is history: the card shows it and does not offer the editor, because the
+    // editor would only open a form the server is going to refuse.
+    await waitFor(() => expect(screen.getByTestId('loading-history-closed-2026-10-30')).toBeInTheDocument());
+    expect(screen.queryByTestId('loading-history-card-2026-10-30')?.querySelector('a')).toBeNull();
+  });
+
+  it('offers reactivate on an inactive day and asks the server for it', async () => {
+    get.mockImplementation(async (url: string) => {
+      if (url.startsWith('/users/options')) return { users: [] };
+      return { items: [batch('2026-11-01', { isActive: false, canActivate: true })], pagination: { page: 1, pageSize: 30, total: 1, totalPages: 1 } };
+    });
+    patch.mockResolvedValue({});
+    renderPage();
+
+    await waitFor(() => expect(screen.getByTestId('activate-loading-batch-2026-11-01')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('activate-loading-batch-2026-11-01'));
+
+    await waitFor(() => expect(patch).toHaveBeenCalledWith('/loading/schedules/batch/2026-11-01/activate', {}));
   });
 
   it('gives the batch actions a target a thumb can hit', async () => {
