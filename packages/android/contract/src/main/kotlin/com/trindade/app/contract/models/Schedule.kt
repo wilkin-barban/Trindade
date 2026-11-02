@@ -46,9 +46,11 @@ import kotlinx.serialization.Contextual
  * @param createdAt 
  * @param updatedAt 
  * @param isActive 
+ * @param isClosedDay 
  * @param readOnly 
  * @param canEdit 
  * @param canDeactivate 
+ * @param canActivate 
  * @param canDelete 
  * @param creator 
  */
@@ -98,6 +100,9 @@ data class Schedule (
     @SerialName(value = "isActive")
     val isActive: kotlin.Boolean,
 
+    @SerialName(value = "isClosedDay")
+    val isClosedDay: kotlin.Boolean,
+
     @SerialName(value = "readOnly")
     val readOnly: kotlin.Boolean,
 
@@ -106,6 +111,9 @@ data class Schedule (
 
     @SerialName(value = "canDeactivate")
     val canDeactivate: kotlin.Boolean,
+
+    @SerialName(value = "canActivate")
+    val canActivate: kotlin.Boolean,
 
     @SerialName(value = "canDelete")
     val canDelete: kotlin.Boolean,

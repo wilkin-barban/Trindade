@@ -44,9 +44,11 @@ import kotlinx.serialization.Contextual
  * @param items 
  * @param temperatures 
  * @param isActive 
+ * @param isClosedDay 
  * @param readOnly 
  * @param canEdit 
  * @param canDeactivate 
+ * @param canActivate 
  * @param canDelete 
  */
 @Serializable
@@ -83,6 +85,9 @@ data class ReportDetail (
     @SerialName(value = "isActive")
     val isActive: kotlin.Boolean? = null,
 
+    @SerialName(value = "isClosedDay")
+    val isClosedDay: kotlin.Boolean? = null,
+
     @SerialName(value = "readOnly")
     val readOnly: kotlin.Boolean? = null,
 
@@ -91,6 +96,9 @@ data class ReportDetail (
 
     @SerialName(value = "canDeactivate")
     val canDeactivate: kotlin.Boolean? = null,
+
+    @SerialName(value = "canActivate")
+    val canActivate: kotlin.Boolean? = null,
 
     @SerialName(value = "canDelete")
     val canDelete: kotlin.Boolean? = null

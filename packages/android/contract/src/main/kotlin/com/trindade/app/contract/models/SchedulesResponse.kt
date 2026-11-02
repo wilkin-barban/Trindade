@@ -33,13 +33,17 @@ import kotlinx.serialization.Contextual
  * 
  *
  * @param schedules 
+ * @param dayActive 
  */
 @Serializable
 
 data class SchedulesResponse (
 
     @SerialName(value = "schedules")
-    val schedules: kotlin.collections.List<SchedulesResponseSchedulesInner>
+    val schedules: kotlin.collections.List<SchedulesResponseSchedulesInner>,
+
+    @SerialName(value = "dayActive")
+    val dayActive: kotlin.Boolean
 
 ) {
 

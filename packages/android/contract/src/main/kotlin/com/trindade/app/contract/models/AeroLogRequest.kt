@@ -40,6 +40,9 @@ import kotlinx.serialization.Contextual
  * @param error 
  * @param launchId 
  * @param note 
+ * @param client 
+ * @param attemptId 
+ * @param durationMs 
  */
 @Serializable
 
@@ -70,30 +73,56 @@ data class AeroLogRequest (
     val launchId: kotlin.Int? = null,
 
     @SerialName(value = "note")
-    val note: kotlin.String? = null
+    val note: kotlin.String? = null,
+
+    @SerialName(value = "client")
+    val client: AeroLogRequest.Client? = null,
+
+    @SerialName(value = "attemptId")
+    val attemptId: kotlin.String? = null,
+
+    @SerialName(value = "durationMs")
+    val durationMs: kotlin.Int? = null
 
 ) {
 
     /**
      * 
      *
-     * Values: test_connection,launch_sync,read_history
+     * Values: test_connection,launch_sync,read_history,dispatch,sync,test,`import`
      */
     @Serializable
     enum class Event(val value: kotlin.String) {
         @SerialName(value = "test_connection") test_connection("test_connection"),
         @SerialName(value = "launch_sync") launch_sync("launch_sync"),
-        @SerialName(value = "read_history") read_history("read_history");
+        @SerialName(value = "read_history") read_history("read_history"),
+        @SerialName(value = "dispatch") dispatch("dispatch"),
+        @SerialName(value = "sync") sync("sync"),
+        @SerialName(value = "test") test("test"),
+        @SerialName(value = "import") `import`("import");
     }
     /**
      * 
      *
-     * Values: requested,result
+     * Values: requested,result,response
      */
     @Serializable
     enum class Phase(val value: kotlin.String) {
         @SerialName(value = "requested") requested("requested"),
-        @SerialName(value = "result") result("result");
+        @SerialName(value = "result") result("result"),
+        @SerialName(value = "response") response("response");
+    }
+    /**
+     * 
+     *
+     * Values: android,web,shortcut,bridge
+     */
+    @Serializable
+    enum class Client(val value: kotlin.String) {
+        @SerialName(value = "android") android("android"),
+        @SerialName(value = "web") web("web"),
+        @SerialName(value = "shortcut") shortcut("shortcut"),
+        @SerialName(value = "bridge") bridge("bridge");
     }
 
 }

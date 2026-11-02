@@ -25,6 +25,21 @@
           },
           "code": {
             "type": "string"
+          },
+          "field": {
+            "type": "string"
+          },
+          "existing": {
+            "type": "object",
+            "properties": {
+              "time_slot": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "time_slot"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -334,6 +349,9 @@
           "isActive": {
             "type": "boolean"
           },
+          "isClosedDay": {
+            "type": "boolean"
+          },
           "readOnly": {
             "type": "boolean"
           },
@@ -341,6 +359,9 @@
             "type": "boolean"
           },
           "canDeactivate": {
+            "type": "boolean"
+          },
+          "canActivate": {
             "type": "boolean"
           },
           "canDelete": {
@@ -381,9 +402,11 @@
           "created_at",
           "updated_at",
           "isActive",
+          "isClosedDay",
           "readOnly",
           "canEdit",
           "canDeactivate",
+          "canActivate",
           "canDelete",
           "creator"
         ],
@@ -416,10 +439,16 @@
           "isActive": {
             "type": "boolean"
           },
+          "isClosedDay": {
+            "type": "boolean"
+          },
           "canEdit": {
             "type": "boolean"
           },
           "canDeactivate": {
+            "type": "boolean"
+          },
+          "canActivate": {
             "type": "boolean"
           },
           "canDelete": {
@@ -455,8 +484,10 @@
           "created_at",
           "updated_at",
           "isActive",
+          "isClosedDay",
           "canEdit",
           "canDeactivate",
+          "canActivate",
           "canDelete",
           "readOnly",
           "creator"
@@ -724,6 +755,9 @@
           "isActive": {
             "type": "boolean"
           },
+          "isClosedDay": {
+            "type": "boolean"
+          },
           "readOnly": {
             "type": "boolean"
           },
@@ -731,6 +765,9 @@
             "type": "boolean"
           },
           "canDeactivate": {
+            "type": "boolean"
+          },
+          "canActivate": {
             "type": "boolean"
           },
           "canDelete": {
@@ -791,6 +828,9 @@
           "isActive": {
             "type": "boolean"
           },
+          "isClosedDay": {
+            "type": "boolean"
+          },
           "readOnly": {
             "type": "boolean"
           },
@@ -798,6 +838,9 @@
             "type": "boolean"
           },
           "canDeactivate": {
+            "type": "boolean"
+          },
+          "canActivate": {
             "type": "boolean"
           },
           "canDelete": {
@@ -2477,6 +2520,9 @@
                 "isActive": {
                   "type": "boolean"
                 },
+                "isClosedDay": {
+                  "type": "boolean"
+                },
                 "readOnly": {
                   "type": "boolean"
                 },
@@ -2484,6 +2530,9 @@
                   "type": "boolean"
                 },
                 "canDeactivate": {
+                  "type": "boolean"
+                },
+                "canActivate": {
                   "type": "boolean"
                 },
                 "canDelete": {
@@ -2524,18 +2573,24 @@
                 "created_at",
                 "updated_at",
                 "isActive",
+                "isClosedDay",
                 "readOnly",
                 "canEdit",
                 "canDeactivate",
+                "canActivate",
                 "canDelete",
                 "creator"
               ],
               "additionalProperties": false
             }
+          },
+          "dayActive": {
+            "type": "boolean"
           }
         },
         "required": [
-          "schedules"
+          "schedules",
+          "dayActive"
         ],
         "additionalProperties": false
       },
@@ -2612,6 +2667,9 @@
               "isActive": {
                 "type": "boolean"
               },
+              "isClosedDay": {
+                "type": "boolean"
+              },
               "readOnly": {
                 "type": "boolean"
               },
@@ -2619,6 +2677,9 @@
                 "type": "boolean"
               },
               "canDeactivate": {
+                "type": "boolean"
+              },
+              "canActivate": {
                 "type": "boolean"
               },
               "canDelete": {
@@ -2659,9 +2720,11 @@
               "created_at",
               "updated_at",
               "isActive",
+              "isClosedDay",
               "readOnly",
               "canEdit",
               "canDeactivate",
+              "canActivate",
               "canDelete",
               "creator"
             ],
@@ -2705,10 +2768,16 @@
                 "isActive": {
                   "type": "boolean"
                 },
+                "isClosedDay": {
+                  "type": "boolean"
+                },
                 "canEdit": {
                   "type": "boolean"
                 },
                 "canDeactivate": {
+                  "type": "boolean"
+                },
+                "canActivate": {
                   "type": "boolean"
                 },
                 "canDelete": {
@@ -2744,8 +2813,10 @@
                 "created_at",
                 "updated_at",
                 "isActive",
+                "isClosedDay",
                 "canEdit",
                 "canDeactivate",
+                "canActivate",
                 "canDelete",
                 "readOnly",
                 "creator"
@@ -2993,6 +3064,9 @@
                 "isActive": {
                   "type": "boolean"
                 },
+                "isClosedDay": {
+                  "type": "boolean"
+                },
                 "readOnly": {
                   "type": "boolean"
                 },
@@ -3000,6 +3074,9 @@
                   "type": "boolean"
                 },
                 "canDeactivate": {
+                  "type": "boolean"
+                },
+                "canActivate": {
                   "type": "boolean"
                 },
                 "canDelete": {
@@ -3070,6 +3147,9 @@
               "isActive": {
                 "type": "boolean"
               },
+              "isClosedDay": {
+                "type": "boolean"
+              },
               "readOnly": {
                 "type": "boolean"
               },
@@ -3077,6 +3157,9 @@
                 "type": "boolean"
               },
               "canDeactivate": {
+                "type": "boolean"
+              },
+              "canActivate": {
                 "type": "boolean"
               },
               "canDelete": {
@@ -3239,6 +3322,9 @@
                 "isActive": {
                   "type": "boolean"
                 },
+                "isClosedDay": {
+                  "type": "boolean"
+                },
                 "readOnly": {
                   "type": "boolean"
                 },
@@ -3246,6 +3332,9 @@
                   "type": "boolean"
                 },
                 "canDeactivate": {
+                  "type": "boolean"
+                },
+                "canActivate": {
                   "type": "boolean"
                 },
                 "canDelete": {
@@ -5658,7 +5747,8 @@
     },
     "/api/loading/schedules": {
       "get": {
-        "summary": "List one date's active schedules",
+        "summary": "List one date's schedules",
+        "description": "Without `includeInactive` this is the operational grid: only active rows. With `includeInactive=1` it is the day as the history holds it, deactivated rows included. `dayActive` is false when the day holds no active row, which is how a client tells an empty day from one the plant closed.",
         "tags": [
           "loading"
         ],
@@ -5671,11 +5761,25 @@
             "required": true,
             "name": "date",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "0",
+                "1",
+                "true",
+                "false"
+              ]
+            },
+            "required": false,
+            "name": "includeInactive",
+            "in": "query"
           }
         ],
         "responses": {
           "200": {
-            "description": "The active schedules for that date, ordered by time slot",
+            "description": "The schedules for that date, ordered by time slot, plus whether the day is active",
             "content": {
               "application/json": {
                 "schema": {
@@ -5733,7 +5837,7 @@
             }
           },
           "400": {
-            "description": "The body failed validation, the driver is missing or inactive, or the date already has a deactivated batch",
+            "description": "The body failed validation, or the driver or vehicle is missing or inactive",
             "content": {
               "application/json": {
                 "schema": {
@@ -5773,7 +5877,7 @@
             }
           },
           "409": {
-            "description": "That driver or that vehicle is already assigned on this date",
+            "description": "The day is closed (`LOADING_HISTORY_FROZEN`), the day was deactivated (`LOADING_BATCH_DEACTIVATED`), or that driver or vehicle is already assigned on this date (`DRIVER_ALREADY_SCHEDULED` / `VEHICLE_ALREADY_SCHEDULED`, with `field` and the `existing.time_slot` that already holds it)",
             "content": {
               "application/json": {
                 "schema": {
@@ -5862,7 +5966,7 @@
             }
           },
           "409": {
-            "description": "That driver or that vehicle is already assigned on this date",
+            "description": "The entry is dated a closed day (`LOADING_HISTORY_FROZEN`), or that driver or vehicle is already assigned on the target date",
             "content": {
               "application/json": {
                 "schema": {
@@ -5925,6 +6029,16 @@
           },
           "404": {
             "description": "No such schedule entry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The entry is dated a closed day (`LOADING_HISTORY_FROZEN`); deactivate it instead",
             "content": {
               "application/json": {
                 "schema": {
@@ -6076,9 +6190,152 @@
         }
       }
     },
+    "/api/loading/schedules/batch/{date}/activate": {
+      "patch": {
+        "summary": "Reactivate every entry of one date",
+        "description": "Deactivation is the reversible half of the loading lifecycle: this works on a closed day too, because it changes the state of the batch without editing its content. Reactivating a day that is already active is a success, not a conflict.",
+        "tags": [
+          "loading"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "date",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The batch was reactivated transactionally",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The date is not in YYYY-MM-DD form",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, or expired credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Administrador only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No batch on that date",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/loading/schedules/{id}/activate": {
+      "patch": {
+        "summary": "Reactivate one schedule entry",
+        "description": "One row at a time, for a detail view. The history reactivates whole days: an operator closes a day, not a row.",
+        "tags": [
+          "loading"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The entry was reactivated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The identifier is not a number",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, or expired credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Administrador only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such schedule entry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/loading/schedules/batch/{date}": {
       "delete": {
         "summary": "Delete every entry of one date",
+        "description": "Only a draft can be erased: a closed day is deactivated, never deleted.",
         "tags": [
           "loading"
         ],
@@ -6128,6 +6385,16 @@
           },
           "404": {
             "description": "No batch on that date",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The date is a closed day (`LOADING_HISTORY_FROZEN`)",
             "content": {
               "application/json": {
                 "schema": {
@@ -6916,6 +7183,77 @@
         "responses": {
           "200": {
             "description": "The report was deactivated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The identifier is not a number",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, or expired credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Administrador only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/{id}/activate": {
+      "patch": {
+        "summary": "Reactivate a report",
+        "description": "Administrador only. Reactivating an active report is a success, not a conflict.",
+        "tags": [
+          "reports"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The report was reactivated",
             "content": {
               "application/json": {
                 "schema": {
@@ -9287,7 +9625,7 @@
       },
       "post": {
         "summary": "Store the snapshot the bridge brought back for one day",
-        "description": "One row per ERP seat: a second sync of the same day updates the seats it recognises instead of appending duplicates, and seats the answer no longer mentions are left alone. Strict validation: a body this module cannot describe is refused and writes nothing.",
+        "description": "One row per ERP seat: a second sync of the same day updates the seats it recognises instead of appending duplicates, and seats the answer no longer mentions are left alone. Strict validation: a body this module cannot describe is refused and writes nothing. A date before today in São Paulo is a closed day and answers 409 `MASSAS_HISTORY_FROZEN` instead of overwriting it.",
         "tags": [
           "integration"
         ],
@@ -9327,6 +9665,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The snapshot is dated a closed day, so nothing was written",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AeroLogError"
                 }
               }
             }

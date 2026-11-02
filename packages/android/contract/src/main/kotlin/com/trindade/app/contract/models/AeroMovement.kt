@@ -40,6 +40,7 @@ import kotlinx.serialization.Contextual
  * @param movementType 
  * @param syncedAt 
  * @param ownerUserId 
+ * @param ownerStatus 
  */
 @Serializable
 
@@ -70,7 +71,10 @@ data class AeroMovement (
     val syncedAt: kotlin.String,
 
     @SerialName(value = "owner_user_id")
-    val ownerUserId: kotlin.Int?
+    val ownerUserId: kotlin.Int?,
+
+    @SerialName(value = "owner_status")
+    val ownerStatus: AeroMovement.OwnerStatus
 
 ) {
 
@@ -83,6 +87,17 @@ data class AeroMovement (
     enum class MovementType(val value: kotlin.String) {
         @SerialName(value = "E") E("E"),
         @SerialName(value = "S") S("S");
+    }
+    /**
+     * 
+     *
+     * Values: active,inactive,missing
+     */
+    @Serializable
+    enum class OwnerStatus(val value: kotlin.String) {
+        @SerialName(value = "active") active("active"),
+        @SerialName(value = "inactive") inactive("inactive"),
+        @SerialName(value = "missing") missing("missing");
     }
 
 }

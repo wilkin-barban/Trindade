@@ -38,8 +38,10 @@ import kotlinx.serialization.Contextual
  * @param createdAt 
  * @param updatedAt 
  * @param isActive 
+ * @param isClosedDay 
  * @param canEdit 
  * @param canDeactivate 
+ * @param canActivate 
  * @param canDelete 
  * @param readOnly 
  * @param creator 
@@ -66,11 +68,17 @@ data class LoadingBatchHistoryItem (
     @SerialName(value = "isActive")
     val isActive: kotlin.Boolean,
 
+    @SerialName(value = "isClosedDay")
+    val isClosedDay: kotlin.Boolean,
+
     @SerialName(value = "canEdit")
     val canEdit: kotlin.Boolean,
 
     @SerialName(value = "canDeactivate")
     val canDeactivate: kotlin.Boolean,
+
+    @SerialName(value = "canActivate")
+    val canActivate: kotlin.Boolean,
 
     @SerialName(value = "canDelete")
     val canDelete: kotlin.Boolean,

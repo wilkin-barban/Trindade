@@ -23,6 +23,7 @@
 
 package com.trindade.app.contract.models
 
+import com.trindade.app.contract.models.ErrorEnvelopeExisting
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -34,6 +35,9 @@ import kotlinx.serialization.Contextual
  * @param error 
  * @param details 
  * @param message 
+ * @param code 
+ * @param `field` 
+ * @param existing 
  */
 @Serializable
 
@@ -46,7 +50,16 @@ data class ErrorEnvelope (
     val details: kotlin.Any? = null,
 
     @SerialName(value = "message")
-    val message: kotlin.String? = null
+    val message: kotlin.String? = null,
+
+    @SerialName(value = "code")
+    val code: kotlin.String? = null,
+
+    @SerialName(value = "field")
+    val `field`: kotlin.String? = null,
+
+    @SerialName(value = "existing")
+    val existing: ErrorEnvelopeExisting? = null
 
 ) {
 
