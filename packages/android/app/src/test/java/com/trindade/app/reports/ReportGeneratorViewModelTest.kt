@@ -227,6 +227,27 @@ class ReportGeneratorViewModelTest {
         assertFalse(model.state.value.showValidation)
     }
 
+    /**
+     * "Not mounted" belongs to one report.
+     *
+     * The state is session-only and has no column on the server (D2, S13), so the form has to hand it back
+     * when the report it described is gone. A form that kept a type switched off after a save would open the
+     * next report with a block of boxes missing and nothing on screen saying so: the operator fills what is
+     * drawn, and the day's boxes go unrecorded.
+     */
+    @Test
+    fun `a delivered report takes the box switches with it`() {
+        val model = viewModel()
+        fillTemperatures(model)
+        model.onBoxTypeChange(1, false)
+        assertEquals(setOf(1), model.state.value.disabledBoxTypeIds)
+
+        model.submit()
+        model.onReportCreatedHandled()
+
+        assertEquals(emptySet<Int>(), model.state.value.disabledBoxTypeIds)
+    }
+
     @Test
     fun `selectTurno manually overrides detected shift and clears missing prerequisite`() {
         val model = viewModel(FakeReportsApi(turnoValue = null))

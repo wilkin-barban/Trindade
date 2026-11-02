@@ -209,6 +209,15 @@ class ReportGeneratorViewModel @Inject constructor(
 
     fun selectTurno(turno: CreateReportRequest.Turno) = selectTurno(turno.value)
 
+    /**
+     * The next report starts as a new form, switches included.
+     *
+     * "Not mounted" is a statement about one day's report and nothing else: it is session state, never
+     * persisted (D2, S13) -- there is no column and no flag for it on the server. Keeping it here after a save
+     * would open the next report with a type of box silently switched off, and its tasks would be missing from
+     * a form the operator believes is complete; the boxes of the day would go unrecorded without anybody
+     * pressing anything.
+     */
     fun onReportCreatedHandled() {
         _state.update { current ->
             current.copy(
@@ -217,6 +226,7 @@ class ReportGeneratorViewModel @Inject constructor(
                 checks = emptyMap(),
                 temperatures = initialReadings(current.formCategories),
                 selectedProducts = emptyMap(),
+                disabledBoxTypeIds = emptySet(),
                 showValidation = false,
                 message = null,
             )

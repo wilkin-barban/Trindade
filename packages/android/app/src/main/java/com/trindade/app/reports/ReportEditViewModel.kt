@@ -181,6 +181,11 @@ class ReportEditViewModel @Inject constructor(
                     checks = report?.items.orEmpty().associate { it.taskId to it.checked },
                     selectedProducts = seedProducts(report),
                     temperatures = seedTemperatures(report, tasks),
+                    // Both types open, always: "not mounted" is what this screen is being told now, not what
+                    // the last report said (D2, S13). Reusing the switch left off in another report would open
+                    // this one with a type missing and its answers unreadable -- and the operator would have
+                    // to guess which of the two screens is wrong.
+                    disabledBoxTypeIds = emptySet(),
                     message = if (report == null) NOT_FOUND else null,
                 )
             }

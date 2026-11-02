@@ -209,6 +209,26 @@ class ReportEditViewModelTest {
      * operator's fix either, because the reading that was left out is the reading the server keeps. Withholding
      * the save and naming the slot is what makes the report's own readings the thing to repair.
      */
+    /**
+     * Both box types open, whatever the report before this one said.
+     *
+     * The screen is one instance reused across reports, and the switch is session state with no column on the
+     * server (D2, S13). Carrying it over would open the next report with a type already off and its tasks
+     * undrawn, which reads as "this report has no boxes of that type" -- a statement nobody made.
+     */
+    @Test
+    fun `a load opens both box types, whatever the previous report had switched off`() {
+        val model = viewModel(fake(report = storedReport()))
+
+        model.load(REPORT_ID)
+        model.onBoxTypeChange(1, false)
+        assertEquals(setOf(1), model.state.value.disabledBoxTypeIds)
+
+        model.load(REPORT_ID)
+
+        assertEquals(emptySet<Int>(), model.state.value.disabledBoxTypeIds)
+    }
+
     @Test
     fun `the save is withheld while the report owes a reading, and names which one`() {
         val recording = fake(
