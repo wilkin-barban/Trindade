@@ -494,8 +494,12 @@ Cada tarea declara objetivo, archivos, tests exactos, aceptación, commit espera
 - **Trabajo**: `pickedVehicleIds`, `freeVehicles` con tanda, `assignedDriverIds` con horario, mensajes de S39/S40, `accept()` valida chapa repetida, `onlyRefused` conserva la chapa propia.
 - **Tests**: `loading-picker.test.ts`: `freeVehicles excludes the plate picked in this batch`; `freeVehicles keeps the plate of the row itself`; `accept refuses two rows with the same plate`; `onlyRefused keeps the plate of the refused row`; `DriverPickerDialog.test.tsx`: `names the slot where a driver already is`; `distinguishes an empty fleet from a day with no free plates`.
 - **Aceptación**: no se puede elegir dos veces la misma chapa; el rechazo nombra el horario; los tres estados de S40 son distinguibles.
-- **Commit**: `fix(web): offer only free plates and explain who is already scheduled` (~300 líneas).
+- **Commit**: `fix(web): give the driver picker the day it is about` (`be0d1a9`), junto con T16 (~356 líneas).
 - **Depende de**: T4 (códigos), T12.
+- **Estado.** Hecho: `freeVehicles` resta la tanda y conserva la chapa propia; `rowsWithRepeatedPlate` corta el
+  envío duplicado; los ocupados se listan con su horario; flota vacía, sin chapas libres y error de lectura son
+  tres estados distintos. Tests: `loading-picker` (537 node en verde), `DriverPicker`, `DriverPickerDialog`,
+  `ScheduleGrid` (107 vitest) y `loading-schedule.spec.ts` (12/12).
 
 #### T16 — Releer el día al abrir el selector
 - **Specs**: S41.
@@ -503,8 +507,10 @@ Cada tarea declara objetivo, archivos, tests exactos, aceptación, commit espera
 - **Trabajo**: lectura fresca del día antes de habilitar el picker; estado de error con reintento; sin “Agregar” si la lectura falla.
 - **Tests**: `DriverPicker.test.tsx`: `reads the day again before offering drivers`; `does not offer adding when the day read failed`; `LoadingSchedulePage.test.tsx`: `the add action waits for the fresh day`.
 - **Aceptación**: un compañero que agregó una fila mientras el modal estaba cerrado aparece como ocupado.
-- **Commit**: `fix(web): read the day again before opening the driver picker` (~140 líneas).
+- **Commit**: `fix(web): give the driver picker the day it is about` (`be0d1a9`), junto con T15 (~356 líneas).
 - **Depende de**: T15.
+- **Estado.** Hecho: `openPicker` relee el día y sólo abre con lectura buena; si falla, `picker-read-error` con
+  el texto de S41 y el picker no se abre. `fetchData` devuelve el resultado de la lectura.
 
 #### T17 — Android: chapas libres y deduplicación
 - **Specs**: S43, S38, S54.
