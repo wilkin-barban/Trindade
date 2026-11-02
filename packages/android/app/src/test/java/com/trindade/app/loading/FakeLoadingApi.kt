@@ -97,6 +97,13 @@ class FakeLoadingApi(
     var vehiclesFail: Boolean = false,
     private val createResponse: Response<ScheduleResponse>? = null,
     /**
+     * A per-request answer, consulted before [createResponse].
+     *
+     * Null for a request falls through to the fixed answer, so a test can name the one row that is
+     * refused and let the others land.
+     */
+    private val createAnswers: ((CreateScheduleRequest) -> Response<ScheduleResponse>?)? = null,
+    /**
      * What an update answers. Null is the server taking the body and echoing the row, which is what it does;
      * a `Response.error` is the refusal the screen has to explain in its own words.
      */
@@ -357,6 +364,9 @@ class FakeLoadingApi(
     override suspend fun createSchedule(body: CreateScheduleRequest): Response<ScheduleResponse> {
         createdBody = body
         createdBodies += body
+        // Per-request answers, so a batch can be refused row by row: one fixed [createResponse] can only
+        // make every row fail the same way, and a partial refusal is exactly the answer a batch produces.
+        createAnswers?.invoke(body)?.let { return it }
         createResponse?.let { return it }
         return Response.success(ScheduleResponse(schedule = entry(id = 500, slot = body.timeSlot, type = SchedulesResponseSchedulesInner.DriverType.fletero)))
     }

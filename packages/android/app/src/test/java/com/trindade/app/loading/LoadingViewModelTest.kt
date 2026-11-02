@@ -1,5 +1,6 @@
 package com.trindade.app.loading
 
+import com.trindade.app.contract.models.CreateScheduleRequest
 import com.trindade.app.contract.models.DriversResponseDriversInner
 import com.trindade.app.contract.models.SchedulesResponse
 import com.trindade.app.contract.models.SchedulesResponseSchedulesInner
@@ -540,6 +541,62 @@ class LoadingViewModelTest {
         // and the batch the operator asked for is not lost to it.
         assertEquals(1, api.createdBodies.size)
         assertEquals(FakeLoadingApi.VEHICLE_ID, api.createdBodies.single().vehicleId)
+    }
+
+    @Test
+    fun `keeps the message after a partial failure`() {
+        val second = VehiclesResponseVehiclesInner(id = 21, description = "HR", licensePlate = "AAA1111")
+        val api = FakeLoadingApi(
+            vehiclesToReturn = FakeLoadingApi.defaultVehicles() + second,
+            createAnswers = { request ->
+                if (request.driverType == CreateScheduleRequest.DriverType.casa) {
+                    // The second row is the duplicate: the first one landed, and one refusal must not cost
+                    // the batch its other rows.
+                    Response.error(
+                        409,
+                        """{"error":"conflict","code":"DRIVER_ALREADY_SCHEDULED","field":"driver_id","existing":{"time_slot":"04:00"}}"""
+                            .toResponseBody("application/json".toMediaType()),
+                    )
+                } else {
+                    null
+                }
+            },
+        )
+        val model = viewModel(api)
+        model.startAdding("07:00")
+        model.toggleFletero(FakeLoadingApi.FLETERO_DRIVER_ID, picked = true)
+        model.toggleCasa(FakeLoadingApi.CASA_DRIVER_ID, picked = true)
+        model.pickCasaVehicle(FakeLoadingApi.CASA_DRIVER_ID, FakeLoadingApi.VEHICLE_ID)
+        model.confirmAdd()
+
+        // The refusal is remembered as a row of the batch, with the hour it duplicates, and the sentence the
+        // server's status earned is still there for the dialog's first line.
+        val result = model.state.value.batchResult
+        assertNotNull(result)
+        assertEquals(listOf("Carlos"), result!!.refusals.map { it.name })
+        assertEquals(LoadingViewModel.DRIVER_ALREADY_SCHEDULED, result.refusals.single().code)
+        assertEquals("04:00", result.refusals.single().occupiedSlot)
+        // The dialog's own sentence, which the reload of the rows that did land cannot clear.
+        assertNotNull(result.message)
+        // The picker stays open on the refused row, so the operator can fix it without rebuilding the batch.
+        assertEquals("07:00", model.state.value.addingToSlot)
+        assertEquals(setOf(FakeLoadingApi.CASA_DRIVER_ID), model.state.value.pickedCasa.keys)
+    }
+
+    @Test
+    fun `dismissing the batch result leaves the grid clean`() {
+        val api = FakeLoadingApi(createResponse = Response.error(409, "{}".toResponseBody("application/json".toMediaType())))
+        val model = viewModel(api)
+        model.startAdding("07:00")
+        model.toggleFletero(FakeLoadingApi.FLETERO_DRIVER_ID, picked = true)
+        model.confirmAdd()
+        assertNotNull(model.state.value.batchResult)
+
+        model.dismissBatchResult()
+
+        // Closing the answer does not touch the day: the rows that landed already did, and the ones that
+        // did not are still picked for a retry.
+        assertNull(model.state.value.batchResult)
     }
 
     @Test

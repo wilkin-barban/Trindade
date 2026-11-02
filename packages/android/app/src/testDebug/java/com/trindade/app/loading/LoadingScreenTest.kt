@@ -213,6 +213,7 @@ class LoadingScreenTest {
         onFleteroPicked: (Int, Boolean) -> Unit = { _, _ -> },
         onCasaPicked: (Int, Boolean) -> Unit = { _, _ -> },
         onCasaVehiclePicked: (Int, Int) -> Unit = { _, _ -> },
+        onDismissBatchResult: () -> Unit = {},
         onConfirmAdd: () -> Unit = {},
         onCancelAdding: () -> Unit = {},
     ) {
@@ -229,6 +230,7 @@ class LoadingScreenTest {
                     onCasaPicked = onCasaPicked,
                     onCasaVehiclePicked = onCasaVehiclePicked,
                     onConfirmAdd = onConfirmAdd,
+                    onDismissBatchResult = onDismissBatchResult,
                     onDelete = {},
                     onEditEntry = { _, _ -> },
                     onLoadExport = {},
@@ -355,6 +357,36 @@ class LoadingScreenTest {
         // Drawn, and withheld: the picker says what the row needs without letting the operator set a value
         // that the request would then ignore for want of a pick.
         composeRule.onNodeWithText("Chapa").performScrollTo().assertIsNotEnabled()
+    }
+
+    @Test
+    fun `shows the result dialog instead of an inline message`() {
+        val dismissed = mutableListOf<Unit>()
+        renderPicker(
+            state = addingState().copy(
+                message = "Esse motorista ou veículo já está nessa data.",
+                batchResult = LoadingViewModel.BatchResult(
+                    message = "Esse motorista ou veículo já está nessa data.",
+                    refusals = listOf(
+                        LoadingViewModel.BatchRefusal(
+                            name = "Fletero",
+                            code = LoadingViewModel.DRIVER_ALREADY_SCHEDULED,
+                            occupiedSlot = "04:00",
+                        ),
+                    ),
+                ),
+            ),
+            onDismissBatchResult = { dismissed += Unit },
+        )
+
+        // The batch answers in a window, with one line per refused row, and the grid no longer carries the
+        // sentence with its "Tentar de novo" -- a batch does not become the day's read failure.
+        composeRule.onNodeWithText("Não foi possível").assertIsDisplayed()
+        composeRule.onNodeWithText("• Fletero já está nas 04:00.").assertIsDisplayed()
+        composeRule.onNodeWithText("Tentar de novo").assertDoesNotExist()
+
+        composeRule.onNodeWithText("Fechar").performClick()
+        assertEquals(1, dismissed.size)
     }
 
     /** What the dialog says and what its buttons report, on the state the view model would produce. */
