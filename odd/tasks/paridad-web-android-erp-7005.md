@@ -289,6 +289,15 @@ S19 — D5/D7, verbatim:
   (S18).
 - **Commit esperado.** `feat(web): pick the day of the massas history from a list of days` · ~220 líneas.
 - **Depende.** T6.
+- **Hecho.** `e676cf0` (lista de días, URL y estado vacío) + `01c5b01` (tests unitarios y e2e). Se dividió en
+  dos porque el conjunto sumaba 458 líneas y el tope por commit es 400.
+  - Evidencia: `npm run test:node` 480/480, `npm run test:unit` 12/12 (3 archivos),
+    `npx playwright test massas-history` 2/2 en 390×844 y 1280×800.
+  - Hallazgo al implementar: el histórico rechaza escrituras en días pasados (`MASSAS_HISTORY_FROZEN`), así que
+    el e2e no puede fabricar un día con lanzamientos; ese caso queda en el test de componentes, que sí puede
+    responder cualquier día. El e2e cubre el enlace profundo, el clic real y el día vacío.
+  - Decisión: "hoy" no se ofrece en la lista. Abrirlo llevaría a un día congelado que se sigue lanzando y la
+    página lo rechaza por diseño, así que un chip "Hoy" solo podría caer en ayer.
 
 ### T8 · Web: Histórico de Contagem con picker y chips
 
@@ -669,7 +678,7 @@ recorta alcance **con aprobación explícita**, nunca moviéndolas a otro ODD po
 | T4 | A | `fix(android): stop swallowing the audit response and name the client` | `AeroTestAuditTest.kt`, `AeroErpClientTest.kt` |
 | T5 | A | `feat(aero): record the paths that were operating without a trace` | `aero-audit.test.ts`, `MassasLaunchViewModelTest.kt` |
 | T6 | B | `fix(web): make the date control open its calendar on a desktop click` | `DateField.test.tsx`, `date-field.spec.ts` |
-| T7 | B, S2 | `feat(web): pick the day of the massas history from a list of days` | `MassasHistoryPage.test.tsx`, `massas-history.spec.ts` |
+| T7 | B, S2 | `e676cf0` `feat(massas): elegir el día del histórico desde una lista` + `01c5b01` `test(massas): cubrir la elección de día del histórico` | `MassasHistoryPage.test.tsx` 5/5, `massas-history.spec.ts` 2/2 |
 | T8 | B | `feat(web): give the stock history a day picker and recent days` | `StockHistoryPage.test.tsx`, `stock-history.spec.ts` |
 | T9 | B | `fix(web): reload the report and loading histories when the day changes` | `ReportHistoryPage.test.tsx`, `LoadingHistoryPage.test.tsx` |
 | T10 | C, S3 | `feat(web): read the dashboard as six cards and one summary panel` | `DashboardPage.test.tsx`, `dashboard.spec.ts` |
