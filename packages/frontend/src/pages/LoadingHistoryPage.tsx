@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { LucideBan, LucideCalendar, LucideTrash2, LucideTruck } from 'lucide-react';
 import { api } from '../api/client';
+import { saoPauloToday } from '../lib/date';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { LoadingSpinner } from '../components/ui/loading-spinner';
@@ -70,7 +71,20 @@ export function LoadingHistoryPage() {
     api.get<{ users: UserOption[] }>('/users/options').then((data) => setUsers(data.users)).catch(() => setUsers([]));
   }, []);
 
-  useEffect(() => { fetchItems(1); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // El filtro es la consulta: cambiarlo tiene que volver a preguntar. Antes el efecto corría una sola vez, así
+  // que elegir un día actualizaba el campo y dejaba la lista como estaba, y el botón "Filtrar" era el único
+  // camino a los datos que el operario ya había pedido.
+  useEffect(() => {
+    void fetchItems(1);
+  }, [fetchItems]);
+
+  const hasFilters = date !== '' || month !== '' || userId !== '';
+  const today = useMemo(() => saoPauloToday(), []);
+  const clearFilters = useCallback(() => {
+    setDate('');
+    setMonth('');
+    setUserId('');
+  }, []);
 
   async function runAction(batchDate: string, action: () => Promise<unknown>) {
     setActionError('');
@@ -115,13 +129,20 @@ export function LoadingHistoryPage() {
       </div>
 
       <Card className="p-3 mb-4 grid grid-cols-1 sm:grid-cols-4 gap-2">
-        <input type="date" value={date} onChange={(e) => { setDate(e.target.value); if (e.target.value) setMonth(''); }} aria-label={t('history.filterDate')} className="rounded-lg border px-3 py-2 text-sm" data-testid="loading-history-date-filter" />
-        <input type="month" value={month} onChange={(e) => { setMonth(e.target.value); if (e.target.value) setDate(''); }} aria-label={t('history.filterMonth')} className="rounded-lg border px-3 py-2 text-sm" data-testid="loading-history-month-filter" />
+        <input type="date" value={date} max={today} onChange={(e) => { setDate(e.target.value); if (e.target.value) setMonth(''); }} aria-label={t('history.filterDate')} className="h-11 rounded-lg border px-3 text-sm sm:h-9" data-testid="loading-history-date-filter" />
+        <input type="month" value={month} max={today.slice(0, 7)} onChange={(e) => { setMonth(e.target.value); if (e.target.value) setDate(''); }} aria-label={t('history.filterMonth')} className="h-11 rounded-lg border px-3 text-sm sm:h-9" data-testid="loading-history-month-filter" />
         <select value={userId} onChange={(e) => setUserId(e.target.value)} aria-label={t('history.filterUser')} className="rounded-lg border px-3 py-2 text-sm" data-testid="loading-history-user-filter">
           <option value="">{t('history.allUsers')}</option>
           {users.map((u) => <option key={u.id} value={u.id}>{u.display_name}</option>)}
         </select>
-        <Button size="sm" onClick={() => fetchItems(1)} data-testid="loading-history-apply-filters">{t('reports.filter')}</Button>
+        <div className="flex gap-2">
+          <Button size="sm" onClick={() => void fetchItems(1)} data-testid="loading-history-apply-filters">{t('reports.filter')}</Button>
+          {hasFilters && (
+            <Button size="sm" variant="outline" onClick={clearFilters} data-testid="history-clear-filters">
+              {t('history.clearFilters')}
+            </Button>
+          )}
+        </div>
       </Card>
 
       {loading && <div className="flex items-center justify-center py-12"><LoadingSpinner /></div>}

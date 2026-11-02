@@ -15,6 +15,24 @@ test.describe('Report History — Filters and pagination', () => {
     await expect(page.getByText(/Página/)).toBeVisible();
   });
 
+  test('choosing a day asks for that day without pressing Filtrar', async ({ page }) => {
+    const asked = page.waitForRequest((request) => request.url().includes('/api/reports/history?') && request.url().includes('date=2026-06-18'));
+    await page.locator('[data-testid="history-date-filter"]').fill('2026-06-18');
+    await asked;
+    await expect(page.locator('[data-testid="history-clear-filters"]')).toBeVisible();
+
+    await page.locator('[data-testid="history-clear-filters"]').click();
+    await expect(page.locator('[data-testid="history-date-filter"]')).toHaveValue('');
+    await expect(page.locator('[data-testid="history-clear-filters"]')).toHaveCount(0);
+  });
+
+  test('the day cannot be a day that has not happened yet', async ({ page }) => {
+    const today = await page.evaluate(() =>
+      new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date()),
+    );
+    await expect(page.locator('[data-testid="history-date-filter"]')).toHaveAttribute('max', today);
+  });
+
   test('date filter can be submitted without crashing', async ({ page }) => {
     await page.locator('[data-testid="history-date-filter"]').fill('2026-06-18');
     await page.locator('[data-testid="history-apply-filters"]').click();

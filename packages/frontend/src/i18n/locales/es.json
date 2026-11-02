@@ -436,7 +436,8 @@
     "legacy": "Legado sin creador",
     "pagination": "Página {{page}} de {{totalPages}} — {{total}} registros",
     "previousPage": "Anterior",
-    "nextPage": "Siguiente"
+    "nextPage": "Siguiente",
+    "clearFilters": "Limpiar filtros"
   },
   "setup": {
     "title": "Configuración inicial",

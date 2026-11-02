@@ -29,6 +29,18 @@ test.describe('Loading History — Filters and pagination', () => {
   });
 
 
+  test('choosing a day asks for that day and clearing drops the filter', async ({ page }) => {
+    const asked = page.waitForRequest(
+      (request) => request.url().includes('/api/loading/schedules/history?') && request.url().includes('date=2026-06-18'),
+    );
+    await page.locator('[data-testid="loading-history-date-filter"]').fill('2026-06-18');
+    await asked;
+
+    await expect(page.locator('[data-testid="history-clear-filters"]')).toBeVisible();
+    await page.locator('[data-testid="history-clear-filters"]').click();
+    await expect(page.locator('[data-testid="loading-history-date-filter"]')).toHaveValue('');
+  });
+
   test('shows one batch card per loading date', async ({ page }) => {
     await expect(page.locator('[data-testid^="loading-history-card-"]').first()).toBeVisible({ timeout: 10000 }).catch(async () => {
       await expect(page.getByText(/Página/)).toBeVisible();

@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { LucideEye, LucideCalendar, LucideTrash2, LucideBan } from 'lucide-react';
 import { api } from '../api/client';
+import { saoPauloToday } from '../lib/date';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { LoadingSpinner } from '../components/ui/loading-spinner';
@@ -70,7 +71,20 @@ export function ReportHistoryPage() {
     api.get<{ users: UserOption[] }>('/users/options').then((data) => setUsers(data.users)).catch(() => setUsers([]));
   }, []);
 
-  useEffect(() => { fetchReports(1); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // El filtro es la consulta: cambiarlo tiene que volver a preguntar. Antes el efecto corría una sola vez, así
+  // que elegir un día actualizaba el campo y dejaba la lista como estaba, y el botón "Filtrar" era el único
+  // camino a los datos que el operario ya había pedido.
+  useEffect(() => {
+    void fetchReports(1);
+  }, [fetchReports]);
+
+  const hasFilters = date !== '' || month !== '' || userId !== '';
+  const today = useMemo(() => saoPauloToday(), []);
+  const clearFilters = useCallback(() => {
+    setDate('');
+    setMonth('');
+    setUserId('');
+  }, []);
 
   async function runAction(id: number, action: () => Promise<unknown>) {
     setActionError('');
@@ -115,13 +129,23 @@ export function ReportHistoryPage() {
       </div>
 
       <Card className="p-3 mb-4 grid grid-cols-1 sm:grid-cols-4 gap-2">
-        <input type="date" value={date} onChange={(e) => { setDate(e.target.value); if (e.target.value) setMonth(''); }} aria-label={t('history.filterDate')} className="rounded-lg border px-3 py-2 text-sm" data-testid="history-date-filter" />
-        <input type="month" value={month} onChange={(e) => { setMonth(e.target.value); if (e.target.value) setDate(''); }} aria-label={t('history.filterMonth')} className="rounded-lg border px-3 py-2 text-sm" data-testid="history-month-filter" />
+        <input type="date" value={date} max={today} onChange={(e) => { setDate(e.target.value); if (e.target.value) setMonth(''); }} aria-label={t('history.filterDate')} className="h-11 rounded-lg border px-3 text-sm sm:h-9" data-testid="history-date-filter" />
+        <input type="month" value={month} max={today.slice(0, 7)} onChange={(e) => { setMonth(e.target.value); if (e.target.value) setDate(''); }} aria-label={t('history.filterMonth')} className="h-11 rounded-lg border px-3 text-sm sm:h-9" data-testid="history-month-filter" />
         <select value={userId} onChange={(e) => setUserId(e.target.value)} aria-label={t('history.filterUser')} className="rounded-lg border px-3 py-2 text-sm" data-testid="history-user-filter">
           <option value="">{t('history.allUsers')}</option>
           {users.map((u) => <option key={u.id} value={u.id}>{u.display_name}</option>)}
         </select>
-        <Button size="sm" onClick={() => fetchReports(1)} data-testid="history-apply-filters">{t('reports.filter')}</Button>
+        <div className="flex gap-2">
+          <Button size="sm" onClick={() => void fetchReports(1)} data-testid="history-apply-filters">{t('reports.filter')}</Button>
+          {/* Limpiar aparece solo cuando hay algo que limpiar: un botón que no haría nada es una promesa
+              vacía, y el filtro por usuario se conserva porque es una ventaja de la web que el teléfono no
+              tiene. */}
+          {hasFilters && (
+            <Button size="sm" variant="outline" onClick={clearFilters} data-testid="history-clear-filters">
+              {t('history.clearFilters')}
+            </Button>
+          )}
+        </div>
       </Card>
 
       {loading && <div className="flex items-center justify-center py-12"><LoadingSpinner /></div>}
