@@ -146,7 +146,16 @@ export function LoadingHistoryPage() {
       </Card>
 
       {loading && <div className="flex items-center justify-center py-12"><LoadingSpinner /></div>}
-      {error && <div role="alert" className="p-4 text-red-700 bg-red-50 border rounded-lg mb-4">{error}</div>}
+      {error && (
+        <div role="alert" className="p-4 text-red-700 bg-red-50 border rounded-lg mb-4" data-testid="loading-history-error">
+          <p>{error}</p>
+          {/* A read that failed has to be retryable from here: reloading the page would drop the day and the
+              operator the list was filtered by, which is exactly what the filters were for. */}
+          <Button size="sm" variant="outline" className="mt-2" onClick={() => void fetchItems(1)} data-testid="loading-history-retry">
+            {t('ui.retry')}
+          </Button>
+        </div>
+      )}
       {actionError && <div role="alert" data-testid="loading-history-action-error" className="p-4 text-red-700 bg-red-50 border rounded-lg mb-4">{actionError}</div>}
       {!loading && !error && items.length === 0 && (
         <div className="text-center py-12"><LucideTruck className="h-12 w-12 mx-auto text-gray-300 mb-3" /><p className="text-gray-500">{t('loading.emptyDay')}</p></div>
@@ -161,12 +170,15 @@ export function LoadingHistoryPage() {
                 <Link to={`/loading/edit?date=${batch.batch_date}`} className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-sm font-semibold">{formatDate(batch.batch_date)}</span>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100">📦 {batch.total_loadings} carregamentos</span>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100" data-testid={`loading-history-count-${batch.batch_date}`}>
+                      {t('loading.historyBatchCount', { count: batch.total_loadings })}
+                    </span>
                     {!batch.isActive && <span className="text-xs text-amber-700">{t('history.inactive')}</span>}
                   </div>
                   <p className="text-xs text-gray-500">
                     <LucideCalendar className="h-3 w-3 inline mr-1" />
-                    Carregamento: {formatDate(batch.loading_date)} — {batch.creator?.display_name ?? t('history.legacy')}
+                    {t('loading.historyLoadingDay', { date: formatDate(batch.loading_date) })} —{' '}
+                    {batch.creator?.display_name ?? t('history.legacy')}
                   </p>
                 </Link>
                 {affordances.showEdit && <Link to={`/loading/edit?date=${batch.batch_date}`}><Button variant="outline" size="sm">{t('loading.editEntry')}</Button></Link>}

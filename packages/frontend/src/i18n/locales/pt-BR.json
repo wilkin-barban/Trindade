@@ -250,7 +250,10 @@
     "pickerAccept": "Aceitar",
     "pickerRetry": "Tentar de novo",
     "pickerEmpty": "Nenhum motorista disponível.",
-    "pickerFailureFor": "Não foi possível agendar {{name}}: {{message}}"
+    "pickerFailureFor": "Não foi possível agendar {{name}}: {{message}}",
+    "historyBatchCount_one": "{{count}} carregamento",
+    "historyBatchCount_other": "{{count}} carregamentos",
+    "historyLoadingDay": "Carregamento: {{date}}"
   },
   "admin": {
     "title": "Administração",
