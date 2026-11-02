@@ -43,6 +43,9 @@ export function LoadingSchedulePage() {
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
   const [drivers, setDrivers] = useState<DriverRow[]>([]);
   const [loading, setLoading] = useState(true);
+  // Whether the day was read at least once. The spinner is for that first read: an empty day stays empty
+  // through every reload, and hanging the spinner on the number of rows brought it back after each batch.
+  const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState('');
 
   // Export modal
@@ -69,6 +72,7 @@ export function LoadingSchedulePage() {
       );
     } finally {
       setLoading(false);
+      setLoaded(true);
     }
   }, [date, t]);
 
@@ -128,7 +132,7 @@ export function LoadingSchedulePage() {
   // The spinner is for the first read of the day, not for every reload: a batch that lands reloads the grid
   // while the modal is open, and replacing the page with a spinner would close the modal and take with it the
   // rows the server refused -- the ones the operator still has to send.
-  if (loading && schedules.length === 0) {
+  if (loading && !loaded) {
     return (
       <div className="flex items-center justify-center py-16">
         <LoadingSpinner />
