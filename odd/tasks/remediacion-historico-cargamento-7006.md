@@ -357,6 +357,11 @@ Cada tarea declara objetivo, archivos, tests exactos, aceptación, commit espera
 - **Aceptación**: ninguna proyección de día pasado devuelve `canEdit`/`canDelete` verdaderos; hoy no cambia; los contratos publicados reflejan los campos nuevos (aditivos).
 - **Commit**: `feat(backend): project closed days as read only with an activate offer` (~140 líneas).
 - **Depende de**: T1 (para la fecha).
+- **Estado.** Hecho en un commit (**868a10d**), 91 líneas insertadas. `OwnableHistoryRow.day_date` optativo:
+  sin fecha la proyección no cambia, así que los reportes conservan su ventana. Con fecha, `isClosedDay`
+  manda sobre el reloj (`readOnly`, `canEdit` y `canDelete` en falso) y `canActivate` aparece para el
+  Administrador sobre una fila inactiva. Los tres call sites de loading pasan `schedule_date`/`batch_date`;
+  `loading.schema.ts` y `reports.schema.ts` publican los campos nuevos como aditivos. 695 tests en verde.
 
 #### T4 — Códigos estables de duplicado
 - **Specs**: S28.
@@ -633,7 +638,7 @@ Los pasos 2, 3 y 4 son **publicación**: se ejecutan solo con autorización expl
 | --- | --- | --- | --- | --- |
 | T1 | S22, S23, S25, S26, S27 | `fe4a921`, `46cd532` | `loading.routes.mutations.test.ts`, `loading.service.test.ts` | hecho |
 | T2 | S24, S31 | `b2fa299` | `loading.routes.mutations.test.ts`, `reports.routes.test.ts` | hecho |
-| T3 | S25, S37 | — | `history-permissions.test.ts` | pendiente |
+| T3 | S25, S37 | `868a10d` | `history-permissions.test.ts` | hecho |
 | T4 | S28 | — | `loading.routes.schedules.test.ts` | pendiente |
 | T5 | S29, S53 | — | `aero.movements.service.test.ts`, `AeroAdaptersTest` | pendiente |
 | T6 | S49 | — | `aero-audit.test.ts`, `aero-bridge-wiring.test.ts` | pendiente |
