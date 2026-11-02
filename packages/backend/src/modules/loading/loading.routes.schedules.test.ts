@@ -26,6 +26,7 @@ const QUOTA_DAY = dateIn(12);
 const ROLLING_DAY = dateIn(13);
 const CONSTRAINTS_DAY = dateIn(14);
 const DUPLICATE_DAY = dateIn(15);
+const DUPLICATE_CODE_DAY = dateIn(17);
 const CLOSED_BATCH_DAY = dateIn(16);
 const PAST_DAY = dateIn(-1);
 
@@ -417,6 +418,83 @@ describe('Loading Schedule Routes', () => {
       body.error.includes('agendado') || body.error.includes('Motorista'),
       'error should mention duplicate'
     );
+  });
+
+  it('POST /schedules answers DRIVER_ALREADY_SCHEDULED with the slot of the existing row', async () => {
+    const driverId = seedDriver(db, 'Fletero Código', 'COD0001');
+    await app.inject({
+      method: 'POST',
+      url: '/api/loading/schedules',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { schedule_date: DUPLICATE_CODE_DAY, time_slot: '04:00', driver_type: 'fletero', driver_id: driverId },
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/loading/schedules',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { schedule_date: DUPLICATE_CODE_DAY, time_slot: '06:00', driver_type: 'fletero', driver_id: driverId },
+    });
+
+    assert.strictEqual(res.statusCode, 409);
+    const body = JSON.parse(res.body);
+    assert.strictEqual(body.code, 'DRIVER_ALREADY_SCHEDULED');
+    assert.strictEqual(body.field, 'driver_id');
+    assert.deepStrictEqual(body.existing, { time_slot: '04:00' }, 'the client learns which slot already holds the driver');
+    assert.ok(body.message.includes('Motorista'), 'the human message still travels');
+  });
+
+  it('POST /schedules answers VEHICLE_ALREADY_SCHEDULED with the slot of the existing row', async () => {
+    const first = seedDriver(db, 'Casa Chapa A', 'CHP0001', 'casa');
+    const second = seedDriver(db, 'Casa Chapa B', 'CHP0002', 'casa');
+    await app.inject({
+      method: 'POST',
+      url: '/api/loading/schedules',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { schedule_date: DUPLICATE_CODE_DAY, time_slot: '04:00', driver_type: 'casa', driver_id: first, vehicle_id: vehicleId },
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/loading/schedules',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { schedule_date: DUPLICATE_CODE_DAY, time_slot: '07:00', driver_type: 'casa', driver_id: second, vehicle_id: vehicleId },
+    });
+
+    assert.strictEqual(res.statusCode, 409);
+    const body = JSON.parse(res.body);
+    assert.strictEqual(body.code, 'VEHICLE_ALREADY_SCHEDULED');
+    assert.strictEqual(body.field, 'vehicle_id');
+    assert.deepStrictEqual(body.existing, { time_slot: '04:00' });
+  });
+
+  it('POST /schedules keeps the duplicate message readable in Portuguese and Spanish', async () => {
+    const driverId = seedDriver(db, 'Fletero Idioma', 'IDI0001');
+    await app.inject({
+      method: 'POST',
+      url: '/api/loading/schedules',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { schedule_date: DUPLICATE_CODE_DAY, time_slot: '08:00', driver_type: 'fletero', driver_id: driverId },
+    });
+
+    const payload = { schedule_date: DUPLICATE_CODE_DAY, time_slot: '09:00', driver_type: 'fletero', driver_id: driverId };
+    const pt = await app.inject({
+      method: 'POST',
+      url: '/api/loading/schedules',
+      headers: { authorization: `Bearer ${token}`, 'accept-language': 'pt-BR' },
+      payload,
+    });
+    const es = await app.inject({
+      method: 'POST',
+      url: '/api/loading/schedules',
+      headers: { authorization: `Bearer ${token}`, 'accept-language': 'es' },
+      payload,
+    });
+
+    assert.strictEqual(JSON.parse(pt.body).error, 'Motorista já agendado neste lote de carregamento.');
+    assert.strictEqual(JSON.parse(es.body).error, 'Motorista ya agendado en este lote de cargamento.');
+    assert.strictEqual(JSON.parse(pt.body).code, 'DRIVER_ALREADY_SCHEDULED');
+    assert.strictEqual(JSON.parse(es.body).code, 'DRIVER_ALREADY_SCHEDULED');
   });
 
   /**

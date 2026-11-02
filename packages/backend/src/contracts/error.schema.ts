@@ -19,5 +19,10 @@ export const ErrorEnvelopeSchema = z
     details: z.unknown().optional(),
     message: z.string().optional(),
     code: z.string().optional(),
+    // A refusal about one request field names it, so a client can mark the offending control
+    // instead of matching prose.
+    field: z.string().optional(),
+    // What already holds the value a caller tried to use: which slot has the driver or the plate.
+    existing: z.object({ time_slot: z.string() }).strict().optional(),
   })
   .strict();

@@ -150,6 +150,14 @@ export async function loadingRoutes(fastify: FastifyInstance) {
             ? 'Ya existe un cronograma para esta fecha en el historial.'
             : 'Já existe um cronograma para esta data no histórico.';
         }
+        if (result.code === 'DRIVER_ALREADY_SCHEDULED') {
+          errMsg = isEs
+            ? 'Motorista ya agendado en este lote de cargamento.'
+            : 'Motorista já agendado neste lote de carregamento.';
+        }
+        if (result.code === 'VEHICLE_ALREADY_SCHEDULED') {
+          errMsg = isEs ? 'Vehículo ya agendado en esta fecha.' : 'Veículo já agendado nesta data.';
+        }
         if (result.code === 'LOADING_BATCH_DEACTIVATED') {
           errMsg = isEs
             ? 'Este día de cargamento fue desactivado. Reactivá el lote antes de agregar registros.'
@@ -164,7 +172,7 @@ export async function loadingRoutes(fastify: FastifyInstance) {
         // answers, and a client that only reads the text cannot tell the day's refusal from the row's.
         return reply
           .status(result.status)
-          .send({ error: errMsg, message: errMsg, code: result.code });
+          .send({ error: errMsg, message: errMsg, code: result.code, field: result.field, existing: result.existing });
       }
 
       // Audit: schedule created
@@ -242,7 +250,9 @@ export async function loadingRoutes(fastify: FastifyInstance) {
       const result = service.update(fastify.db, scheduleId, parse.data, request.user!);
 
       if ('error' in result) {
-        return reply.status(result.status).send({ error: result.error, code: result.code });
+        return reply
+          .status(result.status)
+          .send({ error: result.error, message: result.error, code: result.code, field: result.field, existing: result.existing });
       }
 
       // Audit: schedule updated

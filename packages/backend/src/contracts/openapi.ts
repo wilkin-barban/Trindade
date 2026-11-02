@@ -628,7 +628,9 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
       404: errorResponse('The referenced driver or vehicle does not exist'),
       409: errorResponse(
         'The day is closed (`LOADING_HISTORY_FROZEN`), the day was deactivated ' +
-        '(`LOADING_BATCH_DEACTIVATED`), or that driver or vehicle is already assigned on this date'
+        '(`LOADING_BATCH_DEACTIVATED`), or that driver or vehicle is already assigned on this date ' +
+        '(`DRIVER_ALREADY_SCHEDULED` / `VEHICLE_ALREADY_SCHEDULED`, with `field` and the ' +
+        '`existing.time_slot` that already holds it)'
       ),
     },
   });

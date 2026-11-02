@@ -27,6 +27,10 @@ export interface LoadingRefusal {
   status: number;
   /** Stable, translatable-free name of the refusal. Absent only where a code is not yet defined. */
   code?: string;
+  /** The request field the refusal is about, so a client can mark the offending control. */
+  field?: string;
+  /** What already holds the value the caller tried to use. */
+  existing?: { time_slot: string };
 }
 
 /**
@@ -165,17 +169,17 @@ export function create(
     if (data.driver_id) {
       const duplicate = db
         .prepare(
-          `SELECT id FROM loading_schedules
+          `SELECT id, time_slot FROM loading_schedules
            WHERE schedule_date = ? AND driver_id = ? AND is_active = 1`
         )
         .get(data.schedule_date, data.driver_id) as
-        | { id: number }
+        | { id: number; time_slot: string }
         | undefined;
 
       if (duplicate) {
         throw Object.assign(
           new Error('Motorista já agendado neste lote de carregamento.'),
-          { status: 409 }
+          { status: 409, code: 'DRIVER_ALREADY_SCHEDULED', field: 'driver_id', existing: { time_slot: duplicate.time_slot } }
         );
       }
     }
@@ -184,17 +188,17 @@ export function create(
     if (data.vehicle_id) {
       const duplicate = db
         .prepare(
-          `SELECT id FROM loading_schedules
+          `SELECT id, time_slot FROM loading_schedules
            WHERE schedule_date = ? AND vehicle_id = ? AND is_active = 1`
         )
         .get(data.schedule_date, data.vehicle_id) as
-        | { id: number }
+        | { id: number; time_slot: string }
         | undefined;
 
       if (duplicate) {
         throw Object.assign(
           new Error('Veículo já agendado nesta data.'),
-          { status: 409 }
+          { status: 409, code: 'VEHICLE_ALREADY_SCHEDULED', field: 'vehicle_id', existing: { time_slot: duplicate.time_slot } }
         );
       }
     }
@@ -239,11 +243,17 @@ export function create(
     return projectScheduleRow(row, actor);
   } catch (err: unknown) {
     if (err instanceof Error && 'status' in err) {
-      return {
+      const refusal: LoadingRefusal = {
         error: err.message,
         status: (err as Error & { status: number }).status,
         code: (err as Error & { code?: string }).code ?? err.message,
       };
+      // Only a duplicate carries these; spreading them unconditionally would add two undefined
+      // keys that a structural comparison of the refusal can see.
+      const { field, existing } = err as Error & { field?: string; existing?: { time_slot: string } };
+      if (field) refusal.field = field;
+      if (existing) refusal.existing = existing;
+      return refusal;
     }
     throw err;
   }
@@ -325,17 +335,17 @@ export function update(
     if (effectiveDriverId) {
       const dup = db
         .prepare(
-          `SELECT id FROM loading_schedules
+          `SELECT id, time_slot FROM loading_schedules
            WHERE schedule_date = ? AND driver_id = ? AND is_active = 1 AND id != ?`
         )
         .get(effectiveDate, effectiveDriverId, id) as
-        | { id: number }
+        | { id: number; time_slot: string }
         | undefined;
 
       if (dup) {
         throw Object.assign(
           new Error('Motorista já agendado neste lote de carregamento.'),
-          { status: 409 }
+          { status: 409, code: 'DRIVER_ALREADY_SCHEDULED', field: 'driver_id', existing: { time_slot: dup.time_slot } }
         );
       }
     }
@@ -344,17 +354,17 @@ export function update(
     if (effectiveVehicleId) {
       const dup = db
         .prepare(
-          `SELECT id FROM loading_schedules
+          `SELECT id, time_slot FROM loading_schedules
            WHERE schedule_date = ? AND vehicle_id = ? AND is_active = 1 AND id != ?`
         )
         .get(effectiveDate, effectiveVehicleId, id) as
-        | { id: number }
+        | { id: number; time_slot: string }
         | undefined;
 
       if (dup) {
         throw Object.assign(
           new Error('Veículo já agendado nesta data.'),
-          { status: 409 }
+          { status: 409, code: 'VEHICLE_ALREADY_SCHEDULED', field: 'vehicle_id', existing: { time_slot: dup.time_slot } }
         );
       }
     }
@@ -379,11 +389,17 @@ export function update(
     tx();
   } catch (err: unknown) {
     if (err instanceof Error && 'status' in err) {
-      return {
+      const refusal: LoadingRefusal = {
         error: err.message,
         status: (err as Error & { status: number }).status,
         code: (err as Error & { code?: string }).code ?? err.message,
       };
+      // Only a duplicate carries these; spreading them unconditionally would add two undefined
+      // keys that a structural comparison of the refusal can see.
+      const { field, existing } = err as Error & { field?: string; existing?: { time_slot: string } };
+      if (field) refusal.field = field;
+      if (existing) refusal.existing = existing;
+      return refusal;
     }
     throw err;
   }
