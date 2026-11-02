@@ -548,6 +548,21 @@ describe('aero-integration: readAeroTestResult', () => {
     }
   });
 
+  it('a verified connection with no user name stays nameless instead of becoming somebody', () => {
+    // El ERP aceptó las credenciales pero no dijo de quién son. Antes se rellenaba con el nombre del dueño de
+    // la cuenta de fábrica, que es un falso positivo: la pantalla afirmaba una identidad que nadie había
+    // probado, y la atribuía a una persona concreta.
+    const res = readAeroTestResult({ success: true, data: { CODIGO: 12 } });
+    assert.deepEqual(res, { ok: true, userCode: 12, userName: null });
+
+    const noData = readAeroTestResult({ success: true });
+    assert.deepEqual(noData, { ok: true, userCode: 1, userName: null });
+
+    // Y con mensaje tampoco se inventa: la frase del servidor no es un nombre de usuario.
+    const messageOnly = readAeroTestResult({ success: true, message: 'OK' });
+    assert.deepEqual(messageOnly, { ok: true, userCode: 1, userName: 'OK' });
+  });
+
   it('handles non-object, missing success, and invalid data gracefully without throwing', () => {
     assert.equal(readAeroTestResult(null).ok, false);
     assert.equal(readAeroTestResult('invalid string').ok, false);

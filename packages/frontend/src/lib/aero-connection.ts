@@ -18,7 +18,7 @@ import {
  * origin -- remains the path that really sends the entry.
  */
 export type AeroConnectionProbe =
-  | { kind: 'ok'; httpStatus: number; userCode: number; userName: string; snippet: string }
+  | { kind: 'ok'; httpStatus: number; userCode: number; userName: string | null; snippet: string }
   | { kind: 'http_error'; httpStatus: number; message: string; snippet: string }
   | { kind: 'reachable_without_cors'; snippet: string }
   | { kind: 'blocked'; reason: 'mixed_content' | 'insecure_target' }

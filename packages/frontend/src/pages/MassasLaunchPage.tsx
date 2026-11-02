@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { api, ApiClientError } from '../api/client';
+import { resolveApiErrorKey } from '../lib/api-error-normalizer';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/button';
 import { DateField } from '../components/ui/date-field';
@@ -621,9 +622,12 @@ export function MassasLaunchPage() {
       await Promise.all([load(date), loadMirror(date)]);
     } catch (err) {
       void postAeroAuditEvent(aeroImportAuditEvent({ ...audit, error: 'AERO_IMPORT_REFUSED' }));
+      // La negativa del backend llega con un código semántico y una frase en el idioma del pedido. El texto
+      // crudo del servidor no es una frase para el operario: o hay clave conocida, o está el genérico.
+      const known = err instanceof ApiClientError ? resolveApiErrorKey(err.status, err.message, err.code) : null;
       setNotice({
         type: 'error',
-        message: err instanceof Error ? err.message : t('massas.erp.importError'),
+        message: known ? t(known) : t('massas.erp.importError'),
       });
     } finally {
       setImportingEntLan(null);
@@ -655,12 +659,12 @@ export function MassasLaunchPage() {
       // S18: Table refreshes instantly, recognizes the new operator and button transforms to Importar
       await Promise.all([load(date), loadMirror(date)]);
     } catch (err) {
+      // Misma regla: el texto del servidor no se dibuja. Un alta rápida puede chocar con un usuario que ya
+      // existe o con un rol que no admite, y cada uno tiene su frase.
       const message =
         err instanceof ApiClientError && (err.status === 409 || err.message.includes('userAlreadyExists'))
           ? t('admin.workers.userAlreadyExists')
-          : err instanceof Error
-            ? err.message
-            : t('share.createServerError');
+          : t('share.createServerError');
       setNotice({ type: 'error', message });
     } finally {
       setCreatingOperatorEntLan(null);

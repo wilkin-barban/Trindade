@@ -52,6 +52,18 @@ describe('probeAeroConnection', () => {
     assert.equal(calls.length, 0, 'an invalid configuration must not reach the network');
   });
 
+  it('keeps a nameless success nameless instead of filling in the factory account', async () => {
+    // El WebService aceptó las credenciales sin decir de quién son: la prueba está hecha y el nombre no se
+    // inventa, porque una identidad no probada en pantalla es la que después alguien repite en un correo.
+    const { impl } = stubFetch(jsonResponse({ success: true, data: { CODIGO: 12 } }));
+    const probe = await probeAeroConnection({ settings, pageProtocol: 'http:', fetchImpl: impl });
+
+    assert.equal(probe.kind, 'ok');
+    if (probe.kind !== 'ok') return;
+    assert.equal(probe.userCode, 12);
+    assert.equal(probe.userName, null);
+  });
+
   it('says the page itself blocks a plain-HTTP target before spending a request', async () => {
     const { calls, impl } = stubFetch();
     const probe = await probeAeroConnection({ settings, pageProtocol: 'https:', fetchImpl: impl });

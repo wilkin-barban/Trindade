@@ -217,7 +217,7 @@ export function AeroIntegrationPanel({
         username: draft.username.trim(),
         password: draft.password,
       });
-      setNotice({ tone: 'ok', text: t('massas.aero.testOk', { name: outcome.userName, code: outcome.userCode }) });
+      setNotice({ tone: 'ok', text: describeProbe(outcome, t) });
     }
 
     setBusy(null);
@@ -503,10 +503,14 @@ export function AeroIntegrationPanel({
 }
 
 /** What the panel says about a probe, in the operator's words rather than the browser's. */
-function describeProbe(probe: AeroConnectionProbe, t: (key: string, options?: Record<string, unknown>) => string): string {
+export function describeProbe(probe: AeroConnectionProbe, t: (key: string, options?: Record<string, unknown>) => string): string {
   switch (probe.kind) {
     case 'ok':
-      return t('massas.aero.testOk', { name: probe.userName, code: probe.userCode });
+      // El ERP no siempre dice de quién son las credenciales que aceptó. La frase cambia con ese dato en vez
+      // de inventar un nombre: la conexión está probada, y a quién pertenece es lo que falta saber.
+      return probe.userName
+        ? t('massas.aero.testOk', { name: probe.userName, code: probe.userCode })
+        : t('massas.aero.testOkNoUser', { code: probe.userCode });
     case 'http_error':
       return t('massas.aero.testHttpError', { status: probe.httpStatus, message: probe.message });
     case 'reachable_without_cors':

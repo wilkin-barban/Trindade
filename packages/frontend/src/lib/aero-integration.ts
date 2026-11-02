@@ -347,7 +347,7 @@ export function aeroConnectionBlocker(args: {
  */
 export function readAeroTestResult(
   body: unknown,
-): { ok: true; userCode: number; userName: string } | { ok: false; message: string } {
+): { ok: true; userCode: number; userName: string | null } | { ok: false; message: string } {
   if (typeof body !== 'object' || body === null) {
     return { ok: false, message: 'Invalid response body' };
   }
@@ -370,18 +370,19 @@ export function readAeroTestResult(
         typeof rawCode === 'number' && Number.isInteger(rawCode) && rawCode > 0
           ? rawCode
           : AERO_FALLBACK_USER_CODE;
+      // El ERP puede confirmar las credenciales sin decir de quién son. Inventar un nombre ahí es un falso
+      // positivo que además atribuye la conexión a una persona concreta, así que la ausencia viaja como null
+      // y la pantalla dice lo que sí sabe: que el WebService aceptó las credenciales.
       const userName =
         typeof data.NOME === 'string' && data.NOME.trim()
           ? data.NOME.trim()
           : typeof record.message === 'string' && record.message.trim()
             ? record.message.trim()
-            : 'WILKIN';
+            : null;
       return { ok: true, userCode, userName };
     }
     const userName =
-      typeof record.message === 'string' && record.message.trim()
-        ? record.message.trim()
-        : 'WILKIN';
+      typeof record.message === 'string' && record.message.trim() ? record.message.trim() : null;
     return { ok: true, userCode: AERO_FALLBACK_USER_CODE, userName };
   }
 
