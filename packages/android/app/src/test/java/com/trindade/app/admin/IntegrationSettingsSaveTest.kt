@@ -2,7 +2,7 @@ package com.trindade.app.admin
 
 import com.trindade.app.R
 import com.trindade.app.aero.AeroErpClient
-import com.trindade.app.aero.AeroReachability
+import com.trindade.app.aero.AeroDiagnosis
 import com.trindade.app.aero.AeroReachabilityPort
 import com.trindade.app.aero.AeroSettings
 import com.trindade.app.aero.AeroSettingsPort
@@ -82,9 +82,9 @@ class IntegrationSettingsSaveTest {
     private class NeverProbes : AeroReachabilityPort {
         var calls = 0
 
-        override suspend fun diagnose(wsUrl: String?, timeoutMillis: Int): AeroReachability.Diagnosis {
+        override suspend fun diagnose(wsUrl: String?, timeoutMillis: Int): AeroDiagnosis {
             calls++
-            return AeroReachability.Diagnosis(wifiConnected = false, hostReachable = null)
+            return AeroDiagnosis(wifiConnected = false, hostReachable = null)
         }
     }
 

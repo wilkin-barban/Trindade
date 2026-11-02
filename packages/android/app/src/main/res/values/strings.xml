@@ -915,8 +915,6 @@
     <string name="report_error_photo_limit">O relatório já tem %1$d fotos. Remova uma antes.</string>
     <string name="aero_no_plant_network">Sem conexão com a rede da fábrica</string>
     <string name="aero_plant_unreachable">A rede da fábrica não respondeu</string>
-    <string name="aero_plant_probe_wifi">Conecte o celular no Wi-Fi da fábrica e tente de novo.</string>
-    <string name="aero_plant_probe_host">O endereço do ERP não respondeu em %1$d s.</string>
     <!-- Reports: the day's massas card, shown on the generator and on the detail. -->
     <string name="report_massas_day_title">Massa do dia</string>
     <string name="report_massas_day_empty">Nenhum lançamento registrado.</string>
@@ -966,12 +964,15 @@
     <string name="admin_integration_saved">Configuração salva neste aparelho.</string>
     <string name="admin_integration_save_failed">Não foi possível salvar a configuração neste aparelho. Tente de novo.</string>
     <string name="admin_integration_incomplete">Preencha o endereço, o usuário e a senha.</string>
-    <string name="admin_integration_no_wifi">Sem conexão com a rede da fábrica.</string>
-    <string name="admin_integration_no_host">O ERP não respondeu no endereço configurado.</string>
-    <string name="admin_integration_timeout">O ERP demorou demais para responder.</string>
-    <string name="admin_integration_no_route">Não há caminho até o ERP.</string>
-    <string name="admin_integration_refused">O ERP recusou a conexão.</string>
-    <string name="admin_integration_unknown">Não foi possível falar com o ERP.</string>
+    <string name="aero_failure_not_configured">Configure a integração com o ERP em Administração.</string>
+    <string name="aero_failure_different_network">O celular não está no Wi-Fi da fábrica. Conecte-se a ele e tente de novo.</string>
+    <string name="aero_failure_host_unreachable">A rede da fábrica está aí, mas o ERP não respondeu no endereço configurado.</string>
+    <string name="aero_failure_timeout">O ERP demorou demais para responder. Tente de novo.</string>
+    <string name="aero_failure_no_route">Não há caminho até o endereço do ERP. Confira a rede da fábrica.</string>
+    <string name="aero_failure_refused_connection">O endereço do ERP recusou a conexão.</string>
+    <string name="aero_failure_no_answer">Sem resposta do ERP. Verifique a rede e tente de novo.</string>
+    <string name="aero_failure_erp_refused">O ERP recusou: %1$s</string>
+    <string name="aero_failure_snapshot_refused">O ERP respondeu, mas o servidor não guardou o dia. Tente de novo.</string>
     <string name="admin_integration_probe_ok">Conectado ao ERP: %1$s.</string>
     <string name="admin_integration_probe_refused">O ERP recusou o usuário ou a senha.</string>
     <plurals name="loading_history_loadings">

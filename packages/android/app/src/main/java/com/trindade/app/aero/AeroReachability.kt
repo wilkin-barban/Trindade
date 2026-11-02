@@ -29,7 +29,8 @@ import kotlinx.coroutines.withContext
  *    something is listening.
  *
  * This never replaces the request's own failure handling. It runs before the request to produce a sentence,
- * and a probe that says "reachable" does not promise the ERP will accept the payload.
+ * and a probe that says "reachable" does not promise the ERP will accept the payload. The answer travels as
+ * [AeroDiagnosis], so the words come from [AeroFailure.describe] and not from here.
  */
 /**
  * The network question, as the screens need it.
@@ -42,23 +43,13 @@ interface AeroReachabilityPort {
     suspend fun diagnose(
         wsUrl: String?,
         timeoutMillis: Int = AeroReachability.DEFAULT_TIMEOUT_MS,
-    ): AeroReachability.Diagnosis
+    ): AeroDiagnosis
 }
 
 @Singleton
 class AeroReachability @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : AeroReachabilityPort {
-
-    /** The two answers, as data, so the screen owns the words. */
-    data class Diagnosis(
-        val wifiConnected: Boolean,
-        /** Null when the address is unusable, which is a configuration problem and not a network one. */
-        val hostReachable: Boolean?,
-    ) {
-        /** Reachable only when both halves hold; an unusable address is never reachable. */
-        val plantReachable: Boolean get() = wifiConnected && hostReachable == true
-    }
 
     fun wifiConnected(): Boolean {
         val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
@@ -86,10 +77,10 @@ class AeroReachability @Inject constructor(
         }
     }
 
-    override suspend fun diagnose(wsUrl: String?, timeoutMillis: Int): Diagnosis {
+    override suspend fun diagnose(wsUrl: String?, timeoutMillis: Int): AeroDiagnosis {
         val wifi = wifiConnected()
-        if (!wifi) return Diagnosis(wifiConnected = false, hostReachable = null)
-        return Diagnosis(wifiConnected = true, hostReachable = hostReachable(wsUrl, timeoutMillis))
+        if (!wifi) return AeroDiagnosis(wifiConnected = false, hostReachable = null)
+        return AeroDiagnosis(wifiConnected = true, hostReachable = hostReachable(wsUrl, timeoutMillis))
     }
 
     companion object {

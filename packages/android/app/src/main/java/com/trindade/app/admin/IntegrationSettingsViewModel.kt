@@ -12,6 +12,11 @@ import com.trindade.app.aero.AeroSettingsPermissions
 import com.trindade.app.aero.AeroTestResult
 import com.trindade.app.aero.aeroSettingsEditable
 import com.trindade.app.aero.AeroAudit
+import com.trindade.app.aero.AeroDiagnosis
+import com.trindade.app.aero.AeroFailure
+import com.trindade.app.aero.AeroFailureCode
+import com.trindade.app.aero.failure
+import com.trindade.app.aero.toFailure
 import com.trindade.app.R
 import com.trindade.app.ui.UiText
 import com.trindade.app.auth.AuthRepository
@@ -214,7 +219,7 @@ class IntegrationSettingsViewModel @Inject constructor(
     private fun recordProbe(
         settings: AeroSettings,
         normalized: String?,
-        diagnosis: AeroReachability.Diagnosis,
+        diagnosis: AeroDiagnosis,
         answer: AeroErpClient.Probe?,
         elapsedMs: Long,
     ) {
@@ -248,31 +253,28 @@ class IntegrationSettingsViewModel @Inject constructor(
 /**
  * The one sentence a probe earns, as the resource the screen resolves.
  *
- * The operator's language is decided by the screen's locale and not here: this view model has no `Context`, and
- * a Portuguese sentence handed to a Spanish operator is a translation nobody notices is missing.
+ * The network half comes from [AeroDiagnosis.failure] and the transport half from [AeroFailure.describe], so
+ * the panel says exactly what the table says for the same problem. What is left here is the part that is only
+ * true of a probe: it answered, and the plant named the user the credentials belong to.
  */
 private fun describe(
-    diagnosis: AeroReachability.Diagnosis,
+    diagnosis: AeroDiagnosis,
     answer: AeroErpClient.Probe?,
-): UiText = when {
-    !diagnosis.wifiConnected -> UiText.of(R.string.admin_integration_no_wifi)
-    diagnosis.hostReachable != true -> UiText.of(R.string.admin_integration_no_host)
-    answer == null -> UiText.of(R.string.admin_integration_incomplete)
-    answer is AeroErpClient.Probe.Unreachable -> when (answer.reason) {
-        AeroErpClient.ProbeFailure.TIMEOUT -> UiText.of(R.string.admin_integration_timeout)
-        AeroErpClient.ProbeFailure.NO_ROUTE -> UiText.of(R.string.admin_integration_no_route)
-        AeroErpClient.ProbeFailure.REFUSED -> UiText.of(R.string.admin_integration_refused)
-        AeroErpClient.ProbeFailure.UNKNOWN -> UiText.of(R.string.admin_integration_unknown)
+): UiText {
+    diagnosis.failure()?.let { return it.describe() }
+    answer ?: return AeroFailure(AeroFailureCode.NOT_CONFIGURED).describe()
+
+    return when (answer) {
+        is AeroErpClient.Probe.Unreachable -> answer.reason.toFailure().describe()
+        is AeroErpClient.Probe.Answered -> when (val test = answer.test) {
+            is AeroTestResult.Ok ->
+                UiText.of(R.string.admin_integration_probe_ok, test.userName.ifBlank { test.userCode.toString() })
+            // The server's own refusal is already a sentence: it names the field the plant did not accept, and
+            // a generic replacement would throw away the only explanation the operator has.
+            is AeroTestResult.Failed ->
+                AeroFailure(AeroFailureCode.ERP_REFUSED, test.message).describe()
+        }
     }
-    answer is AeroErpClient.Probe.Answered -> when (val test = answer.test) {
-        is com.trindade.app.aero.AeroTestResult.Ok ->
-            UiText.of(R.string.admin_integration_probe_ok, test.userName.ifBlank { test.userCode.toString() })
-        // The server's own refusal is already a sentence: it names the field the plant did not accept, and a
-        // generic replacement would throw away the only explanation the operator has.
-        is com.trindade.app.aero.AeroTestResult.Failed ->
-            test.message?.let { UiText.literal(it) } ?: UiText.of(R.string.admin_integration_probe_refused)
-    }
-    else -> UiText.of(R.string.admin_integration_probe_ok, "")
 }
 
 /** `MutableStateFlow.update` without the import gymnastics in every setter. */

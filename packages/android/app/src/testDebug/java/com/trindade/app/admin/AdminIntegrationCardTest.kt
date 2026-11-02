@@ -110,7 +110,7 @@ class AdminIntegrationCardTest {
 
     @Test
     fun `a refusal is told apart from an answer`() {
-        render(state(message = UiText.of(R.string.admin_integration_no_wifi), messageIsError = true))
+        render(state(message = UiText.of(R.string.aero_failure_different_network), messageIsError = true))
 
         composeRule.onNodeWithText(string(R.string.action_result_error)).assertIsDisplayed()
     }
