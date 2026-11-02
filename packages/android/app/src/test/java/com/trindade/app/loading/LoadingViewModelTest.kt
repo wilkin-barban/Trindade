@@ -74,7 +74,8 @@ class LoadingViewModelTest {
         api: FakeLoadingApi,
         pdfGenerator: PdfGenerator = RecordingPdfGenerator(),
         shareManager: ShareManager = RecordingShareManager(),
-    ) = LoadingViewModel(LoadingRepository(api), pdfGenerator, shareManager)
+        today: () -> String = { "2026-09-18" },
+    ) = LoadingViewModel(LoadingRepository(api), pdfGenerator, shareManager, today)
 
     @Test
     fun `loads the day's entries and the configured slots`() {
@@ -123,9 +124,10 @@ class LoadingViewModelTest {
         val model = viewModel(api)
 
         // The date drives the request, so a wrong one asks the wrong question rather than showing the
-        // right answer in the wrong place.
+        // right answer in the wrong place. The day comes from the injected clock, which production binds
+        // to São Paulo; the fixture names it so this asserts the wiring rather than the machine's date.
         assertEquals(model.state.value.date, api.lastSchedulesDate)
-        assertEquals(saoPauloToday(), api.lastSchedulesDate)
+        assertEquals("2026-09-18", api.lastSchedulesDate)
     }
 
     @Test
@@ -272,6 +274,57 @@ class LoadingViewModelTest {
      * server as three rows of the same slot -- and each row's type and plate must be the one that driver
      * was given, not the first row's repeated.
      */
+    @Test
+    fun `a past day is closed, and today and a future day are not`() {
+        // The server refuses `date < today` and accepts the rest, so the client's own reading of the
+        // calendar has to agree with it: a future day is a draft, not a closed one.
+        assertTrue(isClosedDay("2026-09-17", "2026-09-18"))
+        assertFalse(isClosedDay("2026-09-18", "2026-09-18"))
+        assertFalse(isClosedDay("2026-09-19", "2026-09-18"))
+    }
+
+    @Test
+    fun `refuses to create on a past day without calling the API`() {
+        val api = FakeLoadingApi()
+        val model = viewModel(api, today = { "2026-09-18" })
+        model.onDateChange("2026-09-17")
+
+        assertTrue("the grid knows the day is closed", model.state.value.readOnly)
+
+        model.startAdding("04:00")
+        model.toggleFletero(FakeLoadingApi.FLETERO_DRIVER_ID, picked = true)
+        model.confirmAdd()
+
+        assertEquals("nothing leaves for a day the server would refuse", 0, api.createdBodies.size)
+        assertNull("no picker is opened on a closed day", model.state.value.addingToSlot)
+    }
+
+    @Test
+    fun `leaves a future day writable, because the server accepts it`() {
+        val api = FakeLoadingApi()
+        val model = viewModel(api, today = { "2026-09-18" })
+        model.onDateChange("2026-09-19")
+
+        assertFalse("a day nobody has lived yet is still a draft", model.state.value.readOnly)
+
+        model.startAdding("04:00")
+        model.toggleFletero(FakeLoadingApi.FLETERO_DRIVER_ID, picked = true)
+        model.confirmAdd()
+
+        assertEquals(1, api.createdBodies.size)
+    }
+
+    @Test
+    fun `refuses to delete a row on a past day`() {
+        val api = FakeLoadingApi(schedulesToReturn = listOf(FakeLoadingApi.entry(7, "04:00")))
+        val model = viewModel(api, today = { "2026-09-18" })
+        model.onDateChange("2026-09-17")
+
+        model.deleteEntry(7)
+
+        assertTrue("the row is history and stays", api.deletedIds.isEmpty())
+    }
+
     @Test
     fun `sends one row per picked driver, each with its own type and plate`() {
         val api = FakeLoadingApi(

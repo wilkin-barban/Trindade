@@ -390,6 +390,27 @@ class LoadingScreenTest {
         composeRule.onAllNodesWithText(copy(R.string.report_edit)).assertCountEquals(0)
     }
 
+    /**
+     * The other way a day is read-only, and the one the calendar decides: a day before today has ended.
+     *
+     * The rows are all still there -- the day is history, not empty -- and nothing that writes is. The
+     * sentence is the closed day's own, not the deactivated batch's: telling an operator that someone
+     * deactivated a batch that simply ended would send them to the history to look for a switch that is
+     * not there.
+     */
+    @Test
+    fun `hides every content action on a past day`() {
+        renderState(state().copy(today = "2026-09-19"))
+
+        day.forEach { displayed(it.driverName.orEmpty()) }
+        composeRule.onNodeWithText(copy(R.string.loading_closed_day)).performScrollTo().assertIsDisplayed()
+        composeRule.onAllNodesWithText(copy(R.string.loading_batch_deactivated)).assertCountEquals(0)
+
+        composeRule.onAllNodesWithText(copy(R.string.loading_add_entry)).assertCountEquals(0)
+        composeRule.onAllNodesWithContentDescription(copy(R.string.report_photo_remove)).assertCountEquals(0)
+        composeRule.onAllNodesWithText(copy(R.string.report_edit)).assertCountEquals(0)
+    }
+
     // ---- Rendering ----
 
     /** What the grid reported, in the order it reported it: the row's id and the day it sits on. */
