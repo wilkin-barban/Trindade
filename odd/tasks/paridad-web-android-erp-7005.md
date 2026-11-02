@@ -380,6 +380,16 @@ S19 — D5/D7, verbatim:
   huérfanas marcadas; el estado es explícito en la sesión. Verificado en 390×844 y en escritorio (S18).
 - **Commit esperado.** `feat(web): switch a box type off together with its tasks` · ~180 líneas.
 - **Depende.** —
+- **Hecho.** `0a0e945` (~430 líneas: la refactorización de `CategorySection` en `TaskBlocks` + interruptor pesó
+  más de lo previsto; comportamiento y tests van juntos). La regla vive en `lib/report-box-types.ts`
+  (`boxTypeEnabled`, `toggleBoxType`, `switchedOffTasks`), compartida por el formulario y la edición.
+  - Evidencia: `report-box-types.test.ts` 5/5 (node), `CategorySection.test.tsx` 4/4 (Vitest),
+    `report-box-types.spec.ts` 2/2 (390×844 y escritorio), node 485/485, Vitest 29/29.
+  - Desvío: el e2e quedó en un spec propio (`report-box-types.spec.ts`) en vez de ampliar
+    `massas-report-section.spec.ts`, que prueba la tarjeta de masas y no el interruptor.
+  - Borde compartido, sin cambio: la validación de temperaturas sigue mirando todas las tareas activas, como el
+    teléfono. Ningún tipo de caja tiene tareas de temperatura en el catálogo, así que hoy no hay campo oculto
+    obligatorio; si un administrador lo creara, ambos clientes lo reclamarían igual y se decide en T19.
 
 ### T12 · Web/backend: payload completo con `checked=false` explícito
 
@@ -706,7 +716,7 @@ recorta alcance **con aprobación explícita**, nunca moviéndolas a otro ODD po
 | T8 | B | `3868188` `feat(stock): elegir el día del histórico desde un panel y los días contados` | `StockHistoryPage.test.tsx` 3/3, `stock-history.spec.ts` 2/2 |
 | T9 | B | `16a7e39` `fix(web): recargar los históricos al elegir la fecha` | `ReportHistoryPage.test.tsx` 4/4, `LoadingHistoryPage.test.tsx` 2/2, e2e 13/13 |
 | T10 | C, S3 | `9f04860` `feat(web): leer el panel como seis tarjetas y un resumen` | `DashboardPage.test.tsx` 4/4, `dashboard.spec.ts` 6/6 |
-| T11 | D | `feat(web): switch a box type off together with its tasks` | `CategorySection.test.tsx` |
+| T11 | D | `0a0e945` `feat(web): apagar un tipo de caja junto con sus tareas` | `CategorySection.test.tsx` 4/4, `report-box-types.test.ts` 5/5, `report-box-types.spec.ts` 2/2 |
 | T12 | D, S1, S16 | `feat(reports): send every task, checked or not, and keep the unchecked rows` | `ReportEditPage.test.tsx`, `reports.command.service.test.ts` |
 | T13 | D | `fix(web): keep read-only reports read-only and draw the receivings` | `CategorySection.test.tsx`, `ReportsPage.test.tsx` |
 | T14 | D | `refactor(web): read the report products from the server catalogue` | `ReportEditPage.test.tsx`, `report-products.test.ts` |
