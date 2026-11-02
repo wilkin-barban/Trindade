@@ -48,10 +48,18 @@ data class MassasLaunchDayView(
     val totalUnits: Int = 0,
 )
 
+/**
+ * Una línea del lote.
+ *
+ * El operario viaja en el ítem cuando el lote mezcla gente: dos personas tipeando en la misma tableta son una
+ * sola petición, y el dueño de cada asiento es quien escribió esa línea, no quien apretó enviar. La tableta que
+ * manda una sola persona puede seguir firmándolo a nivel del cuerpo, como antes.
+ */
 @Serializable
 data class CreateMassasLaunchItem(
     @SerialName("product_code") val productCode: String,
     val boxes: Int,
+    @SerialName("operator_name") val operatorName: String? = null,
 )
 
 @Serializable

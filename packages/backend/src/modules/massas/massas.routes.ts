@@ -84,13 +84,16 @@ export async function massasRoutes(fastify: FastifyInstance) {
     }
 
     // The operator is the seat's, not the importer's; without a name that resolves, the importer keeps the
-    // launch. It is one decision for the whole request because an import carries one operator's boxes.
-    const operatorName = bodyOperatorName ?? targetItems.find((item) => item.operator_name)?.operator_name ?? null;
+    // launch. A batch is often several people's work, so the name travels per item and the body-level one is
+    // only the fallback the older clients still send.
     const seatItems = targetItems.map((item) => ({
       product_code: item.product_code,
       boxes: item.boxes,
       // A body-level seat matches the single item the rule above allowed.
       ent_lan: item.ent_lan ?? bodyEntLan ?? null,
+      // Per item first, the request's own second: an item that names nobody belongs to whoever the body named,
+      // and a body that names nobody leaves the launch to the asker, as it always did.
+      operatorName: item.operator_name ?? bodyOperatorName ?? null,
     }));
 
     // A worker imports only what the ERP already attributes to them; an administrator imports anybody's.
@@ -121,7 +124,8 @@ export async function massasRoutes(fastify: FastifyInstance) {
       const created = createMassaLaunches(fastify.db, {
         date: targetDate,
         userId: request.user!.sub,
-        operatorName,
+        // Only the body's own name; each item carries its own inside `items`.
+        operatorName: bodyOperatorName ?? null,
         items: seatItems,
       });
       return reply.status(201).send({ created });

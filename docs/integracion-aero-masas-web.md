@@ -239,9 +239,12 @@ producción —misma fecha, código, cantidad y operario—, la fila queda conci
 eliminar, para cualquier rol. No es una restricción de permisos sino de consistencia: Delphi ya asentó esa entrada.
 El backend rechaza `PUT` y `DELETE` aunque se los pida por fuera de la interfaz.
 
-**La importación conserva la identidad del asiento.** `POST /api/massas-launch` acepta `ent_lan` y
-`operator_name`; el lanzamiento guarda el asiento en `massa_launches.ent_lan` y el operario del asiento como dueño
-cuando ese nombre resuelve a un usuario activo. La conciliación empareja primero por `ent_lan`, sin mirar el
+**La importación conserva la identidad del asiento.** `POST /api/massas-launch` acepta `ent_lan`, y el operario
+viaja **por ítem** en `items[].operator_name`: un lote de la tableta puede ser el trabajo de dos personas, y el
+dueño de cada fila es quien la escribió. El lanzamiento guarda el asiento en `massa_launches.ent_lan` y el
+operario como dueño cuando ese nombre resuelve a un usuario activo. La forma vieja, un `operator_name` en el
+cuerpo para todo el lote, se sigue aceptando: es el respaldo de los clientes que todavía no se actualizaron, y un
+ítem que no nombra a nadie hereda el del cuerpo. La conciliación empareja primero por `ent_lan`, sin mirar el
 nombre. Un asiento ya importado se rechaza con `409 MASSAS_ALREADY_IMPORTED`.
 
 **Importar es de quien es el asiento.** El backend resuelve el dueño en `aero_movements`, no en el cuerpo de la

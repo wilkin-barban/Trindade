@@ -141,6 +141,13 @@ export interface CreateLaunchItem {
   boxes: number;
   /** The ERP seat this line came from, when the launch is an import. */
   ent_lan?: number | null;
+  /**
+   * The person the line belongs to, when the request names one per item.
+   *
+   * A batch typed on one tablet is often several people's work, and a single owner for the request credits
+   * whoever pressed send with everybody's boxes. Falls back to the request's operator, and then to the asker.
+   */
+  operatorName?: string | null;
 }
 
 export function createMassaLaunches(
@@ -174,21 +181,35 @@ export function createMassaLaunches(
   // rather than lent to the importer: the boxes belong to the person the ERP wrote, and crediting whoever
   // pressed the button is how a day ends up with the wrong names. A launch with no operator name at all is
   // the asker's own work, so the asker keeps it.
-  let ownerId = params.userId;
-  if (normalizeOperatorName(params.operatorName) !== '') {
-    const link = resolveOperatorLink(db, params.operatorName);
+  //
+  // The name is looked up per item and not once per request: one batch from one tablet can be two people's
+  // work, and a single owner for the whole body is exactly the defect this closes. The resolution is cached
+  // because a day of forty boxes from the same four people should not hit the users table forty times.
+  const ownersByName = new Map<string, number>();
+  const ownerFor = (name: string | null | undefined): number => {
+    const normalized = normalizeOperatorName(name);
+    if (normalized === '') return params.userId;
+    const cached = ownersByName.get(normalized);
+    if (cached !== undefined) return cached;
+
+    const link = resolveOperatorLink(db, name);
     if (link.status === 'missing') {
-      const err = new Error(`Operator not linked to a Trindade account: ${params.operatorName}`);
+      const err = new Error(`Operator not linked to a Trindade account: ${name}`);
       (err as unknown as { code: string }).code = 'OPERATOR_NOT_LINKED';
       throw err;
     }
     if (link.status === 'inactive') {
-      const err = new Error(`Operator is inactive in Trindade: ${params.operatorName}`);
+      const err = new Error(`Operator is inactive in Trindade: ${name}`);
       (err as unknown as { code: string }).code = 'OPERATOR_INACTIVE';
       throw err;
     }
-    ownerId = link.userId;
-  }
+    ownersByName.set(normalized, link.userId);
+    return link.userId;
+  };
+
+  // Resolved before the transaction opens, so a name nobody here has refuses the whole batch instead of
+  // leaving its first rows stored and the rest missing.
+  const ownerIds = params.items.map((item) => ownerFor(item.operatorName ?? params.operatorName));
 
   const now = nowIso();
   const insertStmt = db.prepare(
@@ -215,7 +236,8 @@ export function createMassaLaunches(
 
   return db.transaction(() => {
     const created: MassaIndividualLaunch[] = [];
-    for (const item of params.items) {
+    for (const [index, item] of params.items.entries()) {
+      const ownerId = ownerIds[index]!;
       const entLan = item.ent_lan ?? null;
       if (entLan !== null && seatStmt.get(entLan) !== undefined) {
         const err = new Error('This ERP seat was already imported');

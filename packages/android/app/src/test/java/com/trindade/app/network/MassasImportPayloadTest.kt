@@ -42,6 +42,43 @@ class MassasImportPayloadTest {
     }
 
     @Test
+    fun `a batch of two operators names each line's operator instead of the request's`() {
+        // Dos personas en la misma tableta: una petición, dos dueños. El nombre viaja en el ítem, que es la
+        // línea que la planta va a leer, y el cuerpo no firma a nadie.
+        val body = appJson.encodeToString(
+            CreateMassasLaunchRequest.serializer(),
+            CreateMassasLaunchRequest(
+                date = "2026-10-30",
+                items = listOf(
+                    CreateMassasLaunchItem("5000", 27, operatorName = "ALICE"),
+                    CreateMassasLaunchItem("22", 3, operatorName = "BOB"),
+                ),
+            ),
+        )
+
+        val json = appJson.parseToJsonElement(body).jsonObject
+        assertFalse("el cuerpo no firma el lote entero", json.containsKey("operator_name"))
+        val items = json.getValue("items").jsonArray.map { it.jsonObject }
+        assertEquals("ALICE", items[0].getValue("operator_name").jsonPrimitive.content)
+        assertEquals("BOB", items[1].getValue("operator_name").jsonPrimitive.content)
+    }
+
+    @Test
+    fun `a line with no operator sends no key at all`() {
+        val body = appJson.encodeToString(
+            CreateMassasLaunchRequest.serializer(),
+            CreateMassasLaunchRequest(
+                date = "2026-10-30",
+                items = listOf(CreateMassasLaunchItem("22", 3), CreateMassasLaunchItem("5000", 27, "BOB")),
+            ),
+        )
+
+        val items = appJson.parseToJsonElement(body).jsonObject.getValue("items").jsonArray.map { it.jsonObject }
+        assertFalse("la línea sin operario no inventa uno", items[0].containsKey("operator_name"))
+        assertEquals("BOB", items[1].getValue("operator_name").jsonPrimitive.content)
+    }
+
+    @Test
     fun `a launch typed here sends neither key, because the schema refuses what it does not expect`() {
         val body = appJson.encodeToString(
             CreateMassasLaunchRequest.serializer(),

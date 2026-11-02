@@ -198,13 +198,13 @@ describe('aero-mirror: bringing an ERP seat into Trindade', () => {
   });
 
   it('sends the seat and the operator the tablet wrote, not the importer', () => {
-    // Without these two the launch belongs to whoever pressed the button and the seat is forgotten, which
-    // is exactly the pair that never reconciled.
+    // Sin este par el lanzamiento queda a nombre de quien apretó el botón y el asiento se olvida, que es
+    // exactamente el par que nunca conciliaba. El operario va en la línea: el cuerpo no sabe firmar un lote
+    // de dos personas.
     assert.deepEqual(aeroImportPayload(seat({ entLan: 35937, operatorName: 'VICTOR' }), { productCode: '5000', boxes: 27 }, '2026-10-30'), {
       date: '2026-10-30',
       ent_lan: 35937,
-      operator_name: 'VICTOR',
-      items: [{ product_code: '5000', boxes: 27 }],
+      items: [{ product_code: '5000', boxes: 27, operator_name: 'VICTOR' }],
     });
   });
 });

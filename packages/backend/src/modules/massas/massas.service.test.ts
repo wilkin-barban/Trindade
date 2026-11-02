@@ -120,6 +120,65 @@ describe('massas launch service', () => {
     assert.equal(rows.total, 0, 'the refusal writes nothing');
   });
 
+  it('gives each item of one request the operator it names', () => {
+    // Un lote de una tableta es el trabajo de más de uno: dos productos distintos, dos personas distintas. Con
+    // un solo dueño por request, el segundo asiento quedaba a nombre de quien mandó el lote y la fábrica
+    // acreditaba a la persona equivocada.
+    const created = createMassaLaunches(db, {
+      date: testDate,
+      userId: userBobId,
+      items: [
+        { product_code: '5000', boxes: 27, ent_lan: 35937, operatorName: 'Alice Silva' },
+        { product_code: '22', boxes: 3, ent_lan: 35939, operatorName: 'Bob Santos' },
+      ],
+    });
+
+    assert.equal(created.length, 2);
+    assert.equal(created[0].user_id, userAliceId);
+    assert.equal(created[1].user_id, userBobId);
+    // Y el asiento sigue siendo de la línea que lo trajo, no del lote.
+    assert.equal(created[0].ent_lan, 35937);
+    assert.equal(created[1].ent_lan, 35939);
+  });
+
+  it('keeps a request-level operator as the owner of the items that name nobody', () => {
+    // El payload viejo: la pantalla mandaba un operario para todo el lote. Tiene que seguir funcionando igual,
+    // porque el teléfono y la tablet que no se actualizaron siguen mandando así.
+    const created = createMassaLaunches(db, {
+      date: testDate,
+      userId: userBobId,
+      operatorName: 'Alice Silva',
+      items: [
+        { product_code: '5000', boxes: 27, ent_lan: 35937 },
+        { product_code: '22', boxes: 3 },
+      ],
+    });
+
+    assert.deepEqual(
+      created.map((launch) => launch.user_id),
+      [userAliceId, userAliceId],
+    );
+  });
+
+  it('refuses the whole request when one item names an operator nobody here has', () => {
+    // Media importación no existe: si el segundo asiento no se puede atribuir, tampoco se guarda el primero.
+    assert.throws(
+      () =>
+        createMassaLaunches(db, {
+          date: testDate,
+          userId: userBobId,
+          items: [
+            { product_code: '5000', boxes: 27, ent_lan: 35937, operatorName: 'Alice Silva' },
+            { product_code: '22', boxes: 3, ent_lan: 35939, operatorName: 'MARIA DA SILVA' },
+          ],
+        }),
+      (error: unknown) => (error as { code?: string }).code === 'OPERATOR_NOT_LINKED',
+    );
+
+    const rows = db.prepare('SELECT COUNT(*) AS total FROM massa_launches').get() as { total: number };
+    assert.equal(rows.total, 0, 'la negativa no escribe nada');
+  });
+
   it('keeps the asker as the owner when the request names no operator at all', () => {
     // A manual launch is the asker's own work: there is no seat, so there is nobody else it could be.
     const [created] = createMassaLaunches(db, {

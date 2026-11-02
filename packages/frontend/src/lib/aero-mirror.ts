@@ -256,14 +256,15 @@ export function aeroImportPayload(
 ): {
   date: string;
   ent_lan: number;
-  operator_name: string;
-  items: { product_code: string; boxes: number }[];
+  items: { product_code: string; boxes: number; operator_name: string }[];
 } {
+  // El operario viaja en la línea y no en el cuerpo. Un lote de la tableta puede llevar el trabajo de dos
+  // personas, y el cuerpo solo sabe firmar a una: el nombre va donde está la línea que la planta va a leer.
+  // El backend sigue aceptando el cuerpo con un solo operario para los clientes que no se actualizaron.
   return {
     date,
     ent_lan: movement.entLan,
-    operator_name: movement.operatorName.trim(),
-    items: [{ product_code: plan.productCode, boxes: plan.boxes }],
+    items: [{ product_code: plan.productCode, boxes: plan.boxes, operator_name: movement.operatorName.trim() }],
   };
 }
 

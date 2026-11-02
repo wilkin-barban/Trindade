@@ -336,6 +336,44 @@ describe('massas routes', () => {
     assert.deepEqual(seats, [35937, 35939]);
   });
 
+  it('stores one batch with two operators, each seat under the person who typed it', async () => {
+    // La tableta de la fábrica manda el trabajo de dos personas en un solo lote. Con un dueño por request, el
+    // segundo asiento quedaba a nombre de quien apretó enviar, y la fábrica acreditaba a la persona equivocada.
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/massas-launch',
+      headers: { authorization: `Bearer ${tokenAlice}` },
+      payload: {
+        date: dateStr,
+        items: [
+          { product_code: '5000', boxes: 27, operator_name: 'Alice' },
+          { product_code: '22', boxes: 3, operator_name: 'Bob' },
+        ],
+      },
+    });
+
+    assert.equal(res.statusCode, 201, res.body);
+    const created = (JSON.parse(res.body) as { created: MassaIndividualLaunch[] }).created;
+    assert.deepEqual(
+      created.map((launch) => launch.username),
+      ['alice', 'bob'],
+    );
+
+    // Y la lectura del día, que es de donde leen las pantallas, dice lo mismo. Se buscan las dos filas por id y
+    // no por producto: el día puede traer lo que otros tests del mismo archivo ya plantaron.
+    const day = await app.inject({
+      method: 'GET',
+      url: `/api/massas-launch?date=${dateStr}`,
+      headers: { authorization: `Bearer ${tokenAlice}` },
+    });
+    const view = JSON.parse(day.body) as MassasLaunchDayView;
+    const ids = new Set(created.map((launch) => launch.id));
+    assert.deepEqual(
+      view.launches.filter((launch) => ids.has(launch.id)).map((launch) => launch.username),
+      ['alice', 'bob'],
+    );
+  });
+
   it('refuses the seat of an unlinked operator, and refuses the same seat twice once it is linked', async () => {
     // The name on the seat resolves to nobody, so there is no owner to record and the import is refused.
     const unknown = await app.inject({
