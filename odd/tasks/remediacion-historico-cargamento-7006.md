@@ -717,7 +717,7 @@ Los pasos 2, 3 y 4 son **publicación**: se ejecutan solo con autorización expl
 | T14 | S46, S47 | — | `MassasHistoryPage.test.tsx`, `StockHistoryPage.test.tsx` | pendiente |
 | T15 | S38, S39, S40, S42 | — | `loading-picker.test.ts`, `DriverPickerDialog.test.tsx` | pendiente |
 | T16 | S41 | — | `DriverPicker.test.tsx` | pendiente |
-| T17 | S38, S43, S54 | — | `LoadingViewModelTest.kt`, `LoadingScreenTest.kt` | pendiente |
+| T17 | S38, S43, S54 | `fix(android): keep taken plates and busy drivers out of the picker's offers`, `test(android): cover the free plates and the busy driver` | `LoadingViewModelTest.kt`, `LoadingScreenTest.kt` | hecho |
 | T18 | S44 | — | `DriverPickerDialog.test.tsx`, `loading-schedule.spec.ts` | pendiente |
 | T19 | S45 | — | `LoadingScreenTest.kt` | pendiente |
 | T20 | S29, S53 | — | `MassasLaunchViewModelTest.kt`, `AeroDispatcherTest.kt`, `massas-sync-header.spec.ts` | pendiente |
@@ -771,3 +771,13 @@ Correcciones que esta verificación introduce sobre el brief: el hallazgo B est�
 - Banner propio: `loading_closed_day` («Este dia já passou. Apenas consulta.») frente a `loading_batch_deactivated`; el día cerrado gana cuando ambos aplican, porque es el que el operador no puede deshacer.
 - El editor (`LoadingEditViewModel`) ya se dibuja en solo lectura porque la fila del servidor llega con `readOnly=true`, cubierto por `LoadingEditScreenTest > a read-only arrival draws no save action at all`.
 - Evidencia: `LoadingViewModelTest` 45/45, `LoadingScreenTest` 25/25, `LoadingEditScreenTest` 8/8, `LocaleStringsParityTest` 2/2 (`BUILD SUCCESSFUL in 8m 43s`).
+
+**L8 (cierre de T17, evidencia)**
+
+- `UiState.vehicleOptionsFor(driverId)` resta las chapas del día (`schedules.vehicleId`) y las ya elegidas en la tanda (`pickedCasa` salvo la propia). El `PlatePicker` la usa en lugar de `vehicles`; el KDoc que afirmaba «the same plate may be given to several drivers» quedó corregido.
+- `confirmAdd` construye las requests con `filter { it.value != null }.distinctBy { it.value }`: una chapa, una fila. El filtro previo evita que los conductores sin chapa colapsen en un solo `null` antes del `distinctBy`.
+- S54: `fleteroCandidates` y `casaCandidates` parten de `drivers` (no de `availableDrivers`), `assignedSlotOf(id)` da el horario y `CandidateRow` dibuja `loading_picker_driver_busy` con la fila deshabilitada. `toggleFletero` y `toggleCasa` rechazan el pick del ocupado, así que la fila y la request dicen lo mismo.
+- `availableDrivers` se conserva (y su test sigue vivo): sigue siendo la pregunta «quién está libre», ahora sin ser la que arma el selector.
+- Dos tests previos cambiaron de expectativa porque el silencio era justamente lo que S54 quita: `a fletero already on the day is not offered again` (antes exigía `Nenhum motorista disponível.`) ahora exige la fila deshabilitada con `Fletero já está nas 06:00.`; `availableDrivers excludes...` no se tocó.
+- Evidencia: `LoadingViewModelTest` 49/49, `LoadingScreenTest` 27/27 (`BUILD SUCCESSFUL in 8m 10s`).
+- Pendiente de T19: el 409 `DRIVER_ALREADY_SCHEDULED` con nombre y horario dentro de `ActionResultDialog` (S45) todavía muestra la frase genérica de 409 en `refusalMessage`.
