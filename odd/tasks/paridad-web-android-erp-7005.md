@@ -687,6 +687,18 @@ S19 — D5/D7, verbatim:
 - **Aceptación.** Guardar muestra estado y resultado; una acción bloqueada por integración ausente dice por qué.
 - **Commit esperado.** `fix(android): show the result of saving the ERP settings` · ~120 líneas.
 - **Depende.** —
+- **Cerrada.** Un commit: `12b6f40`.
+  - Tests corridos: `IntegrationSettingsSaveTest.kt` (nuevo, 4/4: guardado con mensaje, `isSaving` sin resto,
+    fallo del dispositivo como fallo, formulario incompleto sin escribir nada), `AdminIntegrationCardTest.kt`
+    (5/5, con el caso nuevo del botón que dice «Salvando…» y no acepta un segundo toque),
+    `MassasLaunchViewModelTest.kt` (caso nuevo: con la integración sin contraseña el diálogo dice que los
+    lanzamientos quedaron en el aparato y no sale ningún envío). Suite Android completa: 1230 tests, 0 fallos.
+  - Rojo verificado: con el `return` mudo del despacho y sin el mensaje del guardado, los tres casos nuevos
+    fallan (`IntegrationSettingsSaveTest.kt:131,152`, `MassasLaunchViewModelTest.kt:390`).
+  - Los mensajes del panel pasan a `UiText`, así que un operario en español deja de leer en portugués la
+    respuesta del botón que acaba de tocar; `describe()` sigue siendo la única función que los decide.
+  - `AeroReachabilityPort` nace para poder probar el guardado sin un `Context`: la pregunta de red es del
+    aparato y la decisión no.
 
 ### T22 · Android: un solo `AeroFailure` y el mensaje de Wi-Fi
 
@@ -867,7 +879,7 @@ recorta alcance **con aprobación explícita**, nunca moviéndolas a otro ODD po
 | T18 | E | `feat(web): open and retry a loading day from its history` | `LoadingHistoryPage.test.tsx`, `loading-history.spec.ts` |
 | T19 | E | `fix(web): say what actually failed on the loading schedule` | `LoadingSchedulePage.test.tsx`, `schedule-pdf.test.ts` |
 | T20 | F, S5, S11, S12 | `dcbc2fc` `feat(aero): la contraseña del ERP deja de guardarse en el dispositivo` + `016c30b` (panel y avisos) + `e5ad503` (e2e) + `3069818` (ayuda del panel) | `aero-integration.test.ts` 85/85, `aero-integration-panel.test.tsx` 5/5, `aero-password-session.test.ts` 4/4, `admin-integration.spec.ts` 4/4, Playwright 103/103 |
-| T21 | H P0-1, P0-5 | `fix(android): show the result of saving the ERP settings` | `IntegrationSettingsReadyTest.kt`, `MassasLaunchViewModelTest.kt` |
+| T21 | H P0-1, P0-5 | `12b6f40` `fix(android): decir qué pasó al guardar la integración` | `IntegrationSettingsSaveTest.kt` 4/4, `AdminIntegrationCardTest.kt` 5/5, `MassasLaunchViewModelTest.kt` caso nuevo, Android 1230/1230 |
 | T22 | H P0-2, P0-3 | `refactor(android): one failure model and a real Wi-Fi message` | `AeroFailureTest.kt`, `AeroLogicTest.kt` |
 | T23 | H P0-4, P0-6 | `feat(android): keep the ERP queue across restarts and refuse duplicated seats` | `AeroQueueTest.kt`, `MassasLaunchViewModelTest.kt` |
 | T24 | H P0-7, S17 | `feat(massas): let each seat carry its own operator` | `massas.routes.test.ts`, `massas.service.test.ts`, `MassasImportPayloadTest.kt`, `MassasLaunchPage.test.tsx` |
