@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LucidePlus, LucideX, LucideClock } from 'lucide-react';
 import { DriverPicker } from './DriverPicker';
-import { countInWindow, isQuotaExceeded } from '../../lib/loading-quota';
+import { countInWindow, isQuotaExceeded, toMinutes } from '../../lib/loading-quota';
 
 export interface ScheduleRow {
   id: number;
@@ -53,6 +53,13 @@ export function ScheduleGrid({
 }: ScheduleGridProps) {
   const { t } = useTranslation();
   const [addingSlot, setAddingSlot] = useState<string | null>(null);
+
+  // The day's configured slots, plus any hour the rows themselves mention. The list is a setting and the rows
+  // are facts: an hour saved before the list changed, or booked from the app, would otherwise be drawn nowhere
+  // -- counted by the quota, invisible on the grid, and impossible to empty without the API.
+  const slots = [...new Set([...timeSlots, ...schedules.map((entry) => entry.time_slot)])].sort(
+    (a, b) => toMinutes(a) - toMinutes(b)
+  );
   const [deleting, setDeleting] = useState<number | null>(null);
 
   const assignedVehicleIds = schedules
@@ -99,7 +106,7 @@ export function ScheduleGrid({
 
   return (
     <div className="space-y-3" data-testid="schedule-grid">
-      {timeSlots.map((slot) => {
+      {slots.map((slot) => {
         const entries = getSlotEntries(slot);
         // The badge and the warning answer the same question with the same rule: the shift, not the exact
         // minute. A slot showing «1/3» next to «límite alcanzado» was the two halves disagreeing.

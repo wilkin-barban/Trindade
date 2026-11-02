@@ -65,6 +65,25 @@ describe('ScheduleGrid quota', () => {
     expect(screen.getByTestId('maxed-04-30')).toBeInTheDocument();
   });
 
+  /**
+   * A slot that is not in the day's list still exists in the data.
+   *
+   * The list of slots is a setting and the rows are facts: a load saved at 23:30 before the list changed, or
+   * booked from the app, was drawn nowhere -- it counted against the quota and nobody could see it or remove
+   * it without going through the API.
+   */
+  it('draws an hour the list does not know, so it can still be seen and emptied', () => {
+    renderGrid([fletero(1, '23:30')], ['04:00']);
+
+    expect(screen.getByTestId('time-slot-23-30')).toBeInTheDocument();
+    expect(screen.getByTestId('entry-1')).toHaveTextContent('Fletero 1');
+    // The extra hour goes after the ones the day has, in the order the day runs.
+    expect(screen.getAllByTestId(/^time-slot-/).map((node) => node.getAttribute('data-testid'))).toEqual([
+      'time-slot-04-00',
+      'time-slot-23-30',
+    ]);
+  });
+
   it('shows an hour that holds nobody as zero, not as the shift next door', () => {
     renderGrid([fletero(1, '04:00')], ['04:00', '05:00']);
 
