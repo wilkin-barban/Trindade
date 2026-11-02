@@ -779,6 +779,22 @@ S19 — D5/D7, verbatim:
 - **Commit esperado.** `feat(massas): let each seat carry its own operator` · ~300 líneas (si excede 400, se
   parte en backend y clientes).
 - **Depende.** —
+- **Cerrada.** `08cc333` (contrato, servicio, ruta, clientes web y Android) + `2249394` (`code` en el sobre de
+  error, defecto de contrato que T19 dejó en `main`).
+  - El nombre viaja por ítem en `items[].operator_name`; el cuerpo sigue aceptando uno para todo el pedido como
+    respaldo de los clientes viejos, y un ítem que no nombra a nadie hereda el del cuerpo.
+  - La resolución del dueño es por ítem, con caché por nombre y **antes** de abrir la transacción: un nombre que
+    no existe rechaza el lote entero en lugar de dejar sus primeras filas guardadas.
+  - Web: `aeroImportPayload` pasa el operario del cuerpo al ítem. Android: `CreateMassasLaunchItem.operatorName`
+    opcional, que no se serializa cuando está vacío.
+  - No existe `MassasLaunchPage.test.tsx`: el lote manual de la pantalla lo firma el usuario logueado y el
+    dueño lo resuelve el token, así que el test de contrato del cliente vive en `aero-mirror.test.ts` y en
+    `MassasImportPayloadTest.kt`.
+  - Tests corridos: backend 674/674, web node 521/521, web unit 84/84, `tsc --noEmit` limpio, Android
+    `network.*` en verde.
+  - Hallazgo: `ErrorEnvelopeSchema` era estricto y las rutas de loading mandan `code` desde T19, así que
+    `loading.contract.test.ts` estaba en rojo en `main`. Verificado con `git stash` sobre HEAD antes de
+    arreglarlo.
 
 ### T25 · Web: errores y consultas ERP con el detalle correcto
 
@@ -913,7 +929,7 @@ recorta alcance **con aprobación explícita**, nunca moviéndolas a otro ODD po
 | T21 | H P0-1, P0-5 | `12b6f40` `fix(android): decir qué pasó al guardar la integración` | `IntegrationSettingsSaveTest.kt` 4/4, `AdminIntegrationCardTest.kt` 5/5, `MassasLaunchViewModelTest.kt` caso nuevo, Android 1230/1230 |
 | T22 | H P0-2, P0-3 | `refactor(android): one failure model and a real Wi-Fi message` | `AeroFailureTest.kt`, `AeroLogicTest.kt` |
 | T23 | H P0-4, P0-6 | `feat(android): keep the ERP queue across restarts and refuse duplicated seats` | `AeroQueueTest.kt`, `MassasLaunchViewModelTest.kt` |
-| T24 | H P0-7, S17 | `feat(massas): let each seat carry its own operator` | `massas.routes.test.ts`, `massas.service.test.ts`, `MassasImportPayloadTest.kt`, `MassasLaunchPage.test.tsx` |
+| T24 | H P0-7, S17 | `08cc333` + `2249394` `feat(massas): let each seat carry its own operator` | `massas.service.test.ts` 18/18, `massas.routes.test.ts` 26/26, `aero-mirror.test.ts` 19/19, `MassasImportPayloadTest.kt` |
 | T25 | G | `fix(web): stop masking ERP failures with a successful-looking answer` | `aero-integration.test.ts`, `aero-queue.test.ts` |
 | T26 | H P1 | `feat(android): send ERP launches in eights and retry only what failed` | `MassasLaunchViewModelTest.kt`, `MassasDayHeaderTest.kt` |
 | T27 | S9, S10 | `chore(android): hand the plant the 7005 build as the v0.7.0 asset` | `apksigner`, `aapt2`, `sha256sum -c`, e2e web |
