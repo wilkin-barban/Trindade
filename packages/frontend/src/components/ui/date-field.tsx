@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { Calendar } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { formatDateLabel } from '../../lib/date';
@@ -31,8 +32,35 @@ interface DateFieldProps {
  *
  * `overflow-hidden` is load-bearing: it clips the invisible input to the trigger box, so a residual
  * intrinsic width can never extend the tap target over the control that sits beside it.
+ *
+ * On a phone the tap opens the system wheel by itself, but on a desktop browser clicking a date input
+ * only focuses it: the calendar opens from the tiny icon inside the field, which here is invisible. So
+ * the click and the two keys that mean "open it" call `showPicker()` explicitly. It needs transient
+ * user activation and throws without it, so the call is guarded and the browser that cannot do it keeps
+ * the native behaviour.
  */
 export function DateField({ id, label, value, onChange, min, max, testId, className }: DateFieldProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  /**
+   * Opens the native calendar from the click the operator just made.
+   *
+   * A browser without `showPicker` (Safari shipped it late) keeps whatever its own click does; a browser
+   * that has it but refuses the call -- no user activation, cross-origin iframe -- also keeps it, because
+   * the only thing lost then is an attempt, not the control.
+   */
+  const openPicker = () => {
+    const input = inputRef.current;
+    if (!input) return;
+    const showPicker = (input as HTMLInputElement & { showPicker?: () => void }).showPicker;
+    if (typeof showPicker !== 'function') return;
+    try {
+      showPicker.call(input);
+    } catch {
+      // The field is still focusable and typable; the calendar just did not open.
+    }
+  };
+
   return (
     <div
       className={cn(
@@ -49,11 +77,18 @@ export function DateField({ id, label, value, onChange, min, max, testId, classN
         {label}
       </label>
       <input
+        ref={inputRef}
         id={id}
         type="date"
         value={value}
         min={min}
         max={max}
+        onClick={openPicker}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          openPicker();
+        }}
         onChange={(event) => onChange(event.target.value)}
         data-testid={testId}
         className="absolute inset-0 h-full w-full min-w-0 cursor-pointer opacity-0"
