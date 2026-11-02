@@ -37,6 +37,7 @@ import com.trindade.app.ui.components.AdminPrimaryButton
 import com.trindade.app.ui.components.HelpSection
 import com.trindade.app.ui.components.ModuleHelpButton
 import com.trindade.app.ui.components.ModuleHelpDialog
+import com.trindade.app.ui.components.ModuleHistoryButton
 import com.trindade.app.ui.components.NavigationActionButton
 
 /**
@@ -100,10 +101,9 @@ fun ReportGeneratorScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                NavigationActionButton(
-                    onClick = onOpenHistory,
-                    text = stringResource(R.string.report_history),
-                )
+                // The same pill Cargamento, Massas and Stock draw in their headers: one history affordance for
+                // the whole app, so the way back to the records does not have to be found again per screen.
+                ModuleHistoryButton(onClick = onOpenHistory)
                 ModuleHelpButton(onClick = { showHelpDialog = true })
             }
         }

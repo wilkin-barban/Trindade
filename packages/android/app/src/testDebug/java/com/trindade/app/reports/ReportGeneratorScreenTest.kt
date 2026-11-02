@@ -13,6 +13,8 @@ import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -24,6 +26,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.trindade.app.R
 import com.trindade.app.ui.UiText
+import com.trindade.app.ui.components.ModuleHistoryButtonPillTag
 import com.trindade.app.contract.models.CategoriesResponseCategoriesInner
 import com.trindade.app.contract.models.ProductsResponse
 import com.trindade.app.contract.models.ReportCategoryTasksInner
@@ -383,6 +386,40 @@ class ReportGeneratorScreenTest {
                 "${firstRootTaskTop.value}dp), so it is drawn between the two rows instead of under them",
             childTaskTop > firstRootTaskTop,
         )
+    }
+
+    /**
+     * One history affordance for the whole app.
+     *
+     * Cargamento, Massas and Stock draw the shared pill; the report form used to draw a plain button in the
+     * same corner, so the way to the records changed shape between screens. The tag is the shared
+     * component's own, and the height is the 36dp pill the others draw inside their 48dp touch target.
+     */
+    @Test
+    fun `draws the shared history pill in the header`() {
+        composeRule.setContent {
+            TrindadeTheme {
+                ReportGeneratorScreen(
+                    state = state(listOf(category(id = 8, namePt = "Higiene"))),
+                    onCheckChange = { _, _ -> },
+                    onProductToggle = { _, _, _ -> },
+                    onTemperatureChange = { _, _, _ -> },
+                    onBoxTypeChange = { _, _ -> },
+                    onNotesChange = {},
+                    onSubmit = {},
+                    onOpenHistory = {},
+                    onRetry = {},
+                )
+            }
+        }
+
+        // Unmerged: the tag sits on the pill, and the touch target around it is the node that answers taps.
+        val pill = composeRule.onNodeWithTag(ModuleHistoryButtonPillTag, useUnmergedTree = true)
+        pill.assertExists()
+        val bounds = pill.getUnclippedBoundsInRoot()
+        assertEquals("pill height for bounds $bounds", 36.dp, bounds.bottom - bounds.top)
+        composeRule.onNodeWithContentDescription(copy(R.string.report_history)).assertDoesNotExist()
+        composeRule.onNodeWithText(copy(R.string.report_history)).assertIsDisplayed()
     }
 
     @Test
