@@ -458,6 +458,19 @@ S19 — D5/D7, verbatim:
   despliegue. Verificado en 390×844 y en escritorio (S18).
 - **Commit esperado.** `refactor(web): read the report products from the server catalogue` · ~160 líneas.
 - **Depende.** T12.
+- **Hecho.** `297d3ec` (~150 líneas). `lib/report-products.ts` (`readReportProducts`) valida la respuesta; las
+  dos pantallas piden `/reports/products` en su propia llamada y `CategorySection`/`BoxTypeList`/`TaskBlocks`
+  reciben el catálogo. `productTemplates.ts` borrado.
+  - Fallback: no se conservó copia local. Ante una respuesta inválida o un error, las tareas de producto no
+    pintan casillas y muestran `report-products-unavailable` ("no se pudo cargar la lista"): una lista vacía se
+    leería como «ese producto no existe» y el operario dejaría de cargar. La regla «no queda catálogo
+    duplicado» pesó más que la palabra «fallback» del enunciado.
+  - Evidencia: `report-products.test.ts` 5/5, `CategorySection.test.tsx` 8/8 (oferta del servidor, aviso sin
+    catálogo, producto deshabilitado en solo lectura), `ReportsPage.test.tsx` 5/5 (oferta desde la API y aviso
+    con el endpoint caído sin perder el resto del formulario), `ReportEditPage.test.tsx` 4/4. Frontend node
+    494/494, Vitest 47/47.
+  - Verificado en 390×844 y 1280×900 con el endpoint sirviendo y fallando: casillas de Assaí y Normal desde la
+    API, y el aviso en amarillo en su lugar cuando el servidor no responde.
 
 ### T15 · Android: limpiar el estado de cajas al crear o editar
 
@@ -741,7 +754,7 @@ recorta alcance **con aprobación explícita**, nunca moviéndolas a otro ODD po
 | T11 | D | `0a0e945` `feat(web): apagar un tipo de caja junto con sus tareas` | `CategorySection.test.tsx` 4/4, `report-box-types.test.ts` 5/5, `report-box-types.spec.ts` 2/2 |
 | T12 | D, S1, S16 | `3a4894e` `feat(reports): mandar todas las tareas, marcadas o no` | `report-items.test.ts` 4/4, `ReportEditPage.test.tsx` 2/2, `reports.command.service.test.ts` 5/5, `dashboard.routes.test.ts` 11/11 |
 | T13 | D | `4d70fab` `fix(reports): deshabilitar de verdad y no perder los hijos de Recebimento` | `CategorySection.test.tsx` 5/5, `BoxTypeList.test.tsx` 5/5, `ReportsPage.test.tsx` 3/3, `ReportEditPage.test.tsx` 3/3 |
-| T14 | D | `refactor(web): read the report products from the server catalogue` | `ReportEditPage.test.tsx`, `report-products.test.ts` |
+| T14 | D | `297d3ec` `refactor(reports): leer el catálogo de productos del servidor` | `report-products.test.ts` 5/5, `CategorySection.test.tsx` 8/8, `ReportsPage.test.tsx` 5/5, `ReportEditPage.test.tsx` 4/4 |
 | T15 | D, S13 | `fix(android): keep the box switches in session state` | `ReportGeneratorViewModelTest.kt`, `ReportBoxTypeSwitchTest.kt` |
 | T16 | E | `feat(web): assign several drivers from one modal, each with its plate` | `DriverSelect.test.tsx`, `loading-schedule.spec.ts` |
 | T17 | E | `fix(web): count the loading quota by window and stop shifting edited rows` | `loading-quota.test.ts`, `LoadingEditPage.test.tsx` |
