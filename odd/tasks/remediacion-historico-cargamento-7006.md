@@ -371,6 +371,11 @@ Cada tarea declara objetivo, archivos, tests exactos, aceptación, commit espera
 - **Aceptación**: los tres casos verdes; un cliente que solo lee `error` sigue funcionando.
 - **Commit**: `feat(backend): name duplicate refusals with a stable code and slot` (~90 líneas).
 - **Depende de**: ninguna (paralelizable con T1).
+- **Estado.** Hecho en un commit (**1fc74c5**), 129 líneas. Los cuatro rechazos de duplicado (alta y
+  edición, motorista y vehículo) llevan `code`, `field` y `existing.time_slot`; `LoadingRefusal` los expone
+  solo cuando existen, para que una comparación estructural del rechazo no vea claves de más. El mensaje
+  humano se conserva y se traduce en el alta (PT/ES). `ErrorEnvelopeSchema` documenta los dos campos
+  aditivos y el 409 del contrato los nombra. 698 tests en verde.
 
 #### T5 — Sync ERP sin días pasados
 - **Specs**: S29 (backend).
@@ -639,7 +644,7 @@ Los pasos 2, 3 y 4 son **publicación**: se ejecutan solo con autorización expl
 | T1 | S22, S23, S25, S26, S27 | `fe4a921`, `46cd532` | `loading.routes.mutations.test.ts`, `loading.service.test.ts` | hecho |
 | T2 | S24, S31 | `b2fa299` | `loading.routes.mutations.test.ts`, `reports.routes.test.ts` | hecho |
 | T3 | S25, S37 | `868a10d` | `history-permissions.test.ts` | hecho |
-| T4 | S28 | — | `loading.routes.schedules.test.ts` | pendiente |
+| T4 | S28 | `1fc74c5` | `loading.routes.schedules.test.ts` | hecho |
 | T5 | S29, S53 | — | `aero.movements.service.test.ts`, `AeroAdaptersTest` | pendiente |
 | T6 | S49 | — | `aero-audit.test.ts`, `aero-bridge-wiring.test.ts` | pendiente |
 | T7 | S24, S31 | — | `LoadingHistoryViewModelTest.kt` | pendiente |
