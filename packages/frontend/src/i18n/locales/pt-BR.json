@@ -726,7 +726,15 @@
       "produced": "Produzido",
       "registered": "No ERP",
       "difference": "Diferença"
-    }
+    },
+    "historyDaysLabel": "Dias do histórico",
+    "historyDaysTitle": "Escolha o dia",
+    "historyDaysLoading": "Lendo os dias…",
+    "historyDaysUnavailable": "Não foi possível ler os dias com lançamentos; você pode abrir hoje ou ontem.",
+    "historyToday": "Hoje",
+    "historyYesterday": "Ontem",
+    "historyDayTotals": "{{boxes}} cx · {{units}} un · {{products}} prod · {{operators}} oper",
+    "historyEmptyDay": "Não há lançamentos registrados nesse dia."
   },
   "moduleHelp": {
     "dashboard": {

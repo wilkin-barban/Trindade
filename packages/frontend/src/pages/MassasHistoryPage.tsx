@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { Card, CardContent } from '../components/ui/card';
-import { DateField } from '../components/ui/date-field';
+import { MassasDayList, type MassasHistoryDay } from '../components/massas/MassasDayList';
 import { LoadingSpinner } from '../components/ui/loading-spinner';
 import { toWhatsAppNumber } from '../lib/phone';
 import { shareOrCopy, waMeLink } from '../lib/whatsapp';
@@ -14,7 +14,7 @@ import { MassasCollectiveTable } from './massas/MassasCollectiveTable';
 import { readAeroMovementsSnapshot, type AeroMovementSnapshot } from '../lib/aero-mirror';
 import { massasUnifiedRows, type MassasUnifiedRow } from '../lib/massas-unified';
 import { MassasWhatsAppShare } from './massas/MassasWhatsAppShare';
-import { saoPauloDaysAgo, saoPauloYesterday } from '../lib/date';
+import { saoPauloYesterday } from '../lib/date';
 
 /**
  * A past day of launching, read and shared but not edited.
@@ -25,7 +25,26 @@ import { saoPauloDaysAgo, saoPauloYesterday } from '../lib/date';
  */
 export function MassasHistoryPage() {
   const { t } = useTranslation();
-  const [date, setDate] = useState(saoPauloYesterday());
+  /**
+   * The open day lives in the URL.
+   *
+   * The launch screen and the report both link here with a day, so the day has to survive a reload, a
+   * shared link and the back button. `?date=` is the deep link; without it -- or with a day the history
+   * will not open -- the page falls back to yesterday, the newest day it can show.
+   */
+  const [params, setParams] = useSearchParams();
+  const yesterday = useMemo(() => saoPauloYesterday(), []);
+  const date = useMemo(() => {
+    const asked = params.get('date');
+    if (asked && /^\d{4}-\d{2}-\d{2}$/.test(asked) && asked <= yesterday) return asked;
+    return yesterday;
+  }, [params, yesterday]);
+  const setDate = useCallback(
+    (next: string) => {
+      setParams(next === yesterday ? {} : { date: next }, { replace: true });
+    },
+    [setParams, yesterday],
+  );
   const [dayView, setDayView] = useState<MassasLaunchDayView | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -40,6 +59,17 @@ export function MassasHistoryPage() {
   const [mirror, setMirror] = useState<{ loading: boolean; snapshot: AeroMovementSnapshot | null }>({
     loading: false,
     snapshot: null,
+  });
+  /**
+   * The days that have launches, for the list above the table.
+   *
+   * Its own read, and its own failure: a day list that could not be loaded leaves the operator with the one
+   * day that always exists -- yesterday -- instead of hiding the history behind an error.
+   */
+  const [days, setDays] = useState<{ loading: boolean; failed: boolean; list: MassasHistoryDay[] }>({
+    loading: true,
+    failed: false,
+    list: [],
   });
 
   // Edit / Delete state for Administrador
@@ -66,6 +96,23 @@ export function MassasHistoryPage() {
   useEffect(() => {
     void loadDay(date);
   }, [date, loadDay]);
+
+  useEffect(() => {
+    let active = true;
+    void api
+      .get<{ days?: MassasHistoryDay[] }>('/massas-launch/history')
+      .then((body) => {
+        if (!active) return;
+        const list = Array.isArray(body?.days) ? body.days : [];
+        setDays({ loading: false, failed: false, list });
+      })
+      .catch(() => {
+        if (active) setDays({ loading: false, failed: true, list: [] });
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -155,19 +202,9 @@ export function MassasHistoryPage() {
           </div>
           <p className="text-sm text-gray-500 mt-1">{t('massas.historySubtitle')}</p>
         </div>
-        {/* Una fila, la misma que en el lanzamiento: `DateField` y la vuelta a hoy a ancho propio, con
-            la palabra corta en el teléfono. Sin los botones de días con lanzamientos ni los carteles de
-            "Hoje"/"Modo Leitura": el rango ya dice cuál es el día más nuevo. */}
+        {/* La vuelta a hoy, sola: elegir día es trabajo de la lista, que muestra los totales de cada
+            jornada y no obliga a abrir un calendario para llegar a ayer. */}
         <div className="flex w-full items-center gap-2 sm:w-auto">
-          <DateField
-            id="history-date"
-            label={`${t('massas.date')}:`}
-            value={date}
-            onChange={setDate}
-            min={saoPauloDaysAgo(30)}
-            max={saoPauloYesterday()}
-            testId="massas-history-date"
-          />
           <Link
             to="/massas-launch"
             className="inline-flex h-11 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-300 bg-white px-3 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 sm:h-10"
@@ -197,8 +234,28 @@ export function MassasHistoryPage() {
           {notice.message}
         </div>
       )}
+      <MassasDayList
+        days={days.list}
+        value={date}
+        onChange={setDate}
+        yesterday={yesterday}
+        loading={days.loading}
+        failed={days.failed}
+      />
+
+      {/* Un día sin lanzamientos es un día vacío, no un error: la tabla no dibuja nada y sin esta línea
+          la pantalla quedaría muda, que es indistinguible de una lectura que falló. */}
+      {dayView && dayView.launches.length === 0 && (
+        <div
+          data-testid="massas-history-empty"
+          className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-600 shadow-sm"
+        >
+          {t('massas.historyEmptyDay')}
+        </div>
+      )}
+
       {/* Resumen Colectivo y Desglose por Operador */}
-      {dayView && (
+      {dayView && dayView.launches.length > 0 && (
         <MassasCollectiveTable
           products={dayView.products}
           launches={dayView.launches}
