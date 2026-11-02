@@ -50,12 +50,24 @@ export function availableDrivers<T extends { id: number }>(
   return drivers.filter((driver) => !assignedIds.includes(driver.id));
 }
 
-/** The fleet plates nobody took on this date. */
+/**
+ * The plates a row may choose: the ones nobody took on this date and nobody took in this batch.
+ *
+ * Asked for one row (`ownDriverId`), it keeps that row's own plate: the selector is rebuilt after every pick,
+ * and a list that dropped the current choice would reset the row the operator just answered.
+ */
 export function freeVehicles<T extends { id: number }>(
   vehicles: readonly T[],
-  assignedVehicleIds: readonly number[]
+  assignedVehicleIds: readonly number[],
+  picked: PickedPlates = new Map(),
+  ownDriverId: number | null = null
 ): T[] {
-  return vehicles.filter((vehicle) => !assignedVehicleIds.includes(vehicle.id));
+  const taken = [...picked.entries()]
+    .filter(([driverId]) => driverId !== ownDriverId)
+    .map(([, vehicleId]) => vehicleId);
+  return vehicles.filter(
+    (vehicle) => !assignedVehicleIds.includes(vehicle.id) && !taken.includes(vehicle.id)
+  );
 }
 
 /** Picking a driver twice un-picks him: the same control does both, as a check box does. */
@@ -102,6 +114,22 @@ export function batchRows(
  */
 export function rowsWithoutPlate(rows: readonly BatchRow[]): BatchRow[] {
   return rows.filter((row) => row.driverType === 'casa' && row.vehicleId === null);
+}
+
+/**
+ * The rows that would repeat a plate already carrying another row of the same batch.
+ *
+ * The server refuses the second one with a 409, and sending it spends a request to learn what the screen
+ * already knows. The first row to claim a plate keeps it.
+ */
+export function rowsWithRepeatedPlate(rows: readonly BatchRow[]): BatchRow[] {
+  const claimed = new Set<number>();
+  return rows.filter((row) => {
+    if (row.vehicleId === null) return false;
+    if (claimed.has(row.vehicleId)) return true;
+    claimed.add(row.vehicleId);
+    return false;
+  });
 }
 
 /**

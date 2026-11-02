@@ -283,9 +283,10 @@ test.describe('Loading Schedule — Fletero Assignment and Quota', () => {
     const form = page.locator('[data-testid="driver-form"]');
     await expect(form).toBeVisible();
 
-    // Fill the form
+    // Fill the form. A fletero brings his own truck: the plant does not ask him for a plate, and the one on his
+    // record is an old spreadsheet cell rather than the vehicle of the day.
     await page.locator('[data-testid="driver-form-name"]').fill('E2E Test Fletero');
-    await page.locator('[data-testid="driver-form-plate"]').fill('TST-9999');
+    await expect(page.locator('[data-testid="driver-form-plate"]')).toHaveCount(0);
 
     // Submit
     await page.locator('[data-testid="driver-form-submit"]').click();

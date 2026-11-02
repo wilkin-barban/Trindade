@@ -7,6 +7,7 @@ import {
   freeVehicles,
   onlyRefused,
   refusalMessage,
+  rowsWithRepeatedPlate,
   rowsWithoutPlate,
   schedulePayload,
   togglePick,
@@ -31,6 +32,8 @@ export interface DriverPickerProps {
   drivers: readonly PickerDriver[];
   assignedIds: readonly number[];
   assignedVehicleIds?: readonly number[];
+  /** The drivers of this day that are already in a slot, with the hour they are in. */
+  busy?: readonly { driverId: number; timeSlot: string }[];
   /** Reloads the day so the grid behind the modal already shows what was accepted. */
   onRefresh: () => void;
   onClose: () => void;
@@ -50,6 +53,7 @@ export function DriverPicker({
   drivers,
   assignedIds,
   assignedVehicleIds = [],
+  busy = [],
   onRefresh,
   onClose,
 }: DriverPickerProps) {
@@ -60,6 +64,7 @@ export function DriverPicker({
   const [assigning, setAssigning] = useState(false);
   const [error, setError] = useState('');
   const [plateMissing, setPlateMissing] = useState<string[]>([]);
+  const [plateRepeated, setPlateRepeated] = useState<string[]>([]);
   const [failures, setFailures] = useState<Refused[]>([]);
   // A fletero registered from inside the modal. The day is not reloaded for him: that would replace the grid
   // the modal is drawn over and close it, and the only thing that changed is one row of this list.
@@ -89,16 +94,24 @@ export function DriverPicker({
     ...registered.filter((fresh) => !drivers.some((driver) => driver.id === fresh.id)),
   ];
   const available = pool.filter((driver) => !assignedIds.includes(driver.id));
+  // The ones already in the day, by name: the pool is where their name lives, and an id alone would draw a
+  // sentence the operator cannot read.
+  const alreadyThere = busy.flatMap((entry) => {
+    const driver = pool.find((candidate) => candidate.id === entry.driverId);
+    return driver ? [{ id: driver.id, name: driver.name, timeSlot: entry.timeSlot }] : [];
+  });
 
   function pick(driver: PickerDriver) {
     setPicked((current) => togglePick(current, driver.id));
     setPlateMissing([]);
+    setPlateRepeated([]);
     setError('');
   }
 
   function pickVehicle(driverId: number, raw: string) {
     setPicked((current) => chooseVehicle(current, driverId, raw));
     setPlateMissing([]);
+    setPlateRepeated([]);
   }
 
   async function send(rows: ReturnType<typeof batchRows>) {
@@ -140,6 +153,15 @@ export function DriverPicker({
     const withoutPlate = rowsWithoutPlate(rows);
     if (withoutPlate.length > 0) {
       setPlateMissing(withoutPlate.map((row) => row.name));
+      return;
+    }
+    // Two rows cannot travel with the same plate: the server refuses the second one and the batch lands half
+    // done. The screen knows it before sending, so it says it here instead of spending a request to hear it.
+    const repeated = rowsWithRepeatedPlate(rows).map(
+      (row) => vehicles.find((vehicle) => vehicle.id === row.vehicleId)?.license_plate ?? ''
+    );
+    if (repeated.length > 0) {
+      setPlateRepeated(repeated);
       return;
     }
     if (rows.length > 0) void send(rows);
@@ -192,6 +214,9 @@ export function DriverPicker({
       vehiclesError={vehiclesError}
       onRetryVehicles={loadVehicles}
       plateMissing={plateMissing}
+      plateRepeated={plateRepeated}
+      busy={alreadyThere}
+      fleetSize={vehicles.length}
       error={error}
       failures={failures}
       onRetry={retry}

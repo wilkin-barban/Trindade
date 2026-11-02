@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import i18n from '../../i18n/config';
@@ -12,6 +12,8 @@ import i18n from '../../i18n/config';
 vi.mock('../../api/client', () => ({ api: { get: vi.fn(), post: vi.fn() }, ApiClientError: class extends Error {} }));
 
 const { ScheduleGrid } = await import('./ScheduleGrid');
+const { api } = await import('../../api/client');
+const get = api.get as unknown as { mockResolvedValue: (value: unknown) => void };
 
 const NOOP = () => {};
 
@@ -121,6 +123,93 @@ describe('ScheduleGrid quota', () => {
    * the 04:30 card still read «Nenhum carregamento agendado para este dia». The slot's own sentence is the
    * one that is true there.
    */
+  /**
+   * The picker receives the drivers the day already has, with the hour each one is in.
+   *
+   * Hiding them from the list is right -- they cannot be added twice -- but hiding them without a word reads
+   * as «he is not in the roster», and the operator adds him again to find out he was.
+   */
+  it('tells the picker who is already in the day, and the hour they are in', async () => {
+    get.mockResolvedValue({ vehicles: [] });
+    render(
+      <MemoryRouter>
+        <ScheduleGrid
+          schedules={[fletero(1, '04:00')]}
+          timeSlots={['04:00', '05:00']}
+          date="2026-11-02"
+          drivers={[{ id: 1, name: 'Fletero 1', driver_type: 'fletero', license_plate: null, phone: null }]}
+          loading={false}
+          onDelete={async () => {}}
+          onRefresh={NOOP}
+        />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByTestId('add-fletero-05-00'));
+
+    expect(await screen.findByTestId('driver-select-busy-1')).toHaveTextContent('Fletero 1 ya está en las 04:00');
+  });
+
+  /**
+   * The picker is offered over a day that was just read.
+   *
+   * Between two phones, the day moves: a truck booked from the tablet a minute ago is not in this grid, and a
+   * picker drawn from an old read offers a plate that is already out and hides a driver who is already in.
+   */
+  it('rereads the day before offering the picker', async () => {
+    get.mockResolvedValue({ vehicles: [] });
+    const onRefresh = vi.fn().mockResolvedValue(true);
+    render(
+      <MemoryRouter>
+        <ScheduleGrid
+          schedules={[]}
+          timeSlots={['04:00']}
+          date="2026-11-02"
+          drivers={[]}
+          loading={false}
+          onDelete={async () => {}}
+          onRefresh={onRefresh}
+        />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByTestId('add-fletero-04-00'));
+
+    await waitFor(() => expect(onRefresh).toHaveBeenCalledTimes(1));
+    expect(await screen.findByTestId('driver-select-04-00')).toBeInTheDocument();
+  });
+
+  /**
+   * A read that failed does not open a picker over a day nobody knows.
+   *
+   * The grid still shows the last read, and the operator would be picking drivers for a day that may have
+   * changed; the sentence says so and the retry is the same button.
+   */
+  it('keeps the picker shut when the day could not be read', async () => {
+    get.mockResolvedValue({ vehicles: [] });
+    const onRefresh = vi.fn().mockResolvedValue(false);
+    render(
+      <MemoryRouter>
+        <ScheduleGrid
+          schedules={[]}
+          timeSlots={['04:00']}
+          date="2026-11-02"
+          drivers={[]}
+          loading={false}
+          onDelete={async () => {}}
+          onRefresh={onRefresh}
+        />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByTestId('add-fletero-04-00'));
+
+    expect(await screen.findByTestId('picker-read-error')).toHaveTextContent(
+      'No se pudo leer el día. Reintentá antes de agregar.'
+    );
+    expect(screen.queryByTestId('driver-select-04-00')).toBeNull();
+  });
+
   it('says the hour is empty, not the whole day', () => {
     renderGrid([fletero(1, '04:00')], ['04:00', '05:00']);
 

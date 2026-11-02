@@ -40,7 +40,8 @@ export interface ScheduleGridProps {
   drivers: DriverRow[];
   loading: boolean;
   onDelete: (id: number) => Promise<void>;
-  onRefresh: () => void;
+  /** Reads the day again. A read that failed comes back as `false`, which is what keeps the picker shut. */
+  onRefresh: () => void | boolean | Promise<void | boolean>;
 }
 
 export function ScheduleGrid({
@@ -54,6 +55,11 @@ export function ScheduleGrid({
 }: ScheduleGridProps) {
   const { t } = useTranslation();
   const [addingSlot, setAddingSlot] = useState<string | null>(null);
+  // The slot whose day is being reread, and the sentence left behind when that read failed. The picker is
+  // drawn from the day: opening it over a read nobody could make offers plates that are out and hides drivers
+  // who are already in.
+  const [openingSlot, setOpeningSlot] = useState<string | null>(null);
+  const [pickerError, setPickerError] = useState('');
 
   // The day's configured slots, plus any hour the rows themselves mention. The list is a setting and the rows
   // are facts: an hour saved before the list changed, or booked from the app, would otherwise be drawn nowhere
@@ -66,6 +72,18 @@ export function ScheduleGrid({
   const assignedVehicleIds = schedules
     .filter((e) => e.vehicle_id != null)
     .map((e) => e.vehicle_id as number);
+
+  async function openPicker(slot: string) {
+    setPickerError('');
+    setOpeningSlot(slot);
+    const read = await onRefresh();
+    setOpeningSlot(null);
+    if (read === false) {
+      setPickerError(t('loading.pickerDayReadFailed'));
+      return;
+    }
+    setAddingSlot(slot);
+  }
 
   function getSlotEntries(slot: string): ScheduleRow[] {
     return schedules.filter((s) => s.time_slot === slot);
@@ -115,6 +133,9 @@ export function ScheduleGrid({
         const isExceeded = isQuotaExceeded(fleteroCount);
         const isAdding = addingSlot === slot;
         const assignedIds = getAssignedIds();
+        const busy = schedules
+          .filter((entry) => entry.driver_id != null)
+          .map((entry) => ({ driverId: entry.driver_id as number, timeSlot: entry.time_slot }));
 
         return (
           <div
@@ -214,6 +235,7 @@ export function ScheduleGrid({
                   drivers={drivers}
                   assignedIds={assignedIds}
                   assignedVehicleIds={assignedVehicleIds}
+                  busy={busy}
                   onRefresh={onRefresh}
                   onClose={() => setAddingSlot(null)}
                 />
@@ -221,14 +243,19 @@ export function ScheduleGrid({
                 <div className="flex flex-col gap-1">
                   <button
                     type="button"
-                    onClick={() => setAddingSlot(slot)}
-                    disabled={loading}
+                    onClick={() => void openPicker(slot)}
+                    disabled={loading || openingSlot !== null}
                     className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 font-medium py-1 disabled:opacity-50"
                     data-testid={`add-fletero-${slot.replace(':', '-')}`}
                   >
                     <LucidePlus className="h-4 w-4" />
-                    {t('loading.addFletero')}
+                    {openingSlot === slot ? t('ui.loading') : t('loading.addFletero')}
                   </button>
+                  {pickerError && (
+                    <p className="text-xs text-red-600" role="alert" data-testid="picker-read-error">
+                      {pickerError}
+                    </p>
+                  )}
                   {isExceeded && (
                     // The warning is a sentence, not an emoji glued to one: an emoji here is read out loud by
                     // a screen reader in the middle of the sentence, and it is the same glyph in both

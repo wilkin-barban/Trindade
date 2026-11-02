@@ -155,6 +155,53 @@ describe('DriverPicker', () => {
     expect(post.mock.calls[1][1]).toMatchObject({ driver_id: 77, vehicle_id: null });
   });
 
+  /**
+   * A plate taken by one row of the batch is not offered to the next one.
+   *
+   * Two company drivers cannot travel with the same plate: the server refuses the second row with a 409, so
+   * the batch would land the first and come back owing the second for something the picker already knew. The
+   * guard in `accept` is the second line of defence; this is the first, and the one an operator sees.
+   */
+  it('offers a row only the plates the rest of the batch has not taken', async () => {
+    get.mockResolvedValue({
+      vehicles: [
+        { id: 11, description: 'Volvo FH 540', license_plate: 'TRK-1A11' },
+        { id: 12, description: 'Scania R450', license_plate: 'TRK-2B22' },
+      ],
+    });
+    const onRefresh = vi.fn();
+    render(
+      <DriverPicker
+        timeSlot="04:00"
+        date="2026-02-10"
+        drivers={[
+          CASA,
+          { id: 5, name: 'Joana Casa', driver_type: 'casa', license_plate: null },
+        ]}
+        assignedIds={[]}
+        assignedVehicleIds={[]}
+        onRefresh={onRefresh}
+        onClose={vi.fn()}
+      />,
+    );
+    await act(async () => {});
+
+    fireEvent.click(screen.getByTestId('driver-select-tab-casa'));
+    pick('Silvana Casa');
+    pick('Joana Casa');
+    fireEvent.change(screen.getByTestId('driver-plate-4'), { target: { value: '11' } });
+
+    // Plate 11 is taken by Silvana's row, so Joana's row is offered the other one and its own placeholder only.
+    const joanaPlate = screen.getByTestId('driver-plate-5') as HTMLSelectElement;
+    expect([...joanaPlate.options].map((option) => option.value)).toEqual(['', '12']);
+    // Silvana still sees her own plate: a selector that dropped the current choice would reset her row.
+    expect([...screen.getByTestId('driver-plate-4').querySelectorAll('option')].map((o) => o.value)).toEqual([
+      '',
+      '11',
+      '12',
+    ]);
+  });
+
   it('withholds the batch while a picked company driver has no plate', async () => {
     await renderPicker();
 

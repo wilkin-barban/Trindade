@@ -72,10 +72,13 @@ describe('LoadingSchedulePage', () => {
 
     fireEvent.click(screen.getByTestId('driver-option-1'));
     fireEvent.click(screen.getByTestId('driver-option-4'));
+    // Opening the picker rereads the day, so the count starts here: what this test asserts is the reread the
+    // batch itself asks for, on top of the one the opening made.
+    const beforeAccept = dayRequests;
     fireEvent.click(screen.getByTestId('driver-select-accept'));
 
     await waitFor(() => expect(screen.getByTestId('driver-select-failures')).toBeInTheDocument());
-    await waitFor(() => expect(dayRequests).toBe(2), { interval: 5 });
+    await waitFor(() => expect(dayRequests).toBe(beforeAccept + 1), { interval: 5 });
 
     // While the day is being reread the grid is still there behind the modal, and so is the refusal.
     expect(screen.queryByRole('status')).toBeNull();

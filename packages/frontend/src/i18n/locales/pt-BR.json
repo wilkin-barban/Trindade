@@ -256,7 +256,11 @@
     "historyBatchCount_other": "{{count}} carregamentos",
     "historyLoadingDay": "Carregamento: {{date}}",
     "emptySlot": "Nenhum carregamento neste horário.",
-    "noVehicles": "Nenhum veículo configurado: peça ao Admin para cadastrar as placas."
+    "noVehicles": "Não há veículos na planta.",
+    "pickerAllPlatesTaken": "Todas as chapas já estão em uso neste dia.",
+    "pickerBusy": "{{name}} já está nas {{time}}.",
+    "pickerPlateRepeated": "A chapa {{plate}} já está escolhida nesta leva.",
+    "pickerDayReadFailed": "Não foi possível ler o dia. Tente de novo antes de adicionar."
   },
   "admin": {
     "title": "Administração",

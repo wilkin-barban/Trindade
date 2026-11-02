@@ -7,6 +7,7 @@ import {
   availableDrivers,
   onlyRefused,
   refusalMessage,
+  rowsWithRepeatedPlate,
   rowsWithoutPlate,
   schedulePayload,
   togglePick,
@@ -49,6 +50,36 @@ describe('the picks', () => {
       freeVehicles([{ id: 11 }, { id: 12 }], [12]).map((vehicle) => vehicle.id),
       [11]
     );
+  });
+});
+
+describe('the plates of one batch', () => {
+  const vehicles = [
+    { id: 11, description: 'Mercedes 1', license_plate: 'AAA-1111' },
+    { id: 12, description: 'Mercedes 2', license_plate: 'BBB-2222' },
+  ];
+
+  it('excludes the plate already picked in this batch', () => {
+    const picked = chooseVehicle(togglePick(new Map(), 4), 4, '11');
+
+    assert.deepEqual(freeVehicles(vehicles, [], picked).map((vehicle) => vehicle.id), [12]);
+  });
+
+  it('keeps the plate of the row itself, so choosing it again does not empty the selector', () => {
+    const picked = chooseVehicle(togglePick(new Map(), 4), 4, '11');
+
+    assert.deepEqual(freeVehicles(vehicles, [], picked, 4).map((vehicle) => vehicle.id), [11, 12]);
+  });
+
+  it('refuses two rows of the same batch carrying the same plate', () => {
+    const picked = chooseVehicle(
+      chooseVehicle(togglePick(togglePick(new Map(), 4), 5), 4, '11'),
+      5,
+      '11'
+    );
+    const rows = batchRows(picked, [...DRIVERS, { ...CASA, id: 5, name: 'Joana' }]);
+
+    assert.deepEqual(rowsWithRepeatedPlate(rows).map((row) => row.name), ['Joana']);
   });
 });
 

@@ -2,7 +2,13 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '../ui/button';
 import { Dialog } from '../ui/dialog';
-import type { PickedPlates, PickerDriver, PickerTab, PickerVehicle } from '../../lib/loading-picker';
+import {
+  freeVehicles,
+  type PickedPlates,
+  type PickerDriver,
+  type PickerTab,
+  type PickerVehicle,
+} from '../../lib/loading-picker';
 
 export interface DriverPickerDialogProps {
   slot: string;
@@ -18,6 +24,12 @@ export interface DriverPickerDialogProps {
   vehiclesError: boolean;
   onRetryVehicles: () => void;
   plateMissing: readonly string[];
+  /** The plates two rows of this batch would share, named so the operator knows which row to change. */
+  plateRepeated: readonly string[];
+  /** The drivers of the day that are already somewhere else, with the hour they are in. */
+  busy: readonly { id: number; name: string; timeSlot: string }[];
+  /** How many plates the plant has at all, which is what tells an empty fleet from a full day. */
+  fleetSize: number;
   error: string;
   /** The rows the last batch could not send, each with the reason the server gave for that row. */
   failures: readonly { driverId: number; name: string; message: string }[];
@@ -52,6 +64,9 @@ export function DriverPickerDialog({
   vehiclesError,
   onRetryVehicles,
   plateMissing,
+  plateRepeated,
+  busy,
+  fleetSize,
   error,
   failures,
   onRetry,
@@ -96,6 +111,18 @@ export function DriverPickerDialog({
             {t('loading.pickerHint')}
           </p>
         </div>
+
+        {/* The drivers the day already has, with the hour each one is in: dropping them from the list without a
+            word reads as "he is not in the roster", and the operator adds him again to find out he was. */}
+        {busy.length > 0 && (
+          <ul className="px-4 pt-2 space-y-0.5" data-testid="driver-select-busy">
+            {busy.map((driver) => (
+              <li key={driver.id} className="text-xs text-gray-500" data-testid={`driver-select-busy-${driver.id}`}>
+                {t('loading.pickerBusy', { name: driver.name, time: driver.timeSlot })}
+              </li>
+            ))}
+          </ul>
+        )}
 
         <div className="flex border-b border-gray-200 mx-4" role="tablist" aria-label={t('loading.pickerTitle', { slot })}>
           {tabButton('fleteros', t('loading.pickerTabFleteros'))}
@@ -188,7 +215,9 @@ export function DriverPickerDialog({
                     data-testid={`driver-plate-${driver.id}`}
                   >
                     <option value="">{t('loading.pickerPlate')}</option>
-                    {vehicles.map((vehicle) => (
+                    {/* The plates of this row: the day's free ones, minus the ones the rest of the batch
+                        already took, plus its own so choosing it again does not empty the selector. */}
+                    {freeVehicles(vehicles, [], picked, driver.id).map((vehicle) => (
                       <option key={vehicle.id} value={vehicle.id}>
                         {vehicle.license_plate} · {vehicle.description}
                       </option>
@@ -202,9 +231,17 @@ export function DriverPickerDialog({
           {/* A plant with no plates loaded says so once, above the rows: the row's own complaint («falta la
               chapa de Silvana») is true and unhelpful, and it sends the operator to look for a plate in a list
               that has none. */}
-          {!vehiclesError && vehicles.length === 0 && (
+          {!vehiclesError && vehicles.length === 0 && fleetSize === 0 && (
             <p className="text-xs text-amber-700 mt-2" data-testid="driver-select-no-vehicles">
               {t('loading.noVehicles')}
+            </p>
+          )}
+
+          {/* A plant whose plates are all out on this day is not a plant with no plates: the first is the day,
+              the second is the setup, and only the second one sends anybody to Admin. */}
+          {!vehiclesError && vehicles.length === 0 && fleetSize > 0 && (
+            <p className="text-xs text-amber-700 mt-2" data-testid="driver-select-no-plates-free">
+              {t('loading.pickerAllPlatesTaken')}
             </p>
           )}
 
@@ -219,6 +256,12 @@ export function DriverPickerDialog({
 
           {/* Named rather than counted: with several company drivers picked, "falta una chapa" leaves the
               operator hunting the list for the row that needs it. */}
+          {plateRepeated.length > 0 && (
+            <p className="text-sm text-red-600 mt-2" role="alert" data-testid="driver-select-plate-repeated">
+              {t('loading.pickerPlateRepeated', { plate: plateRepeated.join(', ') })}
+            </p>
+          )}
+
           {plateMissing.length > 0 && (
             <p className="text-sm text-red-600 mt-2" role="alert" data-testid="driver-select-plate-missing">
               {t('loading.pickerPlateMissing', { names: plateMissing.join(', ') })}

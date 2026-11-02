@@ -55,7 +55,8 @@ export function LoadingSchedulePage() {
   const [exportOpen, setExportOpen] = useState(false);
 
   // ---- Fetch data for current date ----
-  const fetchData = useCallback(async () => {
+  // Answers whether the day was read: the picker opens over that answer, not over the last grid on screen.
+  const fetchData = useCallback(async (): Promise<boolean> => {
     setError('');
     setReadError('');
     setLoading(true);
@@ -70,8 +71,10 @@ export function LoadingSchedulePage() {
       setSchedules(schedRes.schedules);
       setTimeSlots(slotsRes.timeSlots);
       setDrivers(driversRes.drivers);
+      return true;
     } catch (err) {
       setReadError(err instanceof Error ? err.message : t('loading.loadingError'));
+      return false;
     } finally {
       setLoading(false);
       setLoaded(true);

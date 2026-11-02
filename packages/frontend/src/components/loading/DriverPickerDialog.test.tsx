@@ -38,6 +38,9 @@ function renderDialog(overrides: Partial<Parameters<typeof DriverPickerDialog>[0
     vehiclesError: false,
     onRetryVehicles: vi.fn(),
     plateMissing: [],
+    plateRepeated: [],
+    busy: [],
+    fleetSize: VEHICLES.length,
     error: '',
     failures: [],
     onRetry: vi.fn(),
@@ -142,9 +145,38 @@ describe('DriverPickerDialog', () => {
    * a list that has none. The missing setup gets said out loud.
    */
   it('says no plate is configured, instead of only blaming the picked driver', () => {
-    renderDialog({ tab: 'casa', vehicles: [] });
+    renderDialog({ tab: 'casa', vehicles: [], fleetSize: 0 });
 
-    expect(screen.getByTestId('driver-select-no-vehicles')).toHaveTextContent('No hay vehículos configurados');
+    expect(screen.getByTestId('driver-select-no-vehicles')).toHaveTextContent('No hay vehículos en la planta');
+  });
+
+  /**
+   * A plant whose plates are all out is not a plant with no plates.
+   *
+   * Both leave the selector with only its placeholder, and reading them as the same thing sends the operator
+   * to Admin to load a fleet that is already loaded and already working.
+   */
+  it('tells a plant with no fleet apart from a day with no free plate', () => {
+    const props = renderDialog({ tab: 'casa', vehicles: [], fleetSize: 0 });
+    expect(screen.getByTestId('driver-select-no-vehicles')).toHaveTextContent('No hay vehículos en la planta');
+
+    props.rerender({ fleetSize: 4, picked: new Map([[4, null]]) });
+    expect(screen.getByTestId('driver-select-no-plates-free')).toHaveTextContent(
+      'Todas las chapas ya están en uso en este día'
+    );
+    expect(screen.queryByTestId('driver-select-no-vehicles')).toBeNull();
+  });
+
+  it('names the slot where a driver already is, instead of dropping him without a word', () => {
+    renderDialog({ busy: [{ id: 5, name: 'Joana', timeSlot: '05:00' }] });
+
+    expect(screen.getByTestId('driver-select-busy')).toHaveTextContent('Joana ya está en las 05:00');
+  });
+
+  it('names the plate two rows of the batch would share', () => {
+    renderDialog({ plateRepeated: ['TRK-1A11'] });
+
+    expect(screen.getByTestId('driver-select-plate-repeated')).toHaveTextContent('TRK-1A11');
   });
 
   it('does not blame the configuration when the plates simply did not arrive', () => {
