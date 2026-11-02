@@ -329,7 +329,7 @@ export function MassasLaunchPage() {
           phase: 'requested',
           destinationUrl: aeroDestination() || aeroSettings.wsUrl,
           payload: requested,
-          error: 'integration not ready',
+          error: 'integration_not_ready',
           note: `${requested.length} not sent`,
         });
       }
@@ -522,7 +522,8 @@ export function MassasLaunchPage() {
         event: 'read_history',
         phase: 'result',
         destinationUrl: aeroEndpoint(aeroSettings.wsUrl, 'movimentoitem'),
-        httpStatus: 200,
+        // The bridge reports what the ERP answered, not an HTTP status: the page never saw the socket, and
+        // a 200 invented here would read as an ERP answer in a log where the whole point is who said what.
         note: `seats=${read.movements.length} skipped=${read.skipped} · via=bridge`,
       });
 

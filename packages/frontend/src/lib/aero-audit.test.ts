@@ -32,7 +32,7 @@ globalThis.window = {
   removeEventListener: () => {},
 } as any;
 
-const { postAeroAuditEvent } = await import('./aero-audit');
+const { aeroErrorCode, postAeroAuditEvent } = await import('./aero-audit');
 
 interface Call {
   url: string;
@@ -51,7 +51,7 @@ function stubFetch(answer: Response | Error): { calls: Call[]; restore: () => vo
 }
 
 describe('postAeroAuditEvent', () => {
-  test('posts the event to the integration log route the server serves', async () => {
+  test('names the client, correlates the attempt and posts to the integration log route', async () => {
     const stub = stubFetch(new Response(JSON.stringify({ ok: true }), { status: 200 }));
     try {
       const kept = await postAeroAuditEvent({
@@ -60,19 +60,94 @@ describe('postAeroAuditEvent', () => {
         destinationUrl: 'http://192.168.1.50:8000/api/entradasitem',
         httpStatus: null,
         payload: { PRO_COD: '5000', PRO_QTD: 20 },
+        attemptId: 'attempt-1',
       });
 
       assert.equal(kept, true);
       assert.equal(stub.calls.length, 1);
       assert.equal(stub.calls[0]!.url, '/api/integration/aero/log');
       assert.equal(stub.calls[0]!.init.method, 'POST');
-      assert.deepEqual(JSON.parse(String(stub.calls[0]!.init.body)), {
+      const sent = JSON.parse(String(stub.calls[0]!.init.body));
+      assert.equal(sent.event, 'launch_sync');
+      assert.equal(sent.phase, 'requested');
+      assert.equal(sent.destinationUrl, 'http://192.168.1.50:8000/api/entradasitem');
+      assert.equal(sent.httpStatus, null);
+      assert.deepEqual(sent.payload, { PRO_COD: '5000', PRO_QTD: 20 });
+      // The three fields the server needs to attribute and correlate the line are not the caller's job.
+      assert.equal(sent.client, 'web');
+      assert.equal(sent.attemptId, 'attempt-1');
+      assert.equal(typeof sent.durationMs, 'number');
+    } finally {
+      stub.restore();
+    }
+  });
+
+  test('measures the duration from the attempt start and never sends the start itself', async () => {
+    const stub = stubFetch(new Response('{}', { status: 200 }));
+    try {
+      await postAeroAuditEvent({
+        event: 'launch_sync',
+        phase: 'result',
+        destinationUrl: 'http://192.168.1.50:8000/api/entradasitem',
+        startedAt: Date.now() - 1234,
+      });
+
+      const sent = JSON.parse(String(stub.calls[0]!.init.body));
+      assert.ok(sent.durationMs >= 1234, `expected >= 1234, got ${sent.durationMs}`);
+      assert.equal('startedAt' in sent, false, 'startedAt is a client concern, not a column');
+    } finally {
+      stub.restore();
+    }
+  });
+
+  test('trims the note to the column the server enforces instead of being refused', async () => {
+    const stub = stubFetch(new Response('{}', { status: 200 }));
+    try {
+      await postAeroAuditEvent({
         event: 'launch_sync',
         phase: 'requested',
         destinationUrl: 'http://192.168.1.50:8000/api/entradasitem',
-        httpStatus: null,
-        payload: { PRO_COD: '5000', PRO_QTD: 20 },
+        note: 'n'.repeat(400),
       });
+
+      const sent = JSON.parse(String(stub.calls[0]!.init.body));
+      assert.equal(sent.note.length, 256);
+    } finally {
+      stub.restore();
+    }
+  });
+
+  test('sends the failure as a stable AERO_ code and keeps the ERP sentence after it', async () => {
+    const stub = stubFetch(new Response('{}', { status: 200 }));
+    try {
+      await postAeroAuditEvent({
+        event: 'launch_sync',
+        phase: 'result',
+        destinationUrl: 'http://192.168.1.50:8000/api/entradasitem',
+        error: 'Usuário ou senha inválidos no ERP',
+      });
+
+      const sent = JSON.parse(String(stub.calls[0]!.init.body));
+      assert.ok(sent.error.startsWith('AERO_'), sent.error);
+      assert.ok(sent.error.includes('Usuário ou senha inválidos'), 'the detail a person needs survives');
+    } finally {
+      stub.restore();
+    }
+  });
+
+  test('caps a long failure at 1024 characters, code first', async () => {
+    const stub = stubFetch(new Response('{}', { status: 200 }));
+    try {
+      await postAeroAuditEvent({
+        event: 'launch_sync',
+        phase: 'result',
+        destinationUrl: 'http://192.168.1.50:8000/api/entradasitem',
+        error: 'x'.repeat(3000),
+      });
+
+      const sent = JSON.parse(String(stub.calls[0]!.init.body));
+      assert.equal(sent.error.length, 1024);
+      assert.ok(sent.error.startsWith('AERO_'));
     } finally {
       stub.restore();
     }
@@ -91,5 +166,27 @@ describe('postAeroAuditEvent', () => {
     } finally {
       stub.restore();
     }
+  });
+});
+
+describe('aeroErrorCode', () => {
+  test('keeps an already-prefixed code and prefixes a token-shaped one', () => {
+    assert.equal(aeroErrorCode('AERO_TIMEOUT'), 'AERO_TIMEOUT');
+    assert.equal(aeroErrorCode('movements_unreadable'), 'AERO_MOVEMENTS_UNREADABLE');
+    assert.equal(aeroErrorCode('batch_item_failed'), 'AERO_BATCH_ITEM_FAILED');
+  });
+
+  test('classifies the sentences the ERP and the browser actually produce', () => {
+    assert.equal(aeroErrorCode('Failed to fetch'), 'AERO_UNREACHABLE');
+    assert.equal(aeroErrorCode('Usuário ou senha inválidos'), 'AERO_UNAUTHORIZED');
+    assert.equal(aeroErrorCode('timeout de 30s'), 'AERO_TIMEOUT');
+    assert.equal(aeroErrorCode('blocked: mixed_content'), 'AERO_BLOCKED_MIXED_CONTENT');
+    assert.equal(aeroErrorCode('Erro 502 no ERP'), 'AERO_ERP_ERROR');
+    assert.equal(aeroErrorCode('qualquer outra coisa'), 'AERO_CLIENT_ERROR');
+  });
+
+  test('answers null for no failure at all', () => {
+    assert.equal(aeroErrorCode(null), null);
+    assert.equal(aeroErrorCode('   '), null);
   });
 });

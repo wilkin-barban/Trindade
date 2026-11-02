@@ -21,7 +21,7 @@ import {
 import { probeAeroConnection, type AeroConnectionProbe } from '../../lib/aero-connection';
 import { connectionVerdictTone, type AeroResultTone } from '../../lib/aero-feedback';
 import { AeroResultDialog } from './AeroResultDialog';
-import { postAeroAuditEvent } from '../../lib/aero-audit';
+import { newAeroAttempt, postAeroAuditEvent } from '../../lib/aero-audit';
 import {
   aeroTestRequestedEvent,
   aeroTestResultEvent,
@@ -144,9 +144,11 @@ export function AeroIntegrationPanel({
 
     const normalized = normalizeAeroWsUrl(draft.wsUrl);
     if (!normalized || !draft.username.trim() || !draft.password) {
+      // A `requested` line carries no error: the attempt did not fail, it never became an attempt. The
+      // reason goes in the note, where it describes why the page stopped before leaving.
       void postAeroAuditEvent({
         ...aeroTestRequestedEvent({ destinationUrl: draft.wsUrl.trim(), reason: null }),
-        error: 'invalid_config',
+        note: 'via=browser reason=invalid_config',
       });
       setNotice({ tone: 'error', text: t('massas.aero.testInvalid') });
       return;
@@ -156,8 +158,12 @@ export function AeroIntegrationPanel({
     const pageProtocol = typeof window === 'undefined' ? 'http:' : window.location.protocol;
     const blocker = aeroConnectionBlocker({ pageProtocol, wsUrl: normalized });
 
+    // One attempt id for the pair: the requested line and whatever result follows are the same action, and
+    // the log is read by correlating them.
+    const attempt = newAeroAttempt();
+
     setBusy('test');
-    await postAeroAuditEvent(aeroTestRequestedEvent({ destinationUrl, reason: blocker }));
+    await postAeroAuditEvent({ ...aeroTestRequestedEvent({ destinationUrl, reason: blocker }), ...attempt });
 
     if (blocker) {
       // The attempt survives the trip in local storage: Safari may reload the page while the phone is in
@@ -195,7 +201,7 @@ export function AeroIntegrationPanel({
     // The audit line is written whether the browser succeeded or hit another wall: the factory test is
     // inspected afterwards from a terminal, and an attempt that never left the phone is the fact that
     // explains the rest.
-    await postAeroAuditEvent(probeToAuditEvent(outcome, destination));
+    await postAeroAuditEvent({ ...probeToAuditEvent(outcome, destination), ...attempt });
 
     if (outcome.kind === 'ok') {
       persist({
