@@ -2037,7 +2037,8 @@
               "read_history",
               "dispatch",
               "sync",
-              "test"
+              "test",
+              "import"
             ]
           },
           "phase": {

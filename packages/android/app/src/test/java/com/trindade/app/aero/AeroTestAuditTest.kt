@@ -87,4 +87,36 @@ class AeroTestAuditTest {
 
         assertEquals(AeroAudit.note("nao-configurado"), request.note)
     }
+
+    /**
+     * The server's contract test pins the same row in TypeScript. The duplication is deliberate: it is what
+     * makes a rename on either side fail a test instead of reaching the plant's log as a line nobody keeps.
+     */
+    @Test
+    fun `the launch line is the dispatch row the backend contract pins`() {
+        val request = AeroAudit.request(
+            event = AeroAudit.Event.DISPATCH,
+            destinationUrl = "http://192.168.25.250:1453/api/entradasitem",
+            phase = "response",
+            httpStatus = 200,
+            durationMs = 1840,
+            detail = "launch #42",
+        )
+
+        assertEquals("dispatch", request.event)
+        assertEquals("response", request.phase)
+        assertEquals("http://192.168.25.250:1453/api/entradasitem", request.destinationUrl)
+        assertEquals(200, request.httpStatus)
+        assertEquals(1840L, request.durationMs)
+        assertTrue(request.note.orEmpty().startsWith(AeroAudit.PREFIX))
+    }
+
+    @Test
+    fun `every event name this app writes is one the backend accepts`() {
+        // Written out as literals on purpose: comparing the constants to themselves would pin nothing.
+        assertEquals(
+            listOf("dispatch", "sync", "test", "import"),
+            listOf(AeroAudit.Event.DISPATCH, AeroAudit.Event.SYNC, AeroAudit.Event.TEST, AeroAudit.Event.IMPORT),
+        )
+    }
 }

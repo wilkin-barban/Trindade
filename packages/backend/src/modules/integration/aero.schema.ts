@@ -26,6 +26,7 @@ export const AeroLogEventSchema = z.enum([
   'dispatch',
   'sync',
   'test',
+  'import',
 ]);
 
 /**
