@@ -2,6 +2,7 @@ package com.trindade.app.reports
 
 import com.trindade.app.contract.models.ReportHistoryResponse
 import com.trindade.app.contract.models.ScheduleHistoryResponsePagination
+import com.trindade.app.contract.models.SuccessResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -382,6 +383,71 @@ class ReportsHistoryViewModelTest {
         assertEquals(true, model.state.value.items.isEmpty())
         assertEquals(false, model.state.value.loading)
         assertEquals(ReportsHistoryViewModel.UNREACHABLE, model.state.value.message)
+    }
+
+    @Test
+    fun `names an expired session instead of a network fault`() {
+        api.deactivateResponse = Response.error(401, EMPTY_BODY)
+        val model = viewModel()
+        model.deactivate(1)
+
+        assertEquals(ReportsHistoryViewModel.SESSION_EXPIRED, model.state.value.message)
+        assertNotEquals(ReportsHistoryViewModel.UNREACHABLE, model.state.value.message)
+    }
+
+    @Test
+    fun `says the server failed rather than the network when it answers a 5xx`() {
+        api.deactivateResponse = Response.error(503, EMPTY_BODY)
+        val model = viewModel()
+        model.deactivate(1)
+
+        assertEquals(ReportsHistoryViewModel.SERVER_FAILED, model.state.value.message)
+    }
+
+    @Test
+    fun `keeps the success message when the reload fails`() {
+        // An activation is only sent from a row the server offers it for, so the fixture has to be one:
+        // `offersActivate` reads `canActivate` as `== true` and the default row answers false.
+        val api = FakeReportsApi(
+            historyToReturn = singleReport(canDeactivate = false, canDelete = false, canActivate = true, isActive = false),
+        )
+        // The first read is the one the screen loads with and has to answer; the second is the reload
+        // that follows the action, and it is the one that fails.
+        api.historyFailsFromRead = 2
+        val model = viewModel(api)
+        model.activate(1)
+
+        assertTrue("the action's own sentence survives the failed reload", model.state.value.resultMessage != null)
+        assertEquals(ReportsHistoryViewModel.UNREACHABLE, model.state.value.message)
+    }
+
+    @Test
+    fun `does not repeat an applied write on retry`() {
+        // The first read is the one the screen loads with and has to answer; the second is the reload
+        // that follows the action, and it is the one that fails.
+        api.historyFailsFromRead = 2
+        val model = viewModel()
+        model.deactivate(1)
+        assertEquals(listOf(1), api.deactivatedIds)
+
+        val readsBefore = api.historyReads
+        model.retry()
+
+        assertEquals("the applied write is not sent again", listOf(1), api.deactivatedIds)
+        assertTrue("the retry re-read the page", api.historyReads > readsBefore)
+    }
+
+    @Test
+    fun `repeats a refused write on retry`() {
+        api.deactivateResponse = Response.error(503, EMPTY_BODY)
+        val model = viewModel()
+        model.deactivate(1)
+        assertEquals(listOf(1), api.deactivatedIds)
+
+        api.deactivateResponse = Response.success(SuccessResponse(success = SuccessResponse.Success.entries.first()))
+        model.retry()
+
+        assertEquals("the refused write is sent again", listOf(1, 1), api.deactivatedIds)
     }
 
     /** One report with the flags a test wants, so an absent flag can be the point of a test. */

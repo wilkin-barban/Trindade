@@ -121,14 +121,19 @@ class FakeLoadingApi(
      */
     private val gateUpdates: Boolean = false,
     private val deleteSucceeds: Boolean = true,
-    /** What a batch deactivation answers. 200 with a body in practice; the fake never reads it either. */
-    private val deactivateBatchResponse: Response<SuccessResponse> =
+    /**
+     * What a batch deactivation answers. 200 with a body in practice; the fake never reads it either.
+     *
+     * A `var` because the retry tests set it after the fake is built: the first attempt has to be the
+     * one that fails, and the second the one that does not.
+     */
+    var deactivateBatchResponse: Response<SuccessResponse> =
         Response.success(SuccessResponse(success = SuccessResponse.Success.entries.first())),
     /** What a batch reactivation answers, the same 200-with-a-body as its pair. */
-    private val activateBatchResponse: Response<SuccessResponse> =
+    var activateBatchResponse: Response<SuccessResponse> =
         Response.success(SuccessResponse(success = SuccessResponse.Success.entries.first())),
     /** What a batch deletion answers, 204 with no body in practice, and the same convention for a refusal. */
-    private val deleteBatchResponse: Response<Unit> = Response.success(Unit),
+    var deleteBatchResponse: Response<Unit> = Response.success(Unit),
     /** Null is the server refusing to render the text, which is the only failure the export has. */
     private val exportToReturn: String? = EXPORT_TEXT,
 ) : LoadingApi {
@@ -247,6 +252,19 @@ class FakeLoadingApi(
         return Response.success(SchedulesResponse(schedules = schedules, dayActive = dayActive))
     }
 
+    /**
+     * The first read that fails, counted from one, so the reload that follows an action can be the read
+     * that fails while the one the screen loaded with still answered. Null leaves every read answering.
+     */
+    var historyFailsFromRead: Int? = null
+
+    /** The first read that waits on its own gate, counted from one, for the same reason. */
+    var gateHistoryFromRead: Int? = null
+
+    /** How many reads have been asked for, counted from the first. */
+    var historyReads = 0
+        private set
+
     override suspend fun history(
         date: String?,
         month: String?,
@@ -254,12 +272,16 @@ class FakeLoadingApi(
         pageSize: Int?,
     ): Response<ScheduleHistoryResponse> {
         historyFailure?.let { throw it }
+        historyReads += 1
+        historyFailsFromRead?.let { if (historyReads >= it) return Response.error(500, EMPTY_BODY) }
 
         val query = LoadingHistoryQuery(date = date, month = month, page = page, pageSize = pageSize)
         lastHistoryQuery = query
         historyQueries += query
 
-        if (gateHistory) {
+        val gateThisRead = gateHistory ||
+            gateHistoryFromRead?.let { historyReads >= it } == true
+        if (gateThisRead) {
             val gate = CompletableDeferred<Unit>()
             historyGates += gate
             gate.await()

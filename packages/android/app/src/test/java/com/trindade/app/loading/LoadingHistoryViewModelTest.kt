@@ -3,6 +3,7 @@ package com.trindade.app.loading
 import com.trindade.app.contract.models.ScheduleHistoryResponse
 import com.trindade.app.contract.models.ScheduleHistoryResponseItemsInner
 import com.trindade.app.contract.models.ScheduleHistoryResponsePagination
+import com.trindade.app.contract.models.SuccessResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -11,6 +12,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -419,6 +421,118 @@ class LoadingHistoryViewModelTest {
         assertEquals(false, model.state.value.loading)
         assertEquals(LoadingHistoryViewModel.UNREACHABLE, model.state.value.message)
     }
+
+    // ---- A refused action says which refusal it was ----
+
+    @Test
+    fun `names an expired session instead of a network fault`() {
+        // A 401 is the server answering: the session is gone and the way back is the sign-in, which is
+        // not what "check the network" tells the operator to do.
+        api.deactivateBatchResponse = Response.error(401, EMPTY_BODY)
+        val model = viewModel()
+        model.deactivateBatch("2026-09-18")
+
+        assertEquals(LoadingHistoryViewModel.SESSION_EXPIRED, model.state.value.message)
+        assertNotEquals(LoadingHistoryViewModel.UNREACHABLE, model.state.value.message)
+    }
+
+    @Test
+    fun `says the server failed rather than the network when it answers a 5xx`() {
+        api.deactivateBatchResponse = Response.error(503, EMPTY_BODY)
+        val model = viewModel()
+        model.deactivateBatch("2026-09-18")
+
+        assertEquals(LoadingHistoryViewModel.SERVER_FAILED, model.state.value.message)
+    }
+
+    @Test
+    fun `names a closed day from the code a 409 carries`() {
+        // A 409 is also how a duplicate answers, so the status alone cannot say which fact this is. The
+        // code can, and the sentence the operator gets is the one for the day being closed.
+        api.deactivateBatchResponse = Response.error(
+            409,
+            """{"error":"Este dia de carregamento já está fechado. Apenas consulta.","code":"LOADING_HISTORY_FROZEN"}"""
+                .toResponseBody("application/json".toMediaType()),
+        )
+        val model = viewModel()
+        model.deactivateBatch("2026-09-18")
+
+        assertEquals(LoadingHistoryViewModel.FROZEN, model.state.value.message)
+        assertNotEquals(LoadingHistoryViewModel.GENERIC, model.state.value.message)
+    }
+
+    // ---- An action is not overwritten by the reload ----
+
+    @Test
+    fun `keeps the success message when the reload fails`() {
+        // The write landed and only the read that follows it failed. Replacing the success with the
+        // network's sentence would report the write as lost when it was not, and the operator would
+        // deactivate the batch again.
+        // The row has to be an inactive batch the server offers activation for, or the action is cut
+        // before it is sent and there is no sentence to keep.
+        val api = FakeLoadingApi(historyToReturn = oneRow(ACTIVATABLE_ROW))
+        // The first read is the one the screen loads with and has to answer; the second is the reload
+        // that follows the action, and it is the one that fails.
+        api.historyFailsFromRead = 2
+        val model = viewModel(api)
+        model.activateBatch("2026-09-18")
+
+        assertTrue("the action's own sentence survives the failed reload", model.state.value.resultMessage != null)
+        assertEquals(LoadingHistoryViewModel.UNREACHABLE, model.state.value.message)
+    }
+
+    @Test
+    fun `keeps busy until the reload ends`() {
+        // The reload is what redraws the row, so an operator still able to tap would be able to send the
+        // same action twice while the first one is only half visible.
+        api.gateHistoryFromRead = 2
+        val model = viewModel()
+        assertFalse("the constructor's own read is not gated", model.state.value.busy)
+
+        model.deactivateBatch("2026-09-18")
+
+        assertTrue("busy lasts through the reload", model.state.value.busy)
+        assertEquals(1, api.deactivatedBatchDates.size)
+
+        api.historyGates.last().complete(Unit)
+    }
+
+    @Test
+    fun `does not repeat an applied write on retry`() {
+        // The write landed; the retry is the read that failed, not a second deactivation.
+        // The first read is the one the screen loads with and has to answer; the second is the reload
+        // that follows the action, and it is the one that fails.
+        api.historyFailsFromRead = 2
+        val model = viewModel()
+        model.deactivateBatch("2026-09-18")
+        assertEquals(1, api.deactivatedBatchDates.size)
+
+        val readsBefore = api.historyReads
+        model.retry()
+
+        assertEquals("the applied write is not sent again", 1, api.deactivatedBatchDates.size)
+        assertTrue("the retry re-read the page", api.historyReads > readsBefore)
+    }
+
+    @Test
+    fun `repeats a refused write on retry`() {
+        // Nothing landed, so the retry is the action itself: a retry that only re-read would leave the
+        // operator with a page that never changes.
+        api.deactivateBatchResponse = Response.error(503, EMPTY_BODY)
+        val model = viewModel()
+        model.deactivateBatch("2026-09-18")
+        assertEquals(1, api.deactivatedBatchDates.size)
+
+        api.deactivateBatchResponse =
+            Response.success(SuccessResponse(success = SuccessResponse.Success.entries.first()))
+        model.retry()
+
+        assertEquals("the refused write is sent again", 2, api.deactivatedBatchDates.size)
+    }
+
+    /** An inactive batch the server offers activation for, the only row an activation is sent from. */
+    private val ACTIVATABLE_ROW: ScheduleHistoryResponseItemsInner
+        get() = FakeLoadingApi.historyItem(isActive = false).copy(canDeactivate = false, canActivate = true)
 
     /** One batch, so a test can make a single row's flags the point of the test. */
     private fun oneRow(row: ScheduleHistoryResponseItemsInner) = ScheduleHistoryResponse(

@@ -87,13 +87,14 @@ class FakeReportsApi(
     /**
      * What a deactivation answers. 200 with a body in practice; the fake never reads the body either.
      */
-    private val deactivateResponse: Response<SuccessResponse> =
+    /** A `var` so a retry test can make the first attempt fail and the second one land. */
+    var deactivateResponse: Response<SuccessResponse> =
         Response.success(SuccessResponse(success = SuccessResponse.Success.entries.first())),
     /** What a reactivation answers, the same 200-with-a-body as its pair. */
-    private val activateResponse: Response<SuccessResponse> =
+    var activateResponse: Response<SuccessResponse> =
         Response.success(SuccessResponse(success = SuccessResponse.Success.entries.first())),
     /** What a deletion answers, 204 with no body in practice, and the same convention for a refusal. */
-    private val deleteResponse: Response<Unit> = Response.success(Unit),
+    var deleteResponse: Response<Unit> = Response.success(Unit),
 ) : ReportsApi {
 
     /** What the last create carried, which is the whole point of most of these tests. */
@@ -108,6 +109,18 @@ class FakeReportsApi(
      * separate fields let a test pin three of them and miss the one that moved.
      */
     var lastHistoryQuery: ReportsHistoryQuery? = null
+
+    /**
+     * The first read that fails, counted from one, so the reload that follows an action can be the read
+     * that fails while the one the screen loaded with still answered. Null leaves every read answering.
+     */
+    var historyFailsFromRead: Int? = null
+
+    /** The first read that waits on its own gate, counted from one, for the same reason. */
+    var gateHistoryFromRead: Int? = null
+
+    /** How many reads have been asked for, counted from the first. */
+    var historyReads = 0
         private set
 
     /**
@@ -173,11 +186,15 @@ class FakeReportsApi(
     ): Response<ReportHistoryResponse> {
         historyFailure?.let { throw it }
 
+        historyReads += 1
+        historyFailsFromRead?.let { if (historyReads >= it) return Response.error(500, EMPTY_BODY) }
+
         val query = ReportsHistoryQuery(date = date, month = month, page = page, pageSize = pageSize)
         lastHistoryQuery = query
         historyQueries += query
 
-        if (gateHistory) {
+        val gateThisRead = gateHistory || gateHistoryFromRead?.let { historyReads >= it } == true
+        if (gateThisRead) {
             val gate = CompletableDeferred<Unit>()
             historyGates += gate
             gate.await()
