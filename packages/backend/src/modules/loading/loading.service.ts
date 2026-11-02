@@ -273,7 +273,7 @@ export function update(
   const closed = closedDayRefusal(existing.schedule_date);
   if (closed) return closed;
 
-  const permissions = projectHistoryPermissions(actor, existing, 'one-hour');
+  const permissions = projectHistoryPermissions(actor, { ...existing, day_date: existing.schedule_date }, 'one-hour');
   if (!permissions.canEdit) {
     return { error: 'Registro somente leitura. Apenas o criador pode editar durante a primeira hora.', status: 403, code: 'SCHEDULE_READ_ONLY' };
   }
@@ -473,7 +473,13 @@ export function removeBatch(db: Database.Database, date: string): boolean | Load
 }
 
 function projectScheduleRow(row: ScheduleRow & { creator_name?: string | null; is_active?: number }, actor?: HistoryActor): ScheduleRow {
-  const permissions = actor ? projectHistoryPermissions(actor, { user_id: row.user_id ?? null, created_at: row.created_at ?? '', is_active: row.is_active }, 'one-hour') : {};
+  const permissions = actor
+    ? projectHistoryPermissions(
+        actor,
+        { user_id: row.user_id ?? null, created_at: row.created_at ?? '', is_active: row.is_active, day_date: row.schedule_date },
+        'one-hour',
+      )
+    : {};
   // The raw columns are this projection's input, not its output. Dropping them here is what lets a
   // generated client exist at all: `is_active` and `isActive` differ only by case, so a generator
   // that camelCases the JSON names would emit the same property twice.
@@ -560,6 +566,7 @@ export function listScheduleHistory(
         user_id: row.user_id,
         created_at: row.created_at ?? '',
         is_active: row.is_active,
+        day_date: row.batch_date,
       },
       'one-hour',
     );
@@ -571,9 +578,11 @@ export function listScheduleHistory(
       created_at: row.created_at,
       updated_at: row.updated_at,
       isActive: row.is_active === 1,
+      isClosedDay: Boolean(permissions.isClosedDay),
       readOnly: Boolean(permissions.readOnly),
       canEdit: Boolean(permissions.canEdit),
       canDeactivate: Boolean(permissions.canDeactivate),
+      canActivate: Boolean(permissions.canActivate),
       canDelete: Boolean(permissions.canDelete),
       creator: row.user_id ? { id: row.user_id, display_name: row.creator_name ?? '' } : null,
     } satisfies LoadingBatchHistoryItem;

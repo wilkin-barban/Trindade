@@ -317,9 +317,11 @@ describe('Loading Schedule Routes', () => {
     assert.strictEqual(history.statusCode, 200);
     const batch = JSON.parse(history.body).items[0];
     assert.strictEqual(batch.creator, null);
+    assert.strictEqual(batch.isClosedDay, true);
     assert.strictEqual(batch.readOnly, true);
     assert.strictEqual(batch.canDeactivate, true);
-    assert.strictEqual(batch.canDelete, true);
+    assert.strictEqual(batch.canActivate, false, 'an active batch offers deactivate, not activate');
+    assert.strictEqual(batch.canDelete, false, 'a closed day is deactivated, never erased');
     assert.strictEqual(batch.total_loadings, 2);
 
     const deactivated = await app.inject({
@@ -329,6 +331,15 @@ describe('Loading Schedule Routes', () => {
     });
     assert.strictEqual(deactivated.statusCode, 200);
     assert.strictEqual((db.prepare('SELECT COUNT(*) AS count FROM loading_schedules WHERE schedule_date = ? AND is_active = 0').get('2026-06-19') as any).count, 2);
+
+    const afterDeactivation = await app.inject({
+      method: 'GET',
+      url: '/api/loading/schedules/history?date=2026-06-19',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    const closedBatch = JSON.parse(afterDeactivation.body).items[0];
+    assert.strictEqual(closedBatch.canActivate, true, 'a closed day offers the way back');
+    assert.strictEqual(closedBatch.canDeactivate, false);
 
     const deleted = await app.inject({
       method: 'DELETE',

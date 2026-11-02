@@ -152,7 +152,9 @@ describe('loading service direct persistence contract', () => {
     assert.equal(history.items[0].total_loadings, 2);
     assert.equal(history.items[0].creator?.id, 2);
     assert.equal(history.items[0].canEdit, false);
-    assert.equal(history.items[0].canDelete, true);
+    // August is behind the operators' today, so the administrator cannot erase that day either.
+    assert.equal(history.items[0].isClosedDay, true);
+    assert.equal(history.items[0].canDelete, false);
     assert.equal(loading.listScheduleHistory(db, { userId: 2, page: 1, pageSize: 30 }, { sub: 2, role: 'Administrador' }).pagination.total, 2);
   });
 

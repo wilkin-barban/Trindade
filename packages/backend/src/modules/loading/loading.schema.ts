@@ -110,9 +110,11 @@ export const ScheduleSchema = z
     // cannot declare both. The first consumer that tried turned a tolerated wart into a blocker.
     // The projection still reads them as input; it no longer returns them.
     isActive: z.boolean(),
+    isClosedDay: z.boolean(),
     readOnly: z.boolean(),
     canEdit: z.boolean(),
     canDeactivate: z.boolean(),
+    canActivate: z.boolean(),
     canDelete: z.boolean(),
     creator: CreatorSchema.nullable(),
   })
@@ -126,8 +128,10 @@ export const LoadingBatchHistoryItemSchema = z
     created_at: z.string().nullable(),
     updated_at: z.string().nullable(),
     isActive: z.boolean(),
+    isClosedDay: z.boolean(),
     canEdit: z.boolean(),
     canDeactivate: z.boolean(),
+    canActivate: z.boolean(),
     canDelete: z.boolean(),
     readOnly: z.boolean(),
     creator: CreatorSchema.nullable(),

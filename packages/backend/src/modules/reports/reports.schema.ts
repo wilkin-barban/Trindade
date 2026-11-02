@@ -184,9 +184,11 @@ export const ReportListItemSchema = z
     user: ReportUserSchema,
     // Server-computed lifecycle flags, present only on the endpoints that pass an actor.
     isActive: z.boolean().optional(),
+    isClosedDay: z.boolean().optional(),
     readOnly: z.boolean().optional(),
     canEdit: z.boolean().optional(),
     canDeactivate: z.boolean().optional(),
+    canActivate: z.boolean().optional(),
     canDelete: z.boolean().optional(),
   })
   .strict();

@@ -90,6 +90,48 @@ describe('history permissions', () => {
     assert.strictEqual(permissions.canDelete, true);
   });
 
+  it('marks a past loading day read only even inside the one-hour window', () => {
+    const permissions = projectHistoryPermissions(
+      { sub: 1, role: 'Trabalhador' },
+      { user_id: 1, created_at: '2026-08-24T11:30:00.000Z', is_active: 1, day_date: '2026-08-23' },
+      'one-hour',
+      now
+    );
+
+    assert.strictEqual(permissions.isClosedDay, true);
+    assert.strictEqual(permissions.canEdit, false, 'the window cannot reopen a day the calendar closed');
+    assert.strictEqual(permissions.readOnly, true);
+  });
+
+  it('forbids deleting a past row even for an Administrador', () => {
+    const past = { user_id: 1, created_at: '2026-08-24T11:30:00.000Z', is_active: 1, day_date: '2026-08-20' };
+    const today = { ...past, day_date: '2026-08-24' };
+
+    assert.strictEqual(projectHistoryPermissions({ sub: 1, role: 'Administrador' }, past, 'one-hour', now).canDelete, false);
+    assert.strictEqual(projectHistoryPermissions({ sub: 1, role: 'Administrador' }, today, 'one-hour', now).canDelete, true);
+  });
+
+  it('offers activate only to an Administrador on an inactive row', () => {
+    const inactive = { user_id: 1, created_at: '2026-08-24T11:30:00.000Z', is_active: 0, day_date: '2026-08-20' };
+    const active = { ...inactive, is_active: 1 };
+
+    assert.strictEqual(projectHistoryPermissions({ sub: 1, role: 'Administrador' }, inactive, 'one-hour', now).canActivate, true);
+    assert.strictEqual(projectHistoryPermissions({ sub: 1, role: 'Administrador' }, active, 'one-hour', now).canActivate, false);
+    assert.strictEqual(projectHistoryPermissions({ sub: 1, role: 'Trabalhador' }, inactive, 'one-hour', now).canActivate, false);
+  });
+
+  it('keeps today editable within the window and leaves rows without a day untouched', () => {
+    const today = { user_id: 1, created_at: '2026-08-24T11:30:00.000Z', is_active: 1, day_date: '2026-08-24' };
+    const permissions = projectHistoryPermissions({ sub: 1, role: 'Trabalhador' }, today, 'one-hour', now);
+    assert.strictEqual(permissions.isClosedDay, false);
+    assert.strictEqual(permissions.canEdit, true);
+    assert.strictEqual(permissions.readOnly, false);
+
+    // A report carries its date elsewhere; without `day_date` the projection keeps its own window.
+    const report = { user_id: 1, created_at: '2026-08-20T11:30:00.000Z', is_active: 1 };
+    assert.strictEqual(projectHistoryPermissions({ sub: 1, role: 'Trabalhador' }, report, 'sao-paulo-current-and-previous-day', now).isClosedDay, false);
+  });
+
   it('projects the reports window when asked for it', () => {
     const row = { user_id: 1, created_at: '2026-08-24T07:00:00.000Z', is_active: 1 };
     const actor = { sub: 1, role: 'Trabalhador' };

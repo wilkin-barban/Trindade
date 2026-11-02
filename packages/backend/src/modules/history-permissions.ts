@@ -9,6 +9,14 @@ export interface OwnableHistoryRow {
   user_id: number | null;
   created_at: string;
   is_active?: number | boolean | null;
+  /**
+   * The São Paulo date the row belongs to, when its domain has one the operator can close.
+   *
+   * Loading schedules carry it; reports keep their rule in the edit window and pass nothing here.
+   * A row without a date is never "a closed day", so adding this field cannot change a projection
+   * that never opted in.
+   */
+  day_date?: string | null;
 }
 
 /**
@@ -86,15 +94,21 @@ export function projectHistoryPermissions(
   now: Date = new Date(),
 ) {
   const active = row.is_active === undefined || row.is_active === null ? true : Boolean(row.is_active);
-  const canEdit = active && row.user_id === actor.sub && isWithinEditWindow(window, row.created_at, now);
+  const isClosedDay = Boolean(row.day_date) && row.day_date! < getSaoPauloDateString(now);
+  // The calendar wins over the clock: a row dated before today is read-only even for its creator
+  // inside the edit window, and even for the administrator who could otherwise erase it.
+  const canEdit = !isClosedDay && active && row.user_id === actor.sub && isWithinEditWindow(window, row.created_at, now);
   const canDeactivate = isAdmin(actor) && active;
-  const canDelete = actor.role === 'Administrador' || actor.role === 'Trabalhador';
+  const canDelete = !isClosedDay && (actor.role === 'Administrador' || actor.role === 'Trabalhador');
+  const canActivate = isAdmin(actor) && !active;
 
   return {
     isActive: active,
-    readOnly: !canEdit,
+    isClosedDay,
+    readOnly: isClosedDay || !canEdit,
     canEdit,
     canDeactivate,
     canDelete,
+    canActivate,
   };
 }
