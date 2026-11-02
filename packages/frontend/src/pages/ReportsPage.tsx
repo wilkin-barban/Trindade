@@ -15,6 +15,7 @@ import {
 } from '../components/reports/CategorySection';
 import { toggleBoxType } from '../lib/report-box-types';
 import { reportItems } from '../lib/report-items';
+import { readReportProducts, type ReportProducts } from '../lib/report-products';
 import { ReceiptsSection } from '../components/reports/ReceiptsSection';
 import { hasTemperatureTasks } from '../lib/report-sections';
 import { MassasReportSection } from '../components/reports/MassasReportSection';
@@ -41,6 +42,8 @@ export function ReportsPage() {
   const location = useLocation();
 
   const [categories, setCategories] = useState<CategoryType[]>([]);
+  // Discovered rather than listed: the server keeps the offer, and a copy here would drift from it.
+  const [products, setProducts] = useState<ReportProducts | null>(null);
   const [turno, setTurno] = useState<'tarde' | 'noite'>('tarde');
   const [notes, setNotes] = useState('');
   const [form, setForm] = useState<FormState>({
@@ -104,15 +107,19 @@ export function ReportsPage() {
 
     async function load() {
       try {
-        const [catData, turnoData] = await Promise.all([
+        const [catData, turnoData, productData] = await Promise.all([
           api.get<{ categories: CategoryType[] }>('/reports/categories'),
           api.get<{ turno: string }>('/reports/turno'),
+          // Its own answer: a catalogue the server could not give is not a reason to refuse the form, so it
+          // is asked separately and a failure leaves the product blocks saying so.
+          api.get<unknown>('/reports/products').catch(() => null),
         ]);
 
         if (cancelled) return;
 
         setCategories(catData.categories);
         setTurno(turnoData.turno as 'tarde' | 'noite');
+        setProducts(readReportProducts(productData));
       } catch (err) {
         if (!cancelled) {
           setError(
@@ -427,6 +434,7 @@ export function ReportsPage() {
                     <BoxTypeList
                       title={i18n.language?.startsWith('es') ? cat.name_es : cat.name_pt}
                       childrenCategories={children}
+                      products={products}
                       form={form}
                       onItemChange={handleItemChange}
                       onTemperatureChange={handleTemperatureChange}
@@ -438,6 +446,7 @@ export function ReportsPage() {
                     <CategorySection
                       category={cat}
                       children={children}
+                      products={products}
                       form={form}
                       onItemChange={handleItemChange}
                       onTemperatureChange={handleTemperatureChange}

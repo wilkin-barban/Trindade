@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Input } from '../ui/input';
-import { ASSAI_PRODUCTS, NORMAL_PRODUCTS } from './productTemplates';
+import type { ReportProducts } from '../../lib/report-products';
 
 // ---- Types ----
 
@@ -42,6 +42,7 @@ export interface FormState {
 interface CategorySectionProps {
   category: CategoryType;
   children?: CategoryType[];
+  products: ReportProducts | null;
   form: FormState;
   onItemChange: (taskId: number, checked: boolean) => void;
   onTemperatureChange: (taskId: number, readingIndex: number, value: string) => void;
@@ -225,6 +226,7 @@ function BoxTypeSwitchRow({
 /** The tasks of one category, drawn without its heading: a root uses its own title, a nested type its switch. */
 function TaskBlocks({
   tasks,
+  products,
   form,
   onItemChange,
   onTemperatureChange,
@@ -232,15 +234,36 @@ function TaskBlocks({
   readOnly,
 }: {
   tasks: TaskType[];
+  products: ReportProducts | null;
   form: FormState;
   onItemChange: CategorySectionProps['onItemChange'];
   onTemperatureChange: CategorySectionProps['onTemperatureChange'];
   onSelectedProductsChange?: CategorySectionProps['onSelectedProductsChange'];
   readOnly?: boolean;
 }) {
+  const { t } = useTranslation();
+  // The offers come from the server, so a task that asks for one has nothing to draw until they arrive.
+  // Saying it once, where the boxes would be, is the difference between "this product does not exist" and
+  // "this list could not be read" -- and an operator who reads the first one stops filing.
+  const asksForProducts = tasks.some(
+    (task) => task.task_type === 'check_assai' || task.task_type === 'check_normal'
+  );
+  const productsMissing = products === null && asksForProducts;
+
   return (
     <div className="space-y-1">
+      {productsMissing && (
+        <p
+          className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+          data-testid="report-products-unavailable"
+        >
+          {t('reports.productsUnavailable')}
+        </p>
+      )}
       {tasks.map((task) => {
+          if (products === null && (task.task_type === 'check_assai' || task.task_type === 'check_normal')) {
+            return null;
+          }
           switch (task.task_type) {
             case 'check':
               return (
@@ -258,7 +281,7 @@ function TaskBlocks({
                 <ProductCheckTask
                   key={task.id}
                   task={task}
-                  products={ASSAI_PRODUCTS}
+                  products={products?.assai ?? []}
                   selectedProducts={form.selectedProducts?.[task.id] ?? []}
                   onChange={(selected) => onSelectedProductsChange && onSelectedProductsChange(task.id, selected)}
                   readOnly={readOnly}
@@ -270,7 +293,7 @@ function TaskBlocks({
                 <ProductCheckTask
                   key={task.id}
                   task={task}
-                  products={NORMAL_PRODUCTS}
+                  products={products?.normal ?? []}
                   selectedProducts={form.selectedProducts?.[task.id] ?? []}
                   onChange={(selected) => onSelectedProductsChange && onSelectedProductsChange(task.id, selected)}
                   readOnly={readOnly}
@@ -307,6 +330,7 @@ function TaskBlocks({
 export function BoxTypeList({
   title,
   childrenCategories,
+  products,
   form,
   onItemChange,
   onTemperatureChange,
@@ -318,6 +342,7 @@ export function BoxTypeList({
   /** Drawn above the list when the caller has no heading of its own. */
   title?: string;
   childrenCategories: CategoryType[];
+  products: ReportProducts | null;
   form: FormState;
   onItemChange: CategorySectionProps['onItemChange'];
   onTemperatureChange: CategorySectionProps['onTemperatureChange'];
@@ -352,6 +377,7 @@ export function BoxTypeList({
             {enabled && (
               <TaskBlocks
                 tasks={child.tasks}
+                products={products}
                 form={form}
                 onItemChange={onItemChange}
                 onTemperatureChange={onTemperatureChange}
@@ -369,6 +395,7 @@ export function BoxTypeList({
 export function CategorySection({
   category,
   children,
+  products,
   form,
   onItemChange,
   onTemperatureChange,
@@ -389,6 +416,7 @@ export function CategorySection({
       </h3>
       <TaskBlocks
         tasks={category.tasks}
+        products={products}
         form={form}
         onItemChange={onItemChange}
         onTemperatureChange={onTemperatureChange}
@@ -397,6 +425,7 @@ export function CategorySection({
       />
       <BoxTypeList
         childrenCategories={children ?? []}
+        products={products}
         form={form}
         onItemChange={onItemChange}
         onTemperatureChange={onTemperatureChange}

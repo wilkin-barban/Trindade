@@ -14,6 +14,7 @@ import {
 } from '../components/reports/CategorySection';
 import { toggleBoxType } from '../lib/report-box-types';
 import { reportItems } from '../lib/report-items';
+import { readReportProducts, type ReportProducts } from '../lib/report-products';
 import { ReceiptsSection } from '../components/reports/ReceiptsSection';
 import { ERP_RECEIPT_CATEGORY_ID, usesErpReceipts } from '../lib/receipts';
 
@@ -81,6 +82,8 @@ export function ReportEditPage() {
 
   const [report, setReport] = useState<ReportDetail | null>(null);
   const [categories, setCategories] = useState<CategoryType[]>([]);
+  // The offer the server keeps; null means it could not be read, and the product blocks say so.
+  const [products, setProducts] = useState<ReportProducts | null>(null);
   const [turno, setTurno] = useState<'tarde' | 'noite'>('tarde');
   const [notes, setNotes] = useState('');
   const [form, setForm] = useState<FormState>({
@@ -124,10 +127,13 @@ export function ReportEditPage() {
 
     async function load() {
       try {
-        const [reportData, catData, photosData] = await Promise.all([
+        const [reportData, catData, photosData, productData] = await Promise.all([
           api.get<{ report: ReportDetail }>(`/reports/${id}`),
           api.get<{ categories: CategoryType[] }>('/reports/categories'),
           api.get<{ photos: ReportPhoto[] }>(`/reports/${id}/photos`),
+          // Asked on its own: an offer the server could not give leaves the product blocks saying so, and
+          // does not take the report the operator came to read down with it.
+          api.get<unknown>('/reports/products').catch(() => null),
         ]);
 
         if (cancelled) return;
@@ -135,6 +141,7 @@ export function ReportEditPage() {
         const r = reportData.report;
         setReport(r);
         setCategories(catData.categories);
+        setProducts(readReportProducts(productData));
         setTurno(r.turno);
         setNotes(r.notes ?? '');
         setPhotos(photosData.photos);
@@ -458,6 +465,7 @@ export function ReportEditPage() {
                   <ReceiptsSection date={report?.report_date ?? ''} readOnly />
                   <BoxTypeList
                     childrenCategories={categories.filter((child) => child.parent_category_id === cat.id)}
+                    products={products}
                     form={form}
                     onItemChange={handleItemChange}
                     onTemperatureChange={handleTemperatureChange}
@@ -471,6 +479,7 @@ export function ReportEditPage() {
                 <CategorySection
                   category={cat}
                   children={categories.filter((child) => child.parent_category_id === cat.id)}
+                  products={products}
                   form={form}
                   onItemChange={handleItemChange}
                   onTemperatureChange={handleTemperatureChange}

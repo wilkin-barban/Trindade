@@ -189,7 +189,8 @@
     "massasSummary": "Resumen colectivo",
     "erpMovementsTitle": "Movimientos del ERP (Masas y Recepción)",
     "erpMovementsSync": "Sincronizar con ERP",
-    "erpMovementsSubtitle": "Entradas registradas en el ERP para masas y recepción de insumos"
+    "erpMovementsSubtitle": "Entradas registradas en el ERP para masas y recepción de insumos",
+    "productsUnavailable": "No se pudo cargar la lista de productos del servidor. Recargá la página para volver a intentarlo."
   },
   "loading": {
     "vehiclesError": "No se pudieron cargar los vehículos.",

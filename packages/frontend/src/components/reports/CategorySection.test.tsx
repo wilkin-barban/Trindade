@@ -61,8 +61,10 @@ const ASSAI_BOXES: CategoryType = {
   name_pt: 'Caixas Assai',
   name_es: 'Cajas Assai',
   sort_order: 6,
-  tasks: [task(61, 10, 'Disgo 500g')],
+  tasks: [{ ...task(61, 10, 'Disgo 500g'), task_type: 'check_assai' }],
 };
+
+const PRODUCTS = { assai: ['Nhoque Kg', 'Quadrada'], normal: ['Nhoque 400g', 'Nhoque Kg'] };
 
 const EMPTY_FORM: FormState = { items: {}, temperatures: {}, selectedProducts: {} };
 
@@ -78,6 +80,7 @@ function renderSection({
   return render(
     <CategorySection
       category={PARENT}
+      products={PRODUCTS}
       children={[SMALL_BOXES, ASSAI_BOXES]}
       form={{ ...EMPTY_FORM, disabledBoxTypeIds }}
       onItemChange={vi.fn()}
@@ -90,6 +93,39 @@ function renderSection({
   );
 }
 
+describe('CategorySection — the product offer', () => {
+  it('draws the boxes the server offered, not a copy of them', () => {
+    renderSection();
+
+    expect(screen.getAllByText('Quadrada').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('product-task-61-Nhoque Kg')).toBeInTheDocument();
+  });
+
+  it('says the offer could not be read instead of offering nothing', () => {
+    // An empty list would read as "this product does not exist", and an operator who reads that stops filing.
+    render(
+      <CategorySection
+        category={PARENT}
+        products={null}
+        children={[ASSAI_BOXES]}
+        form={EMPTY_FORM}
+        onItemChange={vi.fn()}
+        onTemperatureChange={vi.fn()}
+        onSelectedProductsChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('report-products-unavailable')).toBeInTheDocument();
+    expect(screen.queryByTestId('product-task-61-Nhoque Kg')).not.toBeInTheDocument();
+  });
+
+  it('does not let a read-only report select a product either', () => {
+    renderSection({ readOnly: true });
+
+    expect(screen.getByTestId('product-task-61-Nhoque Kg')).toBeDisabled();
+  });
+});
+
 describe('CategorySection — box type switch', () => {
   it('draws one switch per box type, on by default, with its tasks under it', () => {
     renderSection();
@@ -97,7 +133,7 @@ describe('CategorySection — box type switch', () => {
     expect(screen.getByTestId('box-type-switch-9')).toBeChecked();
     expect(screen.getByTestId('box-type-switch-10')).toBeChecked();
     expect(screen.getByTestId('check-task-58')).toBeInTheDocument();
-    expect(screen.getByTestId('check-task-61')).toBeInTheDocument();
+    expect(screen.getByTestId('product-task-61-Nhoque Kg')).toBeInTheDocument();
   });
 
   it('takes the block of a switched-off type off the screen and leaves the other one', () => {
@@ -105,7 +141,7 @@ describe('CategorySection — box type switch', () => {
 
     expect(screen.getByTestId('box-type-switch-9')).not.toBeChecked();
     expect(screen.queryByTestId('check-task-58')).not.toBeInTheDocument();
-    expect(screen.getByTestId('check-task-61')).toBeInTheDocument();
+    expect(screen.getByTestId('product-task-61-Nhoque Kg')).toBeInTheDocument();
     // The parent's own tasks are not a box type and never leave with a switch.
     expect(screen.getByTestId('check-task-23')).toBeInTheDocument();
   });
@@ -124,6 +160,7 @@ describe('CategorySection — box type switch', () => {
       <>
         <CategorySection
           category={PARENT}
+          products={PRODUCTS}
           children={[SMALL_BOXES]}
           form={{ ...EMPTY_FORM, items: { 23: true } }}
           onItemChange={vi.fn()}
@@ -133,6 +170,7 @@ describe('CategorySection — box type switch', () => {
         />
         <CategorySection
           category={TEMPERATURES}
+          products={PRODUCTS}
           form={{ ...EMPTY_FORM, temperatures: { 5: ['4'] } }}
           onItemChange={vi.fn()}
           onTemperatureChange={vi.fn()}

@@ -50,6 +50,7 @@ const CATEGORIES: CategoryType[] = [
   { id: 1, parent_category_id: null, name_pt: 'Higiene', name_es: 'Higiene', sort_order: 1, tasks: [task(1, 1, 'Pátio')] },
   { id: 4, parent_category_id: null, name_pt: 'Recebimento', name_es: 'Recepción', sort_order: 4, tasks: [task(43, 4, 'Recebimento de farinha')] },
   { id: 41, parent_category_id: 4, name_pt: 'Recebimento de congelados', name_es: 'Recepción de congelados', sort_order: 5, tasks: [task(410, 41, 'Conferência do congelado')] },
+  { id: 3, parent_category_id: null, name_pt: 'Caixas', name_es: 'Cajas', sort_order: 3, tasks: [{ ...task(61, 3, 'Montagem Assai'), task_type: 'check_assai' as const }] },
 ];
 
 function renderPage() {
@@ -65,6 +66,7 @@ beforeEach(async () => {
   get.mockImplementation(async (url: string) => {
     if (url === '/reports/categories') return { categories: CATEGORIES };
     if (url === '/reports/turno') return { turno: 'tarde' };
+    if (url === '/reports/products') return { assai: ['Nhoque Kg', 'Quadrada'], normal: ['Nhoque 400g'] };
     return {};
   });
   await i18n.changeLanguage('es');
@@ -87,6 +89,28 @@ describe('ReportsPage — sections', () => {
     // Its child is a category of its own, with its own answer.
     expect(screen.getByTestId('box-type-switch-41')).toBeChecked();
     expect(screen.getByTestId('check-task-410')).toBeInTheDocument();
+  });
+
+  it('offers the product boxes the server answered, not a copy kept here', async () => {
+    renderPage();
+
+    expect(await screen.findByTestId('product-task-61-Nhoque Kg')).toBeInTheDocument();
+    expect(screen.getByTestId('product-task-61-Quadrada')).toBeInTheDocument();
+  });
+
+  it('keeps the form and says so when the product offer cannot be read', async () => {
+    get.mockImplementation(async (url: string) => {
+      if (url === '/reports/categories') return { categories: CATEGORIES };
+      if (url === '/reports/turno') return { turno: 'tarde' };
+      if (url === '/reports/products') throw new Error('offline');
+      return {};
+    });
+    renderPage();
+
+    expect(await screen.findByTestId('report-products-unavailable')).toBeInTheDocument();
+    // The rest of the report is still a report: one missing offer does not take the other sections down.
+    expect(screen.getByTestId('check-task-1')).toBeInTheDocument();
+    expect(screen.queryByTestId('product-task-61-Nhoque Kg')).not.toBeInTheDocument();
   });
 
   it('reads the categories and the turno once, and nothing else to draw the form', async () => {

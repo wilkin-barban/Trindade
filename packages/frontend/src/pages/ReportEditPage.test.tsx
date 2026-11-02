@@ -117,11 +117,37 @@ describe('ReportEditPage — the body it saves', () => {
     expect(body.items.some((item) => item.taskId === 5)).toBe(false);
   });
 
+  it('offers the product boxes the server answered when editing', async () => {
+    const withProducts = {
+      ...REPORT,
+      items: [...REPORT.items, { task_id: 61, checked: false, task_type: 'check_assai' }],
+      selectedProducts: [],
+    };
+    get.mockImplementation(async (url: string) => {
+      if (url === '/reports/7') return { report: withProducts };
+      if (url === '/reports/categories') {
+        return {
+          categories: [
+            ...CATEGORIES,
+            { id: 3, parent_category_id: null, name_pt: 'Caixas', name_es: 'Cajas', sort_order: 3, tasks: [{ ...task(61, 3), task_type: 'check_assai' as const }] },
+          ],
+        };
+      }
+      if (url.endsWith('/photos')) return { photos: [] };
+      if (url === '/reports/products') return { assai: ['Nhoque Kg'], normal: ['Nhoque 400g'] };
+      return {};
+    });
+    renderPage();
+
+    expect(await screen.findByTestId('product-task-61-Nhoque Kg')).toBeInTheDocument();
+  });
+
   it('draws the mirror over Recebimento without dropping the categories below it', async () => {
     get.mockImplementation(async (url: string) => {
       if (url === '/reports/7') return { report: REPORT_AFTER_CUTOFF };
       if (url === '/reports/categories') return { categories: CATEGORIES_AFTER_CUTOFF };
       if (url.endsWith('/photos')) return { photos: [] };
+      if (url === '/reports/products') return { assai: ['Nhoque Kg'], normal: ['Nhoque 400g'] };
       return {};
     });
     renderPage();

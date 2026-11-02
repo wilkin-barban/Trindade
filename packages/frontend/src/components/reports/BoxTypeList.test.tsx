@@ -38,6 +38,7 @@ function renderList(childrenCategories: CategoryType[], readOnly?: boolean) {
     <BoxTypeList
       title="Recebimento"
       childrenCategories={childrenCategories}
+      products={{ assai: ['Nhoque Kg'], normal: ['Nhoque 400g'] }}
       form={{ items: {}, temperatures: {}, selectedProducts: {} }}
       onItemChange={vi.fn()}
       onTemperatureChange={vi.fn()}
@@ -70,6 +71,7 @@ describe('BoxTypeList', () => {
     render(
       <BoxTypeList
         childrenCategories={[CHILD]}
+        products={{ assai: ['Nhoque Kg'], normal: ['Nhoque 400g'] }}
         form={{ items: {}, temperatures: {}, selectedProducts: {}, disabledBoxTypeIds: [41] }}
         onItemChange={vi.fn()}
         onTemperatureChange={vi.fn()}
