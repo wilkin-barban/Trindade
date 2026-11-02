@@ -433,6 +433,18 @@ S19 — D5/D7, verbatim:
   pantallas. Verificado en 390×844 y en escritorio (S18).
 - **Commit esperado.** `fix(web): keep read-only reports read-only and draw the receivings` · ~90 líneas.
 - **Depende.** T11.
+- **Hecho.** `4d70fab` (~380 líneas; el corte de ~90 no se sostuvo porque dibujar los hijos sin repetir el
+  encabezado pidió sacar `BoxTypeList` de `CategorySection`).
+  - `CheckTask` y `TemperatureTask` reciben `readOnly`: `disabled` más el corte en el `onChange`, porque un
+    control deshabilitado sigue disparando eventos sintéticos. `ProductCheckTask` ya lo tenía.
+  - El espejo del ERP reemplaza el checklist de Recebimento, no las categorías que cuelgan de ella. En el
+    formulario el corte dibujaba `null` -- la categoría entera, hijos incluidos; en la edición se perdían solo
+    los hijos. Ahora los dos dibujan `BoxTypeList` con los hijos.
+  - Evidencia: `CategorySection.test.tsx` 5/5 (checkbox, temperatura rellena y sin marcar, todos `disabled`),
+    `BoxTypeList.test.tsx` 5/5, `ReportsPage.test.tsx` 3/3 (nuevo), `ReportEditPage.test.tsx` 3/3. Frontend
+    node 489/489, Vitest 41/41.
+  - Verificado en 390×844 y 1280×900 con el registro del corte: el espejo arriba, el hijo con su interruptor
+    debajo, ningún control apretable; `page.evaluate` confirma `disabled` en las tres tareas y en la temperatura.
 
 ### T14 · Web: catálogo de productos desde `/reports/products`
 
@@ -728,7 +740,7 @@ recorta alcance **con aprobación explícita**, nunca moviéndolas a otro ODD po
 | T10 | C, S3 | `9f04860` `feat(web): leer el panel como seis tarjetas y un resumen` | `DashboardPage.test.tsx` 4/4, `dashboard.spec.ts` 6/6 |
 | T11 | D | `0a0e945` `feat(web): apagar un tipo de caja junto con sus tareas` | `CategorySection.test.tsx` 4/4, `report-box-types.test.ts` 5/5, `report-box-types.spec.ts` 2/2 |
 | T12 | D, S1, S16 | `3a4894e` `feat(reports): mandar todas las tareas, marcadas o no` | `report-items.test.ts` 4/4, `ReportEditPage.test.tsx` 2/2, `reports.command.service.test.ts` 5/5, `dashboard.routes.test.ts` 11/11 |
-| T13 | D | `fix(web): keep read-only reports read-only and draw the receivings` | `CategorySection.test.tsx`, `ReportsPage.test.tsx` |
+| T13 | D | `4d70fab` `fix(reports): deshabilitar de verdad y no perder los hijos de Recebimento` | `CategorySection.test.tsx` 5/5, `BoxTypeList.test.tsx` 5/5, `ReportsPage.test.tsx` 3/3, `ReportEditPage.test.tsx` 3/3 |
 | T14 | D | `refactor(web): read the report products from the server catalogue` | `ReportEditPage.test.tsx`, `report-products.test.ts` |
 | T15 | D, S13 | `fix(android): keep the box switches in session state` | `ReportGeneratorViewModelTest.kt`, `ReportBoxTypeSwitchTest.kt` |
 | T16 | E | `feat(web): assign several drivers from one modal, each with its plate` | `DriverSelect.test.tsx`, `loading-schedule.spec.ts` |
