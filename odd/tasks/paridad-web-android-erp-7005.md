@@ -617,6 +617,26 @@ S19 — D5/D7, verbatim:
   queda nodo oculto tras exportar con error. Verificado en 390×844 y en escritorio (S18).
 - **Commit esperado.** `fix(web): say what actually failed on the loading schedule` · ~130 líneas.
 - **Depende.** T18.
+- **Estado.** Hecho, en un commit.
+  - **0b48eeb** — el día que no se pudo leer ya no se dibuja como día vacío: `readError` es estado propio, toma
+    el lugar de la grilla y trae el reintento (`loading-schedule-read-error` / `loading-schedule-retry`). Sigue
+    habiendo un `error` aparte para el borrado y la exportación.
+  - **0b48eeb** — `src/lib/schedule-pdf.ts`: el nodo de texto se arma, se usa y se libera en un solo lugar, con
+    `finally`; las dos páginas que exportaban (`LoadingSchedulePage`, `LoadingEditPage`) lo usan. Antes, un
+    fallo del escritor dejaba el nodo colgado en el documento, uno por intento.
+  - **0b48eeb** — `scheduleAlreadyExists` es alcanzable: el backend agrega `code` al 409/400 del día cerrado
+    (`loading.routes.ts`), `ApiClientError` lo guarda, y `refusalMessage` lo lee antes que el estado, porque 409
+    también es un conductor duplicado y el 400 del día cerrado traía una frase traducida por el servidor.
+  - **0b48eeb** — una planta sin chapas cargadas lo dice (`driver-select-no-vehicles`), en vez de dejar que el
+    único mensaje sea «Falta la chapa de Silvana».
+  - Pruebas: `LoadingSchedulePage.test.tsx` (fallo ≠ día vacío, reintento), `DriverPickerDialog.test.tsx`
+    (sin vehículos vs. vehículos que no llegaron), `lib/schedule-pdf.test.tsx` (nodo liberado en éxito y en
+    fallo; la extensión es `.tsx` porque el lane de vitest sólo recoge `.test.tsx` y el de `node:test` no tiene
+    DOM), `lib/loading-picker.test.ts` (día cerrado por código) y
+    `backend/src/modules/loading/loading.routes.schedules.test.ts` (el día cerrado manda su código en es y pt).
+    Suite: backend 55/55 en `loading`, web 512/512 `node:test`, 17 archivos / 79 vitest, `tsc --noEmit` limpio.
+  - Visto en 390×844 y 1280×900 (`/tmp/t19-error-phone.png`): con la lectura abortada, la grilla no se dibuja,
+    el aviso aparece con su reintento y el reintento devuelve la grilla en los dos tamaños.
 
 ### T20 · Seguridad: la contraseña del ERP deja de persistirse
 
