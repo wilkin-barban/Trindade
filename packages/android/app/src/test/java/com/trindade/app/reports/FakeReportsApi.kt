@@ -89,6 +89,9 @@ class FakeReportsApi(
      */
     private val deactivateResponse: Response<SuccessResponse> =
         Response.success(SuccessResponse(success = SuccessResponse.Success.entries.first())),
+    /** What a reactivation answers, the same 200-with-a-body as its pair. */
+    private val activateResponse: Response<SuccessResponse> =
+        Response.success(SuccessResponse(success = SuccessResponse.Success.entries.first())),
     /** What a deletion answers, 204 with no body in practice, and the same convention for a refusal. */
     private val deleteResponse: Response<Unit> = Response.success(Unit),
 ) : ReportsApi {
@@ -118,6 +121,7 @@ class FakeReportsApi(
 
     /** The report ids the two lifecycle calls were made with, in the order they were made. */
     val deactivatedIds = mutableListOf<Int>()
+    val activatedIds = mutableListOf<Int>()
     val deletedIds = mutableListOf<Int>()
 
     /** One gate per history call held open by [gateHistory], in the order the calls were made. */
@@ -190,6 +194,11 @@ class FakeReportsApi(
     override suspend fun deactivate(id: Int): Response<SuccessResponse> {
         deactivatedIds += id
         return deactivateResponse
+    }
+
+    override suspend fun activate(id: Int): Response<SuccessResponse> {
+        activatedIds += id
+        return activateResponse
     }
 
     override suspend fun delete(id: Int): Response<Unit> {
@@ -330,6 +339,7 @@ class FakeReportsApi(
             readOnly = !canEdit,
             canEdit = canEdit,
             canDeactivate = true,
+            canActivate = false,
             canDelete = true,
         )
 

@@ -122,6 +122,9 @@ class FakeLoadingApi(
     /** What a batch deactivation answers. 200 with a body in practice; the fake never reads it either. */
     private val deactivateBatchResponse: Response<SuccessResponse> =
         Response.success(SuccessResponse(success = SuccessResponse.Success.entries.first())),
+    /** What a batch reactivation answers, the same 200-with-a-body as its pair. */
+    private val activateBatchResponse: Response<SuccessResponse> =
+        Response.success(SuccessResponse(success = SuccessResponse.Success.entries.first())),
     /** What a batch deletion answers, 204 with no body in practice, and the same convention for a refusal. */
     private val deleteBatchResponse: Response<Unit> = Response.success(Unit),
     /** Null is the server refusing to render the text, which is the only failure the export has. */
@@ -152,6 +155,7 @@ class FakeLoadingApi(
 
     /** The batch dates the two lifecycle calls were made with, in the order they were made. */
     val deactivatedBatchDates = mutableListOf<String>()
+    val activatedBatchDates = mutableListOf<String>()
     val deletedBatchDates = mutableListOf<String>()
 
     /** One gate per history call held open by [gateHistory], in the order the calls were made. */
@@ -230,7 +234,7 @@ class FakeLoadingApi(
         if (date == failForDate) return Response.error(500, EMPTY_BODY)
 
         val schedules = schedulesToReturn ?: return Response.error(500, EMPTY_BODY)
-        return Response.success(SchedulesResponse(schedules = schedules))
+        return Response.success(SchedulesResponse(schedules = schedules, dayActive = true))
     }
 
     override suspend fun history(
@@ -374,6 +378,11 @@ class FakeLoadingApi(
         return deactivateBatchResponse
     }
 
+    override suspend fun activateBatch(date: String): Response<SuccessResponse> {
+        activatedBatchDates += date
+        return activateBatchResponse
+    }
+
     override suspend fun deleteBatch(date: String): Response<Unit> {
         deletedBatchDates += date
         // A real server removes the batch, so the reload that follows a deletion has to see a smaller
@@ -446,8 +455,10 @@ class FakeLoadingApi(
             createdAt = "2026-09-18T10:00:00Z",
             updatedAt = "2026-09-18T10:00:00Z",
             isActive = isActive,
+            isClosedDay = false,
             canEdit = canEdit,
             canDeactivate = true,
+            canActivate = false,
             canDelete = true,
             readOnly = !canEdit,
             creator = null,
@@ -473,9 +484,11 @@ class FakeLoadingApi(
             createdAt = "2026-09-18T10:00:00Z",
             updatedAt = "2026-09-18T10:00:00Z",
             isActive = true,
+            isClosedDay = false,
             readOnly = false,
             canEdit = true,
             canDeactivate = true,
+            canActivate = false,
             canDelete = true,
             creator = null,
         )

@@ -4,7 +4,10 @@ import android.content.Context
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
@@ -495,6 +498,80 @@ class LoadingHistoryScreenTest {
         assertTrue("Right bound (${unclipped.right}) must be <= $viewportWidth", unclipped.right <= viewportWidth)
         assertEquals("Left edge clipped vs unclipped mismatch", unclipped.left, clipped.left)
         assertEquals("Right edge clipped vs unclipped mismatch", unclipped.right, clipped.right)
+    }
+
+    @Test
+    fun `draws the reactivate action only when the server offered it`() {
+        // An inactive batch the server offers to bring back. Reactivating is the only way a day that was
+        // deactivated returns, so the action has to be there for it.
+        var activated = 0
+        val offered = FakeLoadingApi.historyItem(isActive = false).copy(
+            canActivate = true,
+            canDeactivate = false,
+        )
+        composeRule.setContent {
+            TrindadeTheme {
+                LoadingHistoryScreen(
+                    state = LoadingHistoryViewModel.UiState(
+                        loaded = true,
+                        loading = false,
+                        items = listOf(offered),
+                    ),
+                    onBack = {},
+                    onOpenBatch = {},
+                    onDateSelected = {},
+                    onMonthSelected = {},
+                    onClearFilters = {},
+                    onPrevious = {},
+                    onNext = {},
+                    onRetry = {},
+                    onDeactivate = {},
+                    onActivate = { activated++ },
+                    onDelete = {},
+                )
+            }
+        }
+
+        val node = composeRule.onNodeWithContentDescription(copy(R.string.history_activate))
+        node.performScrollTo().assertIsDisplayed()
+        val bounds = node.getUnclippedBoundsInRoot()
+        assertTrue("Reactivate height >= 48dp", bounds.bottom - bounds.top >= 48.dp)
+        node.performClick()
+
+        // Confirmed first: the tap opens the window, and the window is what posts the activation.
+        composeRule.onNodeWithText(copy(R.string.history_activate)).assertIsDisplayed()
+        assertEquals("nothing posted before the confirmation", 0, activated)
+        composeRule.onAllNodesWithText(copy(R.string.history_activate)).onLast().performClick()
+        assertEquals(1, activated)
+    }
+
+    @Test
+    fun `draws no reactivate action for a batch the server did not offer it on`() {
+        // The flag is the permission. An active batch carries `canActivate` false, and the card must not
+        // draw an action whose only possible answer is the refusal the flag was there to report.
+        composeRule.setContent {
+            TrindadeTheme {
+                LoadingHistoryScreen(
+                    state = LoadingHistoryViewModel.UiState(
+                        loaded = true,
+                        loading = false,
+                        items = listOf(FakeLoadingApi.historyItem()),
+                    ),
+                    onBack = {},
+                    onOpenBatch = {},
+                    onDateSelected = {},
+                    onMonthSelected = {},
+                    onClearFilters = {},
+                    onPrevious = {},
+                    onNext = {},
+                    onRetry = {},
+                    onDeactivate = {},
+                    onDelete = {},
+                )
+            }
+        }
+
+        composeRule.onAllNodesWithContentDescription(copy(R.string.history_activate)).assertCountEquals(0)
     }
 
     private fun assertNoOverlap(a: DpRect, b: DpRect) {

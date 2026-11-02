@@ -4,7 +4,10 @@ import android.content.Context
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
@@ -482,5 +485,74 @@ class ReportsHistoryScreenTest {
     private fun assertNoOverlap(a: DpRect, b: DpRect) {
         val overlaps = a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
         assertFalse("Bounding boxes must not overlap: a=$a, b=$b", overlaps)
+    }
+    @Test
+    fun `draws the reactivate action only when the server offered it`() {
+        var activated = 0
+        val offered = FakeReportsApi.historyItem(id = 1, isActive = false).copy(
+            canActivate = true,
+            canDeactivate = false,
+        )
+        composeRule.setContent {
+            TrindadeTheme {
+                ReportsHistoryScreen(
+                    state = ReportsHistoryViewModel.UiState(
+                        loaded = true,
+                        loading = false,
+                        items = listOf(offered),
+                    ),
+                    onBack = {},
+                    onOpenReport = {},
+                    onDateSelected = {},
+                    onMonthSelected = {},
+                    onClearFilters = {},
+                    onPrevious = {},
+                    onNext = {},
+                    onRetry = {},
+                    onDeactivate = {},
+                    onActivate = { activated++ },
+                    onDelete = {},
+                )
+            }
+        }
+
+        val node = composeRule.onNodeWithContentDescription(copy(R.string.history_activate))
+        node.performScrollTo().assertIsDisplayed()
+        val bounds = node.getUnclippedBoundsInRoot()
+        assertTrue("Reactivate height >= 48dp", bounds.bottom - bounds.top >= 48.dp)
+        node.performClick()
+
+        // Confirmed first: the tap opens the window, and the window is what posts the activation.
+        composeRule.onNodeWithText(copy(R.string.history_activate)).assertIsDisplayed()
+        assertEquals("nothing posted before the confirmation", 0, activated)
+        composeRule.onAllNodesWithText(copy(R.string.history_activate)).onLast().performClick()
+        assertEquals(1, activated)
+    }
+
+    @Test
+    fun `draws no reactivate action for a report the server did not offer it on`() {
+        composeRule.setContent {
+            TrindadeTheme {
+                ReportsHistoryScreen(
+                    state = ReportsHistoryViewModel.UiState(
+                        loaded = true,
+                        loading = false,
+                        items = listOf(FakeReportsApi.historyItem(id = 1)),
+                    ),
+                    onBack = {},
+                    onOpenReport = {},
+                    onDateSelected = {},
+                    onMonthSelected = {},
+                    onClearFilters = {},
+                    onPrevious = {},
+                    onNext = {},
+                    onRetry = {},
+                    onDeactivate = {},
+                    onDelete = {},
+                )
+            }
+        }
+
+        composeRule.onAllNodesWithContentDescription(copy(R.string.history_activate)).assertCountEquals(0)
     }
 }

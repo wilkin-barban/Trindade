@@ -3,9 +3,12 @@ package com.trindade.app.loading
 import com.trindade.app.contract.models.ScheduleHistoryResponse
 import com.trindade.app.contract.models.ScheduleHistoryResponsePagination
 import kotlinx.coroutines.test.runTest
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import retrofit2.Response
 
 /**
  * The loading history read, its pagination, and the two dates each item carries.
@@ -37,6 +40,28 @@ class LoadingHistoryRepositoryTest {
             LoadingHistoryQuery(date = null, month = null, page = null, pageSize = null),
             api.lastHistoryQuery,
         )
+    }
+
+    @Test
+    fun `posts the activate route for a date`() = runTest {
+        val api = FakeLoadingApi()
+
+        val result = repository(api).activateBatch("2026-09-18")
+
+        assertEquals(listOf("2026-09-18"), api.activatedBatchDates)
+        assertEquals(ScheduleLifecycleResult.Changed, result)
+    }
+
+    @Test
+    fun `carries the activate refusal's status code instead of a boolean`() = runTest {
+        // The three answers are the deactivate's, and the screen needs the code to say which one: 403 is
+        // "only an administrator", 404 is "that batch is gone", and anything else is the generic
+        // sentence. Collapsing them here would leave the screen guessing.
+        val api = FakeLoadingApi(activateBatchResponse = Response.error(403, EMPTY_BODY))
+
+        val result = repository(api).activateBatch("2026-09-18")
+
+        assertEquals(ScheduleLifecycleResult.Refused(403), result)
     }
 
     @Test
@@ -119,3 +144,6 @@ class LoadingHistoryRepositoryTest {
         assertEquals("2026-06-28", answer?.items?.last()?.loadingDate)
     }
 }
+
+private val EMPTY_BODY: okhttp3.ResponseBody =
+    "{}".toResponseBody("application/json".toMediaType())

@@ -130,8 +130,10 @@ class FleteroQuotaTest {
         // The counter does not read the permission flags, so their values here are arbitrary: a test
         // that made them meaningful would be testing something this object does not do.
         readOnly = false,
+        isClosedDay = false,
         canEdit = true,
         canDeactivate = true,
+        canActivate = false,
         canDelete = true,
         creator = null,
     )

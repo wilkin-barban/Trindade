@@ -444,7 +444,7 @@ class LoadingViewModelTest {
                 if (reads == 2) return Response.error(500, FakeLoadingApi.EMPTY_BODY)
                 val slot = if (reads == 1) "04:00" else "04:30"
                 return Response.success(
-                    SchedulesResponse(schedules = listOf(FakeLoadingApi.entry(41, slot))),
+                    SchedulesResponse(schedules = listOf(FakeLoadingApi.entry(41, slot)), dayActive = true),
                 )
             }
         }

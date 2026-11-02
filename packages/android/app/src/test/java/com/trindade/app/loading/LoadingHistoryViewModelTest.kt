@@ -286,6 +286,53 @@ class LoadingHistoryViewModelTest {
     }
 
     @Test
+    fun `an activation posts the batch and reports it in its own window`() {
+        val row = FakeLoadingApi.historyItem(isActive = false).copy(canActivate = true, canDeactivate = false)
+        val api = FakeLoadingApi(historyToReturn = oneRow(row))
+        val model = viewModel(api)
+
+        model.activateBatch("2026-09-18")
+
+        assertEquals(listOf("2026-09-18"), api.activatedBatchDates)
+        // The page on screen, not the first one: the card that changed is the one being read.
+        assertEquals(listOf(1, 1), api.historyQueries.map { it.page })
+        assertEquals(false, model.state.value.busy)
+        // The re-read redraws the card as active, and a redraw alone does not say that the tap worked:
+        // the sentence is the answer, and it is the window every other action in the app answers in.
+        assertEquals(
+            com.trindade.app.R.string.loading_history_activated,
+            model.state.value.resultMessage?.resId,
+        )
+    }
+
+    @Test
+    fun `dismissing the activation answer leaves the history as it is`() {
+        val row = FakeLoadingApi.historyItem(isActive = false).copy(canActivate = true, canDeactivate = false)
+        val model = viewModel(FakeLoadingApi(historyToReturn = oneRow(row)))
+        model.activateBatch("2026-09-18")
+
+        model.dismissResult()
+
+        assertNull(model.state.value.resultMessage)
+        assertEquals(1, model.state.value.items.size)
+    }
+
+    @Test
+    fun `does not offer activate on a batch the server did not offer it for`() {
+        // An active batch is the case the server answers `canActivate` false for, and the flag is the
+        // whole permission: a client-side "it is inactive, so it can come back" would draw the action on
+        // a row this caller may not touch, and the only possible answer would be the 403 the flag was
+        // there to report.
+        val api = FakeLoadingApi(historyToReturn = oneRow(FakeLoadingApi.historyItem()))
+        val model = viewModel(api)
+
+        model.activateBatch("2026-09-18")
+
+        assertTrue("nothing is posted", api.activatedBatchDates.isEmpty())
+        assertNull(model.state.value.resultMessage)
+    }
+
+    @Test
     fun `a row opens the batch's own day, not the day the load happens on`() {
         // An ordinary pair: the batch is on the 27th and the load the server computed is on the 28th.
         // The grid reads `/api/loading/schedules?date=`, which filters `schedule_date`, so the batch date

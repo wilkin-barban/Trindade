@@ -806,7 +806,7 @@ class LoadingScreenTest {
 
             val slot = if (successfulReads++ == 0) movesFrom else movesTo
             return Response.success(
-                SchedulesResponse(schedules = listOf(FakeLoadingApi.entry(rowId, slot))),
+                SchedulesResponse(schedules = listOf(FakeLoadingApi.entry(rowId, slot)), dayActive = true),
             )
         }
     }

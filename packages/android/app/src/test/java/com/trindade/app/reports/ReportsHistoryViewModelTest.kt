@@ -340,6 +340,40 @@ class ReportsHistoryViewModelTest {
     }
 
     @Test
+    fun `an activation posts the report and reports it in its own window`() {
+        val api = FakeReportsApi(
+            historyToReturn = singleReport(
+                canDeactivate = null,
+                canDelete = null,
+                canActivate = true,
+                isActive = false,
+            ),
+        )
+        val model = viewModel(api)
+
+        model.activate(id = 1)
+
+        assertEquals(listOf(1), api.activatedIds)
+        // The page on screen, not the first one: the card that changed is the one being read.
+        assertEquals(listOf(1, 1), api.historyQueries.map { it.page })
+        assertEquals(false, model.state.value.busy)
+        assertEquals(com.trindade.app.R.string.history_activated, model.state.value.resultMessage?.resId)
+    }
+
+    @Test
+    fun `does not offer activate on a report the server did not offer it for`() {
+        // The flag is the permission, read as `== true`: a live report answers `canActivate` false, and a
+        // client-side guess would draw the action on a row whose only possible answer is a refusal.
+        val api = FakeReportsApi(historyToReturn = singleReport(canDeactivate = true, canDelete = true))
+        val model = viewModel(api)
+
+        model.activate(id = 1)
+
+        assertTrue(api.activatedIds.isEmpty())
+        assertNull(model.state.value.resultMessage)
+    }
+
+    @Test
     fun `says the server was not reached rather than showing an empty history`() {
         val model = viewModel(FakeReportsApi(historyToReturn = null))
 
@@ -351,9 +385,18 @@ class ReportsHistoryViewModelTest {
     }
 
     /** One report with the flags a test wants, so an absent flag can be the point of a test. */
-    private fun singleReport(canDeactivate: Boolean?, canDelete: Boolean?) = ReportHistoryResponse(
+    private fun singleReport(
+        canDeactivate: Boolean?,
+        canDelete: Boolean?,
+        canActivate: Boolean = false,
+        isActive: Boolean = true,
+    ) = ReportHistoryResponse(
         items = listOf(
-            FakeReportsApi.historyItem(id = 1).copy(canDeactivate = canDeactivate, canDelete = canDelete),
+            FakeReportsApi.historyItem(id = 1, isActive = isActive).copy(
+                canDeactivate = canDeactivate,
+                canDelete = canDelete,
+                canActivate = canActivate,
+            ),
         ),
         pagination = ScheduleHistoryResponsePagination(page = 1, pageSize = 30, total = 1, totalPages = 1),
     )

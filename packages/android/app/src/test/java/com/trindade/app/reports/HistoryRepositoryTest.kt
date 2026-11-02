@@ -162,6 +162,16 @@ class HistoryRepositoryTest {
             .build()
             .create(ReportsApi::class.java)
 
+    @Test
+    fun `posts the activate route for a report`() = runTest {
+        val api = FakeReportsApi()
+
+        val result = ReportsRepository(api).activate(7)
+
+        assertEquals(listOf(7), api.activatedIds)
+        assertEquals(ReportLifecycleResult.Changed, result)
+    }
+
     private companion object {
         /** A complete answer that says nothing, so the assertions can be about the request alone. */
         const val EMPTY_HISTORY = """{"items":[],"pagination":{"page":1,"pageSize":30,"total":0,"totalPages":0}}"""
