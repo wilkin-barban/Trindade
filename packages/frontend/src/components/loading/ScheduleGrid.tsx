@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LucidePlus, LucideX, LucideClock } from 'lucide-react';
 import { DriverPicker } from './DriverPicker';
+import { countInWindow, isQuotaExceeded } from '../../lib/loading-quota';
 
 export interface ScheduleRow {
   id: number;
@@ -62,49 +63,10 @@ export function ScheduleGrid({
     return schedules.filter((s) => s.time_slot === slot);
   }
 
-  function getFleteroCount(entries: ScheduleRow[]): number {
-    return entries.filter((e) => e.driver_type === 'fletero').length;
-  }
-
   function getAssignedIds(): number[] {
     return schedules
       .filter((e) => e.driver_id != null)
       .map((e) => e.driver_id as number);
-  }
-
-  function isRollingQuotaMaxed(slot: string): boolean {
-    const existingTimes = schedules
-      .filter((s) => s.driver_type === 'fletero')
-      .map((s) => s.time_slot);
-
-    const times = [...existingTimes, slot];
-    const minutesList = times
-      .map((t) => {
-        const [h, m] = t.split(':').map(Number);
-        return h * 60 + m;
-      })
-      .sort((a, b) => a - b);
-
-    for (let i = 0; i <= minutesList.length - 4; i++) {
-      if (minutesList[i + 3] - minutesList[i] < 60) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  function toMinutes(slot: string): number {
-    const [h, m] = slot.split(':').map(Number);
-    return h * 60 + m;
-  }
-
-  function isRollingQuotaExceeded(slot: string): boolean {
-    const targetMinutes = toMinutes(slot);
-    const matching = schedules.filter((s) => {
-      if (s.driver_type !== 'fletero') return false;
-      return Math.abs(toMinutes(s.time_slot) - targetMinutes) < 60;
-    });
-    return matching.length > 3;
   }
 
   function getDisplayName(entry: ScheduleRow): string {
@@ -139,8 +101,10 @@ export function ScheduleGrid({
     <div className="space-y-3" data-testid="schedule-grid">
       {timeSlots.map((slot) => {
         const entries = getSlotEntries(slot);
-        const fleteroCount = getFleteroCount(entries);
-        const isExceeded = isRollingQuotaExceeded(slot);
+        // The badge and the warning answer the same question with the same rule: the shift, not the exact
+        // minute. A slot showing «1/3» next to «límite alcanzado» was the two halves disagreeing.
+        const fleteroCount = countInWindow(schedules, slot);
+        const isExceeded = isQuotaExceeded(fleteroCount);
         const isAdding = addingSlot === slot;
         const assignedIds = getAssignedIds();
 
