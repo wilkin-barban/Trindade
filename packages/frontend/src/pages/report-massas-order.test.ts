@@ -53,7 +53,7 @@ describe('Massa do dia follows Temperaturas', () => {
 
   it('never renders it before the temperatures section in the create form', () => {
     const massasPlacement = create.indexOf('{cat.id === massasAfterCategoryId && massasCard}');
-    const categoriesMap = create.indexOf('{categories.filter((cat) => !cat.parent_category_id).map((cat) => (');
+    const categoriesMap = create.indexOf('{categories.filter((cat) => !cat.parent_category_id).map((cat) =>');
     assert.ok(categoriesMap > 0 && massasPlacement > categoriesMap);
   });
 });

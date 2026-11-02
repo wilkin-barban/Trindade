@@ -46,6 +46,13 @@ const CATEGORIES: CategoryType[] = [
   { id: 2, parent_category_id: null, name_pt: 'Temperaturas', name_es: 'Temperaturas', sort_order: 2, tasks: [task(5, 2, 'temperature', 'Temperaturas')] },
 ];
 
+/** A report from the cutoff on, with a category hanging below Recebimento: the mirror answers the parent. */
+const CATEGORIES_AFTER_CUTOFF: CategoryType[] = [
+  ...CATEGORIES,
+  { id: 4, parent_category_id: null, name_pt: 'Recebimento', name_es: 'Recepción', sort_order: 4, tasks: [task(43, 4)] },
+  { id: 41, parent_category_id: 4, name_pt: 'Recebimento de congelados', name_es: 'Recepción de congelados', sort_order: 5, tasks: [task(410, 41)] },
+];
+
 const REPORT = {
   id: 7,
   turno: 'tarde' as const,
@@ -59,6 +66,15 @@ const REPORT = {
   ],
   temperatures: [{ location: 'Temperaturas', readingIndex: 1, value: -18 }],
   canEdit: true,
+};
+
+const REPORT_AFTER_CUTOFF = {
+  ...REPORT,
+  report_date: '2026-11-02',
+  items: [
+    ...REPORT.items,
+    { task_id: 410, checked: true, task_type: 'check' },
+  ],
 };
 
 function renderPage() {
@@ -99,6 +115,22 @@ describe('ReportEditPage — the body it saves', () => {
       { taskId: 2, checked: false },
     ]);
     expect(body.items.some((item) => item.taskId === 5)).toBe(false);
+  });
+
+  it('draws the mirror over Recebimento without dropping the categories below it', async () => {
+    get.mockImplementation(async (url: string) => {
+      if (url === '/reports/7') return { report: REPORT_AFTER_CUTOFF };
+      if (url === '/reports/categories') return { categories: CATEGORIES_AFTER_CUTOFF };
+      if (url.endsWith('/photos')) return { photos: [] };
+      return {};
+    });
+    renderPage();
+
+    await screen.findByTestId('box-type-switch-41');
+    expect(screen.getByTestId('check-task-410')).toBeInTheDocument();
+    expect(screen.getByTestId('check-task-410')).toBeChecked();
+    // The category's own checklist is the mirror's business from the cutoff on.
+    expect(screen.queryByTestId('check-task-43')).not.toBeInTheDocument();
   });
 
   it('keeps the row of a task the operator unmarked in this session', async () => {

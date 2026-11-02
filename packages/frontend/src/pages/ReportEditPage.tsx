@@ -7,6 +7,7 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { LoadingSpinner } from '../components/ui/loading-spinner';
 import {
+  BoxTypeList,
   CategorySection,
   type CategoryType,
   type FormState,
@@ -74,7 +75,7 @@ function isEditWindowExpired(reportDate: string): boolean {
 }
 
 export function ReportEditPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
@@ -451,8 +452,21 @@ export function ReportEditPage() {
               {cat.id === ERP_RECEIPT_CATEGORY_ID && usesErpReceipts(report?.report_date ?? '') ? (
                 // Un reporte del día del corte en adelante lee el espejo. Uno anterior conserva sus propias
                 // marcas editables: guardar el reporte reescribe sus items, y perderlas sería borrarle la
-                // historia a un turno que ya se mandó.
-                <ReceiptsSection date={report?.report_date ?? ''} readOnly />
+                // historia a un turno que ya se mandó. El espejo reemplaza el checklist de Recebimento, no
+                // las categorías que cuelgan de ella: esas siguen siendo respuestas de este reporte.
+                <>
+                  <ReceiptsSection date={report?.report_date ?? ''} readOnly />
+                  <BoxTypeList
+                    childrenCategories={categories.filter((child) => child.parent_category_id === cat.id)}
+                    form={form}
+                    onItemChange={handleItemChange}
+                    onTemperatureChange={handleTemperatureChange}
+                    onSelectedProductsChange={handleSelectedProductsChange}
+                    disabledBoxTypeIds={form.disabledBoxTypeIds}
+                    onBoxTypeChange={handleBoxTypeChange}
+                    readOnly={readOnly}
+                  />
+                </>
               ) : (
                 <CategorySection
                   category={cat}

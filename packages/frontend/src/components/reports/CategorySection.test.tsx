@@ -40,6 +40,21 @@ const SMALL_BOXES: CategoryType = {
   tasks: [task(58, 9, 'Nhoque 400g')],
 };
 
+const TEMPERATURES: CategoryType = {
+  id: 2,
+  parent_category_id: null,
+  name_pt: 'Temperaturas',
+  name_es: 'Temperaturas',
+  sort_order: 2,
+  tasks: [
+    {
+      ...task(5, 2, 'Câmara Principal'),
+      task_type: 'temperature',
+      temperature_readings: 1,
+    },
+  ],
+};
+
 const ASSAI_BOXES: CategoryType = {
   id: 10,
   parent_category_id: 8,
@@ -102,6 +117,34 @@ describe('CategorySection — box type switch', () => {
     fireEvent.click(screen.getByTestId('box-type-switch-10'));
 
     expect(onBoxTypeChange).toHaveBeenCalledWith(10, false);
+  });
+
+  it('draws a read-only report with nothing left to press', () => {
+    render(
+      <>
+        <CategorySection
+          category={PARENT}
+          children={[SMALL_BOXES]}
+          form={{ ...EMPTY_FORM, items: { 23: true } }}
+          onItemChange={vi.fn()}
+          onTemperatureChange={vi.fn()}
+          onSelectedProductsChange={vi.fn()}
+          readOnly
+        />
+        <CategorySection
+          category={TEMPERATURES}
+          form={{ ...EMPTY_FORM, temperatures: { 5: ['4'] } }}
+          onItemChange={vi.fn()}
+          onTemperatureChange={vi.fn()}
+          readOnly
+        />
+      </>,
+    );
+
+    expect(screen.getByTestId('check-task-23')).toBeDisabled();
+    expect(screen.getByTestId('check-task-58')).toBeDisabled();
+    expect(screen.getByTestId('temperature-task-5')).toBeDisabled();
+    expect(screen.getByTestId('temperature-task-5')).toHaveValue(4);
   });
 
   it('does not let a read-only report move the switch', () => {

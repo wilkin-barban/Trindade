@@ -109,20 +109,30 @@ function CheckTask({
   task,
   checked,
   onChange,
+  readOnly,
 }: {
   task: TaskType;
   checked: boolean;
   onChange: (checked: boolean) => void;
+  readOnly?: boolean;
 }) {
   const { i18n } = useTranslation();
   const isSpanish = i18n.language?.startsWith('es');
   const taskName = isSpanish && task.name_es ? task.name_es : task.name_pt;
   return (
-    <label className="flex items-center gap-3 py-2 cursor-pointer hover:bg-gray-50 rounded px-3 -mx-3">
+    <label
+      className={`flex items-center gap-3 py-2 rounded px-3 -mx-3 ${readOnly ? 'cursor-not-allowed opacity-75' : 'cursor-pointer hover:bg-gray-50'}`}
+    >
       <input
         type="checkbox"
         checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
+        disabled={readOnly}
+        onChange={(e) => {
+          // The disabled attribute is the browser's promise; this is the rule. A report the server called
+          // read-only has no mark to move, whoever asks.
+          if (readOnly) return;
+          onChange(e.target.checked);
+        }}
         className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
         data-testid={`check-task-${task.id}`}
       />
@@ -135,10 +145,12 @@ function TemperatureTask({
   task,
   values,
   onChange,
+  readOnly,
 }: {
   task: TaskType;
   values: string[];
   onChange: (readingIndex: number, value: string) => void;
+  readOnly?: boolean;
 }) {
   const { i18n } = useTranslation();
   const isSpanish = i18n.language?.startsWith('es');
@@ -155,9 +167,11 @@ function TemperatureTask({
               type="number"
               value={values[index] ?? ''}
               onChange={(e) => onChange(readingIndex, e.target.value)}
+              readOnly={readOnly}
+              disabled={readOnly}
               placeholder="-18"
               step="0.1"
-              className="w-28"
+              className="w-28 disabled:cursor-not-allowed disabled:opacity-75"
               data-testid={readingIndex === 1 ? `temperature-task-${task.id}` : `temperature-task-${task.id}-${readingIndex}`}
             />
             <span className="text-sm text-gray-400">°C</span>
@@ -235,6 +249,7 @@ function TaskBlocks({
                   task={task}
                   checked={form.items[task.id] ?? false}
                   onChange={(checked) => onItemChange(task.id, checked)}
+                  readOnly={readOnly}
                 />
               );
 
@@ -269,6 +284,7 @@ function TaskBlocks({
                   task={task}
                   values={form.temperatures[task.id] ?? []}
                   onChange={(readingIndex, value) => onTemperatureChange(task.id, readingIndex, value)}
+                  readOnly={readOnly}
                 />
               );
 
@@ -276,6 +292,76 @@ function TaskBlocks({
               return null;
           }
         })}
+    </div>
+  );
+}
+
+/**
+ * The nested categories of one section, each as a type of box: its name, the switch that says whether the day
+ * mounted it, and its tasks under it only while the switch is on.
+ *
+ * Split out of [CategorySection] because one page draws these without the parent's checklist: the report's
+ * Recebimento section is answered by the ERP mirror, and replacing the checklist must not replace the types an
+ * administrator hung below it -- a child is its own category, with its own answers.
+ */
+export function BoxTypeList({
+  title,
+  childrenCategories,
+  form,
+  onItemChange,
+  onTemperatureChange,
+  onSelectedProductsChange,
+  disabledBoxTypeIds,
+  onBoxTypeChange,
+  readOnly,
+}: {
+  /** Drawn above the list when the caller has no heading of its own. */
+  title?: string;
+  childrenCategories: CategoryType[];
+  form: FormState;
+  onItemChange: CategorySectionProps['onItemChange'];
+  onTemperatureChange: CategorySectionProps['onTemperatureChange'];
+  onSelectedProductsChange?: CategorySectionProps['onSelectedProductsChange'];
+  disabledBoxTypeIds?: readonly number[];
+  onBoxTypeChange?: (categoryId: number, enabled: boolean) => void;
+  readOnly?: boolean;
+}) {
+  const { i18n } = useTranslation();
+  const isSpanish = i18n.language?.startsWith('es');
+  const switchedOff = disabledBoxTypeIds ?? [];
+
+  if (childrenCategories.length === 0) return null;
+
+  return (
+    <div>
+      {title && (
+        <h3 className="text-md font-semibold text-gray-800 mb-3 pb-2 border-b border-gray-200">{title}</h3>
+      )}
+      {childrenCategories.map((child) => {
+        const enabled = !switchedOff.includes(child.id);
+        const childName = isSpanish && child.name_es ? child.name_es : child.name_pt;
+        return (
+          <div key={child.id} className="mt-5 ml-2 border-l-2 border-blue-100 pl-4">
+            <BoxTypeSwitchRow
+              categoryId={child.id}
+              label={childName}
+              enabled={enabled}
+              readOnly={readOnly}
+              onChange={onBoxTypeChange ? (value) => onBoxTypeChange(child.id, value) : undefined}
+            />
+            {enabled && (
+              <TaskBlocks
+                tasks={child.tasks}
+                form={form}
+                onItemChange={onItemChange}
+                onTemperatureChange={onTemperatureChange}
+                onSelectedProductsChange={onSelectedProductsChange}
+                readOnly={readOnly}
+              />
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -309,34 +395,16 @@ export function CategorySection({
         onSelectedProductsChange={onSelectedProductsChange}
         readOnly={readOnly}
       />
-      {/* Cada hijo es un tipo de caja: su nombre, el interruptor que dice si el día lo montó, y sus tareas
-          debajo solo mientras el interruptor está encendido. Un tipo apagado con su checklist a la vista era
-          una pantalla de controles muertos; una decisión que se lee como una decisión es esto. */}
-      {children?.map((child) => {
-        const enabled = !switchedOff.includes(child.id);
-        const childName = isSpanish && child.name_es ? child.name_es : child.name_pt;
-        return (
-          <div key={child.id} className="mt-5 ml-2 border-l-2 border-blue-100 pl-4">
-            <BoxTypeSwitchRow
-              categoryId={child.id}
-              label={childName}
-              enabled={enabled}
-              readOnly={readOnly}
-              onChange={onBoxTypeChange ? (value) => onBoxTypeChange(child.id, value) : undefined}
-            />
-            {enabled && (
-              <TaskBlocks
-                tasks={child.tasks}
-                form={form}
-                onItemChange={onItemChange}
-                onTemperatureChange={onTemperatureChange}
-                onSelectedProductsChange={onSelectedProductsChange}
-                readOnly={readOnly}
-              />
-            )}
-          </div>
-        );
-      })}
+      <BoxTypeList
+        childrenCategories={children ?? []}
+        form={form}
+        onItemChange={onItemChange}
+        onTemperatureChange={onTemperatureChange}
+        onSelectedProductsChange={onSelectedProductsChange}
+        disabledBoxTypeIds={switchedOff}
+        onBoxTypeChange={onBoxTypeChange}
+        readOnly={readOnly}
+      />
     </div>
   );
 }

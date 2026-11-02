@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { LoadingSpinner } from '../components/ui/loading-spinner';
 import { ModuleHelpModal } from '../components/ui/ModuleHelpModal';
 import {
+  BoxTypeList,
   CategorySection,
   type CategoryType,
   type FormState,
@@ -35,7 +36,7 @@ const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
 const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 export function ReportsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -410,27 +411,47 @@ export function ReportsPage() {
             para conferir a mesma manhã duas vezes. */}
         {massasAfterCategoryId === null && massasCard}
 
-        {categories.filter((cat) => !cat.parent_category_id).map((cat) => (
-          cat.id === ERP_RECEIPT_CATEGORY_ID && usesErpReceipts(saoPauloToday()) ? null : (
+        {categories.filter((cat) => !cat.parent_category_id).map((cat) => {
+          const children = categories.filter((child) => child.parent_category_id === cat.id);
+          // Recebimento lo contesta el espejo del ERP -- `ErpMovementsCard`, más arriba --, no un checklist.
+          // Lo que el espejo no reemplaza son las categorías que cuelgan de ella: cada una es su propia
+          // categoría, con sus propias respuestas, y tirarlas era una forma silenciosa de perderlas.
+          const erpReceipts = cat.id === ERP_RECEIPT_CATEGORY_ID && usesErpReceipts(reportDate);
+          if (erpReceipts && children.length === 0) return null;
+
+          return (
             <Fragment key={cat.id}>
               <Card className="mb-6">
                 <CardContent className="pt-6">
-                  <CategorySection
-                    category={cat}
-                    children={categories.filter((child) => child.parent_category_id === cat.id)}
-                    form={form}
-                    onItemChange={handleItemChange}
-                    onTemperatureChange={handleTemperatureChange}
-                    onSelectedProductsChange={handleSelectedProductsChange}
-                    disabledBoxTypeIds={form.disabledBoxTypeIds}
-                    onBoxTypeChange={handleBoxTypeChange}
-                  />
+                  {erpReceipts ? (
+                    <BoxTypeList
+                      title={i18n.language?.startsWith('es') ? cat.name_es : cat.name_pt}
+                      childrenCategories={children}
+                      form={form}
+                      onItemChange={handleItemChange}
+                      onTemperatureChange={handleTemperatureChange}
+                      onSelectedProductsChange={handleSelectedProductsChange}
+                      disabledBoxTypeIds={form.disabledBoxTypeIds}
+                      onBoxTypeChange={handleBoxTypeChange}
+                    />
+                  ) : (
+                    <CategorySection
+                      category={cat}
+                      children={children}
+                      form={form}
+                      onItemChange={handleItemChange}
+                      onTemperatureChange={handleTemperatureChange}
+                      onSelectedProductsChange={handleSelectedProductsChange}
+                      disabledBoxTypeIds={form.disabledBoxTypeIds}
+                      onBoxTypeChange={handleBoxTypeChange}
+                    />
+                  )}
                 </CardContent>
               </Card>
               {cat.id === massasAfterCategoryId && massasCard}
             </Fragment>
-          )
-        ))}
+          );
+        })}
 
         {/* Notes */}
         <Card className="mb-6">
