@@ -1,6 +1,7 @@
 package com.trindade.app.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -34,6 +35,13 @@ fun ActionResultDialog(
     isSuccess: Boolean,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    /**
+     * One line per thing the answer is about, when it is about several.
+     *
+     * A batch refused row by row is a list, and the sentence alone can only say that something failed:
+     * the rows are what the operator has to act on, so they are drawn under it, each one already named.
+     */
+    rows: List<String> = emptyList(),
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -53,7 +61,12 @@ fun ActionResultDialog(
             }
         },
         text = {
-            Text(text = message, style = MaterialTheme.typography.bodyMedium)
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(text = message, style = MaterialTheme.typography.bodyMedium)
+                rows.forEach { row ->
+                    Text(text = "• $row", style = MaterialTheme.typography.bodyMedium)
+                }
+            }
         },
         confirmButton = {
             Button(

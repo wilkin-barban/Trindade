@@ -287,6 +287,9 @@
     <string name="loading_picker_tab_fleteros">Fleteros</string>
     <string name="loading_picker_tab_casa">Choferes de la casa</string>
     <string name="loading_picker_plate">Chapa</string>
+    <string name="loading_batch_refused">Algunas filas no entraron.</string>
+    <string name="loading_batch_row_refused">No se pudo agendar a %1$s.</string>
+    <string name="loading_batch_vehicle_busy">La chapa %1$s ya está en las %2$s.</string>
     <string name="loading_picker_driver_busy">%1$s ya está en las %2$s.</string>
     <string name="loading_picker_selected">%1$d seleccionados</string>
     <string name="loading_picker_plate_missing">Elija la chapa de %1$s para continuar.</string>

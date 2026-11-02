@@ -65,6 +65,7 @@ import com.trindade.app.contract.models.SchedulesResponseSchedulesInner
 import com.trindade.app.contract.models.VehiclesResponseVehiclesInner
 import com.trindade.app.ui.cleanPhone
 import com.trindade.app.ui.filterPhoneInput
+import com.trindade.app.ui.components.ActionResultDialog
 import com.trindade.app.ui.components.AdminPrimaryButton
 import com.trindade.app.ui.components.AdminSecondaryButton
 import com.trindade.app.ui.components.HelpSection
@@ -113,6 +114,7 @@ fun LoadingScreen(
     onCopyExport: (String) -> Unit = {},
     onQuickAdd: (String, String?, String?) -> Unit = { _, _, _ -> },
     onRetry: () -> Unit = {},
+    onDismissBatchResult: () -> Unit = {},
 ) {
     val clipboard = LocalClipboardManager.current
     var showHelpDialog by remember { mutableStateOf(false) }
@@ -189,7 +191,9 @@ fun LoadingScreen(
             }
         }
 
-        state.message?.let { message ->
+        // A batch's refusal is a dialog's job, not a row's: see the `ActionResultDialog` below. What is
+        // left here is a sentence about the day -- a read that failed -- which the grid owns.
+        state.message.takeIf { state.batchResult == null }?.let { message ->
             item {
                 // A failure the operator can only read is a dead end: the read that failed is the one
                 // that fills the grid, so the message carries the way to ask again.
@@ -313,6 +317,18 @@ fun LoadingScreen(
             onConfirm = onConfirmAdd,
             onCancel = onCancelAdding,
             onQuickAdd = onQuickAdd,
+        )
+    }
+
+    // Where a batch answers. The rows are named one by one because a partial refusal is a list -- some
+    // rows are in the day and some are not -- and "não foi possível" over the three of them would leave
+    // the operator without knowing which two made it.
+    state.batchResult?.let { result ->
+        ActionResultDialog(
+            message = result.message,
+            isSuccess = false,
+            onDismiss = onDismissBatchResult,
+            rows = result.refusals.map { refusal -> refusalLine(refusal) },
         )
     }
 
@@ -744,6 +760,26 @@ private fun PlatePicker(
     }
 }
 
+/**
+ * One refused row of a batch, in the sentence its own refusal earned.
+ *
+ * A duplicate names what it duplicates and the hour it is already in -- the driver, or the plate -- and
+ * anything else names the row and stops there, because the server's other refusals do not carry an hour
+ * and inventing one would be worse than saying less.
+ */
+@Composable
+private fun refusalLine(refusal: LoadingViewModel.BatchRefusal): String = when {
+    refusal.code == LoadingViewModel.DRIVER_ALREADY_SCHEDULED && refusal.occupiedSlot != null ->
+        stringResource(R.string.loading_picker_driver_busy, refusal.name, refusal.occupiedSlot)
+
+    refusal.code == LoadingViewModel.VEHICLE_ALREADY_SCHEDULED &&
+        refusal.occupiedSlot != null &&
+        refusal.vehiclePlate != null ->
+        stringResource(R.string.loading_batch_vehicle_busy, refusal.vehiclePlate, refusal.occupiedSlot)
+
+    else -> stringResource(R.string.loading_batch_row_refused, refusal.name)
+}
+
 /** What a vehicle reads as in the plate menu: its plate first, since the plate is what was asked for. */
 internal fun vehicleChoiceLabel(vehicle: VehiclesResponseVehiclesInner): String {
     val description = vehicle.description.trim()
@@ -920,5 +956,6 @@ fun LoadingRoute(
         onOpenWhatsApp = viewModel::openWhatsAppFor,
         onQuickAdd = viewModel::quickAddDriver,
         onRetry = { viewModel.load() },
+        onDismissBatchResult = viewModel::dismissBatchResult,
     )
 }

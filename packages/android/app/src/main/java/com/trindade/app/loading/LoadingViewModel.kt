@@ -78,6 +78,16 @@ class LoadingViewModel @Inject constructor(
         val busy: Boolean = false,
         val message: String? = null,
         /**
+         * What a batch answered, when it did not simply land.
+         *
+         * The grid's [message] is a sentence about the day; a batch that failed row by row is a list, and a
+         * list pushed into a single sentence loses the rows. It carries its own sentence rather than
+         * reading [message] because the reload that follows a partial success clears that one, and a dialog
+         * left open with no reason would be the answer this exists to give. Non-null tells the screen the
+         * batch is over: the dialog opens and the grid's inline sentence steps aside.
+         */
+        val batchResult: BatchResult? = null,
+        /**
          * The WhatsApp text the server rendered for [date], or null when there is nothing to copy.
          *
          * Null covers both "not asked for yet" and "asked for and the server could not render it", and
@@ -213,6 +223,23 @@ class LoadingViewModel @Inject constructor(
             get() = !busy && pickedCount > 0 && pickedCasa.values.none { it == null }
     }
 
+    /** What a batch answered: the sentence the dialog opens with, and one line per refused row. */
+    data class BatchResult(val message: String, val refusals: List<BatchRefusal>)
+
+    /**
+     * One refused row of a batch: who it was, and where the value it duplicates already is.
+     *
+     * `code` is the server's own reason and what picks the sentence; `occupiedSlot` is the hour of the
+     * duplicate and is absent when the refusal was not a duplicate. `vehiclePlate` is set for the vehicle
+     * half of a duplicate, because "a chapa" is a different sentence from the driver's.
+     */
+    data class BatchRefusal(
+        val name: String,
+        val code: String? = null,
+        val occupiedSlot: String? = null,
+        val vehiclePlate: String? = null,
+    )
+
     private val _state = MutableStateFlow(UiState(date = clock.today(), today = clock.today()))
     val state: StateFlow<UiState> = _state.asStateFlow()
 
@@ -342,6 +369,8 @@ class LoadingViewModel @Inject constructor(
         _state.update { it.copy(addingToSlot = slot, pickerTab = LoadingPickerTab.FLETEROS, message = null) }
     }
 
+    fun dismissBatchResult() = _state.update { it.copy(batchResult = null) }
+
     fun cancelAdding() = _state.update {
         it.copy(
             addingToSlot = null,
@@ -430,11 +459,14 @@ class LoadingViewModel @Inject constructor(
                 }
         if (requests.isEmpty()) return
 
-        _state.update { it.copy(busy = true, message = null) }
+        _state.update { it.copy(busy = true, message = null, batchResult = null) }
 
         viewModelScope.launch {
             val failed = mutableListOf<CreateScheduleRequest>()
-            var refused: ScheduleWriteResult.Refused? = null
+            // Kept per request, not just the first one: a batch of three rows refused for three different
+            // reasons is three lines the operator has to read, and a single sentence would answer one of
+            // them and hide the other two.
+            val refusedBy = mutableMapOf<CreateScheduleRequest, ScheduleWriteResult.Refused>()
             var unreachable = false
 
             for (request in requests) {
@@ -442,7 +474,7 @@ class LoadingViewModel @Inject constructor(
                     is ScheduleWriteResult.Saved -> Unit
                     is ScheduleWriteResult.Refused -> {
                         failed += request
-                        if (refused == null) refused = result
+                        refusedBy[request] = result
                     }
                     ScheduleWriteResult.Unreachable -> {
                         failed += request
@@ -450,6 +482,7 @@ class LoadingViewModel @Inject constructor(
                     }
                 }
             }
+            val refused = refusedBy.values.firstOrNull()
 
             _state.update {
                 it.copy(
@@ -470,6 +503,31 @@ class LoadingViewModel @Inject constructor(
                         unreachable -> UNREACHABLE
                         refused != null -> refusalMessage(refused.statusCode, refused.code)
                         else -> null
+                    },
+                    // The rows of this batch, named, when the server refused any: the dialog is where a
+                    // batch answers, and an empty list is not a result, so a full success clears it.
+                    batchResult = if (failed.isEmpty()) {
+                        null
+                    } else {
+                        BatchResult(
+                            message = when {
+                                unreachable -> UNREACHABLE
+                                refused != null -> refusalMessage(refused.statusCode, refused.code)
+                                else -> GENERIC
+                            },
+                            refusals = failed.map { request ->
+                                val refusal = refusedBy[request]
+                                BatchRefusal(
+                                    name = current.drivers.firstOrNull { it.id == request.driverId }?.name
+                                        ?: request.driverId.toString(),
+                                    code = refusal?.code,
+                                    occupiedSlot = refusal?.occupiedSlot,
+                                    vehiclePlate = request.vehicleId?.let { id ->
+                                        current.vehicles.firstOrNull { it.id == id }?.licensePlate
+                                    },
+                                )
+                            },
+                        )
                     },
                 )
             }
@@ -683,6 +741,15 @@ class LoadingViewModel @Inject constructor(
 
         /** The server's code for "this day's batch is deactivated", as `POST /loading/schedules` reports it. */
         const val BATCH_DEACTIVATED = "LOADING_BATCH_DEACTIVATED"
+
+        /**
+         * The two duplicate refusals, told apart by the envelope's code rather than by its prose.
+         *
+         * Both are a 409 and both carry the slot the value already occupies; which of the two it is
+         * decides whether the sentence names a driver or a plate.
+         */
+        const val DRIVER_ALREADY_SCHEDULED = "DRIVER_ALREADY_SCHEDULED"
+        const val VEHICLE_ALREADY_SCHEDULED = "VEHICLE_ALREADY_SCHEDULED"
 
         /** The sentence the deactivated batch gets, verbatim from S27: it names the way out, not the fault. */
         const val BATCH_DEACTIVATED_MESSAGE =

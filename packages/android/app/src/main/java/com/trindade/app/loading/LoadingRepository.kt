@@ -167,8 +167,23 @@ class LoadingRepository @Inject constructor(
         val response = runCatchingCancellable { call() }.getOrNull() ?: return ScheduleWriteResult.Unreachable
         val schedule = response.body()?.schedule
         if (response.isSuccessful && schedule != null) return ScheduleWriteResult.Saved(schedule)
-        return ScheduleWriteResult.Refused(response.code(), refusalCode(response))
+        val envelope = errorEnvelope(response)
+        return ScheduleWriteResult.Refused(
+            statusCode = response.code(),
+            code = envelope?.code,
+            // The slot the value already occupies, which is what turns "já existe" into a sentence the
+            // operator can act on: the row is named and so is the hour it is already in.
+            occupiedSlot = envelope?.existing?.timeSlot,
+        )
     }
+
+    /** The envelope a refusal answered with, or null when the body is not one. */
+    private fun errorEnvelope(response: Response<*>): ErrorEnvelope? =
+        runCatching {
+            response.errorBody()?.string()
+                ?.takeIf { it.isNotBlank() }
+                ?.let { body -> errorJson.decodeFromString<ErrorEnvelope>(body) }
+        }.getOrNull()
 
     /**
      * The machine-readable reason a write was refused, when the server named one.
@@ -200,7 +215,19 @@ data class LoadingDay(
 
 sealed interface ScheduleWriteResult {
     data class Saved(val schedule: SchedulesResponseSchedulesInner) : ScheduleWriteResult
-    data class Refused(val statusCode: Int, val code: String? = null) : ScheduleWriteResult
+
+    /**
+     * The server said no, and said as much of why as the envelope carries.
+     *
+     * `occupiedSlot` is the hour the duplicate already sits in: the 409 names the code and the field, and
+     * the slot is what lets a refusal read as "Fletero já está nas 04:00." instead of "already exists".
+     */
+    data class Refused(
+        val statusCode: Int,
+        val code: String? = null,
+        val occupiedSlot: String? = null,
+    ) : ScheduleWriteResult
+
     data object Unreachable : ScheduleWriteResult
 }
 
