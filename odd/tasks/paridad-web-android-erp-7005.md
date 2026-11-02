@@ -513,6 +513,25 @@ S19 — D5/D7, verbatim:
   en escritorio (S18).
 - **Commit esperado.** `feat(web): assign several drivers from one modal, each with its plate` · ~340 líneas.
 - **Depende.** —
+- **Estado.** Hecho. Seis commits, porque la funcionalidad no entra en uno por debajo de 400 líneas.
+  - **50a10a7** — reglas de qué se puede marcar y qué manda cada fila (`batchRows`, `togglePick`,
+    `chooseVehicle`, `missingPlates`, `refusalMessage`). Nueve tests después del reintento.
+  - **edc72fb** — `DriverPickerDialog`: pestañas, checkbox por fila, chapa por fila, contador y pie fijo.
+  - **00569e9** — `DriverPicker`: la tanda se manda fila por fila contra `POST /loading/schedules`.
+  - **cf8a320** — `ScheduleGrid` abre el modal por horario y el panel viejo desaparece; `DriverSelect.test.tsx`
+    se va con él (sus casos quedaron en los dos nuevos).
+  - **911b52d** — retención del fallo parcial: `onlyRefused` deja marcado sólo lo rechazado, cada rechazo lleva
+    el nombre de su fila y el botón de reintentar manda nada más que eso.
+  - **df59d9d** — el fletero registrado dentro del modal entra en la tanda (se armaba con las props y él no
+    estaba), y la grilla deja de reemplazarse por el spinner en cada recarga: el spinner se llevaba el modal y
+    con él las filas rechazadas. El spinner queda para la primera lectura del día.
+  - Pruebas: `node --test src/lib/loading-picker.test.ts` → 9/9; `vitest run` de `DriverPicker.test.tsx` y
+    `DriverPickerDialog.test.tsx` → 9/9; suite frontend completa → 503/503 en `node:test` y 13 archivos / 56
+    tests en vitest; `tsc --noEmit` limpio. e2e `loading-schedule.spec.ts` → 12/12, incluidos «asigna tres
+    fleteros en una sola apertura» y «quick-add entra en la tanda».
+  - Visto en 390×844 y en 1280×900 (`/tmp/t16-fleteros-phone.png`, `/tmp/t16-casa-phone.png`,
+    `/tmp/t16-casa-desktop.png`): con la grilla detrás en gris, la lista scrollea, el pie con contador y
+    Aceptar/Cancelar queda fijo, y la pestaña «Motoristas da casa» dibuja el selector de chapa en cada fila.
 
 ### T17 · Web: bugs de cuota, off-by-one, slots huérfanos y spinners
 
