@@ -16,6 +16,14 @@ export interface StockProduct {
   units: number;
 }
 
+/** One counted day as the history lists it: enough to recognise it, not the day itself. */
+export interface StockHistoryDay {
+  date: string;
+  products: number;
+  boxes: number;
+  units: number;
+}
+
 export interface StockDay {
   date: string;
   products: StockProduct[];

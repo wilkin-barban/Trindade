@@ -13,6 +13,13 @@ interface DateFieldProps {
   max?: string;
   testId?: string;
   className?: string;
+  /**
+   * `inline` is the compact box beside other controls; `panel` is a full-width surface whose whole body is
+   * the day. The panel exists because a ten-character date is the smallest thing to read on a screen that
+   * asks for it with the largest control: the day becomes the biggest text, its name sits above it at label
+   * size, and the surface -- not a word inside it -- is what opens the calendar.
+   */
+  variant?: 'inline' | 'panel';
 }
 
 /**
@@ -39,7 +46,17 @@ interface DateFieldProps {
  * user activation and throws without it, so the call is guarded and the browser that cannot do it keeps
  * the native behaviour.
  */
-export function DateField({ id, label, value, onChange, min, max, testId, className }: DateFieldProps) {
+export function DateField({
+  id,
+  label,
+  value,
+  onChange,
+  min,
+  max,
+  testId,
+  className,
+  variant = 'inline',
+}: DateFieldProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   /**
@@ -61,18 +78,33 @@ export function DateField({ id, label, value, onChange, min, max, testId, classN
     }
   };
 
+  const panel = variant === 'panel';
+
   return (
     <div
       className={cn(
-        'relative inline-flex h-11 shrink-0 items-center gap-1.5 overflow-hidden rounded-lg border border-gray-300 bg-white px-2.5 text-sm font-medium text-gray-900',
-        'transition-colors focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/30 sm:h-10',
+        'relative overflow-hidden border border-gray-300 bg-white text-gray-900 transition-colors',
+        'focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/30',
+        panel
+          ? 'flex w-full items-center justify-between gap-3 rounded-xl px-4 py-2.5 text-left'
+          : 'inline-flex h-11 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium sm:h-10',
         className,
       )}
+      data-variant={variant}
     >
-      <Calendar className="h-4 w-4 shrink-0 text-gray-500" aria-hidden="true" />
-      <span aria-hidden="true" className="tabular-nums">
-        {formatDateLabel(value)}
+      <span className={panel ? 'flex min-w-0 flex-col' : 'contents'}>
+        {panel && <span className="text-xs text-gray-500">{label}</span>}
+        <span
+          aria-hidden="true"
+          className={cn('tabular-nums', panel ? 'truncate text-lg font-semibold' : '')}
+        >
+          {formatDateLabel(value)}
+        </span>
       </span>
+      <Calendar
+        className={cn('shrink-0 text-gray-500', panel ? 'h-5 w-5 text-blue-600' : 'h-4 w-4')}
+        aria-hidden="true"
+      />
       <label htmlFor={id} className="sr-only">
         {label}
       </label>

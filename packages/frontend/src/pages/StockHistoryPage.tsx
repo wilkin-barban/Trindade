@@ -6,8 +6,15 @@ import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { DateField } from '../components/ui/date-field';
 import { Input } from '../components/ui/input';
-import { mailtoLink, stockEmailBody, stockMessage, stockSummary, type StockDay } from '../lib/stock';
-import { saoPauloDaysAgo, saoPauloYesterday } from '../lib/date';
+import {
+  mailtoLink,
+  stockEmailBody,
+  stockMessage,
+  stockSummary,
+  type StockDay,
+  type StockHistoryDay,
+} from '../lib/stock';
+import { formatDateLabel, saoPauloDaysAgo, saoPauloYesterday } from '../lib/date';
 import { formatPhoneMask, toWhatsAppNumber } from '../lib/phone';
 import { shareOrCopy, waMeLink } from '../lib/whatsapp';
 import { ModuleHelpModal } from '../components/ui/ModuleHelpModal';
@@ -33,6 +40,28 @@ export function StockHistoryPage() {
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
   const [freeNumber, setFreeNumber] = useState('');
+  /**
+   * The days that were counted, newest first.
+   *
+   * Its own read and its own silence: a history list that cannot be read leaves the day panel working, so a
+   * failed chip row never costs the operator the day they came for.
+   */
+  const [days, setDays] = useState<StockHistoryDay[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    void api
+      .get<{ days?: StockHistoryDay[] }>('/stock/history')
+      .then((body) => {
+        if (active) setDays(Array.isArray(body?.days) ? body.days : []);
+      })
+      .catch(() => {
+        if (active) setDays([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const load = useCallback(
     async (target: string) => {
@@ -103,19 +132,9 @@ export function StockHistoryPage() {
           </div>
           <p className="text-sm text-gray-500">{t('stock.historySubtitle')}</p>
         </div>
-        {/* Igual que en el calculador: `DateField` y la vuelta al contador en la misma fila, cada uno a
-            ancho propio. Una sola fecha y dos topes: la última noche cerrada hacia atrás y treinta días
-            de archivo. */}
+        {/* La vuelta al contador, sola: el día lo elige el panel de abajo, que es la superficie grande que
+            el operario ya usa en el teléfono. */}
         <div className="flex w-full items-center gap-2 sm:w-auto">
-          <DateField
-            id="stock-history-date"
-            label={t('stock.date')}
-            value={date}
-            onChange={setDate}
-            min={saoPauloDaysAgo(30)}
-            max={saoPauloYesterday()}
-            testId="stock-history-date"
-          />
           <Link
             to="/stock-calculator"
             className="inline-flex h-11 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-300 bg-white px-3 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 sm:h-10"
@@ -126,6 +145,54 @@ export function StockHistoryPage() {
             <span className="hidden sm:inline">{t('stock.backToCounter')}</span>
           </Link>
         </div>
+      </div>
+
+      {/* El día, como en el teléfono: el panel entero abre el calendario y el día es el texto más grande,
+          así el control más ancho no sostiene el dato más chico. Dos topes: la última noche cerrada hacia
+          atrás y treinta días de archivo. */}
+      <div className="space-y-2">
+        <DateField
+          id="stock-history-date"
+          label={t('stock.date')}
+          value={date}
+          onChange={setDate}
+          min={saoPauloDaysAgo(30)}
+          max={saoPauloYesterday()}
+          testId="stock-history-date"
+          variant="panel"
+        />
+        {/* Los días contados, para no abrir un calendario cuando el día que se busca es el de al lado: cada
+            chip dice el día y lo contado en unidades, que es lo que distingue una jornada de otra. */}
+        {days.length > 0 && (
+          <div
+            role="group"
+            aria-label={t('stock.history')}
+            data-testid="stock-history-days"
+            className="flex gap-2 overflow-x-auto pb-1"
+          >
+            {days.map((counted) => {
+              const active = counted.date === date;
+              return (
+                <button
+                  key={counted.date}
+                  type="button"
+                  onClick={() => setDate(counted.date)}
+                  disabled={active}
+                  aria-pressed={active}
+                  data-testid={`stock-history-day-${counted.date}`}
+                  className={
+                    'inline-flex h-11 shrink-0 items-center rounded-lg border px-3 text-sm font-medium tabular-nums transition-colors ' +
+                    (active
+                      ? 'border-blue-600 bg-blue-50 text-blue-900'
+                      : 'border-gray-300 bg-white text-gray-800 hover:bg-gray-50')
+                  }
+                >
+                  {`${formatDateLabel(counted.date).slice(0, 5)} · ${counted.units}`}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {error !== '' && (

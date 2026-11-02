@@ -17,6 +17,7 @@ import { adminRoutes } from './modules/admin/admin.routes.js';
 import { auditRoutes } from './modules/audit/audit.routes.js';
 import { appRoutes } from './modules/app/app.routes.js';
 import { aeroIntegrationRoutes } from './modules/integration/aero.routes.js';
+import { stockRoutes } from './modules/stock/stock.routes.js';
 import { massasRoutes } from './modules/massas/massas.routes.js';
 import { getPhotoByPublicToken } from './modules/reports/reports.lifecycle.service.js';
 import { REFERENCE_DATASET, verifyReferencePrerequisites } from './db/reference-data.js';
@@ -135,6 +136,9 @@ export async function buildTestApp(options: Pick<AuthRoutesOptions, 'authAdmissi
   await app.register(aeroIntegrationRoutes, { prefix: '/api/integration/aero' });
   // The launch screen is what the ERP mirror is read next to, so the E2E app serves it like production does.
   await app.register(massasRoutes, { prefix: '/api/massas-launch' });
+  // The counting history is read from the counter's own routes: without them the E2E app answered 404 for the
+  // day and for the list of counted days, and a browser test of that screen could only assert its error.
+  await app.register(stockRoutes, { prefix: '/api/stock' });
 
 
 // Authenticated user options for history filters
