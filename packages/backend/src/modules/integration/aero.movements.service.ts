@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3';
 import type { AeroMovementItemInput } from './aero.movements.schema.js';
 import { matchOperatorUserId, type OperatorCandidate } from '../massas/massas-operator.js';
+import { getSaoPauloDateString } from '../../utils/date.js';
 
 /**
  * What the seat's operator means for Trindade, in the terms a screen has to act on.
@@ -59,6 +60,18 @@ export function aeroMovementsTableExists(db: Database.Database): boolean {
 }
 
 /**
+ * Why a snapshot was not stored.
+ *
+ * A closed massas day is refused rather than overwritten: the mirror is a cache of the company's records,
+ * and the plant closes the day it already reported. The answer names the reason so a phone can tell it
+ * apart from a network failure.
+ */
+export interface AeroMovementsRefusal {
+  code: 'MASSAS_HISTORY_FROZEN';
+  error: string;
+}
+
+/**
  * Stores one day's answer, one row per ERP seat.
  *
  * `ENT_LAN` identifies the document, and a document carries one line per product, so the stored key is
@@ -70,7 +83,16 @@ export function aeroMovementsTableExists(db: Database.Database): boolean {
 export function saveAeroMovements(
   db: Database.Database,
   args: { date: string; movements: readonly AeroMovementItemInput[] },
-): number {
+): number | AeroMovementsRefusal {
+  // The calendar decides, not the clock: yesterday in São Paulo is a day the plant already closed, no
+  // matter how recently a phone tried to stamp it again.
+  if (args.date < getSaoPauloDateString()) {
+    return {
+      code: 'MASSAS_HISTORY_FROZEN',
+      error: 'O histórico de massas é somente leitura: dias passados não podem ser alterados',
+    };
+  }
+
   const syncedAt = new Date().toISOString();
   const statement = db.prepare(
     `INSERT INTO aero_movements

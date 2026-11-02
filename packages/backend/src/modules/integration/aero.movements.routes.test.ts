@@ -1,9 +1,21 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { buildTestApp, type TestFixtures } from '../../test-helper.js';
 import { REFERENCE_DATASET } from '../../db/reference-data.js';
+import { AERO_LOG_FILE } from './aero.log.service.js';
+import { getSaoPauloDateString } from '../../utils/date.js';
+
+/** A São Paulo date shifted by whole days, so a snapshot names a day the plant still works on. */
+function dateIn(days: number): string {
+  const anchor = new Date(`${getSaoPauloDateString()}T12:00:00Z`);
+  anchor.setUTCDate(anchor.getUTCDate() + days);
+  return anchor.toISOString().slice(0, 10);
+}
 
 /**
  * The ERP mirror is a snapshot, not an authority: the company WebService owns `ENT_LAN`, and these
@@ -18,13 +30,21 @@ describe('Aero movements routes', () => {
   let wilkinToken: string;
   let wilkinId: number;
   let workerToken: string;
+  let originalLogDir: string | undefined;
+  let tempLogDir: string;
+
+  const SNAPSHOT_DAY = dateIn(0);
+  const SECOND_DAY = dateIn(1);
+  const THIRD_DAY = dateIn(2);
+  const FOURTH_DAY = dateIn(3);
+  const PAST_DAY = dateIn(-1);
 
   const seat = {
     ent_lan: 10542,
     product_code: '001192',
     product_desc: 'MASSA QUADRADA',
     quantity: 90,
-    entry_date: '2026-10-28',
+    entry_date: SNAPSHOT_DAY,
     operator_name: 'WILKIN',
     movement_type: 'E' as const,
   };
@@ -35,6 +55,10 @@ describe('Aero movements routes', () => {
       : `/api/integration/aero/movements?date=${date}`;
 
   before(async () => {
+    originalLogDir = process.env.AERO_LOG_DIR;
+    tempLogDir = mkdtempSync(join(tmpdir(), 'aero-movements-test-'));
+    process.env.AERO_LOG_DIR = tempLogDir;
+
     const built = await buildTestApp();
     app = built.app;
     db = built.db;
@@ -62,16 +86,22 @@ describe('Aero movements routes', () => {
   after(async () => {
     await app.close();
     db.close();
+    if (originalLogDir !== undefined) {
+      process.env.AERO_LOG_DIR = originalLogDir;
+    } else {
+      delete process.env.AERO_LOG_DIR;
+    }
+    rmSync(tempLogDir, { recursive: true, force: true });
   });
 
   it('answers 401 without a token, for reading and for writing', async () => {
-    const read = await app.inject({ method: 'GET', url: url('2026-10-28') });
+    const read = await app.inject({ method: 'GET', url: url(SNAPSHOT_DAY) });
     assert.equal(read.statusCode, 401);
 
     const write = await app.inject({
       method: 'POST',
       url: url(),
-      payload: { date: '2026-10-28', movements: [seat] },
+      payload: { date: SNAPSHOT_DAY, movements: [seat] },
     });
     assert.equal(write.statusCode, 401);
   });
@@ -110,27 +140,27 @@ describe('Aero movements routes', () => {
       method: 'POST',
       url: url(),
       headers: { authorization: `Bearer ${workerToken}` },
-      payload: { date: '2026-10-28', movements: [seat] },
+      payload: { date: SNAPSHOT_DAY, movements: [seat] },
     });
     assert.equal(stored.statusCode, 201);
     assert.deepEqual(JSON.parse(stored.body), { saved: 1, massas: 1, insumos: 0 });
 
     const res = await app.inject({
       method: 'GET',
-      url: url('2026-10-28'),
+      url: url(SNAPSHOT_DAY),
       headers: { authorization: `Bearer ${workerToken}` },
     });
 
     assert.equal(res.statusCode, 200);
     const body = JSON.parse(res.body);
-    assert.equal(body.date, '2026-10-28');
+    assert.equal(body.date, SNAPSHOT_DAY);
     assert.equal(body.movements.length, 1);
     const [movement] = body.movements;
     assert.equal(movement.ent_lan, 10542);
     assert.equal(movement.product_code, '001192');
     assert.equal(movement.product_desc, 'MASSA QUADRADA');
     assert.equal(movement.quantity, 90);
-    assert.equal(movement.entry_date, '2026-10-28');
+    assert.equal(movement.entry_date, SNAPSHOT_DAY);
     assert.equal(movement.operator_name, 'WILKIN');
     assert.equal(movement.movement_type, 'E');
     assert.match(movement.synced_at, /^\d{4}-\d{2}-\d{2}T/);
@@ -151,17 +181,17 @@ describe('Aero movements routes', () => {
       url: url(),
       headers: { authorization: `Bearer ${workerToken}` },
       payload: {
-        date: '2026-10-23',
+        date: SECOND_DAY,
         movements: [
-          { ...seat, ent_lan: 35952, entry_date: '2026-10-23', operator_name: 'JEFFERSON' },
-          { ...seat, ent_lan: 35947, entry_date: '2026-10-23', operator_name: 'JOAO H' },
+          { ...seat, ent_lan: 35952, entry_date: SECOND_DAY, operator_name: 'JEFFERSON' },
+          { ...seat, ent_lan: 35947, entry_date: SECOND_DAY, operator_name: 'JOAO H' },
         ],
       },
     });
 
     const res = await app.inject({
       method: 'GET',
-      url: url('2026-10-23'),
+      url: url(SECOND_DAY),
       headers: { authorization: `Bearer ${workerToken}` },
     });
     const movements = JSON.parse(res.body).movements as { operator_name: string; owner_user_id: number | null; owner_status: string }[];
@@ -182,7 +212,7 @@ describe('Aero movements routes', () => {
       url: url(),
       headers: { authorization: `Bearer ${workerToken}` },
       payload: {
-        date: '2026-10-28',
+        date: SNAPSHOT_DAY,
         movements: [{ ...seat, quantity: 90, operator_name: 'wilkin' }],
       },
     });
@@ -191,7 +221,7 @@ describe('Aero movements routes', () => {
     // same operator do not render as two chips.
     const first = await app.inject({
       method: 'GET',
-      url: url('2026-10-28'),
+      url: url(SNAPSHOT_DAY),
       headers: { authorization: `Bearer ${workerToken}` },
     });
     assert.equal(JSON.parse(first.body).movements.length, 1);
@@ -201,13 +231,13 @@ describe('Aero movements routes', () => {
       method: 'POST',
       url: url(),
       headers: { authorization: `Bearer ${workerToken}` },
-      payload: { date: '2026-10-28', movements: [{ ...seat, quantity: 120 }] },
+      payload: { date: SNAPSHOT_DAY, movements: [{ ...seat, quantity: 120 }] },
     });
     assert.equal(stored.statusCode, 201);
 
     const res = await app.inject({
       method: 'GET',
-      url: url('2026-10-28'),
+      url: url(SNAPSHOT_DAY),
       headers: { authorization: `Bearer ${workerToken}` },
     });
     const body = JSON.parse(res.body);
@@ -223,7 +253,7 @@ describe('Aero movements routes', () => {
       url: url(),
       headers: { authorization: `Bearer ${workerToken}` },
       payload: {
-        date: '2026-10-31',
+        date: THIRD_DAY,
         movements: [
           {
             ...seat,
@@ -231,7 +261,7 @@ describe('Aero movements routes', () => {
             product_code: '001774',
             product_desc: 'CAIXA DE PAPELAO PEQUENA MISTA',
             quantity: 3606,
-            entry_date: '2026-10-31',
+            entry_date: THIRD_DAY,
             operator_name: 'VIVIANE',
           },
           {
@@ -240,7 +270,7 @@ describe('Aero movements routes', () => {
             product_code: '000084',
             product_desc: 'MASSA PARA PASTEL DISCO 500G',
             quantity: 500,
-            entry_date: '2026-10-31',
+            entry_date: THIRD_DAY,
             operator_name: 'VIVIANE',
           },
         ],
@@ -250,7 +280,7 @@ describe('Aero movements routes', () => {
 
     const res = await app.inject({
       method: 'GET',
-      url: url('2026-10-31'),
+      url: url(THIRD_DAY),
       headers: { authorization: `Bearer ${workerToken}` },
     });
     const body = JSON.parse(res.body);
@@ -277,14 +307,14 @@ describe('Aero movements routes', () => {
       url: url(),
       headers: { authorization: `Bearer ${workerToken}` },
       payload: {
-        date: '2026-10-31',
+        date: THIRD_DAY,
         movements: [
           ...massas.map((product_code, index) => ({
             ...seat,
             ent_lan: 36000 + index,
             product_code,
             product_desc: `MASSA ${index}`,
-            entry_date: '2026-10-31',
+            entry_date: THIRD_DAY,
           })),
           {
             ...seat,
@@ -292,7 +322,7 @@ describe('Aero movements routes', () => {
             product_code: '001774',
             product_desc: 'CAIXA DE PAPELAO PEQUENA MISTA',
             quantity: 3606,
-            entry_date: '2026-10-31',
+            entry_date: THIRD_DAY,
             operator_name: 'VIVIANE',
           },
         ],
@@ -309,14 +339,14 @@ describe('Aero movements routes', () => {
       url: url(),
       headers: { authorization: `Bearer ${workerToken}` },
       payload: {
-        date: '2026-10-29',
-        movements: [{ ...seat, ent_lan: 10600, entry_date: '2026-10-29' }],
+        date: FOURTH_DAY,
+        movements: [{ ...seat, ent_lan: 10600, entry_date: FOURTH_DAY }],
       },
     });
 
     const other = await app.inject({
       method: 'GET',
-      url: url('2026-10-29'),
+      url: url(FOURTH_DAY),
       headers: { authorization: `Bearer ${workerToken}` },
     });
     assert.equal(JSON.parse(other.body).movements.length, 1);
@@ -360,13 +390,38 @@ describe('Aero movements routes', () => {
     assert.deepEqual(JSON.parse(after.body).movements, [], 'a refused snapshot must write nothing');
   });
 
+  it('answers 409 MASSAS_HISTORY_FROZEN for a past date and audits the refusal', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: url(),
+      headers: { authorization: `Bearer ${wilkinToken}` },
+      payload: { date: PAST_DAY, movements: [{ ...seat, entry_date: PAST_DAY }] },
+    });
+
+    assert.equal(res.statusCode, 409);
+    assert.equal(JSON.parse(res.body).code, 'MASSAS_HISTORY_FROZEN');
+    const stored = db
+      .prepare('SELECT COUNT(*) AS count FROM aero_movements WHERE movement_date = ?')
+      .get(PAST_DAY) as { count: number };
+    assert.equal(stored.count, 0);
+
+    const lines = readFileSync(join(tempLogDir, AERO_LOG_FILE), 'utf-8').split('\n').filter(Boolean);
+    const refusals = lines
+      .map((line) => JSON.parse(line) as { note?: string; httpStatus?: number; error?: string; payload?: { date?: string } })
+      .filter((entry) => entry.note === 'sync_refused');
+    assert.equal(refusals.length, 1);
+    assert.equal(refusals[0].httpStatus, 409);
+    assert.equal(refusals[0].error, 'MASSAS_HISTORY_FROZEN');
+    assert.equal(refusals[0].payload?.date, PAST_DAY);
+  });
+
   it('answers 503 with a named code when the database has not been migrated', async () => {
     db.exec('ALTER TABLE aero_movements RENAME TO aero_movements_missing');
 
     try {
       const read = await app.inject({
         method: 'GET',
-        url: url('2026-10-28'),
+        url: url(SNAPSHOT_DAY),
         headers: { authorization: `Bearer ${workerToken}` },
       });
       assert.equal(read.statusCode, 503);
@@ -376,7 +431,7 @@ describe('Aero movements routes', () => {
         method: 'POST',
         url: url(),
         headers: { authorization: `Bearer ${workerToken}` },
-        payload: { date: '2026-10-28', movements: [seat] },
+        payload: { date: SNAPSHOT_DAY, movements: [seat] },
       });
       assert.equal(write.statusCode, 503);
       assert.equal(JSON.parse(write.body).code, 'AERO_MOVEMENTS_NOT_MIGRATED');
@@ -388,7 +443,7 @@ describe('Aero movements routes', () => {
   it('reads the snapshot for whoever is signed in, because the plant reads the same mirror', async () => {
     const res = await app.inject({
       method: 'GET',
-      url: url('2026-10-28'),
+      url: url(SNAPSHOT_DAY),
       headers: { authorization: `Bearer ${wilkinToken}` },
     });
     assert.equal(res.statusCode, 200);

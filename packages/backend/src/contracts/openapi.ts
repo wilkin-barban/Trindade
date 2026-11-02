@@ -1719,13 +1719,18 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
     description:
       "One row per ERP seat: a second sync of the same day updates the seats it recognises instead of " +
       'appending duplicates, and seats the answer no longer mentions are left alone. Strict validation: ' +
-      'a body this module cannot describe is refused and writes nothing.',
+      'a body this module cannot describe is refused and writes nothing. A date before today in São ' +
+      'Paulo is a closed day and answers 409 `MASSAS_HISTORY_FROZEN` instead of overwriting it.',
     tags: ['integration'],
     request: jsonRequest(AeroMovementsBodySchema),
     responses: {
       201: jsonResponse('The seats that were stored', AeroMovementsSavedResponseSchema),
       400: jsonResponse('The snapshot failed validation', AeroErrorResponseSchema),
       401: UNAUTHORIZED,
+      409: jsonResponse(
+        'The snapshot is dated a closed day, so nothing was written',
+        AeroErrorResponseSchema,
+      ),
       503: jsonResponse('The mirror table has not been migrated yet', AeroErrorResponseSchema),
     },
   });

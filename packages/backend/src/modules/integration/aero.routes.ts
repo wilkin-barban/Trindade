@@ -136,6 +136,29 @@ export async function aeroIntegrationRoutes(fastify: FastifyInstance) {
       }
 
       const saved = saveAeroMovements(fastify.db, parsed.data);
+      if (typeof saved !== 'number') {
+        // A past day is frozen by the calendar, not by the clock. The refusal is audited with the date so
+        // an operator reading the log sees which night a phone kept trying to rewrite.
+        appendAeroLog({
+          ts: new Date().toISOString(),
+          event: 'sync',
+          phase: 'response',
+          user: request.user!.username,
+          role: request.user!.role,
+          destinationUrl: '/api/integration/aero/movements',
+          httpStatus: 409,
+          payload: { date: parsed.data.date },
+          response: null,
+          error: saved.code,
+          launchId: null,
+          note: 'sync_refused',
+          client: 'android',
+          attemptId: null,
+          durationMs: null,
+        });
+        return reply.status(409).send(apiError(saved.error, saved.code));
+      }
+
       // The day is stored whole and counted twice: each screen asks the lens it cares about, so counting
       // here keeps the catalogue in one place instead of a copy on the phone.
       const lenses = movementLenses(parsed.data.movements);
