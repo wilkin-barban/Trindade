@@ -70,9 +70,10 @@ test.describe('the ERP sync, read through each module lens', () => {
 
     const message = page.locator('[data-testid="aero-result-message"]');
     await expect(message).toHaveText(/10 massas sincronizadas do ERP para \d{2}\/\d{2}\/\d{4}\./);
-    // The box arrived on the same day and is none of this screen's business.
+    // The box arrived on the same day and is none of this screen's business. The count is asserted as a
+    // count: a bare "11" also matches the eleventh month of the date the message ends with.
     await expect(message).not.toContainText('insumo');
-    await expect(message).not.toContainText('11');
+    await expect(message).not.toContainText('11 massas');
 
     const close = page.locator('[data-testid="aero-result-close"]');
     expect((await close.boundingBox())!.height).toBeGreaterThanOrEqual(44);
@@ -96,9 +97,13 @@ test.describe('the ERP sync, read through each module lens', () => {
     await page.locator('[data-testid="aero-result-close"]').click();
     await expect(dialog).toBeHidden();
 
-    // The section behind the window now reads the same day from the mirror.
+    // The section behind the window now reads the same day from the mirror. The line is named by the seat
+    // the company gave it: the shared database keeps the mirrors of every run, and the same product may
+    // already be listed from an earlier one.
     await expect(page.locator('[data-testid="receipts-list"]')).toBeVisible();
-    await expect(page.getByText('CAIXA DE PAPELAO PEQUENA MISTA', { exact: true })).toBeVisible();
+    await expect(page.locator('[data-testid="receipt-line-36111-001774"]')).toContainText(
+      'CAIXA DE PAPELAO PEQUENA MISTA',
+    );
 
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
