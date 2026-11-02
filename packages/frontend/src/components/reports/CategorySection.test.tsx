@@ -1,0 +1,116 @@
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import '../../i18n/config';
+import { CategorySection, type CategoryType, type FormState, type TaskType } from './CategorySection';
+
+/**
+ * The switch of a box type: off, its block leaves the screen; on, it comes back empty.
+ *
+ * The state behind the switch lives in the page — `lib/report-box-types.ts` holds the rule and its own tests —
+ * and this file holds the other half of it: that the switch exists, that it is the thing that hides the block,
+ * and that a read-only report cannot move it.
+ */
+function task(id: number, categoryId: number, namePt: string): TaskType {
+  return {
+    id,
+    category_id: categoryId,
+    name_pt: namePt,
+    name_es: namePt,
+    task_type: 'check',
+    sort_order: id,
+    temperature_readings: 0,
+  };
+}
+
+const PARENT: CategoryType = {
+  id: 8,
+  parent_category_id: null,
+  name_pt: 'Montagem das Caixas',
+  name_es: 'Montaje de Cajas',
+  sort_order: 3,
+  tasks: [task(23, 8, 'Montagem de caixas Produção')],
+};
+
+const SMALL_BOXES: CategoryType = {
+  id: 9,
+  parent_category_id: 8,
+  name_pt: 'Caixas pequenas',
+  name_es: 'Cajas pequeñas',
+  sort_order: 5,
+  tasks: [task(58, 9, 'Nhoque 400g')],
+};
+
+const ASSAI_BOXES: CategoryType = {
+  id: 10,
+  parent_category_id: 8,
+  name_pt: 'Caixas Assai',
+  name_es: 'Cajas Assai',
+  sort_order: 6,
+  tasks: [task(61, 10, 'Disgo 500g')],
+};
+
+const EMPTY_FORM: FormState = { items: {}, temperatures: {}, selectedProducts: {} };
+
+function renderSection({
+  disabledBoxTypeIds = [],
+  onBoxTypeChange,
+  readOnly,
+}: {
+  disabledBoxTypeIds?: number[];
+  onBoxTypeChange?: (categoryId: number, enabled: boolean) => void;
+  readOnly?: boolean;
+} = {}) {
+  return render(
+    <CategorySection
+      category={PARENT}
+      children={[SMALL_BOXES, ASSAI_BOXES]}
+      form={{ ...EMPTY_FORM, disabledBoxTypeIds }}
+      onItemChange={vi.fn()}
+      onTemperatureChange={vi.fn()}
+      onSelectedProductsChange={vi.fn()}
+      disabledBoxTypeIds={disabledBoxTypeIds}
+      onBoxTypeChange={onBoxTypeChange}
+      readOnly={readOnly}
+    />,
+  );
+}
+
+describe('CategorySection — box type switch', () => {
+  it('draws one switch per box type, on by default, with its tasks under it', () => {
+    renderSection();
+
+    expect(screen.getByTestId('box-type-switch-9')).toBeChecked();
+    expect(screen.getByTestId('box-type-switch-10')).toBeChecked();
+    expect(screen.getByTestId('check-task-58')).toBeInTheDocument();
+    expect(screen.getByTestId('check-task-61')).toBeInTheDocument();
+  });
+
+  it('takes the block of a switched-off type off the screen and leaves the other one', () => {
+    renderSection({ disabledBoxTypeIds: [9] });
+
+    expect(screen.getByTestId('box-type-switch-9')).not.toBeChecked();
+    expect(screen.queryByTestId('check-task-58')).not.toBeInTheDocument();
+    expect(screen.getByTestId('check-task-61')).toBeInTheDocument();
+    // The parent's own tasks are not a box type and never leave with a switch.
+    expect(screen.getByTestId('check-task-23')).toBeInTheDocument();
+  });
+
+  it('asks the page to switch the type the operator pressed', () => {
+    const onBoxTypeChange = vi.fn();
+    renderSection({ onBoxTypeChange });
+
+    fireEvent.click(screen.getByTestId('box-type-switch-10'));
+
+    expect(onBoxTypeChange).toHaveBeenCalledWith(10, false);
+  });
+
+  it('does not let a read-only report move the switch', () => {
+    const onBoxTypeChange = vi.fn();
+    renderSection({ onBoxTypeChange, readOnly: true });
+
+    const boxSwitch = screen.getByTestId('box-type-switch-9');
+    expect(boxSwitch).toBeDisabled();
+    fireEvent.click(boxSwitch);
+    expect(onBoxTypeChange).not.toHaveBeenCalled();
+  });
+});

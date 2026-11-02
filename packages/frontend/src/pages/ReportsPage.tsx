@@ -12,6 +12,7 @@ import {
   type CategoryType,
   type FormState,
 } from '../components/reports/CategorySection';
+import { toggleBoxType } from '../lib/report-box-types';
 import { ReceiptsSection } from '../components/reports/ReceiptsSection';
 import { hasTemperatureTasks } from '../lib/report-sections';
 import { MassasReportSection } from '../components/reports/MassasReportSection';
@@ -134,6 +135,20 @@ export function ReportsPage() {
       items: { ...prev.items, [taskId]: checked },
     }));
   }, []);
+
+  /**
+   * Switches one type of box, taking its answers with it.
+   *
+   * The rule -- what a switch drops and why -- is `toggleBoxType`'s, in `lib/report-box-types.ts`, because the
+   * edit screen has the same switch and the same body to build.
+   */
+  const handleBoxTypeChange = useCallback(
+    (categoryId: number, enabled: boolean) => {
+      const tasks = categories.filter((category) => category.id === categoryId).flatMap((category) => category.tasks);
+      setForm((prev) => toggleBoxType(prev, tasks, categoryId, enabled));
+    },
+    [categories],
+  );
 
   const handleSelectedProductsChange = useCallback((taskId: number, products: string[]) => {
     setForm((prev) => ({
@@ -414,6 +429,8 @@ export function ReportsPage() {
                     onItemChange={handleItemChange}
                     onTemperatureChange={handleTemperatureChange}
                     onSelectedProductsChange={handleSelectedProductsChange}
+                    disabledBoxTypeIds={form.disabledBoxTypeIds}
+                    onBoxTypeChange={handleBoxTypeChange}
                   />
                 </CardContent>
               </Card>

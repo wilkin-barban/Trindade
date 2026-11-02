@@ -27,6 +27,14 @@ export interface FormState {
   items: Record<number, boolean>;
   temperatures: Record<number, string[]>;
   selectedProducts?: Record<number, string[]>;
+  /**
+   * The box types this report does not mount, by their category's id.
+   *
+   * Off by absence rather than by a `false`, the way the phone keeps it: every form opens with every type on,
+   * so the switch answers a question the operator asks instead of one the form assumed. The rule behind the
+   * switch — and what happens to the answers of the type it turns off — lives in `lib/report-box-types.ts`.
+   */
+  disabledBoxTypeIds?: number[];
 }
 
 // ---- Props ----
@@ -38,6 +46,9 @@ interface CategorySectionProps {
   onItemChange: (taskId: number, checked: boolean) => void;
   onTemperatureChange: (taskId: number, readingIndex: number, value: string) => void;
   onSelectedProductsChange?: (taskId: number, products: string[]) => void;
+  /** Switched off box types, by category id; see `FormState.disabledBoxTypeIds`. */
+  disabledBoxTypeIds?: readonly number[];
+  onBoxTypeChange?: (categoryId: number, enabled: boolean) => void;
   readOnly?: boolean;
 }
 
@@ -157,28 +168,65 @@ function TemperatureTask({
   );
 }
 
+/** One box type and the switch that says whether the day mounted it, on a single line. */
+function BoxTypeSwitchRow({
+  categoryId,
+  label,
+  enabled,
+  readOnly,
+  onChange,
+}: {
+  categoryId: number;
+  label: string;
+  enabled: boolean;
+  readOnly?: boolean;
+  onChange?: (enabled: boolean) => void;
+}) {
+  return (
+    <label
+      className={`flex items-center justify-between gap-3 py-2 ${readOnly ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'}`}
+    >
+      <span className="text-sm font-semibold text-gray-700">{label}</span>
+      <input
+        type="checkbox"
+        role="switch"
+        checked={enabled}
+        disabled={readOnly || !onChange}
+        onChange={(e) => {
+          // Guarded here and not only by `disabled`: the disabled attribute is the browser's promise, and a
+          // promise is not a rule. A read-only report has no switch to move, whoever asks.
+          if (readOnly) return;
+          onChange?.(e.target.checked);
+        }}
+        className="h-5 w-9 shrink-0 cursor-pointer appearance-none rounded-full bg-gray-300 transition-colors checked:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
+        data-testid={`box-type-switch-${categoryId}`}
+        aria-label={label}
+      />
+    </label>
+  );
+}
+
 // ---- Main Component ----
 
-export function CategorySection({
-  category,
-  children,
+/** The tasks of one category, drawn without its heading: a root uses its own title, a nested type its switch. */
+function TaskBlocks({
+  tasks,
   form,
   onItemChange,
   onTemperatureChange,
   onSelectedProductsChange,
   readOnly,
-}: CategorySectionProps) {
-  const { i18n } = useTranslation();
-  const isSpanish = i18n.language?.startsWith('es');
-  const catName = isSpanish && category.name_es ? category.name_es : category.name_pt;
-
+}: {
+  tasks: TaskType[];
+  form: FormState;
+  onItemChange: CategorySectionProps['onItemChange'];
+  onTemperatureChange: CategorySectionProps['onTemperatureChange'];
+  onSelectedProductsChange?: CategorySectionProps['onSelectedProductsChange'];
+  readOnly?: boolean;
+}) {
   return (
-    <div className="mb-6">
-      <h3 className="text-md font-semibold text-gray-800 mb-3 pb-2 border-b border-gray-200">
-        {catName}
-      </h3>
-      <div className="space-y-1">
-        {category.tasks.map((task) => {
+    <div className="space-y-1">
+      {tasks.map((task) => {
           switch (task.task_type) {
             case 'check':
               return (
@@ -228,19 +276,67 @@ export function CategorySection({
               return null;
           }
         })}
-      </div>
-      {children?.map((child) => (
-        <div key={child.id} className="mt-5 ml-2 border-l-2 border-blue-100 pl-4">
-          <CategorySection
-            category={child}
-            form={form}
-            onItemChange={onItemChange}
-            onTemperatureChange={onTemperatureChange}
-            onSelectedProductsChange={onSelectedProductsChange}
-            readOnly={readOnly}
-          />
-        </div>
-      ))}
+    </div>
+  );
+}
+
+export function CategorySection({
+  category,
+  children,
+  form,
+  onItemChange,
+  onTemperatureChange,
+  onSelectedProductsChange,
+  disabledBoxTypeIds,
+  onBoxTypeChange,
+  readOnly,
+}: CategorySectionProps) {
+  const { i18n } = useTranslation();
+  const isSpanish = i18n.language?.startsWith('es');
+  const catName = isSpanish && category.name_es ? category.name_es : category.name_pt;
+  const switchedOff = disabledBoxTypeIds ?? [];
+
+  return (
+    <div className="mb-6">
+      <h3 className="text-md font-semibold text-gray-800 mb-3 pb-2 border-b border-gray-200">
+        {catName}
+      </h3>
+      <TaskBlocks
+        tasks={category.tasks}
+        form={form}
+        onItemChange={onItemChange}
+        onTemperatureChange={onTemperatureChange}
+        onSelectedProductsChange={onSelectedProductsChange}
+        readOnly={readOnly}
+      />
+      {/* Cada hijo es un tipo de caja: su nombre, el interruptor que dice si el día lo montó, y sus tareas
+          debajo solo mientras el interruptor está encendido. Un tipo apagado con su checklist a la vista era
+          una pantalla de controles muertos; una decisión que se lee como una decisión es esto. */}
+      {children?.map((child) => {
+        const enabled = !switchedOff.includes(child.id);
+        const childName = isSpanish && child.name_es ? child.name_es : child.name_pt;
+        return (
+          <div key={child.id} className="mt-5 ml-2 border-l-2 border-blue-100 pl-4">
+            <BoxTypeSwitchRow
+              categoryId={child.id}
+              label={childName}
+              enabled={enabled}
+              readOnly={readOnly}
+              onChange={onBoxTypeChange ? (value) => onBoxTypeChange(child.id, value) : undefined}
+            />
+            {enabled && (
+              <TaskBlocks
+                tasks={child.tasks}
+                form={form}
+                onItemChange={onItemChange}
+                onTemperatureChange={onTemperatureChange}
+                onSelectedProductsChange={onSelectedProductsChange}
+                readOnly={readOnly}
+              />
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

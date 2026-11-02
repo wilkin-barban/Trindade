@@ -11,6 +11,7 @@ import {
   type CategoryType,
   type FormState,
 } from '../components/reports/CategorySection';
+import { toggleBoxType } from '../lib/report-box-types';
 import { ReceiptsSection } from '../components/reports/ReceiptsSection';
 import { ERP_RECEIPT_CATEGORY_ID, usesErpReceipts } from '../lib/receipts';
 
@@ -188,6 +189,16 @@ export function ReportEditPage() {
       }));
     },
     [readOnly]
+  );
+
+  /** Same rule as the generator's, from `lib/report-box-types.ts`: both screens build the same body. */
+  const handleBoxTypeChange = useCallback(
+    (categoryId: number, enabled: boolean) => {
+      if (readOnly) return;
+      const tasks = categories.filter((category) => category.id === categoryId).flatMap((category) => category.tasks);
+      setForm((prev) => toggleBoxType(prev, tasks, categoryId, enabled));
+    },
+    [categories, readOnly],
   );
 
   const handleSelectedProductsChange = useCallback(
@@ -456,6 +467,8 @@ export function ReportEditPage() {
                   onItemChange={handleItemChange}
                   onTemperatureChange={handleTemperatureChange}
                   onSelectedProductsChange={handleSelectedProductsChange}
+                  disabledBoxTypeIds={form.disabledBoxTypeIds}
+                  onBoxTypeChange={handleBoxTypeChange}
                   readOnly={readOnly}
                 />
               )}
