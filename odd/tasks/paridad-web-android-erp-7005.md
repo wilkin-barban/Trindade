@@ -1188,3 +1188,51 @@ cerrar la tarea, con el hash que quedó en el historial.
 - Todo en español.
 - Al terminar, reportá: path del ODD, número de tareas, dependencias, decisiones que necesitan aprobación y cualquier conflicto que hayas encontrado.
 ```
+
+## Anexo B — Remediación post-release 7005 (T28, T29)
+
+Wilkin verificó dos defectos en producción después de publicar 7005. La directiva completa está en
+`/tmp/commandcode-1001/.../scratchpad/trindade-fix-massas-fleteros.md`; acá quedan sus requisitos y su
+trazabilidad. Alcance **solo web**: no toca Android, APK, `versionCode`, tag ni release.
+
+### S20 — El histórico de Massas elige el día con el panel de Contagem
+
+Verbatim de la directiva:
+
+> 1. En MassasHistoryPage, reemplazar `MassasDayList` por el **mismo bloque visual y funcional** de Contagem:
+>    - `DateField variant="panel" id="massas-history-date" label={t('massas.date')} value={date} onChange={setDate} min={saoPauloDaysAgo(30)} max={saoPauloYesterday()} testId="massas-history-date"`.
+>    - Chips de los días de `/massas-launch/history` con la misma estructura/clases que Contagem, `data-testid="massas-history-days"` y `data-testid="massas-history-day-<date>"`; texto `DD/MM · totalUnits` (mismo formato que Contagem).
+>    - Mantener el día en `?date=`, el fallback a ayer, el deep link y el comportamiento de "ayer" sin query.
+>    - No mostrar la tarjeta "Escolha o dia" ni el título viejo.
+>    - Si `/massas-launch/history` falla, no reemplaces el panel: el `DateField` debe seguir usable; un aviso discreto debajo es aceptable, pero no una tarjeta distinta.
+> 2. La forma más segura de que no vuelvan a divergir es extraer un `HistoryDayPanel` compartido y usarlo en Massas y Contagem. Si preferís no tocar Contagem, copiá exactamente su markup/clases; no inventes un tercer diseño.
+> 3. Borrar `MassasDayList` si queda sin uso (y sus tests), o dejarlo solo si sigue siendo usado en otro lugar; hoy solo lo usa Massas.
+
+Decisión de implementación: se extrae `HistoryDayPanel` y lo usan las dos pantallas, que es lo que impide la
+tercera divergencia. Un día ofrecido por defecto que el endpoint no lista (ayer) se dibuja con el chip solo
+`DD/MM`, sin `· 0`: un cero afirmaría un día vacío que nadie leyó.
+
+### S21 — Un fletero no tiene chapa en el selector ni en el alta rápida
+
+Verbatim de la directiva:
+
+> 1. En la rama de fleteros, quitar por completo el `<span>` de `driver.license_plate`; la fila debe mostrar solo checkbox + nombre. No debe existir `driver-plate-<id>` para un fletero.
+> 2. La rama `casa` conserva el `<select>` de chapa y su validación; no la cambies.
+> 3. Mismo criterio en el alta rápida de fletero: `packages/frontend/src/components/loading/DriverForm.tsx:61-68` pide `license_plate` y lo manda en el POST. Quitá el campo de chapa del formulario de fletero y no envíes `license_plate` desde ese alta. El backend puede seguir aceptando el campo para datos históricos; no borres placas de la base.
+
+Datos reales que motivan el pedido: Celso (`id=31`, `license_plate='RXK'`) y Fabiano (`id=51`,
+`license_plate='RKM'`), ambos `driver_type='fletero'`. La placa es la que se elige al asignar un vehículo de la
+planta, no un atributo de la persona.
+
+### T28 · Massas con el panel de Contagem
+
+- **Specs.** S20.
+- **Commit esperado.** `refactor(web): share the day panel between the two histories` · componente + tests.
+- **Commit esperado.** `fix(web): let the massas history pick its day like the count does` · página + e2e.
+- **Depende.** T27 (la release no se toca).
+
+### T29 · Fleteros sin chapa
+
+- **Specs.** S21.
+- **Commit esperado.** `fix(web): stop asking a fletero for a plate he does not carry` · picker, alta rápida y tests.
+- **Depende.** Ninguna.
