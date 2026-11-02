@@ -166,7 +166,15 @@ export class ApiClientError extends Error {
   constructor(
     public status: number,
     message: string,
-    public details?: unknown
+    public details?: unknown,
+    /**
+     * The semantic name of the refusal, when the payload carries one.
+     *
+     * A status is not enough to tell two refusals apart -- a closed day and a duplicate driver both answer
+     * 400 or 409 -- and the sentence is written by the server in the language of the request. The code is
+     * the field that survives both.
+     */
+    public code?: string
   ) {
     super(message);
     this.name = 'ApiClientError';
@@ -273,7 +281,7 @@ async function request<T>(
       markGuestReadonlyNotice();
     }
 
-    throw new ApiClientError(response.status, message, data && data.details);
+    throw new ApiClientError(response.status, message, data && data.details, rawCode || undefined);
   }
 
   return data as T;

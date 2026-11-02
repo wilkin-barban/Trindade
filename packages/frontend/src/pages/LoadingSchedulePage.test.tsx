@@ -82,4 +82,56 @@ describe('LoadingSchedulePage', () => {
     expect(screen.getByTestId('schedule-grid')).toBeInTheDocument();
     expect(screen.getByTestId('driver-select-failure-4')).toHaveTextContent('Silvana');
   });
+
+  /**
+   * A read that failed is not a day without loads.
+   *
+   * The grid drew itself anyway, with every hour saying nobody was scheduled, and the only sign of the truth
+   * was a red line above it. On a phone the operator reads the grid, not the line: the day looked empty and the
+   * crew looked idle. The failure takes the grid's place, and it comes with the retry.
+   */
+  it('says the read failed instead of drawing an empty day', async () => {
+    get.mockImplementation(async (url: string) => {
+      if (url.startsWith('/loading/schedules')) throw new Error('Network Error');
+      if (url.startsWith('/loading/time-slots')) return { timeSlots: ['04:00'] };
+      if (url.startsWith('/loading/drivers')) return { drivers: [driver(1, 'Carlos')] };
+      return {};
+    });
+    render(
+      <MemoryRouter>
+        <LoadingSchedulePage />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => expect(screen.getByTestId('loading-schedule-read-error')).toBeInTheDocument());
+    expect(screen.queryByTestId('schedule-grid')).toBeNull();
+    expect(screen.getByText('Network Error')).toBeInTheDocument();
+  });
+
+  it('rereads the day from the failure itself', async () => {
+    let failures = 1;
+    get.mockImplementation(async (url: string) => {
+      if (url.startsWith('/loading/schedules')) {
+        if (failures > 0) {
+          failures -= 1;
+          throw new Error('Network Error');
+        }
+        return { schedules: [] };
+      }
+      if (url.startsWith('/loading/time-slots')) return { timeSlots: ['04:00'] };
+      if (url.startsWith('/loading/drivers')) return { drivers: [driver(1, 'Carlos')] };
+      return {};
+    });
+    render(
+      <MemoryRouter>
+        <LoadingSchedulePage />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => expect(screen.getByTestId('loading-schedule-retry')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('loading-schedule-retry'));
+
+    await waitFor(() => expect(screen.getByTestId('schedule-grid')).toBeInTheDocument());
+    expect(screen.queryByTestId('loading-schedule-read-error')).toBeNull();
+  });
 });

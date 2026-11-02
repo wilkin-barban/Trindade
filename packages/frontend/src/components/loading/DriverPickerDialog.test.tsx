@@ -122,4 +122,24 @@ describe('DriverPickerDialog', () => {
     fireEvent.click(screen.getByTestId('driver-select-retry'));
     expect(props.onRetry).toHaveBeenCalled();
   });
+
+  /**
+   * A plant with no plates loaded is not a plant whose plates failed to load.
+   *
+   * Without vehicles, every company driver's select showed only its placeholder, and the only thing the modal
+   * ever said was «Falta la chapa de Silvana»: true, unhelpful, and it sent the operator to look for a plate in
+   * a list that has none. The missing setup gets said out loud.
+   */
+  it('says no plate is configured, instead of only blaming the picked driver', () => {
+    renderDialog({ tab: 'casa', vehicles: [] });
+
+    expect(screen.getByTestId('driver-select-no-vehicles')).toHaveTextContent('No hay vehículos configurados');
+  });
+
+  it('does not blame the configuration when the plates simply did not arrive', () => {
+    renderDialog({ tab: 'casa', vehicles: [], vehiclesError: true });
+
+    expect(screen.queryByTestId('driver-select-no-vehicles')).toBeNull();
+    expect(screen.getByText('No se pudieron cargar los vehículos.')).toBeInTheDocument();
+  });
 });

@@ -6,7 +6,7 @@ import { Button } from '../components/ui/button';
 import { LoadingSpinner } from '../components/ui/loading-spinner';
 import { ScheduleGrid } from '../components/loading/ScheduleGrid';
 import { ScheduleExportView } from '../components/loading/ScheduleExportView';
-import { exportPdf } from '../lib/exportPdf';
+import { exportScheduleTextAsPdf } from '../lib/schedule-pdf';
 import { ModuleHelpModal } from '../components/ui/ModuleHelpModal';
 import type { ScheduleRow, DriverRow } from '../components/loading/ScheduleGrid';
 
@@ -47,6 +47,9 @@ export function LoadingSchedulePage() {
   // through every reload, and hanging the spinner on the number of rows brought it back after each batch.
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState('');
+  // A failed read is its own state, not an error line over a grid that lies: the grid would draw every hour as
+  // empty, and on a phone the grid is what is read. This one takes the grid's place and carries the retry.
+  const [readError, setReadError] = useState('');
 
   // Export modal
   const [exportOpen, setExportOpen] = useState(false);
@@ -54,6 +57,7 @@ export function LoadingSchedulePage() {
   // ---- Fetch data for current date ----
   const fetchData = useCallback(async () => {
     setError('');
+    setReadError('');
     setLoading(true);
 
     try {
@@ -67,9 +71,7 @@ export function LoadingSchedulePage() {
       setTimeSlots(slotsRes.timeSlots);
       setDrivers(driversRes.drivers);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : t('loading.loadingError')
-      );
+      setReadError(err instanceof Error ? err.message : t('loading.loadingError'));
     } finally {
       setLoading(false);
       setLoaded(true);
@@ -103,24 +105,7 @@ export function LoadingSchedulePage() {
     try {
       const data = await api.get<{ text: string }>(`/loading/export?date=${date}`);
 
-      const tempDiv = document.createElement('div');
-      tempDiv.id = 'loading-export-text-temp';
-      tempDiv.style.position = 'absolute';
-      tempDiv.style.left = '-9999px';
-      tempDiv.style.top = '-9999px';
-      tempDiv.style.width = '450px';
-      tempDiv.style.padding = '20px';
-      tempDiv.style.backgroundColor = '#f9fafb';
-      tempDiv.style.fontFamily = 'monospace';
-      tempDiv.style.fontSize = '12px';
-      tempDiv.style.whiteSpace = 'pre-wrap';
-      tempDiv.style.color = '#1f2937';
-      tempDiv.style.lineHeight = '1.6';
-      tempDiv.innerText = data.text;
-      document.body.appendChild(tempDiv);
-
-      await exportPdf('loading-export-text-temp', `cronograma-${date}`);
-      document.body.removeChild(tempDiv);
+      await exportScheduleTextAsPdf(data.text, `cronograma-${date}`);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : t('loading.exportError')
@@ -174,7 +159,24 @@ export function LoadingSchedulePage() {
         </div>
       )}
 
-      {/* Grid */}
+      {/* A day that could not be read: the failure in the grid's place, with the way back. */}
+      {readError ? (
+        <div
+          className="rounded-lg border border-red-200 bg-red-50 px-4 py-6 text-center"
+          data-testid="loading-schedule-read-error"
+        >
+          <p className="text-sm text-red-700">{readError}</p>
+          <Button
+            onClick={() => { void fetchData(); }}
+            variant="outline"
+            size="sm"
+            className="mt-3"
+            data-testid="loading-schedule-retry"
+          >
+            {t('ui.retry')}
+          </Button>
+        </div>
+      ) : (
       <ScheduleGrid
         schedules={schedules}
         timeSlots={timeSlots}
@@ -184,6 +186,7 @@ export function LoadingSchedulePage() {
         onDelete={handleDelete}
         onRefresh={fetchData}
       />
+      )}
 
       {/* Action buttons */}
       <div className="flex justify-end gap-3 mt-6 mb-8">

@@ -254,7 +254,8 @@
     "historyBatchCount_one": "{{count}} carga",
     "historyBatchCount_other": "{{count}} cargas",
     "historyLoadingDay": "Carga: {{date}}",
-    "emptySlot": "Ninguna carga en este horario."
+    "emptySlot": "Ninguna carga en este horario.",
+    "noVehicles": "No hay vehículos configurados: pedile a Admin que cargue las chapas."
   },
   "admin": {
     "title": "Administración",

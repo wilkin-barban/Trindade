@@ -199,6 +199,15 @@ export function DriverPickerDialog({
             })
           )}
 
+          {/* A plant with no plates loaded says so once, above the rows: the row's own complaint («falta la
+              chapa de Silvana») is true and unhelpful, and it sends the operator to look for a plate in a list
+              that has none. */}
+          {!vehiclesError && vehicles.length === 0 && (
+            <p className="text-xs text-amber-700 mt-2" data-testid="driver-select-no-vehicles">
+              {t('loading.noVehicles')}
+            </p>
+          )}
+
           {vehiclesError && (
             <div className="flex items-center gap-2 text-xs text-red-600 mt-2" role="alert">
               <span>{t('loading.vehiclesError')}</span>

@@ -395,6 +395,48 @@ describe('Loading Schedule Routes', () => {
     );
   });
 
+  /**
+   * The day that is already in the history answers with a code, not only with a sentence.
+   *
+   * The sentence is written here, in the language of the request, so a client can only recognize the refusal
+   * by reading it -- and it arrives as a 400, the same status a bad driver arrives with. The code is what
+   * tells the two apart without depending on the wording or on the language.
+   */
+  it('POST /schedules names the closed day with its code, in both languages', async () => {
+    const driverId = seedDriver(db, 'Fletero Cerrado', 'CER0001');
+    const first = await app.inject({
+      method: 'POST',
+      url: '/api/loading/schedules',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { schedule_date: '2026-08-05', time_slot: '05:00', driver_type: 'fletero', driver_id: driverId },
+    });
+    assert.strictEqual(first.statusCode, 201);
+    // The day is closed: its entries stay, all inactive, and that is the day the history already holds.
+    const closed = await app.inject({
+      method: 'PATCH',
+      url: '/api/loading/schedules/batch/2026-08-05/deactivate',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.strictEqual(closed.statusCode, 200, 'the day is closed');
+
+    for (const lang of ['pt-BR', 'es']) {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/loading/schedules',
+        headers: { authorization: `Bearer ${token}`, 'accept-language': lang },
+        payload: { schedule_date: '2026-08-05', time_slot: '07:00', driver_type: 'fletero', driver_id: driverId },
+      });
+      const body = JSON.parse(res.body);
+
+      assert.strictEqual(res.statusCode, 400, `${lang}: refused`);
+      assert.strictEqual(body.code, 'scheduleAlreadyExists', `${lang}: names the code`);
+      assert.ok(
+        body.error.includes(lang === 'es' ? 'historial' : 'histórico'),
+        `${lang}: keeps the sentence in the language of the request`
+      );
+    }
+  });
+
   // ---- Schedules: Delete ----
 
 });

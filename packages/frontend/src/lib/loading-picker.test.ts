@@ -117,6 +117,21 @@ describe('what a refusal says', () => {
     assert.equal(refusalMessage(driver, t), 'loading.driverAlreadyScheduled');
   });
 
+  /**
+   * The closed day arrives as a 400 with a sentence the server translated.
+   *
+   * Read by status it was indistinguishable from a bad driver id, and read by sentence it was in whatever
+   * language the request had asked for. The code is what makes the branch reachable at all.
+   */
+  it('recognizes the closed day by its code, whatever the sentence says', () => {
+    const closedDay = Object.assign(new Error('Já existe um cronograma para esta data no histórico.'), {
+      status: 400,
+      code: 'scheduleAlreadyExists',
+    });
+
+    assert.equal(refusalMessage(closedDay, t), 'loading.scheduleAlreadyExists');
+  });
+
   it('keeps the batch-level refusal, the network, and whatever the server said', () => {
     assert.equal(
       refusalMessage(new Error('scheduleAlreadyExists'), t),

@@ -6,7 +6,7 @@ import { api, ApiClientError } from '../api/client';
 import { Button } from '../components/ui/button';
 import { LoadingSpinner } from '../components/ui/loading-spinner';
 import { ScheduleExportView } from '../components/loading/ScheduleExportView';
-import { exportPdf } from '../lib/exportPdf';
+import { exportScheduleTextAsPdf } from '../lib/schedule-pdf';
 import type { ScheduleRow } from '../components/loading/ScheduleGrid';
 import { countInWindow, isQuotaExceeded, quotaIfMoved, toMinutes } from '../lib/loading-quota';
 
@@ -60,24 +60,7 @@ export function LoadingEditPage() {
     try {
       const data = await api.get<{ text: string }>(`/loading/export?date=${date}`);
 
-      const tempDiv = document.createElement('div');
-      tempDiv.id = 'loading-export-text-temp';
-      tempDiv.style.position = 'absolute';
-      tempDiv.style.left = '-9999px';
-      tempDiv.style.top = '-9999px';
-      tempDiv.style.width = '450px';
-      tempDiv.style.padding = '20px';
-      tempDiv.style.backgroundColor = '#f9fafb';
-      tempDiv.style.fontFamily = 'monospace';
-      tempDiv.style.fontSize = '12px';
-      tempDiv.style.whiteSpace = 'pre-wrap';
-      tempDiv.style.color = '#1f2937';
-      tempDiv.style.lineHeight = '1.6';
-      tempDiv.innerText = data.text;
-      document.body.appendChild(tempDiv);
-
-      await exportPdf('loading-export-text-temp', `cronograma-${date}`);
-      document.body.removeChild(tempDiv);
+      await exportScheduleTextAsPdf(data.text, `cronograma-${date}`);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : t('loading.exportError')

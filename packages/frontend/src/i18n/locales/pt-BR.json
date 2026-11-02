@@ -254,7 +254,8 @@
     "historyBatchCount_one": "{{count}} carregamento",
     "historyBatchCount_other": "{{count}} carregamentos",
     "historyLoadingDay": "Carregamento: {{date}}",
-    "emptySlot": "Nenhum carregamento neste horário."
+    "emptySlot": "Nenhum carregamento neste horário.",
+    "noVehicles": "Nenhum veículo configurado: peça ao Admin para cadastrar as placas."
   },
   "admin": {
     "title": "Administração",

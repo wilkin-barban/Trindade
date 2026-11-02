@@ -134,7 +134,13 @@ export function schedulePayload(date: string, timeSlot: string, row: BatchRow): 
   };
 }
 
-/** What a refused row says: the server's reason, in the operator's words. */
+/**
+ * What a refused row says: the server's reason, in the operator's words.
+ *
+ * The code is read first. A day that is already in the history answers 400 with a sentence the server
+ * translated -- «Já existe um cronograma para esta data no histórico.» -- and without the code this branch
+ * only matched a client that echoed the raw name, which no server does any more.
+ */
 export function refusalMessage(err: unknown, t: (key: string) => string): string {
   const status = typeof (err as { status?: unknown })?.status === 'number'
     ? (err as { status: number }).status
@@ -142,8 +148,11 @@ export function refusalMessage(err: unknown, t: (key: string) => string): string
   const raw = typeof (err as { message?: unknown })?.message === 'string'
     ? (err as { message: string }).message
     : '';
+  const code = typeof (err as { code?: unknown })?.code === 'string'
+    ? (err as { code: string }).code
+    : '';
 
-  if (raw === 'scheduleAlreadyExists') return t('loading.scheduleAlreadyExists');
+  if (code === 'scheduleAlreadyExists' || raw === 'scheduleAlreadyExists') return t('loading.scheduleAlreadyExists');
   if (status === 409) {
     // The 409 the server sends names no field, so the message is what tells the two duplicates apart: the
     // plate, or the driver.

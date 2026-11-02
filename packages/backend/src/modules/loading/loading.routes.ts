@@ -117,7 +117,11 @@ export async function loadingRoutes(fastify: FastifyInstance) {
             ? 'Ya existe un cronograma para esta fecha en el historial.'
             : 'Já existe um cronograma para esta data no histórico.';
         }
-        return reply.status(result.status).send({ error: errMsg, message: errMsg });
+        // The sentence travels for the user and the code for the client: 409 is also how a duplicate driver
+        // answers, and a client that only reads the text cannot tell the day's refusal from the row's.
+        return reply
+          .status(result.status)
+          .send({ error: errMsg, message: errMsg, code: result.error });
       }
 
       // Audit: schedule created
