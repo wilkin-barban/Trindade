@@ -711,7 +711,7 @@ Los pasos 2, 3 y 4 son **publicación**: se ejecutan solo con autorización expl
 | T8 | S26, S27, S32 | — | `LoadingViewModelTest.kt` | pendiente |
 | T9 | S30, S33, S34 | `5e82d44`, `83d0773` | `LoadingHistoryViewModelTest.kt`, `ReportsHistoryViewModelTest.kt` | hecho |
 | T10 | S52 | — | `ReportGeneratorScreenTest.kt` | pendiente |
-| T11 | S22, S32 | — | `LoadingScreenTest.kt` | pendiente |
+| T11 | S22, S32 | `feat(android): open a past loading day in read only`, `test(android): cover the closed day on the grid` | `LoadingScreenTest.kt`, `LoadingViewModelTest.kt` | hecho |
 | T12 | S35, S37 | — | `LoadingHistoryPage.test.tsx`, `LoadingEditPage.test.tsx` | pendiente |
 | T13 | S36 | — | `loading-history.spec.ts` | pendiente |
 | T14 | S46, S47 | — | `MassasHistoryPage.test.tsx`, `StockHistoryPage.test.tsx` | pendiente |
@@ -761,3 +761,13 @@ Correcciones que esta verificación introduce sobre el brief: el hallazgo B est�
 - Rechazos nombrados: 401 `SESSION_EXPIRED`, 403 `ADMIN_ONLY`, 404 `GONE`, 409 por código (`LOADING_HISTORY_FROZEN` → `FROZEN`, el resto `GENERIC`), 5xx `SERVER_FAILED`, transporte caído `UNREACHABLE`.
 - Los fakes ganaron `historyFailsFromRead` y `gateHistoryFromRead` (la primera lectura que falla o se retiene, contada desde uno) y sus respuestas de ciclo de vida pasaron a `var`. El desplazamiento importa: la primera versión usaba `>` y el fallo caía en la lectura siguiente, lo que hacía pasar el test por la razón equivocada.
 - Evidencia: `LoadingHistoryViewModelTest` 28/28 y `ReportsHistoryViewModelTest` 24/24 en verde; suite completa `:app:testDebugUnitTest` 1305 tests, 0 fallos, 0 saltados (`BUILD SUCCESSFUL in 12m 8s`).
+
+**L7 (cierre de T11, evidencia)**
+
+- Regla del calendario: `isClosedDay(date, today) = date < today` en `loading/LoadingDay.kt`, que es exactamente la del servidor (`closedDayRefusal` en `loading.service.ts:45-48`). Un día futuro queda escribible porque el backend lo acepta; la web es más estricta (`date !== today`), diferencia existente que no se toca aquí.
+- `UiState` gana `today` y `closedDay`; `readOnly` pasa a `!dayActive || closedDay`. `today` se recalcula en `onDateChange` para una grilla que cruza la medianoche.
+- Reloj inyectable: `DayClock` (`ui/SaoPauloDate.kt`) con `@Provides` en `di/ClockModule.kt`, junto al `Clock` monotónico del actualizador. El primer intento usó `() -> String` en el constructor `@Inject` y Hilt falló con `[Dagger/MissingBinding] Function0<String>`; el tipo nombrado es lo que Dagger puede bindear.
+- Guardas de escritura antes del request en `startAdding`, `confirmAdd`, `deleteEntry` y `quickAddDriver`.
+- Banner propio: `loading_closed_day` («Este dia já passou. Apenas consulta.») frente a `loading_batch_deactivated`; el día cerrado gana cuando ambos aplican, porque es el que el operador no puede deshacer.
+- El editor (`LoadingEditViewModel`) ya se dibuja en solo lectura porque la fila del servidor llega con `readOnly=true`, cubierto por `LoadingEditScreenTest > a read-only arrival draws no save action at all`.
+- Evidencia: `LoadingViewModelTest` 45/45, `LoadingScreenTest` 25/25, `LoadingEditScreenTest` 8/8, `LocaleStringsParityTest` 2/2 (`BUILD SUCCESSFUL in 8m 43s`).
