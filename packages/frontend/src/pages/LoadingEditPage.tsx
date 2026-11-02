@@ -8,25 +8,13 @@ import { LoadingSpinner } from '../components/ui/loading-spinner';
 import { ScheduleExportView } from '../components/loading/ScheduleExportView';
 import { exportPdf } from '../lib/exportPdf';
 import type { ScheduleRow } from '../components/loading/ScheduleGrid';
+import { countInWindow, isQuotaExceeded, quotaIfMoved, toMinutes } from '../lib/loading-quota';
 
 
 
 function formatDisplayDate(dateStr: string): string {
   const [y, m, d] = dateStr.split('-');
   return `${d}/${m}/${y}`;
-}
-
-function toMinutes(slot: string): number {
-  const [h, m] = slot.split(':').map(Number);
-  return h * 60 + m;
-}
-
-function getRollingQuotaBySlot(schedules: ScheduleRow[], slot: string, excludeId?: number): number {
-  const targetMinutes = toMinutes(slot);
-  return schedules.filter((s) => {
-    if (s.driver_type !== 'fletero' || s.id === excludeId) return false;
-    return Math.abs(toMinutes(s.time_slot) - targetMinutes) < 60;
-  }).length;
 }
 
 export function LoadingEditPage() {
@@ -168,6 +156,12 @@ export function LoadingEditPage() {
     }
   }
 
+  // The hours of the day, plus the ones the day's rows mention. A row left on an hour the list dropped had an
+  // empty select and a save the server refused: it could only be deleted, not put back.
+  const slotOptions = [...new Set([...timeSlots, ...schedules.map((entry) => entry.time_slot)])].sort(
+    (a, b) => toMinutes(a) - toMinutes(b)
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -206,7 +200,7 @@ export function LoadingEditPage() {
         <div className="space-y-2" data-testid="edit-schedule-list">
           {schedules.map((entry) => {
             const isEditing = editingId === entry.id;
-            const currentQuota = getRollingQuotaBySlot(schedules, entry.time_slot);
+            const currentQuota = countInWindow(schedules, entry.time_slot);
 
             return (
               <div
@@ -222,10 +216,11 @@ export function LoadingEditPage() {
                       className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                       data-testid={`slot-select-${entry.id}`}
                     >
-                      {timeSlots.map((slot) => {
-                        const quota = getRollingQuotaBySlot(schedules, slot, slot === entry.time_slot ? undefined : entry.id);
-                        const finalCount = entry.driver_type === 'fletero' ? quota + 1 : quota;
-                        const isExceeded = finalCount > 3;
+                      {slotOptions.map((slot) => {
+                        // Priced with the row counted where it is going and left out of where it is: on its
+                        // own hour that is the same count it already has, not one more.
+                        const finalCount = quotaIfMoved(schedules, entry, slot);
+                        const isExceeded = isQuotaExceeded(finalCount);
                         return (
                           <option key={slot} value={slot}>
                             {slot}
