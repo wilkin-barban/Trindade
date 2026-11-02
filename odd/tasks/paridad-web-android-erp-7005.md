@@ -882,6 +882,7 @@ cerrar la tarea, con el hash que quedó en el historial.
 ## Reglas de trabajo
 | T6 | `c53389e` | `vitest run`: 7/7 (6 nuevos en `DateField.test.tsx`: clic invoca `showPicker`, Enter y Espacio lo invocan y cancelan el scroll, Tab no, navegador sin `showPicker` sigue usable y propaga ISO, `NotAllowedError` se traga, y etiqueta/valor). Playwright `date-field.spec.ts` nuevo: 2/2, el clic abre el calendario a 390×844 y a 1280×800. `node:test`: 475/475. `tsc --noEmit`: limpio. |
 
+| T5 | `599e420` | `node:test`: 480/480 (4 nuevos: recepción con lente e insumos, snapshot rechazado, importación con `ent_lan`/cajas y sync que no arranca) + `receipts-sync-wiring.test.ts` con la aserción del emisor. Playwright `report-receipts`: 1/1. Android `:app:testDebugUnitTest`: BUILD SUCCESSFUL; `AeroDispatcherTest` 12/12 (3 nuevos: dispatch sin configurar escribe `AERO_NOT_CONFIGURED` sin tocar el ERP, sync sin configurar igual, e importación con asiento y cajas), `MassasLaunchViewModelTest` 34/34 (la importación deja `ent_lan=35937`/`boxes=3` en el log). |
 - Primero solo el ODD. No toques código ni abras ramas.
 - No cierres paneles de Herdr.
 - No interrumpas si estás `working`; terminá el ODD y quedate idle.
