@@ -2,10 +2,14 @@ package com.trindade.app.massas
 
 import androidx.lifecycle.viewModelScope
 import com.trindade.app.R
+import com.trindade.app.ui.UiText
 import com.trindade.app.admin.UsersRepository
 import com.trindade.app.auth.AuthRepository
 import com.trindade.app.aero.AERO_DEFAULT_WS_URL
 import com.trindade.app.aero.AeroDispatcher
+import com.trindade.app.aero.AeroQueue
+import com.trindade.app.aero.AeroQueueItem
+import com.trindade.app.aero.AeroQueuePort
 import com.trindade.app.aero.AeroSettings
 import com.trindade.app.aero.AeroTestResult
 import com.trindade.app.aero.AeroWriteResult
@@ -55,6 +59,7 @@ class MassasLaunchViewModelTest {
     private lateinit var massasRepository: MassasRepository
     private lateinit var settingsPort: FakeSettingsPort
     private lateinit var ackPort: FakeAckPort
+    private lateinit var queuePort: FakeQueuePort
     private lateinit var erpPort: FakeErpPort
     private lateinit var mirrorPort: FakeMirrorPort
     private lateinit var reachability: FakeReachability
@@ -107,6 +112,7 @@ class MassasLaunchViewModelTest {
         massasRepository = MassasRepository(massasApi)
         settingsPort = FakeSettingsPort(AeroSettings(wsUrl = AERO_DEFAULT_WS_URL, username = "WILKIN", password = "pw"))
         ackPort = FakeAckPort()
+        queuePort = FakeQueuePort()
         erpPort = FakeErpPort()
         mirrorPort = FakeMirrorPort()
         reachability = FakeReachability()
@@ -244,6 +250,7 @@ class MassasLaunchViewModelTest {
         repository = repository,
         authRepository = authRepository,
         aeroSettingsStore = settingsPort,
+        aeroQueueStore = queuePort,
         aeroDispatcher = AeroDispatcher(erpPort, mirrorPort, reachability),
         tabletAckStore = ackPort,
         usersRepository = usersRepository,
@@ -864,6 +871,115 @@ class MassasLaunchViewModelTest {
         assertEquals(3000, erpPort.payloads.single().quantity)
         assertTrue(erpPort.payloads.single().observation.contains("#7"))
         assertTrue(testVm.state.value.resultDialogIsSuccess)
+    }
+
+    // ---- La cola de lo que la planta todavía no tiene (T23) ----
+
+    /**
+     * Lo que la planta ya registró no se vuelve a mandar.
+     *
+     * Es la mitad del doble asiento: entre el toque del operario y la respuesta, otra tableta —o el propio
+     * teléfono, en un reintento— puede haber conciliado la fila. Si el botón ya no está y la petición sale
+     * igual, la fábrica recibe dos veces la misma caja.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `un asiento ya conciliado no se reenvía`() = runTest {
+        val settled = launch(3010, boxes = 3, units = 30)
+        val today = MassasLaunchViewModel.saopauloToday()
+        val stored = com.trindade.app.network.AeroMovementsStoredDay(
+            date = today,
+            movements = listOf(
+                com.trindade.app.network.AeroStoredMovement(
+                    entLan = 35937,
+                    productCode = "1045",
+                    productDesc = "MASSA CASEIRA",
+                    quantity = 30.0,
+                    entryDate = today,
+                    operatorName = "WILKIN",
+                    movementType = "E",
+                ),
+            ),
+        )
+        val testVm = newViewModel(DayRepository(massasApi, dayWith(settled), stored))
+        testVm.refresh()
+        advanceUntilIdle()
+
+        val row = testVm.state.value.unifiedRows.single()
+        assertEquals(MassasRowState.RECONCILED, row.state)
+
+        testVm.sendPendingLaunch(row)
+        advanceUntilIdle()
+
+        assertEquals("ni una petición para un asiento que el ERP ya tiene", 0, erpPort.payloads.size)
+        assertEquals(
+            UiText.of(com.trindade.app.R.string.massas_error_reconciled),
+            testVm.state.value.errorMessage,
+        )
+    }
+
+    /**
+     * Un pendiente guardado sobrevive a cerrar la app.
+     *
+     * El teléfono quedó sin Wi-Fi de la fábrica y el operario cerró todo: al volver, la apertura del día lee la
+     * cola y la reintenta sola. Sin esto, cerrar la app era la forma más silenciosa de perder el trabajo.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `al abrir el día se reintenta lo que quedó pendiente de antes`() = runTest {
+        val today = MassasLaunchViewModel.saopauloToday()
+        queuePort = FakeQueuePort(
+            AeroQueue(
+                createdAt = System.currentTimeMillis(),
+                date = today,
+                items = listOf(
+                    AeroQueueItem(
+                        productCode = "001045",
+                        productName = "MASSA CASEIRA",
+                        quantity = 30.0,
+                        operatorName = "JAIME",
+                        launchIds = listOf(3010),
+                        date = today,
+                    ),
+                ),
+            ),
+        )
+        val repo = DayRepository(massasApi, dayWith(launch(3010, boxes = 300, units = 3000)))
+        val testVm = newViewModel(repo)
+        advanceUntilIdle()
+
+        assertEquals(1, erpPort.payloads.size)
+        // La cola guarda unidades humanas y el ERP las recibe escaladas por cien, como todo asiento.
+        assertEquals(3000, erpPort.payloads.single().quantity)
+        assertEquals("el pendiente ya viajó", null, queuePort.stored)
+        assertTrue(testVm.state.value.noticeMessage != null)
+    }
+
+    /**
+     * El pendiente se guarda antes de salir, no después de fallar.
+     *
+     * Un teléfono que se queda sin batería a mitad de la petición no alcanza a escribir el error. Lo que sí
+     * queda escrito, porque se escribió antes, es el trabajo.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `un envío sin red deja el pendiente guardado`() = runTest {
+        reachability.wifiConnected = false
+        val repo = DayRepository(massasApi, dayWith())
+        repo.created = listOf(launch(7, boxes = 3, units = 30))
+        val testVm = newViewModel(repo)
+
+        testVm.onQuantityChange("1045", "3")
+        testVm.requestLaunchConfirmation()
+        testVm.confirmLaunch()
+        advanceUntilIdle()
+
+        assertEquals(0, erpPort.payloads.size)
+        assertEquals(listOf(7), queuePort.stored!!.items.flatMap { it.launchIds })
+        // En la cola queda el trabajo, no el payload: treinta unidades de una caja de diez.
+        assertEquals(30.0, queuePort.stored!!.items.single().quantity, 0.0)
+        // Quien firmó la fila, no el usuario configurado del teléfono: la cola conserva al operario del asiento.
+        assertEquals("Wilkin", queuePort.stored!!.items.single().operatorName)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)

@@ -9,6 +9,9 @@ import com.trindade.app.aero.AeroFailure
 import com.trindade.app.aero.AeroDispatchRequest
 import com.trindade.app.aero.AeroDispatcher
 import com.trindade.app.aero.AeroErpMovement
+import com.trindade.app.aero.AeroQueue
+import com.trindade.app.aero.AeroQueueItem
+import com.trindade.app.aero.AeroQueuePort
 import com.trindade.app.aero.AeroSettings
 import com.trindade.app.aero.AeroSettingsPort
 import com.trindade.app.aero.AeroSyncOutcome
@@ -52,6 +55,7 @@ class MassasLaunchViewModel @Inject constructor(
     private val repository: MassasRepository,
     private val authRepository: AuthRepository,
     private val aeroSettingsStore: AeroSettingsPort,
+    private val aeroQueueStore: AeroQueuePort,
     private val aeroDispatcher: AeroDispatcher,
     private val tabletAckStore: TabletAckPort,
     private val usersRepository: UsersRepository? = null,
@@ -247,6 +251,10 @@ class MassasLaunchViewModel @Inject constructor(
             // Always, and regardless of this phone's ERP credentials: the day the plant lived is already in
             // Trindade's database, and opening it is a read of that, not a trip to the factory.
             refreshMirror(date)
+            // Con el espejo del día ya leído, la cola sabe qué quedó pendiente en un turno anterior y puede
+            // preguntar por lo que la planta todavía no tiene. Va después del espejo a propósito: la guarda de
+            // un asiento ya registrado se lee de ahí y no del reloj del teléfono.
+            flushPendingQueue()
         }
     }
 
@@ -420,6 +428,11 @@ class MassasLaunchViewModel @Inject constructor(
         // The batch keeps the first failure instead of counting kinds: the dialog says the rest of the answer,
         // and one sentence about the network is worth more than a tally of codes nobody asked for.
         var firstFailure: AeroFailure? = null
+        // La cola se lee una vez y se escribe con cada envío: releerla por fila convertiría una lista de cuatro
+        // productos en cuatro lecturas de preferencias, y la última escribiría encima de lo que la anterior
+        // acababa de liquidar.
+        var queueSnapshot = aeroQueueStore.read()
+            ?: AeroQueue(createdAt = System.currentTimeMillis(), date = state.value.date)
 
         for (launch in created) {
             val request = AeroDispatchRequest(
@@ -435,8 +448,17 @@ class MassasLaunchViewModel @Inject constructor(
                 // credits one person for everybody's work.
                 operatorName = launch.displayName.ifBlank { launch.username },
             )
+            // El pendiente queda guardado antes de salir: lo que el teléfono no alcanzó a mandar sigue ahí
+            // aunque la app se cierre a mitad del lote, y lo que la planta tomó se saca enseguida.
+            queueSnapshot = queueSnapshot.enqueue(queueItemFor(request))
+            aeroQueueStore.write(queueSnapshot)
+
             when (val outcome = aeroDispatcher.dispatch(settings, request)) {
-                is AeroDispatchOutcome.Sent -> sent++
+                is AeroDispatchOutcome.Sent -> {
+                    sent++
+                    queueSnapshot = queueSnapshot.settle(listOf(request.launchId))
+                    aeroQueueStore.write(queueSnapshot)
+                }
                 is AeroDispatchOutcome.Failed -> if (firstFailure == null) firstFailure = outcome.failure
             }
         }
@@ -528,6 +550,13 @@ class MassasLaunchViewModel @Inject constructor(
             _state.value = _state.value.copy(errorMessage = UiText.of(R.string.massas_aero_launch_missing))
             return
         }
+        // La planta ya tiene este asiento. Volver a mandarlo es la forma más fácil de duplicar una caja, y la
+        // fila no debería haber ofrecido el botón: si llegó acá es porque el espejo cambió entre el toque y la
+        // respuesta, y lo que se contesta es que ya está, no un error de red.
+        if (launch.id in settledLaunchIds()) {
+            _state.value = _state.value.copy(errorMessage = UiText.of(R.string.massas_error_reconciled))
+            return
+        }
 
         viewModelScope.launch {
             _state.value = _state.value.copy(noticeMessage = null, errorMessage = null)
@@ -541,8 +570,16 @@ class MassasLaunchViewModel @Inject constructor(
                 // resolved account. Either way `ENT_USU` names the operator and not the phone's user.
                 operatorName = row.operatorName.ifBlank { launch.displayName.ifBlank { launch.username } },
             )
+            // El reintento de una fila pasa por la misma cola que el lote: si se cae la conexión a mitad del
+            // viaje, el pendiente ya está guardado y la próxima apertura del día lo vuelve a intentar.
+            var queue = aeroQueueStore.read()
+                ?: AeroQueue(createdAt = System.currentTimeMillis(), date = request.date)
+            queue = queue.enqueue(queueItemFor(request))
+            aeroQueueStore.write(queue)
+
             when (val outcome = aeroDispatcher.dispatch(settings, request)) {
                 is AeroDispatchOutcome.Sent -> {
+                    aeroQueueStore.write(queue.settle(listOf(request.launchId)))
                     val refreshed = repository.day(state.value.date)
                     if (refreshed != null) _state.value = _state.value.copy(dayView = refreshed)
                     refreshMirror(state.value.date)
@@ -551,6 +588,77 @@ class MassasLaunchViewModel @Inject constructor(
                 is AeroDispatchOutcome.Failed ->
                     _state.value = _state.value.copy(errorMessage = outcome.failure.describe())
             }
+        }
+    }
+
+    // ---- La cola de lo que la planta todavía no tiene (T23) ----
+
+    /**
+     * El pendiente de un envío, con la forma con la que se guarda.
+     *
+     * Se encola *antes* de despachar y no después de fallar: si el teléfono se queda sin batería justo cuando
+     * la petición salía, nadie sabe si el ERP la tomó, y una entrada guardada de más se descarta sola cuando el
+     * espejo muestra el asiento conciliado. Una entrada guardada de menos es una caja que la fábrica nunca ve.
+     */
+    private fun queueItemFor(request: AeroDispatchRequest): AeroQueueItem = AeroQueueItem(
+        productCode = request.productCode,
+        productName = request.productName,
+        quantity = request.units,
+        operatorName = request.operatorName,
+        launchIds = listOf(request.launchId),
+        date = request.date,
+    )
+
+    /**
+     * Vacía lo que quedó pendiente de un turno anterior.
+     *
+     * Corre al abrir el día, cuando el espejo ya se leyó: un asiento que la planta tiene se saca de la cola sin
+     * volver a mandarlo, que es la mitad del problema del doble asiento. Lo que falla se queda guardado para la
+     * próxima vez, y no se avisa: la pantalla ya muestra las filas pendientes, y una queja por una cola que se
+     * reintenta sola en cada apertura sería una alarma que el operario no puede apagar.
+     */
+    private suspend fun flushPendingQueue() {
+        val settings = state.value.aeroSettings
+        if (!settings.ready) return
+        val stored = aeroQueueStore.read() ?: return
+
+        // Lo que la planta ya registró no se vuelve a mandar. La guarda se aplica antes de tomar el lote, así
+        // que un turno cerrado en otra tableta no cuesta ni una petición.
+        var queue = stored.settle(settledLaunchIds())
+        if (queue.isEmpty) {
+            aeroQueueStore.clear()
+            return
+        }
+
+        val (batch, rest) = queue.takeBatch()
+        queue = rest
+        var sent = 0
+        for (item in batch) {
+            val request = AeroDispatchRequest(
+                launchId = item.launchIds.first(),
+                productCode = item.productCode,
+                productName = item.productName,
+                units = item.quantity,
+                date = item.date,
+                operatorName = item.operatorName,
+            )
+            when (aeroDispatcher.dispatch(settings, request)) {
+                is AeroDispatchOutcome.Sent -> {
+                    sent++
+                    queue = queue.settle(item.launchIds)
+                }
+                // El motivo no se guarda: lo que la cola conserva es el trabajo, no el diagnóstico. La próxima
+                // apertura lo vuelve a intentar y, si el problema sigue, la fila de la tabla ya lo explica.
+                is AeroDispatchOutcome.Failed -> Unit
+            }
+        }
+        aeroQueueStore.write(queue)
+
+        if (sent > 0) {
+            val refreshed = repository.day(state.value.date)
+            if (refreshed != null) _state.value = _state.value.copy(dayView = refreshed)
+            refreshMirror(state.value.date)
+            _state.value = _state.value.copy(noticeMessage = UiText.of(R.string.massas_aero_sent))
         }
     }
 

@@ -8,6 +8,8 @@ import com.trindade.app.aero.AeroMirrorPort
 import com.trindade.app.aero.AeroReachability
 import com.trindade.app.aero.AeroReachabilityPort
 import com.trindade.app.aero.AeroSettingsPort
+import com.trindade.app.aero.AeroQueuePort
+import com.trindade.app.aero.AeroQueueStore
 import com.trindade.app.aero.AeroSettingsStore
 import com.trindade.app.aero.TabletAckPort
 import com.trindade.app.aero.TabletAckStore
@@ -39,6 +41,16 @@ object AeroModule {
     @Provides
     @Singleton
     fun provideSettingsPort(store: AeroSettingsStore): AeroSettingsPort = store
+
+    /**
+     * La cola de lo que la planta todavía no tiene.
+     *
+     * Es del dispositivo y no del día: una cola por teléfono, compartida por el lote y por el reintento de una
+     * fila, para que las dos puertas escriban la misma lista.
+     */
+    @Provides
+    @Singleton
+    fun provideQueuePort(store: AeroQueueStore): AeroQueuePort = store
 
     @Provides
     @Singleton

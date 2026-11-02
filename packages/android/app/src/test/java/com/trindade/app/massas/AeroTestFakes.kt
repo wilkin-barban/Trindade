@@ -6,6 +6,8 @@ import com.trindade.app.aero.AeroErpMovement
 import com.trindade.app.aero.AeroErpPort
 import com.trindade.app.aero.AeroMirrorPort
 import com.trindade.app.aero.AeroMovementsResult
+import com.trindade.app.aero.AeroQueue
+import com.trindade.app.aero.AeroQueuePort
 import com.trindade.app.aero.AeroReachabilityPort
 import com.trindade.app.aero.AeroSettings
 import com.trindade.app.aero.AeroSettingsPort
@@ -39,6 +41,30 @@ class FakeSettingsPort(
 
     override fun markSynced(date: String, at: String) {
         syncedAt[date] = at
+    }
+}
+
+/**
+ * La cola en memoria, y con el mismo contrato que el archivo real.
+ *
+ * `seed` es lo que quedó guardado antes de que la app se cerrara: un test lo usa para abrir el día con un
+ * pendiente de ayer y comprobar que la apertura lo reintenta sin que nadie toque un botón.
+ */
+class FakeQueuePort(seed: AeroQueue? = null) : AeroQueuePort {
+    var stored: AeroQueue? = seed
+    var writes = 0
+    var clears = 0
+
+    override fun read(now: Long): AeroQueue? = stored
+
+    override fun write(queue: AeroQueue) {
+        writes++
+        stored = if (queue.isEmpty) null else queue
+    }
+
+    override fun clear() {
+        clears++
+        stored = null
     }
 }
 
