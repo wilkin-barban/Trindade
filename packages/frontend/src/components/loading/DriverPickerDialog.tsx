@@ -145,10 +145,10 @@ export function DriverPickerDialog({
                     disabled={assigning}
                     className="h-4 w-4 rounded border-gray-300 text-blue-600"
                   />
+                  {/* Solo el nombre: la chapa de un fletero en el padrón es un dato viejo de la planilla,
+                      no el vehículo que se le asigna. La chapa que importa se elige en la pestaña de la casa,
+                      sobre una fila ya marcada. */}
                   <span className="text-sm font-medium text-gray-800 flex-1">{driver.name}</span>
-                  {driver.license_plate && (
-                    <span className="text-xs text-gray-500">{driver.license_plate}</span>
-                  )}
                 </label>
               ))}
               {quickAdd}

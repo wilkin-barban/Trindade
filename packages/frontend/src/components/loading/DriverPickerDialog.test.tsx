@@ -84,6 +84,17 @@ describe('DriverPickerDialog', () => {
     expect((screen.getByTestId('driver-plate-4') as HTMLSelectElement).disabled).toBe(true);
   });
 
+  it('draws a fletero with his name and nothing else: the plate is the plant\'s, not his', () => {
+    renderDialog({ tab: 'fleteros', picked: new Map([[1, null]]) });
+
+    const row = screen.getByTestId('driver-option-1');
+    expect(row).toHaveTextContent('Carlos Fletero');
+    // Celso carries 'RXK' and Fabiano 'RKM' in the plant's records, and those plates are why the row used to
+    // read «Chapa» beside a man who does not drive a truck of ours. Neither the word nor the value belong here.
+    expect(row).not.toHaveTextContent('ABC-1D23');
+    expect(screen.queryByTestId('driver-plate-1')).not.toBeInTheDocument();
+  });
+
   it('counts what is waiting and holds the batch until one driver is picked', () => {
     const props = renderDialog({ picked: new Map([[1, null], [4, null]]) });
 

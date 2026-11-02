@@ -112,6 +112,27 @@ describe('DriverPicker', () => {
     expect(post.mock.calls[0][1]).toMatchObject({ driver_id: 4, vehicle_id: 11 });
   });
 
+  it('registers a fletero without asking for a plate he does not carry', async () => {
+    post.mockImplementation(async (url: string, body: { driver_id?: number; name?: string }) => {
+      if (url === '/loading/drivers') {
+        return { driver: { id: 77, name: body.name, license_plate: null, phone: null } };
+      }
+      return { schedule: { id: 177 } };
+    });
+    await renderPicker();
+
+    fireEvent.click(screen.getByTestId('add-new-fletero-btn'));
+
+    // The plate on a company driver's row is the plant's vehicle; a fletero arrives with his name and phone.
+    expect(screen.queryByTestId('driver-form-plate')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByTestId('driver-form-name'), { target: { value: 'Celso' } });
+    fireEvent.click(screen.getByTestId('driver-form-submit'));
+
+    await waitFor(() => expect(screen.getByTestId('driver-option-77')).toBeInTheDocument());
+    expect(post.mock.calls[0][0]).toBe('/loading/drivers');
+    expect(post.mock.calls[0][1]).not.toHaveProperty('license_plate');
+  });
+
   it('sends the fletero registered in the modal as part of the same batch', async () => {
     post.mockImplementation(async (url: string, body: { driver_id?: number; name?: string }) => {
       if (url === '/loading/drivers') {

@@ -18,7 +18,6 @@ export interface DriverFormProps {
 export function DriverForm({ onSaved, onCancel }: DriverFormProps) {
   const { t } = useTranslation();
   const [name, setName] = useState('');
-  const [plate, setPlate] = useState('');
   const [phone, setPhone] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -29,11 +28,12 @@ export function DriverForm({ onSaved, onCancel }: DriverFormProps) {
     setSaving(true);
 
     try {
+      // Sin chapa: este alta es la de un fletero, y la chapa que la planta le asigna a un viaje se elige en
+      // la pestaña de los motoristas de la casa. El endpoint la sigue aceptando para los registros viejos.
       const data = await api.post<{
         driver: { id: number; name: string; license_plate: string | null; phone: string | null };
       }>('/loading/drivers', {
         name: name.trim(),
-        license_plate: plate.trim() || undefined,
         phone: cleanPhone(phone) || undefined,
       });
       onSaved(data.driver);
@@ -57,14 +57,6 @@ export function DriverForm({ onSaved, onCancel }: DriverFormProps) {
         autoFocus
         disabled={saving}
         data-testid="driver-form-name"
-      />
-      <Input
-        type="text"
-        value={plate}
-        onChange={(e) => setPlate(e.target.value)}
-        placeholder={t('loading.licensePlate')}
-        disabled={saving}
-        data-testid="driver-form-plate"
       />
       <Input
         type="tel"
