@@ -150,6 +150,19 @@ describe('LoadingHistoryPage', () => {
     await waitFor(() => expect(patch).toHaveBeenCalledWith('/loading/schedules/batch/2026-11-01/activate', {}));
   });
 
+  it('offers edit as a link that carries the button classes, not a button inside a link', async () => {
+    get.mockImplementation(async (url: string) => {
+      if (url.startsWith('/users/options')) return { users: [] };
+      return { items: [batch('2026-11-02')], pagination: { page: 1, pageSize: 30, total: 1, totalPages: 1 } };
+    });
+    renderPage();
+
+    const edit = await screen.findByRole('link', { name: 'Editar' });
+    expect(edit).toHaveAttribute('href', '/loading/edit?date=2026-11-02');
+    // A button inside an anchor is invalid markup and two targets for one thumb.
+    expect(edit.querySelector('button')).toBeNull();
+  });
+
   it('gives the batch actions a target a thumb can hit', async () => {
     get.mockImplementation(async (url: string) => {
       if (url.startsWith('/users/options')) return { users: [] };

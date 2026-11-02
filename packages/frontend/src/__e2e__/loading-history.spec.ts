@@ -16,6 +16,23 @@ function today(): string {
   return new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
 }
 
+/** A batch on today, with an active fletero and one scheduled row: the card the actions live on. */
+async function seedBatch(page: Page) {
+  const date = today();
+  const stamp = Date.now();
+  const driver = await apiPost(page, '/loading/drivers', {
+    name: `Row ${stamp}`,
+    license_plate: `R${stamp % 10000}`,
+  });
+  await apiPost(page, '/loading/schedules', {
+    schedule_date: date,
+    time_slot: '06:00',
+    driver_type: 'fletero',
+    driver_id: driver.data.driver.id,
+  });
+  return date;
+}
+
 test.describe('Loading History — Filters and pagination', () => {
   test.beforeEach(async ({ page }) => {
     await goToProtected(page, '/loading/history');
@@ -90,6 +107,39 @@ test.describe('Loading History — Filters and pagination', () => {
 
     await page.waitForURL(new RegExp(`/loading/edit\\?date=${date}`));
     await expect(page.locator('[data-testid="edit-schedule-list"]')).toContainText(`Hist ${stamp}`);
+  });
+
+  test('keeps the date and the actions on separate rows at 390x844', async ({ page }) => {
+    const date = await seedBatch(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/loading/history');
+
+    const card = page.locator(`[data-testid="loading-history-card-${date}"]`);
+    await expect(card).toBeVisible({ timeout: 10000 });
+    const summary = card.locator('a').first();
+    const deactivate = card.locator(`[data-testid="deactivate-loading-batch-${date}"]`);
+    const summaryBox = await summary.boundingBox();
+    const actionBox = await deactivate.boundingBox();
+    expect(summaryBox).not.toBeNull();
+    expect(actionBox).not.toBeNull();
+
+    // On a phone the date owns the width and the controls take the row below: side by side the date was
+    // squeezed into a sliver and the thumb missed the icons.
+    expect(actionBox!.y).toBeGreaterThanOrEqual(summaryBox!.y + summaryBox!.height - 1);
+  });
+
+  test('does not nest the edit button inside the link', async ({ page }) => {
+    const date = await seedBatch(page);
+    await page.goto('/loading/history');
+
+    const card = page.locator(`[data-testid="loading-history-card-${date}"]`);
+    await expect(card).toBeVisible({ timeout: 10000 });
+
+    // A button inside a link is invalid markup and two targets for one thumb: the edit control carries the
+    // button classes on the link itself. Whether the control is offered at all is the server's answer (the
+    // one-hour window), so this asserts the shape of the card, not the permission.
+    await expect(card.locator('a').first()).toBeVisible({ timeout: 10000 });
+    expect(await card.locator('a button').count()).toBe(0);
   });
 
   test('a read that failed is retried from the alert, filters and all', async ({ page }) => {
