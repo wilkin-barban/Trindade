@@ -112,6 +112,20 @@ describe('LoadingHistoryPage', () => {
     expect(screen.getByTestId('loading-history-card-2026-11-04')).toHaveTextContent('1 carga');
   });
 
+  it('gives the batch actions a target a thumb can hit', async () => {
+    get.mockImplementation(async (url: string) => {
+      if (url.startsWith('/users/options')) return { users: [] };
+      return { items: [batch('2026-11-02')], pagination: { page: 1, pageSize: 30, total: 1, totalPages: 1 } };
+    });
+    renderPage();
+
+    // Same 48 as the grid's row actions: these two are pressed in the same place, with the same thumb, and
+    // they were 16-pixel glyphs inside a padding-less button.
+    const deactivate = await screen.findByTestId('deactivate-loading-batch-2026-11-02');
+    expect(deactivate).toHaveClass('min-h-12', 'min-w-12');
+    expect(screen.getByTestId('delete-loading-batch-2026-11-02')).toHaveClass('min-h-12', 'min-w-12');
+  });
+
   it('bounds the filters by today and clears all of them together', async () => {
     renderPage();
     const todayInSaoPaulo = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());

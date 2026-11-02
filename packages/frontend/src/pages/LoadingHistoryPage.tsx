@@ -182,8 +182,8 @@ export function LoadingHistoryPage() {
                   </p>
                 </Link>
                 {affordances.showEdit && <Link to={`/loading/edit?date=${batch.batch_date}`}><Button variant="outline" size="sm">{t('loading.editEntry')}</Button></Link>}
-                {affordances.showDeactivate && <button onClick={() => deactivateBatch(batch.batch_date)} disabled={busyKey === batch.batch_date} aria-label={t('history.deactivateLoading', { date: formatDate(batch.batch_date) })} className="text-amber-600 disabled:opacity-50" data-testid={`deactivate-loading-batch-${batch.batch_date}`}><LucideBan className="h-4 w-4" /></button>}
-                {affordances.showDelete && <button onClick={() => setPendingDelete(batch)} disabled={busyKey === batch.batch_date} aria-label={t('history.deleteLoading', { date: formatDate(batch.batch_date) })} className="text-red-600 disabled:opacity-50" data-testid={`delete-loading-batch-${batch.batch_date}`}><LucideTrash2 className="h-4 w-4" /></button>}
+                {affordances.showDeactivate && <button onClick={() => deactivateBatch(batch.batch_date)} disabled={busyKey === batch.batch_date} aria-label={t('history.deactivateLoading', { date: formatDate(batch.batch_date) })} className="inline-flex min-h-12 min-w-12 items-center justify-center rounded text-amber-600 hover:bg-amber-50 disabled:opacity-50" data-testid={`deactivate-loading-batch-${batch.batch_date}`}><LucideBan className="h-4 w-4" /></button>}
+                {affordances.showDelete && <button onClick={() => setPendingDelete(batch)} disabled={busyKey === batch.batch_date} aria-label={t('history.deleteLoading', { date: formatDate(batch.batch_date) })} className="inline-flex min-h-12 min-w-12 items-center justify-center rounded text-red-600 hover:bg-red-50 disabled:opacity-50" data-testid={`delete-loading-batch-${batch.batch_date}`}><LucideTrash2 className="h-4 w-4" /></button>}
               </div>
             </Card>
             );
