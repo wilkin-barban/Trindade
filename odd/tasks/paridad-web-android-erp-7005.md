@@ -1230,9 +1230,52 @@ planta, no un atributo de la persona.
 - **Commit esperado.** `refactor(web): share the day panel between the two histories` · componente + tests.
 - **Commit esperado.** `fix(web): let the massas history pick its day like the count does` · página + e2e.
 - **Depende.** T27 (la release no se toca).
+- **Cerrada.** `99dd75e` (los dos commits de arriba quedaron en uno: el componente y las dos pantallas son el
+  mismo cambio, y separarlos dejaba un commit intermedio que no compilaba solo).
+  - `HistoryDayPanel` nuevo en `packages/frontend/src/components/ui/HistoryDayPanel.tsx`, con `-date`, `-days`
+    y `-day-<date>` parametrizados por prefijo. Lo usan `StockHistoryPage` y `MassasHistoryPage`; es la única
+    diferencia que queda entre las dos pantallas.
+  - `MassasHistoryPage` pasa `id="massas-history-date"`, `label={t('massas.date')}`, `min=saoPauloDaysAgo(30)`,
+    `max=saoPauloYesterday()` y los chips de `/massas-launch/history` con `totalUnits`. Se conservan `?date=`,
+    el fallback a ayer, el deep link y el `replace` que limpia la query cuando el día es ayer.
+  - Un día que el endpoint no lista y la pantalla ofrece por defecto (ayer) se dibuja solo `DD/MM`, sin `· 0`.
+  - `MassasDayList.tsx` borrado (sin otros usos) y sus claves muertas de i18n también (`historyDaysTitle`,
+    `historyDaysLoading`, `historyToday`, `historyYesterday`, `historyDayTotals`). `historyDaysUnavailable` ya
+    no promete abrir hoy, que este histórico no abre. `massas.date` agregada en es y pt-BR.
+  - Tests: `HistoryDayPanel.test.tsx` 5/5 nuevo, `MassasHistoryPage.test.tsx` 6/6 (chip con unidades, ayer sin
+    unidades, min/max del campo, clic que cambia la tabla y conserva `?date=`, panel usable cuando el listado
+    falla, «Escolha o dia» ausente), `StockHistoryPage.test.tsx` 3/3 sin cambios de aserción. e2e
+    `massas-history.spec.ts` 2/2 con el panel, el chip de ayer y el conteo de chips, en 390×844 y 1280×800.
+
+### Verificación de la remediación
+
+- `npm run test:node` (frontend): **526/526**. `vitest run`: **92/92**. `tsc -p tsconfig.json --noEmit`: limpio.
+- Playwright focalizado: `massas-history.spec.ts` **2/2**. El resto de la suite e2e no se re-corrió entera en
+  esta tanda: los dos cambios son de presentación y sus specs propios pasan.
+- Una corrida intermedia de `vitest run` marcó dos tests (`aero-integration-panel` con 5300 ms y
+  `DriverPicker` «each with its own plate») por timeout bajo carga; los dos pasan aislados y la corrida
+  completa siguiente quedó 92/92. Es flakiness de jsdom por paralelismo, no del cambio.
+- Producción: `docker compose build web && docker compose up -d web`; `https://trindademasas.duckdns.org` →
+  200, y el bundle servido incluye `MassasHistoryPage-Z3Dx1nwt.js` con `massas-history-date`.
+- Capturas (producción, admin `wilkin`):
+  - `/tmp/fix-massas-history-phone.png` y `-desk.png`: campo `Data` con el día grande y 9 chips
+    (`01/11`, `30/10 · 7345`, `29/10 · 2130`, …) en una fila en escritorio.
+  - `/tmp/fix-picker-fleteros-phone.png` y `-desk.png`: **0** selects de chapa en la pestaña de fleteros;
+    `/tmp/fix-picker-celso-fabiano-phone.png`: Celso y Fabiano con el nombre solo.
+  - `/tmp/fix-picker-casa-phone.png` y `-desk.png`: **5** selects de chapa intactos.
+  - Sin errores de consola en ninguna de las páginas recorridas.
 
 ### T29 · Fleteros sin chapa
 
 - **Specs.** S21.
 - **Commit esperado.** `fix(web): stop asking a fletero for a plate he does not carry` · picker, alta rápida y tests.
 - **Depende.** Ninguna.
+- **Cerrada.** `8a7651e`.
+  - `DriverPickerDialog.tsx`: se fue el `<span>` de `license_plate` de la rama de fleteros. La fila queda
+    checkbox + nombre; la rama `casa` conserva su `<select data-testid="driver-plate-<id>">` y la validación
+    de chapa faltante, sin tocar.
+  - `DriverForm.tsx`: se fue el campo `driver-form-plate` y `license_plate` dejó de viajar en el POST del alta
+    rápida. El backend sigue aceptándolo y ninguna placa se borró de la base.
+  - Tests: `DriverPickerDialog.test.tsx` 9/9 (nuevo: un fletero con `license_plate` no dibuja la placa ni su
+    select; el de casa sigue dibujando el select y sus opciones), `DriverPicker.test.tsx` 5/5 (nuevo: el alta
+    no tiene `driver-form-plate` y el POST no lleva `license_plate`).
