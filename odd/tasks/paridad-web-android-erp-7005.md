@@ -334,6 +334,12 @@ S19 — D5/D7, verbatim:
   escritorio (S18).
 - **Commit esperado.** `fix(web): reload the report and loading histories when the day changes` · ~140 líneas.
 - **Depende.** T6.
+- **Hecho.** `16a7e39`. El efecto pasa a depender del lector (`fetchReports`/`fetchItems`), que ya depende de
+  fecha, mes y usuario: un solo cambio recarga sin botón. "Limpiar" aparece solo con algún filtro puesto.
+  - Evidencia: unit 21/21 (6 archivos), `report-history.spec.ts` + `loading-history.spec.ts` 13/13 en
+    navegador, node 480/480.
+  - Decisión: `max` = hoy en ambos campos; no se puso `min`. El teléfono tampoco lo tiene y cualquier `min`
+    inventaría la fecha en que arrancó el sistema, escondiendo reportes que existen.
 
 ### T10 · Web: dashboard de 6 tarjetas y panel «Resumo» (con i18n)
 
@@ -688,7 +694,7 @@ recorta alcance **con aprobación explícita**, nunca moviéndolas a otro ODD po
 | T6 | B | `fix(web): make the date control open its calendar on a desktop click` | `DateField.test.tsx`, `date-field.spec.ts` |
 | T7 | B, S2 | `e676cf0` `feat(massas): elegir el día del histórico desde una lista` + `01c5b01` `test(massas): cubrir la elección de día del histórico` | `MassasHistoryPage.test.tsx` 5/5, `massas-history.spec.ts` 2/2 |
 | T8 | B | `3868188` `feat(stock): elegir el día del histórico desde un panel y los días contados` | `StockHistoryPage.test.tsx` 3/3, `stock-history.spec.ts` 2/2 |
-| T9 | B | `fix(web): reload the report and loading histories when the day changes` | `ReportHistoryPage.test.tsx`, `LoadingHistoryPage.test.tsx` |
+| T9 | B | `16a7e39` `fix(web): recargar los históricos al elegir la fecha` | `ReportHistoryPage.test.tsx` 4/4, `LoadingHistoryPage.test.tsx` 2/2, e2e 13/13 |
 | T10 | C, S3 | `feat(web): read the dashboard as six cards and one summary panel` | `DashboardPage.test.tsx`, `dashboard.spec.ts` |
 | T11 | D | `feat(web): switch a box type off together with its tasks` | `CategorySection.test.tsx` |
 | T12 | D, S1, S16 | `feat(reports): send every task, checked or not, and keep the unchecked rows` | `ReportEditPage.test.tsx`, `reports.command.service.test.ts` |
