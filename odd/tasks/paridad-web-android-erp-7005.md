@@ -409,6 +409,16 @@ S19 — D5/D7, verbatim:
   correcto. Verificado en 390×844 y en escritorio (S18).
 - **Commit esperado.** `feat(reports): send every task, checked or not, and keep the unchecked rows` · ~140 líneas.
 - **Depende.** T11.
+- **Hecho.** `3a4894e` (~345 líneas). Regla nueva en `lib/report-items.ts` (`reportTasks`, `reportItems`), usada
+  por el formulario y por la edición. El backend no cambió: ya insertaba `checked` como 0/1 y borraba por
+  `report_id` al actualizar.
+  - Evidencia: `report-items.test.ts` 4/4 (node), `ReportEditPage.test.tsx` 2/2 (Vitest, cuerpo del PATCH),
+    `reports.command.service.test.ts` 5/5 (`getReport` conserva `checked=0` en alta y en edición),
+    `dashboard.routes.test.ts` 11/11 (`higieneDone` = 1 con tres filas, dos sin marcar), `export.service.test.ts`
+    ya cubría que la no marcada no sale. Frontend node 489/489, Vitest 31/31, backend 669/669.
+  - Desvío: sin e2e propio. La cadena queda probada en los dos extremos por interfaces públicas (cuerpo del
+    PATCH en el navegador simulado, filas leídas por `getReport` y por el resumen HTTP); un tercer nivel con
+    navegador no agregaría una regla distinta.
 
 ### T13 · Web: solo lectura real y tareas de Recebimento visibles
 
@@ -717,7 +727,7 @@ recorta alcance **con aprobación explícita**, nunca moviéndolas a otro ODD po
 | T9 | B | `16a7e39` `fix(web): recargar los históricos al elegir la fecha` | `ReportHistoryPage.test.tsx` 4/4, `LoadingHistoryPage.test.tsx` 2/2, e2e 13/13 |
 | T10 | C, S3 | `9f04860` `feat(web): leer el panel como seis tarjetas y un resumen` | `DashboardPage.test.tsx` 4/4, `dashboard.spec.ts` 6/6 |
 | T11 | D | `0a0e945` `feat(web): apagar un tipo de caja junto con sus tareas` | `CategorySection.test.tsx` 4/4, `report-box-types.test.ts` 5/5, `report-box-types.spec.ts` 2/2 |
-| T12 | D, S1, S16 | `feat(reports): send every task, checked or not, and keep the unchecked rows` | `ReportEditPage.test.tsx`, `reports.command.service.test.ts` |
+| T12 | D, S1, S16 | `3a4894e` `feat(reports): mandar todas las tareas, marcadas o no` | `report-items.test.ts` 4/4, `ReportEditPage.test.tsx` 2/2, `reports.command.service.test.ts` 5/5, `dashboard.routes.test.ts` 11/11 |
 | T13 | D | `fix(web): keep read-only reports read-only and draw the receivings` | `CategorySection.test.tsx`, `ReportsPage.test.tsx` |
 | T14 | D | `refactor(web): read the report products from the server catalogue` | `ReportEditPage.test.tsx`, `report-products.test.ts` |
 | T15 | D, S13 | `fix(android): keep the box switches in session state` | `ReportGeneratorViewModelTest.kt`, `ReportBoxTypeSwitchTest.kt` |
