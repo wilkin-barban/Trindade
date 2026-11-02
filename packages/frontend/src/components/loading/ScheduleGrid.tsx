@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LucidePlus, LucideX, LucideClock } from 'lucide-react';
-import { DriverSelect } from './DriverSelect';
+import { DriverPicker } from './DriverPicker';
 
 export interface ScheduleRow {
   id: number;
@@ -134,10 +134,6 @@ export function ScheduleGrid({
     }
   }
 
-  function handleAssigned() {
-    setAddingSlot(null);
-    onRefresh();
-  }
 
   return (
     <div className="space-y-3" data-testid="schedule-grid">
@@ -226,13 +222,15 @@ export function ScheduleGrid({
             {/* Add fletero area */}
             <div className="px-4 py-2 border-t border-gray-100 bg-white">
               {isAdding ? (
-                <DriverSelect
+                // The modal is opened from the slot's own button, so closing it is the same state change in
+                // both directions: the slot that was being filled stops being the active one.
+                <DriverPicker
                   timeSlot={slot}
                   date={date}
                   drivers={drivers}
                   assignedIds={assignedIds}
                   assignedVehicleIds={assignedVehicleIds}
-                  onAssigned={handleAssigned}
+                  onRefresh={onRefresh}
                   onClose={() => setAddingSlot(null)}
                 />
               ) : (
