@@ -866,6 +866,17 @@ Debe seguir el formato de `odd/tasks/remediacion-diseno-android-acciones-y-dashb
 - Riesgos y decisiones pendientes.
 - Tabla de trazabilidad tarea → commit → test.
 
+## Registro de ejecución
+
+Una fila por tarea cerrada: commit atómico en `main`, evidencia observada. La evidencia se escribe acá al
+cerrar la tarea, con el hash que quedó en el historial.
+
+| Tarea | Commit | Evidencia observada |
+| --- | --- | --- |
+| T0 | `e84bc39` | `vitest run`: 1/1 verde (`src/components/ui/__smoke__.test.tsx`, jsdom). `node:test`: 468/468. `tsc --noEmit`: limpio. `scripts/ci.sh` corre la lane unitaria del frontend. |
+| T1 | `440d882` | `aero.routes.test.ts`: 8/8 (2 nuevos: cuerpo Android 200 con `client`/`attemptId`/`durationMs`; `error` > 1024 y `client` desconocido siguen 400). `aero.log.service.test.ts`: 6/6. Contrato regenerado. De paso corrige el fixture de `receipts.service.test.ts` que dejaba `tsc --noEmit` rojo en `main` desde `9427d7b`. |
+| T2 | `3f6c472` | `aero.log.contract.test.ts`: 25/25 (9 cuerpos reales web/Android aceptados, 16 bordes estrictos). Backend completo: 667/667. `:app:testDebugUnitTest --tests AeroTestAuditTest`: 7/7 en `ghcr.io/cirruslabs/android-sdk:35`. |
+
 ## Reglas de trabajo
 
 - Primero solo el ODD. No toques código ni abras ramas.
