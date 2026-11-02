@@ -705,24 +705,24 @@ Los pasos 2, 3 y 4 son **publicación**: se ejecutan solo con autorización expl
 | T2 | S24, S31 | `b2fa299` | `loading.routes.mutations.test.ts`, `reports.routes.test.ts` | hecho |
 | T3 | S25, S37 | `868a10d` | `history-permissions.test.ts` | hecho |
 | T4 | S28 | `1fc74c5` | `loading.routes.schedules.test.ts` | hecho |
-| T5 | S29, S53 | — | `aero.movements.service.test.ts`, `AeroAdaptersTest` | pendiente |
-| T6 | S49 | — | `aero-audit.test.ts`, `aero-bridge-wiring.test.ts` | pendiente |
-| T7 | S24, S31 | — | `LoadingHistoryViewModelTest.kt` | pendiente |
-| T8 | S26, S27, S32 | — | `LoadingViewModelTest.kt` | pendiente |
+| T5 | S29, S53 | `b9e5a58`, `0927dbd` | `aero.movements.service.test.ts`, `AeroAdaptersTest` | hecho |
+| T6 | S49 | `8e97cc3` | `aero-audit.test.ts`, `aero-bridge-wiring.test.ts` | hecho |
+| T7 | S24, S31 | `96478b1`, `7115ce2` | `LoadingHistoryViewModelTest.kt` | hecho |
+| T8 | S26, S27, S32 | `dc1930e` | `LoadingViewModelTest.kt` | hecho |
 | T9 | S30, S33, S34 | `5e82d44`, `83d0773` | `LoadingHistoryViewModelTest.kt`, `ReportsHistoryViewModelTest.kt` | hecho |
-| T10 | S52 | — | `ReportGeneratorScreenTest.kt` | pendiente |
+| T10 | S52 | `b1ca32f` | `ReportGeneratorScreenTest.kt` | hecho |
 | T11 | S22, S32 | `feat(android): open a past loading day in read only`, `test(android): cover the closed day on the grid` | `LoadingScreenTest.kt`, `LoadingViewModelTest.kt` | hecho |
-| T12 | S35, S37 | — | `LoadingHistoryPage.test.tsx`, `LoadingEditPage.test.tsx` | pendiente |
-| T13 | S36 | — | `loading-history.spec.ts` | pendiente |
-| T14 | S46, S47 | — | `MassasHistoryPage.test.tsx`, `StockHistoryPage.test.tsx` | pendiente |
-| T15 | S38, S39, S40, S42 | — | `loading-picker.test.ts`, `DriverPickerDialog.test.tsx` | pendiente |
-| T16 | S41 | — | `DriverPicker.test.tsx` | pendiente |
+| T12 | S35, S37 | `bb40c14` | `LoadingHistoryPage.test.tsx`, `LoadingEditPage.test.tsx` | hecho |
+| T13 | S36 | `5fb60ff` | `loading-history.spec.ts` | hecho |
+| T14 | S46, S47 | `01ea409` | `MassasHistoryPage.test.tsx`, `StockHistoryPage.test.tsx` | hecho |
+| T15 | S38, S39, S40, S42 | `be0d1a9` | `loading-picker.test.ts`, `DriverPickerDialog.test.tsx` | hecho |
+| T16 | S41 | `be0d1a9` | `DriverPicker.test.tsx` | hecho |
 | T17 | S38, S43, S54 | `fix(android): keep taken plates and busy drivers out of the picker's offers`, `test(android): cover the free plates and the busy driver` | `LoadingViewModelTest.kt`, `LoadingScreenTest.kt` | hecho |
-| T18 | S44 | — | `DriverPickerDialog.test.tsx`, `loading-schedule.spec.ts` | pendiente |
-| T19 | S45 | — | `LoadingScreenTest.kt` | pendiente |
-| T20 | S29, S53 | — | `MassasLaunchViewModelTest.kt`, `AeroDispatcherTest.kt`, `massas-sync-header.spec.ts` | pendiente |
-| T21 | S48 | — | `ScheduleGrid.test.tsx`, `LoadingEditPage.test.tsx` | pendiente |
-| T22 | S49, S50 | — | `aero.log.contract.test.ts` | pendiente |
+| T18 | S44 | `a5ac887` | `DriverPickerDialog.test.tsx`, `loading-schedule.spec.ts` | hecho |
+| T19 | S45 | `feebe79`, `d640914` | `LoadingScreenTest.kt` | hecho |
+| T20 | S29, S53 | `3b055cc` | `MassasLaunchViewModelTest.kt`, `AeroDispatcherTest.kt`, `massas-sync-header.spec.ts` | hecho |
+| T21 | S48 | `769636a` | `ScheduleGrid.test.tsx`, `LoadingEditPage.test.tsx` | hecho |
+| T22 | S49, S50 | `5f9a131` | `aero.log.contract.test.ts` | hecho |
 | T23 | S51 | — | build + emulador + capturas | pendiente |
 
 ---
