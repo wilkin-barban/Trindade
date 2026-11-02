@@ -34,6 +34,9 @@ const rows: readonly Row[] = [
       phase: 'requested',
       destinationUrl: `${ANDROID_WS}/usuarios`,
       note: 'client=web · via=bridge',
+      client: 'web',
+      attemptId: 'attempt-2f0c91a4',
+      durationMs: 0,
     },
     accepted: true,
   },
@@ -46,6 +49,9 @@ const rows: readonly Row[] = [
       httpStatus: 200,
       response: '{"success":true}',
       note: 'client=web · via=bridge',
+      client: 'web',
+      attemptId: 'attempt-2f0c91a4',
+      durationMs: 1840,
     },
     accepted: true,
   },
@@ -58,6 +64,9 @@ const rows: readonly Row[] = [
       payload: { PRO_COD: '000084', QTD: 10 },
       launchId: 42,
       note: 'client=web · via=bridge',
+      client: 'web',
+      attemptId: 'attempt-2f0c91a4',
+      durationMs: 0,
     },
     accepted: true,
   },
@@ -71,6 +80,9 @@ const rows: readonly Row[] = [
       response: '{"success":true,"message":"Lancamento efetuado"}',
       launchId: 42,
       note: 'client=web · via=bridge',
+      client: 'web',
+      attemptId: 'attempt-2f0c91a4',
+      durationMs: 940,
     },
     accepted: true,
   },
@@ -83,6 +95,9 @@ const rows: readonly Row[] = [
       httpStatus: 200,
       response: '{"movimentos":[]}',
       note: 'client=web · via=bridge',
+      client: 'web',
+      attemptId: 'attempt-2f0c91a4',
+      durationMs: 612,
     },
     accepted: true,
   },
@@ -253,6 +268,25 @@ describe('the Aero audit contract, pinned to the bodies each client sends', () =
       assert.equal(parsed.success, row.accepted);
     });
   }
+
+  it('accepts the pair a web launch sends on both members of the action', () => {
+    // The pair is what turns two lines into one action. Both members carry the same `attemptId` here for the
+    // same reason the emitters pass it along: a `requested` whose `result` cannot be found is not a record.
+    const web = rows.filter((row) => row.accepted && (row.body as { client?: string }).client === 'web');
+    const pairs = new Map<string, number>();
+
+    for (const row of web) {
+      const body = row.body as { attemptId?: string; durationMs?: number };
+      assert.ok(body.attemptId, `${row.who} left the attempt unnamed`);
+      assert.equal(typeof body.durationMs, 'number', `${row.who} left the duration unstated`);
+      pairs.set(body.attemptId, (pairs.get(body.attemptId) ?? 0) + 1);
+    }
+
+    assert.ok(
+      [...pairs.values()].some((count) => count >= 2),
+      'no two web rows share an attempt, so nothing pairs'
+    );
+  });
 
   it('refuses every row with the same sentence and code, so a client can branch on it', () => {
     // The route answers 400 `INVALID_AERO_LOG` for every refusal above; that mapping lives in aero.routes.ts and

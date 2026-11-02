@@ -579,8 +579,13 @@ Cada tarea declara objetivo, archivos, tests exactos, aceptación, commit espera
 - **Trabajo**: reemplazar fixtures inventados por los emisores web reales; validar `client`, `attemptId`, `durationMs`.
 - **Tests**: `aero.log.contract.test.ts`: `accepts the body a web launch actually sends`; `requires client and attemptId on both members of the pair`.
 - **Aceptación**: el contrato falla si un emisor deja de mandar `client` o `attemptId`.
-- **Commit**: `test(backend): pin the ERP log contract to the real web emitters` (~110 líneas).
+- **Commit**: `test(erp): pin the log contract to the web emitters` (~150 líneas).
 - **Depende de**: T6.
+- **Estado.** Hecho, con el reparto que imponen los paquetes: los emisores web viven en el frontend, así que
+  el cuerpo se construye llamándolos de verdad en `packages/frontend/src/lib/aero-log-contract.test.ts`
+  (`client`, `attemptId` compartido por el par, `durationMs` medido y recortes de columna), y el contrato del
+  backend fija lo que el servidor acepta de esas filas —incluido el par— en `aero.log.contract.test.ts`.
+  Importar el frontend desde el backend habría cruzado `rootDir` y atado los dos paquetes por un test.
 
 ### Fase 8 — Release y verificación
 
