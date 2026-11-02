@@ -12,6 +12,7 @@ import {
   type FormState,
 } from '../components/reports/CategorySection';
 import { toggleBoxType } from '../lib/report-box-types';
+import { reportItems } from '../lib/report-items';
 import { ReceiptsSection } from '../components/reports/ReceiptsSection';
 import { ERP_RECEIPT_CATEGORY_ID, usesErpReceipts } from '../lib/receipts';
 
@@ -333,17 +334,10 @@ export function ReportEditPage() {
       }))
     );
 
-    // Build items
-    const items = Object.entries(form.items)
-      .filter(([, checked]) => checked)
-      .map(([taskIdStr]) => {
-        const taskId = Number(taskIdStr);
-        return {
-          taskId,
-          checked: true,
-          selectedProducts: form.selectedProducts?.[taskId] || [],
-        };
-      });
+    // Build items: one row per task that is not a temperature, marked or not, so that leaving a task unmarked
+    // records the answer instead of deleting its row. The rule is `lib/report-items.ts`'s, shared with the
+    // generator.
+    const items = reportItems(categories, form);
 
     try {
       await api.patch<{ report: { id: number } }>(`/reports/${id}`, {

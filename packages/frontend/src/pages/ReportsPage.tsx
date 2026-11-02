@@ -13,6 +13,7 @@ import {
   type FormState,
 } from '../components/reports/CategorySection';
 import { toggleBoxType } from '../lib/report-box-types';
+import { reportItems } from '../lib/report-items';
 import { ReceiptsSection } from '../components/reports/ReceiptsSection';
 import { hasTemperatureTasks } from '../lib/report-sections';
 import { MassasReportSection } from '../components/reports/MassasReportSection';
@@ -252,17 +253,9 @@ export function ReportsPage() {
       }))
     );
 
-    // Build items
-    const items = Object.entries(form.items)
-      .filter(([, checked]) => checked)
-      .map(([taskIdStr]) => {
-        const taskId = Number(taskIdStr);
-        return {
-          taskId,
-          checked: true,
-          selectedProducts: form.selectedProducts?.[taskId] || [],
-        };
-      });
+    // Build items: one row per task that is not a temperature, marked or not. What the day did not do is part
+    // of the record, and the rule that says so is `lib/report-items.ts`'s, shared with the edit screen.
+    const items = reportItems(categories, form);
 
     try {
       let reportId = createdReportId;

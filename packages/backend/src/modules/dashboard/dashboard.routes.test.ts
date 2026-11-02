@@ -67,6 +67,38 @@ describe('Dashboard Routes', () => {
     assert.strictEqual(body.recepcionTotal, recepcionTotal);
   });
 
+  /**
+   * The two pairs are progress, so the `done` half counts the rows a report marked and nothing else.
+   *
+   * A report now carries one row per task, marked or not -- that is the point of recording the day's "no" --
+   * so a count that read the rows instead of the answer would report every task of the day as done.
+   */
+  it('counts as done only the tasks a report marked', async (t) => {
+    t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-09-01T15:00:00.000Z') }); // Tuesday 12:00 in São Paulo
+    t.after(() => t.mock.timers.reset());
+
+    const higieneTasks = db
+      .prepare(
+        `SELECT rt.id FROM report_tasks rt
+         JOIN report_categories rc ON rc.id = rt.category_id
+         WHERE rc.name_pt = 'Higiene e Organização' AND rt.is_active = 1
+         ORDER BY rt.id`,
+      )
+      .all() as { id: number }[];
+    const reportId = db
+      .prepare(`INSERT INTO reports (user_id, turno, report_date, notes) VALUES (1, 'tarde', '2026-09-01', '')`)
+      .run().lastInsertRowid as number;
+    const insertItem = db.prepare(`INSERT INTO report_items (report_id, task_id, checked) VALUES (?, ?, ?)`);
+    insertItem.run(reportId, higieneTasks[0].id, 1);
+    insertItem.run(reportId, higieneTasks[1].id, 0);
+    insertItem.run(reportId, higieneTasks[2].id, 0);
+
+    const body = await summaryWith([]);
+
+    assert.strictEqual(body.higieneDone, 1);
+    assert.strictEqual(body.higieneTotal, higieneTasks.length);
+  });
+
   it('GET /api/dashboard/summary returns 401 without token', async () => {
     const response = await app.inject({
       method: 'GET',
