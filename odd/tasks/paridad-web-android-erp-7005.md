@@ -487,6 +487,16 @@ S19 — D5/D7, verbatim:
   sesión.
 - **Commit esperado.** `fix(android): keep the box switches in session state` · ~120 líneas.
 - **Depende.** —
+- **Hecho.** `c78ce5b` (~55 líneas). `onReportCreatedHandled` limpia `disabledBoxTypeIds`; `ReportEditViewModel`
+  lo resiembra vacío en cada carga. En los dos casos con un comentario que dice que es estado de sesión (D2,
+  S13) y qué se pierde si sobrevive: un reporte que abre con un tipo afuera y sus cajas sin registrar.
+  - Evidencia: `ReportGeneratorViewModelTest` (nuevo caso `a delivered report takes the box switches with it`)
+    y `ReportEditViewModelTest` (`a load opens both box types, whatever the previous report had switched off`).
+    Con las dos líneas de producción revertidas los dos casos fallan; con el cambio, la lane
+    `testDebugUnitTest` de las dos clases pasa entera.
+  - `ReportBoxTypeSwitchTest` no cambió: el dibujo ya afirmaba que el estado vacío enciende los dos
+    interruptores, y lo que T15 arregla es quién deja ese estado vacío, que es de los ViewModel.
+  - Sin columna, sin bandera persistida y sin migración: el esquema no se tocó.
 
 ### T16 · Web: Horário con modal de pestañas, multiselección y chapa
 
@@ -755,7 +765,7 @@ recorta alcance **con aprobación explícita**, nunca moviéndolas a otro ODD po
 | T12 | D, S1, S16 | `3a4894e` `feat(reports): mandar todas las tareas, marcadas o no` | `report-items.test.ts` 4/4, `ReportEditPage.test.tsx` 2/2, `reports.command.service.test.ts` 5/5, `dashboard.routes.test.ts` 11/11 |
 | T13 | D | `4d70fab` `fix(reports): deshabilitar de verdad y no perder los hijos de Recebimento` | `CategorySection.test.tsx` 5/5, `BoxTypeList.test.tsx` 5/5, `ReportsPage.test.tsx` 3/3, `ReportEditPage.test.tsx` 3/3 |
 | T14 | D | `297d3ec` `refactor(reports): leer el catálogo de productos del servidor` | `report-products.test.ts` 5/5, `CategorySection.test.tsx` 8/8, `ReportsPage.test.tsx` 5/5, `ReportEditPage.test.tsx` 4/4 |
-| T15 | D, S13 | `fix(android): keep the box switches in session state` | `ReportGeneratorViewModelTest.kt`, `ReportBoxTypeSwitchTest.kt` |
+| T15 | D, S13 | `c78ce5b` `fix(android): que los interruptores de caja duren lo que dura el reporte` | `ReportGeneratorViewModelTest.kt` y `ReportEditViewModelTest.kt`, casos nuevos; rojo verificado revirtiendo las dos líneas de producción |
 | T16 | E | `feat(web): assign several drivers from one modal, each with its plate` | `DriverSelect.test.tsx`, `loading-schedule.spec.ts` |
 | T17 | E | `fix(web): count the loading quota by window and stop shifting edited rows` | `loading-quota.test.ts`, `LoadingEditPage.test.tsx` |
 | T18 | E | `feat(web): open and retry a loading day from its history` | `LoadingHistoryPage.test.tsx`, `loading-history.spec.ts` |
