@@ -880,6 +880,7 @@ cerrar la tarea, con el hash que quedó en el historial.
 | T3 | `0e68273` | `node:test`: 475/475 (9 en `aero-audit.test.ts`: `client=web`, `attemptId`, `durationMs`, prefijo `AERO_*`, recorte de `note` 256 y `error` 1024, y que `read_history` ya no invente `httpStatus 200`). `tsc --noEmit` limpio. `npm run test:unit`: verde. |
 | T4 | `d65b1d4` | `:app:testDebugUnitTest --tests "com.trindade.app.aero.*"` en `ghcr.io/cirruslabs/android-sdk:35`: BUILD SUCCESSFUL (11m). `AeroTestAuditTest` 11/11 (4 nuevos: `client=android` + `attemptId` por intento, correlación pedido/resultado, `error` recortado a 1024 y `note` a 256, y `rejection()` con el código del backend). `AeroMirrorAdapterTest` nuevo (Robolectric + MockWebServer): el cuerpo en el cable lleva `client`, `attemptId` y `durationMs`, y un 400 no lanza. |
 ## Reglas de trabajo
+| T6 | `c53389e` | `vitest run`: 7/7 (6 nuevos en `DateField.test.tsx`: clic invoca `showPicker`, Enter y Espacio lo invocan y cancelan el scroll, Tab no, navegador sin `showPicker` sigue usable y propaga ISO, `NotAllowedError` se traga, y etiqueta/valor). Playwright `date-field.spec.ts` nuevo: 2/2, el clic abre el calendario a 390×844 y a 1280×800. `node:test`: 475/475. `tsc --noEmit`: limpio. |
 
 - Primero solo el ODD. No toques código ni abras ramas.
 - No cierres paneles de Herdr.
