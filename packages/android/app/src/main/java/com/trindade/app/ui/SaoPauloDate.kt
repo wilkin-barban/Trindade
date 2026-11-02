@@ -14,3 +14,16 @@ val SAO_PAULO_ZONE: ZoneId = ZoneId.of("America/Sao_Paulo")
 
 /** The current day in São Paulo, with no hour attached. */
 fun saoPauloLocalDate(): LocalDate = LocalDate.now(SAO_PAULO_ZONE)
+
+/**
+ * Today in São Paulo, behind an interface so a screen can be measured against a day it names.
+ *
+ * Not for the production path, which has [saoPauloLocalDate] and needs no indirection: this exists because
+ * the loading grid now decides from the calendar whether a day is still writable, and a test of that
+ * decision has to say which day is "today" rather than inherit the one the machine happens to be on. A
+ * `() -> String` would do the same job, but a named type is what Dagger can bind without every other
+ * function-typed parameter in the graph looking the same.
+ */
+fun interface DayClock {
+    fun today(): String
+}

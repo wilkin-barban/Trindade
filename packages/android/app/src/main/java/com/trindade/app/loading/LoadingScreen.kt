@@ -173,11 +173,16 @@ fun LoadingScreen(
 
         if (state.readOnly) {
             item {
-                // The day is off, and the sentence is the server's own (S27) copied verbatim: it says what
-                // happened and where the way out is. It is not an error -- nothing failed -- so it is not
-                // painted in the error colour, and it carries no retry: there is nothing to ask again.
+                // Two ways a day is read-only, and they are not the same sentence: a closed day is the
+                // calendar's, and no one can reopen it; a deactivated batch is someone's decision, and the
+                // history is where it is undone. The closed day wins when both hold, because it is the one
+                // the operator can neither change nor wait out. Neither is an error -- nothing failed -- so
+                // neither is painted in the error colour, and neither carries a retry: there is nothing to
+                // ask again.
                 Text(
-                    text = stringResource(R.string.loading_batch_deactivated),
+                    text = stringResource(
+                        if (state.closedDay) R.string.loading_closed_day else R.string.loading_batch_deactivated,
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

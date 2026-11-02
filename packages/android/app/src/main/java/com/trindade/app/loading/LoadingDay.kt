@@ -16,3 +16,13 @@ import java.time.ZoneId
  * change to the code rather than to the test. Recorded rather than papered over.
  */
 fun saoPauloToday(): String = LocalDate.now(ZoneId.of("America/Sao_Paulo")).toString()
+
+/**
+ * Whether the day is in the past, which on a loading day is when it stops accepting writes.
+ *
+ * `date < today` and not `date != today`, which is the rule the server itself applies: a day before today
+ * is history and is refused, and a day after it is still a draft that the routes accept. It takes `today`
+ * as a parameter rather than reading the clock so the caller decides which day is being measured, which
+ * is what lets the view model be tested against a fixed calendar.
+ */
+fun isClosedDay(date: String, today: String): Boolean = date < today

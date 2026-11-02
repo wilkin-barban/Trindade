@@ -10,6 +10,7 @@ import com.trindade.app.export.NoOpPdfGenerator
 import com.trindade.app.export.NoOpShareManager
 import com.trindade.app.export.PdfGenerator
 import com.trindade.app.export.ShareManager
+import com.trindade.app.ui.DayClock
 import com.trindade.app.ui.waMeLink
 import com.trindade.app.ui.waMeNumber
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -29,14 +30,24 @@ class LoadingViewModel @Inject constructor(
     private val repository: LoadingRepository,
     private val pdfGenerator: PdfGenerator,
     private val shareManager: ShareManager,
+    /**
+     * Today in São Paulo, asked for rather than captured.
+     *
+     * A grid left open past midnight has to start treating yesterday as closed without being recreated,
+     * and a test has to be able to name the day instead of being run on one. See [isClosedDay].
+     */
+    private val clock: DayClock,
 ) : ViewModel() {
 
     internal constructor(
         repository: LoadingRepository,
-    ) : this(repository, NoOpPdfGenerator, NoOpShareManager)
+        today: () -> String = ::saoPauloToday,
+    ) : this(repository, NoOpPdfGenerator, NoOpShareManager, DayClock(today))
 
     data class UiState(
         val date: String = saoPauloToday(),
+        /** The day this state's [date] is read against. See [closedDay]. */
+        val today: String = date,
         val loading: Boolean = true,
         val schedules: List<SchedulesResponseSchedulesInner> = emptyList(),
         /**
@@ -79,13 +90,24 @@ class LoadingViewModel @Inject constructor(
         val exportingPdf: Boolean = false,
     ) {
         /**
+         * Whether the day is in the past, which is when it stops accepting writes.
+         *
+         * Read from the calendar rather than from a flag: the server describes its rows one by one, not
+         * the day as a whole, and the rule -- a day that has ended is history -- is the one its routes
+         * apply when they refuse. A future day is a draft and stays writable, so `date != today` would
+         * lock a day the server accepts. See [isClosedDay].
+         */
+        val closedDay: Boolean get() = isClosedDay(date, today)
+
+        /**
          * True when nothing on this day can be written: no add, no edit, no removal.
          *
-         * Derived from the server's bit rather than stored, because the rows keep their own per-entry
-         * `readOnly` flag and the two must agree: a day that is off is off for every row on it, and a
-         * second copy of that fact here is a second place for the two to disagree.
+         * Two facts, one answer: the day is closed because it is not today, or because the batch that
+         * holds it was deactivated. Both are derived rather than stored, because the rows keep their own
+         * per-entry `readOnly` flag and the three must agree: a day that is off is off for every row on
+         * it, and a second copy of either fact here is a second place for the two to disagree.
          */
-        val readOnly: Boolean get() = !dayActive
+        val readOnly: Boolean get() = !dayActive || closedDay
 
         /**
          * The slots to draw: the configured ones, plus any slot an entry already sits in.
@@ -159,7 +181,7 @@ class LoadingViewModel @Inject constructor(
             get() = !busy && pickedCount > 0 && pickedCasa.values.none { it == null }
     }
 
-    private val _state = MutableStateFlow(UiState())
+    private val _state = MutableStateFlow(UiState(date = clock.today(), today = clock.today()))
     val state: StateFlow<UiState> = _state.asStateFlow()
 
     /**
@@ -218,6 +240,9 @@ class LoadingViewModel @Inject constructor(
             _state.update {
                 it.copy(
                     date = date,
+                    // Re-read on every named day: a grid that sat open past midnight measures the new day
+                    // against the calendar as it is now, not as it was when the screen was built.
+                    today = clock.today(),
                     schedules = emptyList(),
                     timeSlots = emptyList(),
                     drivers = emptyList(),
@@ -277,8 +302,12 @@ class LoadingViewModel @Inject constructor(
         }
     }
 
-    fun startAdding(slot: String) = _state.update {
-        it.copy(addingToSlot = slot, pickerTab = LoadingPickerTab.FLETEROS, message = null)
+    fun startAdding(slot: String) {
+        // The screen does not draw the action on a closed day, so this is the second lock rather than the
+        // only one: a picker opened on a day the server refuses every write from would be a form that can
+        // only end in a refusal.
+        if (state.value.readOnly) return
+        _state.update { it.copy(addingToSlot = slot, pickerTab = LoadingPickerTab.FLETEROS, message = null) }
     }
 
     fun cancelAdding() = _state.update {
@@ -340,6 +369,9 @@ class LoadingViewModel @Inject constructor(
      */
     fun confirmAdd() {
         val current = state.value
+        // No request leaves for a closed day: the server would refuse it (T1), and asking anyway spends a
+        // round trip to learn what the calendar already says.
+        if (current.readOnly) return
         val slot = current.addingToSlot ?: return
         if (!current.canConfirm) return
 
@@ -416,6 +448,9 @@ class LoadingViewModel @Inject constructor(
     )
 
     fun deleteEntry(id: Int) {
+        // Same lock as the add: a closed day has no removable rows, and the row's own `readOnly` flag is
+        // the server's answer for it, which the screen already honours.
+        if (state.value.readOnly) return
         _state.update { it.copy(busy = true, message = null) }
 
         viewModelScope.launch {
@@ -505,7 +540,7 @@ class LoadingViewModel @Inject constructor(
     /** Quick-add for a driver who is not in the list yet. Always a `fletero`, per the contract. */
     fun quickAddDriver(name: String, licensePlate: String?, phone: String? = null, assignToSlot: Boolean = true) {
         val slot = state.value.addingToSlot
-        if (name.isBlank() || state.value.busy) return
+        if (state.value.readOnly || name.isBlank() || state.value.busy) return
         _state.update { it.copy(busy = true, message = null) }
 
         viewModelScope.launch {

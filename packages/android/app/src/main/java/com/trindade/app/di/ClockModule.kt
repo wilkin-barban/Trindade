@@ -1,6 +1,8 @@
 package com.trindade.app.di
 
 import android.os.SystemClock
+import com.trindade.app.ui.DayClock
+import com.trindade.app.ui.saoPauloLocalDate
 import com.trindade.app.update.Clock
 import dagger.Module
 import dagger.Provides
@@ -29,4 +31,15 @@ object ClockModule {
     @Provides
     @Singleton
     fun provideClock(): Clock = Clock { SystemClock.elapsedRealtime() }
+
+    /**
+     * Today in São Paulo, bound beside the elapsed-realtime clock and for a different question.
+     *
+     * The update cache asks how long ago it wrote something; the loading grid asks which day it is, and
+     * that one has to be São Paulo's date whatever the phone's timezone says. Two clocks, two questions,
+     * and keeping them apart is what stops a monotonic reading from being subtracted against a calendar.
+     */
+    @Provides
+    @Singleton
+    fun provideDayClock(): DayClock = DayClock { saoPauloLocalDate().toString() }
 }
