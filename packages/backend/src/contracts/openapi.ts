@@ -595,11 +595,16 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
   registry.registerPath({
     method: 'get',
     path: '/api/loading/schedules',
-    summary: "List one date's active schedules",
+    summary: "List one date's schedules",
+    description:
+      'Without `includeInactive` this is the operational grid: only active rows. With ' +
+      '`includeInactive=1` it is the day as the history holds it, deactivated rows included. ' +
+      '`dayActive` is false when the day holds no active row, which is how a client tells an empty ' +
+      'day from one the plant closed.',
     tags: ['loading'],
     request: { query: ScheduleQuerySchema },
     responses: {
-      200: jsonResponse('The active schedules for that date, ordered by time slot', SchedulesResponseSchema),
+      200: jsonResponse('The schedules for that date, ordered by time slot, plus whether the day is active', SchedulesResponseSchema),
       400: errorResponse('The query parameters failed validation'),
       401: UNAUTHORIZED,
     },
@@ -617,11 +622,14 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
     request: { ...jsonRequest(CreateScheduleSchema) },
     responses: {
       201: jsonResponse('The created schedule, projected like a listed one', ScheduleResponseSchema),
-      400: errorResponse('The body failed validation, the driver is missing or inactive, or the date already has a deactivated batch'),
+      400: errorResponse('The body failed validation, or the driver or vehicle is missing or inactive'),
       401: UNAUTHORIZED,
       403: errorResponse('The date is read-only for this user'),
       404: errorResponse('The referenced driver or vehicle does not exist'),
-      409: errorResponse('That driver or that vehicle is already assigned on this date'),
+      409: errorResponse(
+        'The day is closed (`LOADING_HISTORY_FROZEN`), the day was deactivated ' +
+        '(`LOADING_BATCH_DEACTIVATED`), or that driver or vehicle is already assigned on this date'
+      ),
     },
   });
 
@@ -640,7 +648,10 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
       401: UNAUTHORIZED,
       403: errorResponse('Only the creator may edit, and only during the first hour'),
       404: errorResponse('No such schedule entry'),
-      409: errorResponse('That driver or that vehicle is already assigned on this date'),
+      409: errorResponse(
+        'The entry is dated a closed day (`LOADING_HISTORY_FROZEN`), or that driver or vehicle is ' +
+        'already assigned on the target date'
+      ),
     },
   });
 
@@ -657,6 +668,7 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
       401: UNAUTHORIZED,
       403: errorResponse('A Trabalhador may only delete their own entry'),
       404: errorResponse('No such schedule entry'),
+      409: errorResponse('The entry is dated a closed day (`LOADING_HISTORY_FROZEN`); deactivate it instead'),
     },
   });
 
@@ -694,6 +706,7 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
     method: 'delete',
     path: '/api/loading/schedules/batch/{date}',
     summary: 'Delete every entry of one date',
+    description: 'Only a draft can be erased: a closed day is deactivated, never deleted.',
     tags: ['loading'],
     request: { params: BATCH_DATE_PARAMS },
     responses: {
@@ -702,6 +715,7 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
       401: UNAUTHORIZED,
       403: errorResponse('Administrador only'),
       404: errorResponse('No batch on that date'),
+      409: errorResponse('The date is a closed day (`LOADING_HISTORY_FROZEN`)'),
     },
   });
 

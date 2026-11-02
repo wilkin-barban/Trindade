@@ -10,10 +10,48 @@ import type {
   LoadingBatchHistoryItem,
 } from './loading.schema.js';
 import { projectHistoryPermissions, type HistoryActor } from '../history-permissions.js';
+import { getSaoPauloDateString } from '../../utils/date.js';
 
 // ---- Schedule CRUD ----
 
-export function listByDate(db: Database.Database, date: string, actor?: HistoryActor): ScheduleRow[] {
+/**
+ * A write the calendar refuses.
+ *
+ * The `code` is the part the clients branch on: the message is Portuguese prose that the web and the
+ * Android app already translate, and matching on prose is what made a renamed string a silent
+ * behaviour change in three clients at once. `LOADING_HISTORY_FROZEN` is the loading counterpart of
+ * the massas `MASSAS_HISTORY_FROZEN`, so a client needs one rule for every closed day.
+ */
+export interface LoadingRefusal {
+  error: string;
+  status: number;
+  /** Stable, translatable-free name of the refusal. Absent only where a code is not yet defined. */
+  code?: string;
+}
+
+/**
+ * Refuses any write dated before the operators' today, in São Paulo.
+ *
+ * The day is closed when the clock passes midnight there, not when a row is one hour old: the plant
+ * closes a batch by deactivating it, and rewriting yesterday's production after the fact is the thing
+ * the audit trail exists to prevent. Deactivation and reactivation stay allowed -- they are the
+ * lifecycle the history exposes -- but creation, editing, moving into the past and physical deletion
+ * do not. A future day is still a draft, so only `date < today` is refused.
+ */
+function closedDayRefusal(date: string): LoadingRefusal | null {
+  if (date >= getSaoPauloDateString()) return null;
+  return { error: 'HISTORY_FROZEN', status: 409, code: 'LOADING_HISTORY_FROZEN' };
+}
+
+export function listByDate(
+  db: Database.Database,
+  date: string,
+  actor?: HistoryActor,
+  options: { includeInactive?: boolean } = {}
+): ScheduleRow[] {
+  // Opt-in, so the operational grid keeps its contract: an inactive row that reappears there reads as
+  // an assignment that still stands. Only the history asks for the day as it was.
+  const activeClause = options.includeInactive ? '' : ' AND ls.is_active = 1';
   const rows = db
     .prepare(
       `SELECT ls.id, ls.schedule_date, ls.time_slot, ls.driver_type,
@@ -24,20 +62,43 @@ export function listByDate(db: Database.Database, date: string, actor?: HistoryA
        LEFT JOIN drivers d ON ls.driver_id = d.id
        LEFT JOIN vehicles v ON ls.vehicle_id = v.id
        LEFT JOIN users u ON ls.user_id = u.id
-       WHERE ls.schedule_date = ? AND ls.is_active = 1
+       WHERE ls.schedule_date = ?${activeClause}
        ORDER BY ls.time_slot ASC, ls.driver_type, ls.id`
     )
     .all(date) as (ScheduleRow & { creator_name?: string | null; is_active?: number })[];
   return rows.map((row) => projectScheduleRow(row, actor));
 }
 
+/**
+ * One date, plus whether the day still has an active batch.
+ *
+ * The flag is what lets a client tell "this day has no schedules yet" from "this day was deactivated":
+ * both used to arrive as an empty list, and the history could not offer to reopen the second one.
+ */
+export function readDay(
+  db: Database.Database,
+  date: string,
+  actor?: HistoryActor,
+  options: { includeInactive?: boolean } = {}
+): { schedules: ScheduleRow[]; dayActive: boolean } {
+  const schedules = listByDate(db, date, actor, options);
+  const active = db
+    .prepare('SELECT COUNT(*) AS count FROM loading_schedules WHERE schedule_date = ? AND is_active = 1')
+    .get(date) as { count: number };
+  return { schedules, dayActive: active.count > 0 };
+}
+
 export function create(
   db: Database.Database,
   data: CreateScheduleBody,
   actor: HistoryActor
-): ScheduleRow | { error: string; status: number } {
+): ScheduleRow | LoadingRefusal {
+  const closed = closedDayRefusal(data.schedule_date);
+  if (closed) return closed;
+
   const tx = db.transaction(() => {
-    // Block creating a new schedule if the date has only inactive entries
+    // A day kept only as history cannot receive a new draft: reopening it is an explicit act, and the
+    // old answer was the duplicate message, which pointed the operator at the wrong problem.
     const totalCount = db
       .prepare('SELECT COUNT(*) AS count FROM loading_schedules WHERE schedule_date = ?')
       .get(data.schedule_date) as { count: number };
@@ -48,8 +109,8 @@ export function create(
 
     if (totalCount.count > 0 && activeCount.count === 0) {
       throw Object.assign(
-        new Error('scheduleAlreadyExists'),
-        { status: 400 }
+        new Error('This loading day was deactivated. Reopen the batch before adding entries.'),
+        { status: 409, code: 'LOADING_BATCH_DEACTIVATED' }
       );
     }
 
@@ -181,6 +242,7 @@ export function create(
       return {
         error: err.message,
         status: (err as Error & { status: number }).status,
+        code: (err as Error & { code?: string }).code ?? err.message,
       };
     }
     throw err;
@@ -192,7 +254,7 @@ export function update(
   id: number,
   data: UpdateScheduleBody,
   actor: HistoryActor
-): ScheduleRow | { error: string; status: number } {
+): ScheduleRow | LoadingRefusal {
   const existing = db
     .prepare(
       `SELECT id, schedule_date, time_slot, driver_type, driver_id, vehicle_id, user_id, created_at, is_active
@@ -203,17 +265,25 @@ export function update(
     | undefined;
 
   if (!existing) {
-    return { error: 'Schedule entry not found', status: 404 };
+    return { error: 'Schedule entry not found', status: 404, code: 'SCHEDULE_NOT_FOUND' };
   }
+
+  // The closed day answers before the ownership check: a Trabalhador who owns yesterday's row would
+  // otherwise be told to ask the creator, when nobody can edit it.
+  const closed = closedDayRefusal(existing.schedule_date);
+  if (closed) return closed;
 
   const permissions = projectHistoryPermissions(actor, existing, 'one-hour');
   if (!permissions.canEdit) {
-    return { error: 'Registro somente leitura. Apenas o criador pode editar durante a primeira hora.', status: 403 };
+    return { error: 'Registro somente leitura. Apenas o criador pode editar durante a primeira hora.', status: 403, code: 'SCHEDULE_READ_ONLY' };
   }
 
   // Resolve effective values (new or keep existing)
   const effectiveDate = data.schedule_date !== undefined ? data.schedule_date : existing.schedule_date;
   const effectiveSlot = data.time_slot !== undefined ? data.time_slot : existing.time_slot;
+
+  const movingClosed = effectiveDate === existing.schedule_date ? null : closedDayRefusal(effectiveDate);
+  if (movingClosed) return movingClosed;
 
   let effectiveDriverId = data.driver_id !== undefined ? data.driver_id : existing.driver_id;
   if (effectiveDriverId === null || effectiveDriverId === undefined) {
@@ -312,6 +382,7 @@ export function update(
       return {
         error: err.message,
         status: (err as Error & { status: number }).status,
+        code: (err as Error & { code?: string }).code ?? err.message,
       };
     }
     throw err;
@@ -335,10 +406,14 @@ export function update(
   return projectScheduleRow(row, actor);
 }
 
-export function remove(db: Database.Database, id: number): boolean {
+export function remove(db: Database.Database, id: number): boolean | LoadingRefusal {
   const tx = db.transaction(() => {
-    const existing = db.prepare('SELECT id FROM loading_schedules WHERE id = ?').get(id);
+    const existing = db.prepare('SELECT id, schedule_date FROM loading_schedules WHERE id = ?').get(id) as
+      | { id: number; schedule_date: string }
+      | undefined;
     if (!existing) return false;
+    const closed = closedDayRefusal(existing.schedule_date);
+    if (closed) return closed;
     db.prepare('DELETE FROM loading_schedules WHERE id = ?').run(id);
     return true;
   });
@@ -360,7 +435,9 @@ export function deactivateBatch(db: Database.Database, date: string): boolean {
   return tx();
 }
 
-export function removeBatch(db: Database.Database, date: string): boolean {
+export function removeBatch(db: Database.Database, date: string): boolean | LoadingRefusal {
+  const closed = closedDayRefusal(date);
+  if (closed) return closed;
   const tx = db.transaction(() => {
     const existing = db.prepare('SELECT COUNT(*) AS count FROM loading_schedules WHERE schedule_date = ?').get(date) as { count: number };
     if (existing.count === 0) return false;

@@ -54,7 +54,11 @@ export async function loadingRoutes(fastify: FastifyInstance) {
       if (request.user!.role !== 'Administrador') return reply.status(403).send({ error: 'Insufficient permissions' });
       const { date } = request.params as { date: string };
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return reply.status(400).send({ error: 'Invalid batch date' });
-      if (!service.removeBatch(fastify.db, date)) return reply.status(404).send({ error: 'Loading batch not found' });
+      const removed = service.removeBatch(fastify.db, date);
+      if (removed !== true) {
+        if (!removed) return reply.status(404).send({ error: 'Loading batch not found' });
+        return reply.status(removed.status).send({ error: removed.error, code: removed.code });
+      }
       auditLog(fastify.db, { userId: request.user!.sub, action: 'delete', entityType: 'loading_batch', ipAddress: request.ip, details: { scheduleDate: date } });
       return reply.status(204).send();
     }
@@ -87,8 +91,10 @@ export async function loadingRoutes(fastify: FastifyInstance) {
         });
       }
 
-      const schedules = service.listByDate(fastify.db, parse.data.date, request.user!);
-      return reply.send({ schedules });
+      const day = service.readDay(fastify.db, parse.data.date, request.user!, {
+        includeInactive: parse.data.includeInactive,
+      });
+      return reply.send(day);
     }
   );
 
@@ -117,11 +123,21 @@ export async function loadingRoutes(fastify: FastifyInstance) {
             ? 'Ya existe un cronograma para esta fecha en el historial.'
             : 'Já existe um cronograma para esta data no histórico.';
         }
+        if (result.code === 'LOADING_BATCH_DEACTIVATED') {
+          errMsg = isEs
+            ? 'Este día de cargamento fue desactivado. Reactivá el lote antes de agregar registros.'
+            : 'Este dia de carregamento foi desativado. Reative o lote antes de adicionar registros.';
+        }
+        if (result.code === 'LOADING_HISTORY_FROZEN') {
+          errMsg = isEs
+            ? 'Este día de cargamento ya está cerrado. Solo se puede consultar.'
+            : 'Este dia de carregamento já está fechado. Apenas consulta.';
+        }
         // The sentence travels for the user and the code for the client: 409 is also how a duplicate driver
         // answers, and a client that only reads the text cannot tell the day's refusal from the row's.
         return reply
           .status(result.status)
-          .send({ error: errMsg, message: errMsg, code: result.error });
+          .send({ error: errMsg, message: errMsg, code: result.code });
       }
 
       // Audit: schedule created
@@ -158,8 +174,9 @@ export async function loadingRoutes(fastify: FastifyInstance) {
 
       const deleted = service.remove(fastify.db, scheduleId);
 
-      if (!deleted) {
-        return reply.status(404).send({ error: 'Schedule entry not found' });
+      if (deleted !== true) {
+        if (!deleted) return reply.status(404).send({ error: 'Schedule entry not found' });
+        return reply.status(deleted.status).send({ error: deleted.error, code: deleted.code });
       }
 
       // Audit: schedule deleted
@@ -198,7 +215,7 @@ export async function loadingRoutes(fastify: FastifyInstance) {
       const result = service.update(fastify.db, scheduleId, parse.data, request.user!);
 
       if ('error' in result) {
-        return reply.status(result.status).send({ error: result.error });
+        return reply.status(result.status).send({ error: result.error, code: result.code });
       }
 
       // Audit: schedule updated

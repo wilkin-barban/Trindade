@@ -5,6 +5,12 @@ import { PaginationSchema, TimeSlotsResponseSchema } from '../../contracts/commo
 
 export const ScheduleQuerySchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format. Use YYYY-MM-DD.'),
+  // Opt-in, and read from an enum rather than `z.coerce.boolean()`: that helper turns the string
+  // `"false"` into `true`, so `?includeInactive=0` would have silently asked for the whole day.
+  includeInactive: z
+    .enum(['0', '1', 'true', 'false'])
+    .optional()
+    .transform((value) => value === '1' || value === 'true'),
 });
 
 export const HistoryQuerySchema = z.object({
@@ -148,7 +154,13 @@ export const VehicleSchema = z
 
 // ---- Response Envelopes ----
 
-export const SchedulesResponseSchema = z.object({ schedules: z.array(ScheduleSchema) }).strict();
+export const SchedulesResponseSchema = z
+  .object({
+    schedules: z.array(ScheduleSchema),
+    // Present even when false, so a client never has to distinguish a missing flag from a closed day.
+    dayActive: z.boolean(),
+  })
+  .strict();
 
 export const ScheduleResponseSchema = z.object({ schedule: ScheduleSchema }).strict();
 
