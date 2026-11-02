@@ -29,7 +29,8 @@ La guía de firma y publicación está en [release-android.md](release-android.m
 | 0.7.0 | 7001 | 2026-10-31 | No publicada | Build de respaldo; citada por las notas de la release | `8f6156f2d5dfe8e5ad343ed01e52de629e4de5b8d9cd4c1304b38313435a8621` |
 | 0.7.0 | 7002 | 2026-10-31 | Reemplazada | Binario anterior servido por producción; nunca fue asset de GitHub | `bc038f2eeda605fb07bfdd26550c93cfc5a1a8b9c9b06408df0fe505c6ec2f4c` |
 | 0.7.0 | 7003 | 2026-11-01 | Reemplazada | Homogeneización visual de Android; asset de GitHub y binario de producción hasta el build 7004 | `82fce07f17e98206a0ad6916463c80053154a87b5991b3679d47e001747e5810` |
-| 0.7.0 | 7004 | 2026-11-01 | **Publicada** | Acciones y filtros de históricos, Compartilhar App con el APK y resumen único del inicio; asset de GitHub y binario de producción | `7622756da304157904a1e47eccacff04e65d97d46615ecc804d62d24f0d1674f` |
+| 0.7.0 | 7004 | 2026-11-01 | Reemplazada | Acciones y filtros de históricos, Compartilhar App con el APK y resumen único del inicio | `7622756da304157904a1e47eccacff04e65d97d46615ecc804d62d24f0d1674f` |
+| 0.7.0 | 7005 | 2026-11-02 | **Publicada** | Paridad web/Android del ERP: cola drenada con ack reversible, multioperario por asiento y fallos de Aero unificados; asset de GitHub y binario de producción | `87f9a6a36166d0206031a23aa223bc1ea857e749304045ef79ea06877549ba75` |
 
 Notas:
 

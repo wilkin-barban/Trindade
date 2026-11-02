@@ -37,7 +37,7 @@ versionCode = major * 1000000 + minor * 1000 + patch
 | `v1.2.3` | `1.2.3` | `1002003` |
 | `v2.0.0` | `2.0.0` | `2000000` |
 
-El tag `v0.7.0` deriva `7000`; la build publicada es `7003`, superior a la anterior, para que Android acepte la actualización.
+El tag `v0.7.0` deriva `7000`; la build publicada es `7005`, superior a la anterior, para que Android acepte la actualización.
 
 Reglas:
 
@@ -72,15 +72,16 @@ Los dos números se calculan una sola vez en `build.gradle.kts` y alimentan tant
 | 0.7.0 | 7001 | No publicada | Build de respaldo; citada por notas anteriores |
 | 0.7.0 | 7002 | Reemplazada | Binario anterior de producción; nunca fue asset de GitHub |
 | 0.7.0 | 7003 | Reemplazada | Asset anterior de GitHub Release `v0.7.0` |
-| 0.7.0 | 7004 | **Publicada** | Acciones y filtros de históricos, Compartilhar App y resumen del inicio; asset actual de GitHub Release `v0.7.0` y binario de producción |
+| 0.7.0 | 7004 | Reemplazada | Acciones y filtros de históricos, Compartilhar App y resumen del inicio |
+| 0.7.0 | 7005 | **Publicada** | Paridad web/Android del ERP: cola drenada con ack reversible, multioperario por asiento, fallos de Aero unificados y errores traducidos; asset actual de GitHub Release `v0.7.0` y binario de producción |
 
 Las builds 0.6.x se distribuyeron por `GET /api/app/download-apk`, no por un tag de GitHub. Los hashes y las
 verificaciones completas están en [release-android-historial.md](release-android-historial.md).
 
-> **Estado final del 2026-11-01.** La release `v0.7.0` se republicó con el build **7004**. El asset de GitHub, su
-> `.sha256`, `packages/backend/apk/trindade-0.7.0.apk` y `GET /api/app/download-apk` son el mismo binario:
-> `versionCode 7004`, 11.194.408 bytes, sha256
-> `7622756da304157904a1e47eccacff04e65d97d46615ecc804d62d24f0d1674f`. Las builds 7000 a 7003 son
+> **Estado final del 2026-11-02.** La release `v0.7.0` se republicó con el build **7005**. El asset de GitHub,
+> su `.sha256`, `packages/backend/apk/trindade-0.7.0.apk`, la copia de escritorio y `GET /api/app/download-apk`
+> son el mismo binario: `versionCode 7005`, `versionName 0.7.0`, 11.220.352 bytes, sha256
+> `87f9a6a36166d0206031a23aa223bc1ea857e749304045ef79ea06877549ba75`. Las builds 7000 a 7004 son
 > históricas. El tag `v0.7.0` no se movió.
 
 ## 4. Workflow de publicación

@@ -867,6 +867,32 @@ S19 — D5/D7, verbatim:
   `v0.7.0` no se movió.
 - **Commit esperado.** `chore(android): hand the plant the 7005 build as the v0.7.0 asset` · binario + docs.
 - **Depende.** Todas las anteriores.
+- **Cerrada.** `1a4b1d5`.
+  - Build `7005` desde `/tmp/andrelease.sh :app:assembleRelease -PversionName=0.7.0 -PversionCode=7005
+    -PrequireSigned=true`: `aapt2 dump badging` → `versionCode='7005' versionName='0.7.0'`, `signingReport` →
+    alias `trindade`, certificado `ee0e404b…`, 11.220.352 bytes.
+  - Suite Android completa: **1268/1268** en verde antes de compilar.
+  - Emulador `Trindade_UX_v030`: instalación sobre el build anterior (`install -r`, sin desinstalar),
+    `dumpsys package` → `versionCode=7005 versionName=0.7.0`. Recorrido: dashboard (6 tarjetas + Resumo),
+    Lançamento (catálogo con `un/сx`), Horários, Relatórios, Painel Admin, guardado de la integración
+    (**«Tudo certo — Configuração salva neste aparelho»**), prueba de conexión contra una IP inalcanzable
+    (**«Não foi possível — A rede da fábrica está aí, mas o ERP não respondeu no endereço configurado»**, que es
+    T22 en el dispositivo) e Histórico de Massas con plurales correctos ("1 produto lançado · 1 operador").
+  - El primer arranque con el build nuevo pidió actualización: era el asset viejo (7002, 11 194 408 B) frente a
+    11 220 352 B de la app instalada, es decir el detector de `SAME_RELEASE_PATCH` funcionando. Al servir el
+    asset 7005 el aviso desapareció, lo que confirma el camino completo hasta producción.
+  - Web: `docker compose build web api && up -d`; `GET /api/app/latest-release` → `apkSize 11220352`;
+    capturas en 390×844 y 1440×900 de dashboard, cronograma, admin y masas. Sin errores de página en consola.
+  - Assets: `gh release upload v0.7.0 … --clobber` (digest del asset `sha256:87f9a6a3…`) y `gh release edit`
+    con las notas en español. `publishedAt` sigue en 2026-10-31: el tag no se movió.
+  - Un solo hash en los cinco destinos: release descargada, sidecar (`sha256sum -c` → OK), `packages/backend/apk`,
+    `~/Desktop` y `https://trindademasas.duckdns.org/api/app/download-apk` → `87f9a6a3…`.
+  - Documentación: `CHANGELOG.md` (`0.7.0+7005`), `docs/release-android.md` (fila + estado final),
+    `docs/release-android-historial.md` (fila con el digest) y las notas de la release en GitHub.
+  - **No verificado en este entorno:** el emulador no tenía `adb` en la ruta histórica (`~/android-sdk`); se usó
+    la real (`~/Android/Sdk/platform-tools/adb`). No hubo prueba con el ERP de la fábrica porque el VPS no tiene
+    ruta a su LAN (S11): el diálogo de la prueba de conexión se capturó contra una dirección inalcanzable, que es
+    justamente el caso que T22 explica.
 
 ## Plan de release (7005)
 
@@ -960,7 +986,7 @@ recorta alcance **con aprobación explícita**, nunca moviéndolas a otro ODD po
 | T24 | H P0-7, S17 | `08cc333` + `2249394` `feat(massas): let each seat carry its own operator` | `massas.service.test.ts` 18/18, `massas.routes.test.ts` 26/26, `aero-mirror.test.ts` 19/19, `MassasImportPayloadTest.kt` |
 | T25 | G | `1be3908` `fix(web): stop reporting a nameless connection as a known operator` | `aero-integration.test.ts` 86/86, `aero-connection.test.ts` 10/10, `aero-probe-copy.test.ts` 3/3, node 526/526 |
 | T26 | H P1 | `c1c2c0c` + `bb6ac45` `feat(android): send ERP launches in eights and retry only what failed` | `AeroQueueTest.kt` 12/12, `MassasUnifiedTest.kt` 23/23, `MassasLaunchViewModelTest.kt` 41/41, `MassasUnifiedTableTest.kt` 3/3 |
-| T27 | S9, S10 | `chore(android): hand the plant the 7005 build as the v0.7.0 asset` | `apksigner`, `aapt2`, `sha256sum -c`, e2e web |
+| T27 | S9, S10 | `1a4b1d5` `chore(android): hand the plant the 7005 build as the v0.7.0 asset` | `aapt2` (`versionCode 7005`), `signingReport` (`ee0e404b…`), 1268/1268 Android, `sha256sum -c` en los cinco destinos, e2e web |
 
 ## Log
 

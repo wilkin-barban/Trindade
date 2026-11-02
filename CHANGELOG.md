@@ -10,6 +10,46 @@ hashes y verificaciones está en [docs/release-android-historial.md](docs/releas
 
 ---
 
+## [0.7.0+7005] — 2026-11-02
+
+### Cambiado
+
+- **La cola de envíos al ERP se vacía entera y se puede deshacer.** El lote se drena en tandas de ocho con
+  corte en el primer fallo, así que veinte lanzamientos pendientes salen en una sola apertura de la
+  aplicación y lo que sigue no viaja a un servidor que acaba de no contestar. El botón de la pantalla muestra
+  cuántos quedan y reintenta los pendientes, y una fila marcada como enviada ofrece **Desfazer** en lugar de
+  volver a marcarse.
+- **El asiento sin cajas enteras dice por qué no se puede importar.** "3 un não fecham caixas inteiras de 10
+  un", "produto desconhecido" y "saída de stock" se explican en la propia fila, con el tamaño de caja del
+  catálogo, en vez de ofrecer un botón que el backend iba a rechazar.
+- **Una cuenta dada de baja en el ERP no se ofrece para crear.** El estado del operario se lee del espejo y
+  del ERP (`owner_status`) y manda sobre la tabla local de vínculos.
+- **Guardar la integración ERP responde.** El botón queda en progreso y la pantalla dice si quedó guardado,
+  si falta un dato o si el backend rechazó la configuración; el lanzamiento de masas avisa cuando se guardó
+  local sin ERP.
+- **Una sola forma de contar un fallo de Aero.** El diagnóstico de red, el timeout y el rechazo del
+  WebService llegan como una frase propia de la aplicación, con el aviso de Wi-Fi separado de la dirección
+  mal escrita.
+- **El operario de cada asiento viaja con el asiento.** `items[].operator_name` resuelve el dueño por ítem
+  antes de abrir la transacción, con la confirmación de la pestaña como respaldo para clientes anteriores: un
+  lote de dos operarios deja de quedar a nombre de quien lo envió.
+
+### Corregido
+
+- **Una conexión probada sin usuario ya no se atribuye a nadie.** El panel HTTP y la aplicación dejaron de
+  rellenar el nombre de la cuenta de fábrica cuando el ERP confirmaba las credenciales sin decir de quién
+  son, y la importación de un asiento ya no dibuja el texto crudo del servidor: se traduce por código y, si
+  no hay uno conocido, queda el mensaje genérico.
+
+### Distribución Android
+
+- Build **7005** es el asset de GitHub Release `v0.7.0` (`trindade-0.7.0.apk` y su `.sha256`) y la que sirve
+  `GET /api/app/download-apk`, con `versionCode 7005`, `versionName 0.7.0`, 11.220.352 bytes y sha256
+  `87f9a6a3…`.
+- El tag `v0.7.0` no se movió: se reemplazaron los assets de la misma release.
+
+---
+
 ## [0.7.0+7004] — 2026-11-01
 
 ### Cambiado
