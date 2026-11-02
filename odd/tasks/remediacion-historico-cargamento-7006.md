@@ -781,3 +781,13 @@ Correcciones que esta verificación introduce sobre el brief: el hallazgo B est�
 - Dos tests previos cambiaron de expectativa porque el silencio era justamente lo que S54 quita: `a fletero already on the day is not offered again` (antes exigía `Nenhum motorista disponível.`) ahora exige la fila deshabilitada con `Fletero já está nas 06:00.`; `availableDrivers excludes...` no se tocó.
 - Evidencia: `LoadingViewModelTest` 49/49, `LoadingScreenTest` 27/27 (`BUILD SUCCESSFUL in 8m 10s`).
 - Pendiente de T19: el 409 `DRIVER_ALREADY_SCHEDULED` con nombre y horario dentro de `ActionResultDialog` (S45) todavía muestra la frase genérica de 409 en `refusalMessage`.
+
+**L9 (cierre de T19, evidencia)**
+
+- `UiState.batchResult: BatchResult?` (`message` + `refusals: List<BatchRefusal>`) en lugar de reutilizar `message`: la relectura posterior a un éxito parcial limpia `message` (`load()` la pone en `null`), así que el diálogo abierto se habría quedado sin su primera línea. El primer intento colgó el diálogo de `message` y `keeps the message after a partial failure` lo detectó.
+- `BatchRefusal(name, code, occupiedSlot, vehiclePlate)`; el texto lo arma `refusalLine` en la pantalla con `loading_picker_driver_busy`, `loading_batch_vehicle_busy` o `loading_batch_row_refused`, así que PT/ES siguen saliendo de recursos y no de literales del ViewModel.
+- `ScheduleWriteResult.Refused` gana `occupiedSlot`, leído de `existing.time_slot` del mismo sobre que ya daba `code` (`ErrorEnvelope` del contrato ya lo tenía). El código se conserva para `BATCH_DEACTIVATED`; `refusalCode` quedó como está para el ciclo de vida.
+- La grilla deja de dibujar el mensaje de una tanda (`state.message.takeIf { state.batchResult == null }`); el diálogo se dibuja en la raíz, junto al selector, con `onDismissBatchResult = viewModel::dismissBatchResult`.
+- `message` sigue llevando la frase del lote desactivado, porque además voltea el día a solo lectura y el test existente de S27 la espera ahí.
+- `FakeLoadingApi` gana `createAnswers` por request (null cae al `createResponse` fijo) para poder rechazar una fila y dejar entrar las otras.
+- Evidencia: `LoadingViewModelTest` 51/51, `LoadingScreenTest` 28/28, `LocaleStringsParityTest` 2/2 (`BUILD SUCCESSFUL in 7m 12s`).
