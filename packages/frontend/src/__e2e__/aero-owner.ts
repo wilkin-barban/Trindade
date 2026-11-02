@@ -29,3 +29,31 @@ export async function loginAsAeroOwner(page: Page): Promise<void> {
   await ensureAeroOwner(page);
   await loginViaApi(page, AERO_OWNER);
 }
+
+/**
+ * Types the ERP password into this tab, which is the only place it lives now.
+ *
+ * It used to be seeded into `localStorage` by a couple of specs, and that is exactly what stopped being
+ * possible -- and what must not come back as a test-only path, because a test that writes the secret to disk
+ * would keep passing while the phone did something else. The panel writes it to the session's memory; the
+ * trip back is the app's own link, so the document is never reloaded and the memory survives.
+ */
+export async function openErpSession(page: Page, password = 'senha'): Promise<void> {
+  await page.goto('/admin');
+  await page.locator('[data-testid="admin-tab-integration"]').click();
+  await page.locator('[data-testid="aero-ws-user"]').fill('wilkin');
+  await page.locator('[data-testid="aero-ws-pass"]').fill(password);
+  await page.locator('[data-testid="aero-save"]').click();
+  await expect(page.getByText(/Configuración guardada|Configuração salva/)).toBeVisible();
+}
+
+/** Leaves the current screen for another one of the app, without a reload: the session's secret survives. */
+export async function navigateInApp(page: Page, href: string): Promise<void> {
+  const openSidebar = page.getByRole('button', { name: /Abrir men/ });
+  if (await openSidebar.isVisible().catch(() => false)) {
+    await openSidebar.click();
+  }
+  await page.locator(`a[href="${href}"]`).first().click();
+  await expect(page).toHaveURL(new RegExp(`${href.replace('/', '\\/')}$`));
+}
+

@@ -76,4 +76,44 @@ test.describe('integration tab in the admin panel', () => {
     await page.locator('[data-testid="admin-tab-integration"]').click();
     await expect(page.locator('[data-testid="aero-ws-url"]')).toBeEditable();
   });
+
+  /**
+   * The password does not survive the tab, and the screen says so before anyone wonders.
+   *
+   * It used to sit in `localStorage` in clear. Now the field is emptied by a reload on purpose: the cost of
+   * not keeping the company's secret on the device is typing it again when the session opens, and a person who
+   * is not told reads that as the app losing the configuration.
+   */
+  test('saving keeps the password out of the device and a reload asks for it again', async ({ page }) => {
+    await loginAsAeroOwner(page);
+    await page.goto('/admin');
+    await page.locator('[data-testid="admin-tab-integration"]').click();
+
+    const pass = page.locator('[data-testid="aero-ws-pass"]');
+    await expect(pass).toHaveValue('');
+    // The language of the run is the operator's: the sentence is matched in both.
+    await expect(page.locator('[data-testid="aero-pass-notice"]')).toContainText(/no se guarda|não é guardada/);
+
+    // A fresh profile carries no user either: the save needs the address and the user, and the secret is
+    // what it deliberately does not keep.
+    await page.locator('[data-testid="aero-ws-user"]').fill('wilkin');
+    await pass.fill('segredo-do-erp');
+    await page.locator('[data-testid="aero-save"]').click();
+    await expect(page.getByText(/Configuración guardada|Configuração salva/)).toBeVisible();
+
+    const stored = await page.evaluate(() => localStorage.getItem('trindade.aero.integration.v1') ?? '');
+    expect(stored).not.toContain('segredo-do-erp');
+    expect(stored).toContain('192.168.25.250');
+
+    await page.reload();
+    await page.locator('[data-testid="admin-tab-integration"]').click();
+
+    await expect(page.locator('[data-testid="aero-ws-pass"]')).toHaveValue('');
+    // Configured, and waiting for the secret: not «sin configurar», which is what it would say if the reload
+    // had thrown the address away too.
+    await expect(page.locator('[data-testid="aero-state"]')).toContainText(
+      /Falta la contraseña de esta sesión|Falta a senha desta sessão/
+    );
+    await expect(page.locator('[data-testid="aero-ws-url"]')).toHaveValue('http://192.168.25.250:1453/api');
+  });
 });

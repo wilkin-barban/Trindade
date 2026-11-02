@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { IPHONE_UA } from './auth-helpers';
-import { loginAsAeroOwner } from './aero-owner';
+import { loginAsAeroOwner, navigateInApp, openErpSession } from './aero-owner';
 
 /**
  * Three products, one trip out of the page.
@@ -20,10 +20,10 @@ const AERO_QUEUE_KEY = 'trindade.aero.queue.v1';
  */
 const DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
 
+/** What the device keeps: the plant's address and the account, and never the password. */
 const SETTINGS = JSON.stringify({
   wsUrl: 'http://192.168.25.250:1453/api',
   username: 'wilkin',
-  password: 'senha',
   shortcutName: 'Aero32 Bridge',
   syncEnabled: true,
 });
@@ -48,7 +48,10 @@ async function openLaunchPage(page: Page) {
     ({ key, value }) => window.localStorage.setItem(key, value),
     { key: AERO_SETTINGS_KEY, value: SETTINGS },
   );
-  await page.goto('/massas-launch');
+  // The password is not part of what the device keeps, so the tab asks for it once -- the same thing an
+  // operator does -- and then walks to the launch screen through the app, which is what keeps it in memory.
+  await openErpSession(page);
+  await navigateInApp(page, '/massas-launch');
   await page.locator('[data-testid="massas-launch-date"]').fill(DAY);
   await expect(page.locator('input[type="number"]').first()).toBeVisible({ timeout: 15000 });
 }
