@@ -357,6 +357,16 @@ S19 — D5/D7, verbatim:
   escritorio (S18).
 - **Commit esperado.** `feat(web): read the dashboard as six cards and one summary panel` · ~220 líneas.
 - **Depende.** —
+- **Hecho.** `9f04860`. Seis tarjetas (Reportes, Cronograma, Masas, Stock, Assaí, Compartir App) y panel
+  «Resumo» con las cinco filas; salen Histórico de Contagem y las tres tarjetas de números. La tarjeta de masas
+  deja de ser enlace y ofrece dos puertas, así que no queda ancla anidada. Grilla `lg:grid-cols-3` para que las
+  seis no dejen una huérfana. Copia `es` corregida: «Reportes totales», «Mercaderías».
+  - Evidencia: `DashboardPage.test.tsx` 4/4, `dashboard.spec.ts` 6/6 (390×844 y 1280×900, incluido desborde
+    horizontal), node 480/480, Vitest 25/25. Capturas: `/tmp/t10-dashboard-phone.png`,
+    `/tmp/t10-dashboard-desktop.png`.
+  - Decisión: la fila de higiene/recepción de la tarjeta sigue mostrando solo `done`, como el teléfono y como la
+    propia copia `pt-BR`; el par `done/total` se lee en el panel. Cambiar la tarjeta sería cambiar la frase, y
+    eso se decide una vez, en el idioma.
 
 ### T11 · Web: interruptor por tipo de caja en Montagem das Caixas
 
@@ -695,7 +705,7 @@ recorta alcance **con aprobación explícita**, nunca moviéndolas a otro ODD po
 | T7 | B, S2 | `e676cf0` `feat(massas): elegir el día del histórico desde una lista` + `01c5b01` `test(massas): cubrir la elección de día del histórico` | `MassasHistoryPage.test.tsx` 5/5, `massas-history.spec.ts` 2/2 |
 | T8 | B | `3868188` `feat(stock): elegir el día del histórico desde un panel y los días contados` | `StockHistoryPage.test.tsx` 3/3, `stock-history.spec.ts` 2/2 |
 | T9 | B | `16a7e39` `fix(web): recargar los históricos al elegir la fecha` | `ReportHistoryPage.test.tsx` 4/4, `LoadingHistoryPage.test.tsx` 2/2, e2e 13/13 |
-| T10 | C, S3 | `feat(web): read the dashboard as six cards and one summary panel` | `DashboardPage.test.tsx`, `dashboard.spec.ts` |
+| T10 | C, S3 | `9f04860` `feat(web): leer el panel como seis tarjetas y un resumen` | `DashboardPage.test.tsx` 4/4, `dashboard.spec.ts` 6/6 |
 | T11 | D | `feat(web): switch a box type off together with its tasks` | `CategorySection.test.tsx` |
 | T12 | D, S1, S16 | `feat(reports): send every task, checked or not, and keep the unchecked rows` | `ReportEditPage.test.tsx`, `reports.command.service.test.ts` |
 | T13 | D | `fix(web): keep read-only reports read-only and draw the receivings` | `CategorySection.test.tsx`, `ReportsPage.test.tsx` |
