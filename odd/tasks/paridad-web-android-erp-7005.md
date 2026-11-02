@@ -660,6 +660,20 @@ S19 — D5/D7, verbatim:
   (S18).
 - **Commit esperado.** `fix(web): keep the ERP password in memory instead of localStorage` · ~140 líneas.
 - **Depende.** —
+- **Cerrada.** Tres commits: `dcbc2fc` (la lib y su migración), `016c30b` (el panel, el aviso y los dos caminos
+  que fallaban en silencio), `e5ad503` (los e2e que sembraban la contraseña).
+  - Tests corridos: `aero-integration.test.ts` 85/85 `node:test`; `aero-integration-panel.test.tsx` 5/5 y
+    `aero-password-session.test.ts` 4/4 (suites nuevas); vitest 84/84; web `node:test` 517/517;
+    `tsc --noEmit` limpio; Playwright 103/103 (`admin-integration.spec.ts` 4/4).
+  - Rojo verificado antes del verde: la lib fallaba por falta de `aeroMissingSetup` y el panel por el
+    `aero-state` que la prueba pide.
+  - Lo guardado no contiene `password` y una recarga pide la contraseña sin perder la dirección; lo comprueban
+    el e2e de admin y `localStorage` leído desde la página.
+  - La suite completa traía dos fallos ajenos a esta tarea, corregidos aparte en `8946c1d`: una aserción que
+    negaba el literal `11` (que también está en la fecha de noviembre) y un locator que resolvía dos líneas del
+    mismo insumo en la base compartida.
+  - Visto en 390×844 (`/tmp/t20-plan-390.png`) y 1280×900 (`/tmp/t20-plan-1280.png`): el aviso cabe bajo el
+    campo sin desbordar y el badge dice «Falta la contraseña de esta sesión».
 
 ### T21 · Android: feedback al guardar la integración y no fallar en silencio
 
@@ -851,7 +865,7 @@ recorta alcance **con aprobación explícita**, nunca moviéndolas a otro ODD po
 | T17 | E | `fix(web): count the loading quota by window and stop shifting edited rows` | `loading-quota.test.ts`, `LoadingEditPage.test.tsx` |
 | T18 | E | `feat(web): open and retry a loading day from its history` | `LoadingHistoryPage.test.tsx`, `loading-history.spec.ts` |
 | T19 | E | `fix(web): say what actually failed on the loading schedule` | `LoadingSchedulePage.test.tsx`, `schedule-pdf.test.ts` |
-| T20 | F, S5, S11, S12 | `fix(web): keep the ERP password in memory instead of localStorage` | `aero-integration.test.ts`, `aero-integration-panel.test.tsx`, `admin-integration.spec.ts` |
+| T20 | F, S5, S11, S12 | `dcbc2fc` `feat(aero): la contraseña del ERP deja de guardarse en el dispositivo` + `016c30b` (panel y avisos) + `e5ad503` (e2e) | `aero-integration.test.ts` 85/85, `aero-integration-panel.test.tsx` 5/5, `aero-password-session.test.ts` 4/4, `admin-integration.spec.ts` 4/4, Playwright 103/103 |
 | T21 | H P0-1, P0-5 | `fix(android): show the result of saving the ERP settings` | `IntegrationSettingsReadyTest.kt`, `MassasLaunchViewModelTest.kt` |
 | T22 | H P0-2, P0-3 | `refactor(android): one failure model and a real Wi-Fi message` | `AeroFailureTest.kt`, `AeroLogicTest.kt` |
 | T23 | H P0-4, P0-6 | `feat(android): keep the ERP queue across restarts and refuse duplicated seats` | `AeroQueueTest.kt`, `MassasLaunchViewModelTest.kt` |
