@@ -39,6 +39,8 @@ function renderDialog(overrides: Partial<Parameters<typeof DriverPickerDialog>[0
     onRetryVehicles: vi.fn(),
     plateMissing: [],
     error: '',
+    failures: [],
+    onRetry: vi.fn(),
     assigning: false,
     onAccept: vi.fn(),
     onClose: vi.fn(),
@@ -106,5 +108,18 @@ describe('DriverPickerDialog', () => {
     renderDialog({ error: 'Vehículo ya programado en esta fecha.' });
 
     expect(screen.getByTestId('driver-select-error')).toHaveTextContent('Vehículo ya programado');
+  });
+
+  it('names each refused row beside the retry that sends only those', () => {
+    const props = renderDialog({
+      failures: [{ driverId: 4, name: 'Silvana Casa', message: 'Vehículo ya programado en esta fecha.' }],
+    });
+
+    // The row's own name, not a count: with eight picked drivers, "uno falló" leaves the operator hunting.
+    expect(screen.getByTestId('driver-select-failure-4')).toHaveTextContent('Silvana Casa');
+    expect(screen.getByTestId('driver-select-failure-4')).toHaveTextContent('Vehículo ya programado');
+
+    fireEvent.click(screen.getByTestId('driver-select-retry'));
+    expect(props.onRetry).toHaveBeenCalled();
   });
 });

@@ -5,6 +5,7 @@ import {
   batchRows,
   chooseVehicle,
   freeVehicles,
+  onlyRefused,
   refusalMessage,
   rowsWithoutPlate,
   schedulePayload,
@@ -16,6 +17,13 @@ import {
 } from '../../lib/loading-picker';
 import { DriverForm } from './DriverForm';
 import { DriverPickerDialog } from './DriverPickerDialog';
+
+/** One row the batch could not send: the driver, and the sentence the server gave for that row. */
+interface Refused {
+  driverId: number;
+  name: string;
+  message: string;
+}
 
 export interface DriverPickerProps {
   timeSlot: string;
@@ -52,6 +60,7 @@ export function DriverPicker({
   const [assigning, setAssigning] = useState(false);
   const [error, setError] = useState('');
   const [plateMissing, setPlateMissing] = useState<string[]>([]);
+  const [failures, setFailures] = useState<Refused[]>([]);
   const [vehicles, setVehicles] = useState<PickerVehicle[]>([]);
   const [vehiclesError, setVehiclesError] = useState(false);
 
@@ -85,27 +94,35 @@ export function DriverPicker({
   async function send(rows: ReturnType<typeof batchRows>) {
     setAssigning(true);
     setError('');
+    setFailures([]);
 
+    const refused: Refused[] = [];
     let accepted = 0;
-    let refusal = '';
     for (const row of rows) {
       try {
         await api.post('/loading/schedules', schedulePayload(date, timeSlot, row));
         accepted += 1;
       } catch (err) {
-        // The first refusal is the one worth reading: the batch stops being a batch once part of it did not
-        // land, and the sentence is about that row's own duplicate.
-        refusal = refusal || refusalMessage(err, t);
+        refused.push({ driverId: row.driverId, name: row.name, message: refusalMessage(err, t) });
       }
     }
 
     setAssigning(false);
     if (accepted > 0) onRefresh();
-    if (refusal) {
-      setError(refusal);
+
+    if (refused.length === 0) {
+      onClose();
       return;
     }
-    onClose();
+
+    // What landed is in the grid and needs no pick; what was refused stays selected, which is what makes the
+    // next accept a retry of the rows still owed instead of a second batch.
+    setFailures(refused);
+    setPicked((current) => onlyRefused(current, refused));
+  }
+
+  function retry() {
+    void send(batchRows(picked, drivers));
   }
 
   function accept() {
@@ -166,6 +183,8 @@ export function DriverPicker({
       onRetryVehicles={loadVehicles}
       plateMissing={plateMissing}
       error={error}
+      failures={failures}
+      onRetry={retry}
       assigning={assigning}
       onAccept={accept}
       onClose={onClose}

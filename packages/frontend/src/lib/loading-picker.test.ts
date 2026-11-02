@@ -5,6 +5,7 @@ import {
   chooseVehicle,
   freeVehicles,
   availableDrivers,
+  onlyRefused,
   refusalMessage,
   rowsWithoutPlate,
   schedulePayload,
@@ -92,6 +93,16 @@ describe('the batch', () => {
       driver_id: 4,
       vehicle_id: 11,
     });
+  });
+});
+
+describe('what a half-sent batch leaves', () => {
+  it('keeps only the rows the server refused, so the retry cannot send the accepted ones twice', () => {
+    const picked = chooseVehicle(togglePick(togglePick(new Map(), 1), 4), 4, '11');
+
+    const owed = onlyRefused(picked, [{ driverId: 4 }]);
+
+    assert.deepEqual([...owed.entries()], [[4, 11]]);
   });
 });
 

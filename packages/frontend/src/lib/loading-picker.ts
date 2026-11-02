@@ -105,6 +105,20 @@ export function rowsWithoutPlate(rows: readonly BatchRow[]): BatchRow[] {
 }
 
 /**
+ * The picks that are still owed after a batch: the rows the server refused.
+ *
+ * What landed is already in the grid, so keeping it picked would let a second accept send it twice; what was
+ * refused is the only thing left to do, and leaving exactly that selected is what makes the retry a retry.
+ */
+export function onlyRefused(
+  picked: PickedPlates,
+  refused: readonly { driverId: number }[]
+): Map<number, number | null> {
+  const owed = refused.map((refusal) => refusal.driverId);
+  return new Map([...picked].filter(([driverId]) => owed.includes(driverId)));
+}
+
+/**
  * What one row sends.
  *
  * A fletero travels with `vehicle_id: null` and not with the key left out: the server refuses a fletero that

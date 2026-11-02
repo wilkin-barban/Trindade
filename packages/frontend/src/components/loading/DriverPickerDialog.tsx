@@ -19,6 +19,9 @@ export interface DriverPickerDialogProps {
   onRetryVehicles: () => void;
   plateMissing: readonly string[];
   error: string;
+  /** The rows the last batch could not send, each with the reason the server gave for that row. */
+  failures: readonly { driverId: number; name: string; message: string }[];
+  onRetry: () => void;
   assigning: boolean;
   onAccept: () => void;
   onClose: () => void;
@@ -50,6 +53,8 @@ export function DriverPickerDialog({
   onRetryVehicles,
   plateMissing,
   error,
+  failures,
+  onRetry,
   assigning,
   onAccept,
   onClose,
@@ -102,6 +107,22 @@ export function DriverPickerDialog({
             <p className="mb-2 text-sm text-red-600" role="alert" data-testid="driver-select-error">
               {error}
             </p>
+          )}
+
+          {/* One sentence per refused row, with the name in it: a batch that half landed owes the operator
+              the specific rows that did not, not a count to hunt for in the list. */}
+          {failures.length > 0 && (
+            <ul className="mb-2 space-y-1" role="alert" data-testid="driver-select-failures">
+              {failures.map((failure) => (
+                <li
+                  key={failure.driverId}
+                  className="text-sm text-red-600"
+                  data-testid={`driver-select-failure-${failure.driverId}`}
+                >
+                  {t('loading.pickerFailureFor', { name: failure.name, message: failure.message })}
+                </li>
+              ))}
+            </ul>
           )}
 
           {tab === 'fleteros' ? (
@@ -200,6 +221,18 @@ export function DriverPickerDialog({
           <span className="text-xs text-gray-500 flex-1" data-testid="driver-select-count">
             {t('loading.pickerSelected', { count: picked.size })}
           </span>
+          {failures.length > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onRetry}
+              disabled={assigning}
+              data-testid="driver-select-retry"
+            >
+              {t('loading.pickerRetry')}
+            </Button>
+          )}
           <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={assigning} data-testid="driver-select-close">
             {t('ui.cancel')}
           </Button>

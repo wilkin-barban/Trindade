@@ -81,6 +81,37 @@ describe('DriverPicker', () => {
     expect(onRefresh).toHaveBeenCalled();
   });
 
+  it('keeps what landed, and leaves only the refused row selected for the retry', async () => {
+    post.mockImplementation(async (_url: string, body: { driver_id: number }) => {
+      if (body.driver_id === 4) throw Object.assign(new Error('Veículo já agendado nesta data.'), { status: 409 });
+      return { schedule: { id: 90 + body.driver_id } };
+    });
+    const { onRefresh, onClose } = await renderPicker();
+
+    pick('Carlos Fletero');
+    fireEvent.click(screen.getByTestId('driver-select-tab-casa'));
+    pick('Silvana Casa');
+    fireEvent.change(screen.getByTestId('driver-plate-4'), { target: { value: '11' } });
+    fireEvent.click(screen.getByTestId('driver-select-accept'));
+
+    await waitFor(() => expect(screen.getByTestId('driver-select-failures')).toBeInTheDocument());
+
+    // The slot is not finished, so the modal stays; the row that landed is already reloaded into the grid.
+    expect(onClose).not.toHaveBeenCalled();
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('driver-select-failure-4')).toHaveTextContent('Vehículo ya programado');
+    // What is still owed is the only thing selected: a second accept cannot send what already landed twice.
+    expect(screen.getByTestId('driver-select-count')).toHaveTextContent('1 seleccionado');
+
+    post.mockClear();
+    post.mockResolvedValue({ schedule: { id: 92 } });
+    fireEvent.click(screen.getByTestId('driver-select-retry'));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(post.mock.calls[0][1]).toMatchObject({ driver_id: 4, vehicle_id: 11 });
+  });
+
   it('withholds the batch while a picked company driver has no plate', async () => {
     await renderPicker();
 
