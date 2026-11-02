@@ -15,9 +15,22 @@ import {
 import { buildTestApp, type TestFixtures } from '../test-helper.js';
 import { SuccessResponseSchema, TextResponseSchema } from './common.schema.js';
 import { ErrorEnvelopeSchema } from './error.schema.js';
+import { getSaoPauloDateString } from '../utils/date.js';
 
-const CREATE_DATE = '2026-03-15';
-const BATCH_DATE = '2026-03-16';
+/**
+ * Two future days, computed from the operators' today.
+ *
+ * The contract fixtures used to name fixed 2026 dates. Once a past day became read-only, those
+ * writes were refused by the calendar and the contract never reached the shapes it exists to check.
+ */
+function dateIn(days: number): string {
+  const anchor = new Date(`${getSaoPauloDateString()}T12:00:00Z`);
+  anchor.setUTCDate(anchor.getUTCDate() + days);
+  return anchor.toISOString().slice(0, 10);
+}
+
+const CREATE_DATE = dateIn(20);
+const BATCH_DATE = dateIn(21);
 
 function expectMatch<T extends z.ZodTypeAny>(schema: T, body: string): z.infer<T> {
   const parsed = schema.safeParse(JSON.parse(body));

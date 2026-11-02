@@ -4,6 +4,44 @@ import type { FastifyInstance } from 'fastify';
 import type Database from 'better-sqlite3';
 
 import { buildLoadingTestApp, type TestFixtures } from './loading-test-helper.js';
+import { getSaoPauloDateString } from '../../utils/date.js';
+
+/**
+ * A São Paulo date shifted by whole days.
+ *
+ * These fixtures used to name fixed 2026 dates, and the export layout they assert depends on the
+ * weekday. Once a past day became read-only, the writes had to move to days the plant can still
+ * accept, so each fixture now computes its own day and the expected weekday text from the same value.
+ */
+function shift(date: string, days: number): string {
+  const anchor = new Date(`${date}T12:00:00Z`);
+  anchor.setUTCDate(anchor.getUTCDate() + days);
+  return anchor.toISOString().slice(0, 10);
+}
+
+function dateIn(days: number): string {
+  return shift(getSaoPauloDateString(), days);
+}
+
+/** The next future date that falls on `weekday` (0 = Sunday), never today. */
+function nextWeekday(weekday: number): string {
+  const today = getSaoPauloDateString();
+  const delta = (weekday - new Date(`${today}T12:00:00Z`).getUTCDay() + 7) % 7 || 7;
+  return shift(today, delta);
+}
+
+function ptWeekday(date: string): string {
+  const name = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`));
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+function ptDate(date: string): string {
+  const [year, month, day] = date.split('-');
+  return `${day}/${month}/${year}`;
+}
+
+const WEDNESDAY = nextWeekday(3);
+const FRIDAY = nextWeekday(5);
 
 /**
  * Helper: login as admin and return the JWT token.
@@ -68,7 +106,7 @@ describe('Loading Schedule Routes', () => {
       url: '/api/loading/schedules',
       headers: { authorization: `Bearer ${token}` },
       payload: {
-        schedule_date: '2026-06-17',
+        schedule_date: WEDNESDAY,
         time_slot: '05:00',
         driver_type: 'casa',
         driver_id: casaDriverId,
@@ -80,7 +118,7 @@ describe('Loading Schedule Routes', () => {
       url: '/api/loading/schedules',
       headers: { authorization: `Bearer ${token}` },
       payload: {
-        schedule_date: '2026-06-17',
+        schedule_date: WEDNESDAY,
         time_slot: '04:00',
         driver_type: 'fletero',
         driver_id: fleteroDriverId,
@@ -89,7 +127,7 @@ describe('Loading Schedule Routes', () => {
 
     const res = await app.inject({
       method: 'GET',
-      url: '/api/loading/export?date=2026-06-17',
+      url: `/api/loading/export?date=${WEDNESDAY}`,
       headers: { authorization: `Bearer ${token}` },
     });
 
@@ -97,7 +135,7 @@ describe('Loading Schedule Routes', () => {
     const text: string = JSON.parse(res.body).text;
 
     assert.ok(text.startsWith('🚛 *CRONOGRAMA DE CARREGAMENTO*'));
-    assert.ok(text.includes('📅 Quinta-feira • 18/06/2026'));
+    assert.ok(text.includes(`📅 ${ptWeekday(shift(WEDNESDAY, 1))} • ${ptDate(shift(WEDNESDAY, 1))}`));
     assert.ok(text.includes('━━━━━━━━━━━━━━'));
     assert.ok(text.includes('🕓 04:00  │ Diego'));
     const vehiclePlate = (db.prepare('SELECT license_plate FROM vehicles WHERE id = ?').get(vehicleId) as { license_plate: string }).license_plate;
@@ -111,7 +149,7 @@ describe('Loading Schedule Routes', () => {
   it('GET /export returns no-loadings message for empty schedule', async () => {
     const res = await app.inject({
       method: 'GET',
-      url: '/api/loading/export?date=2026-12-25',
+      url: `/api/loading/export?date=${dateIn(40)}`,
       headers: { authorization: `Bearer ${token}` },
     });
 
@@ -132,8 +170,8 @@ describe('Loading Schedule Routes', () => {
 
   it('GET /export fails explicitly when a required loading reference is missing', async () => {
     db.pragma('foreign_keys = OFF');
-    db.prepare("INSERT INTO loading_schedules (id, schedule_date, time_slot, driver_id, vehicle_id, driver_type, user_id) VALUES (9990, '2026-12-26', '04:00', 9999, NULL, 'fletero', ?)").run(fixtures.admin.id);
-    const response = await app.inject({ method: 'GET', url: '/api/loading/export?date=2026-12-26', headers: { authorization: `Bearer ${token}` } });
+    db.prepare("INSERT INTO loading_schedules (id, schedule_date, time_slot, driver_id, vehicle_id, driver_type, user_id) VALUES (9990, ?, '04:00', 9999, NULL, 'fletero', ?)").run(dateIn(41), fixtures.admin.id);
+    const response = await app.inject({ method: 'GET', url: `/api/loading/export?date=${dateIn(41)}`, headers: { authorization: `Bearer ${token}` } });
     assert.equal(response.statusCode, 500);
     db.prepare('DELETE FROM loading_schedules WHERE id = 9990').run();
     db.pragma('foreign_keys = ON');
@@ -144,16 +182,17 @@ describe('Loading Schedule Routes', () => {
   it('GET /schedules/history returns one batch item with total count and creator flags', async () => {
     const d1 = seedDriver(db, 'History Driver A', 'HIS-1');
     const d2 = seedDriver(db, 'History Driver B', 'HIS-2');
-    db.prepare(`INSERT INTO loading_schedules (id, schedule_date, time_slot, driver_id, driver_type, user_id, created_at) VALUES (9201, '2026-06-18', '04:00', ?, 'fletero', 1, datetime('now', '-30 minutes'))`).run(d1);
-    db.prepare(`INSERT INTO loading_schedules (id, schedule_date, time_slot, driver_id, driver_type, user_id, created_at) VALUES (9202, '2026-06-18', '04:30', ?, 'fletero', NULL, datetime('now', '-25 minutes'))`).run(d2);
+    const historyDay = dateIn(20);
+    db.prepare(`INSERT INTO loading_schedules (id, schedule_date, time_slot, driver_id, driver_type, user_id, created_at) VALUES (9201, ?, '04:00', ?, 'fletero', 1, datetime('now', '-30 minutes'))`).run(historyDay, d1);
+    db.prepare(`INSERT INTO loading_schedules (id, schedule_date, time_slot, driver_id, driver_type, user_id, created_at) VALUES (9202, ?, '04:30', ?, 'fletero', NULL, datetime('now', '-25 minutes'))`).run(historyDay, d2);
 
-    const res = await app.inject({ method: 'GET', url: '/api/loading/schedules/history?date=2026-06-18', headers: { authorization: `Bearer ${token}` } });
+    const res = await app.inject({ method: 'GET', url: `/api/loading/schedules/history?date=${historyDay}`, headers: { authorization: `Bearer ${token}` } });
     assert.strictEqual(res.statusCode, 200);
     const body = JSON.parse(res.body);
     assert.strictEqual(body.pagination.total, 1);
     assert.strictEqual(body.items.length, 1);
-    assert.strictEqual(body.items[0].batch_date, '2026-06-18');
-    assert.strictEqual(body.items[0].loading_date, '2026-06-19');
+    assert.strictEqual(body.items[0].batch_date, historyDay);
+    assert.strictEqual(body.items[0].loading_date, shift(historyDay, 1));
     assert.strictEqual(body.items[0].total_loadings, 2);
     assert.strictEqual(body.items[0].creator.id, 1);
     assert.strictEqual(body.items[0].canEdit, true);
@@ -210,13 +249,13 @@ describe('Loading Schedule Routes', () => {
   it('GET /export for Friday schedule shifts date to next Monday and includes creator display_name', async () => {
     const driverId = seedDriver(db, 'Casa Driver Fri', undefined, 'casa');
 
-    // 2026-06-19 is a Friday. Create schedule on that day
+    // A Friday: its export is dated the next Monday.
     await app.inject({
       method: 'POST',
       url: '/api/loading/schedules',
       headers: { authorization: `Bearer ${token}` },
       payload: {
-        schedule_date: '2026-06-19',
+        schedule_date: FRIDAY,
         time_slot: '04:00',
         driver_type: 'casa',
         driver_id: driverId,
@@ -226,15 +265,15 @@ describe('Loading Schedule Routes', () => {
 
     const res = await app.inject({
       method: 'GET',
-      url: '/api/loading/export?date=2026-06-19',
+      url: `/api/loading/export?date=${FRIDAY}`,
       headers: { authorization: `Bearer ${token}` },
     });
 
     assert.strictEqual(res.statusCode, 200);
     const text: string = JSON.parse(res.body).text;
 
-    // Friday export should show next Monday: 2026-06-22
-    assert.ok(text.includes('📅 Segunda-feira • 22/06/2026'));
+    // A Friday export is dated the following Monday.
+    assert.ok(text.includes(`📅 ${ptWeekday(shift(FRIDAY, 3))} • ${ptDate(shift(FRIDAY, 3))}`));
     // Should display the responsible name
     assert.ok(text.includes('👤 *Responsável:* '));
   });
@@ -242,13 +281,13 @@ describe('Loading Schedule Routes', () => {
   it('GET /schedules/history for Friday schedule keeps Friday date as loading_date', async () => {
     const driverId = seedDriver(db, 'Casa Driver Fri 2', undefined, 'casa');
 
-    // 2026-06-26 is a Friday. Create schedule
+    // A Friday schedule keeps its own date, instead of jumping to Saturday.
     await app.inject({
       method: 'POST',
       url: '/api/loading/schedules',
       headers: { authorization: `Bearer ${token}` },
       payload: {
-        schedule_date: '2026-06-26',
+        schedule_date: FRIDAY,
         time_slot: '04:00',
         driver_type: 'casa',
         driver_id: driverId,
@@ -258,15 +297,15 @@ describe('Loading Schedule Routes', () => {
 
     const res = await app.inject({
       method: 'GET',
-      url: '/api/loading/schedules/history?date=2026-06-26',
+      url: `/api/loading/schedules/history?date=${FRIDAY}`,
       headers: { authorization: `Bearer ${token}` },
     });
 
     assert.strictEqual(res.statusCode, 200);
     const body = JSON.parse(res.body);
-    assert.strictEqual(body.items[0].batch_date, '2026-06-26');
-    // loading_date in history must be Friday itself (2026-06-26) instead of Saturday
-    assert.strictEqual(body.items[0].loading_date, '2026-06-26');
+    assert.strictEqual(body.items[0].batch_date, FRIDAY);
+    // loading_date in history must be Friday itself instead of Saturday
+    assert.strictEqual(body.items[0].loading_date, FRIDAY);
   });
 
 });

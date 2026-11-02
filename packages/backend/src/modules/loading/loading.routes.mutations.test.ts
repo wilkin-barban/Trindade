@@ -4,6 +4,29 @@ import type { FastifyInstance } from 'fastify';
 import type Database from 'better-sqlite3';
 
 import { buildLoadingTestApp, type TestFixtures } from './loading-test-helper.js';
+import { getSaoPauloDateString } from '../../utils/date.js';
+
+/**
+ * Dates relative to the operators' today.
+ *
+ * The fixtures below used to name fixed 2026 dates; once a past day became read-only, every one of
+ * them would have asserted the calendar refusal instead of the route it was written to cover.
+ */
+function dateIn(days: number): string {
+  const anchor = new Date(`${getSaoPauloDateString()}T12:00:00Z`);
+  anchor.setUTCDate(anchor.getUTCDate() + days);
+  return anchor.toISOString().slice(0, 10);
+}
+
+const TODAY = dateIn(0);
+const TOMORROW = dateIn(1);
+const YESTERDAY = dateIn(-1);
+
+// Each lifecycle test owns a date of its own: the file shares one database, and a day that another
+// test already filled is no longer "a day with only inactive rows".
+const CLOSED_BATCH_DAY = dateIn(3);
+const WHOLE_DAY = dateIn(4);
+const DISCARD_DAY = dateIn(5);
 
 /**
  * Helper: login as admin and return the JWT token.
@@ -67,7 +90,7 @@ describe('Loading Schedule Routes', () => {
       url: '/api/loading/schedules',
       headers: { authorization: `Bearer ${token}` },
       payload: {
-        schedule_date: '2026-09-01',
+        schedule_date: TODAY,
         time_slot: '04:00',
         driver_type: 'fletero',
         driver_id: driverId,
@@ -86,7 +109,7 @@ describe('Loading Schedule Routes', () => {
     // Verify it's gone
     const listRes = await app.inject({
       method: 'GET',
-      url: '/api/loading/schedules?date=2026-09-01',
+      url: `/api/loading/schedules?date=${TODAY}`,
       headers: { authorization: `Bearer ${token}` },
     });
     const listBody = JSON.parse(listRes.body);
@@ -96,7 +119,7 @@ describe('Loading Schedule Routes', () => {
   it('DELETE /schedules/:id releases casa and fletero drivers for another active slot', async () => {
     const fleteroId = seedDriver(db, 'Fletero Reassign', 'REA-FLT');
     const casaId = seedDriver(db, 'Casa Reassign', 'REA-CAS', 'casa');
-    const date = '2026-09-02';
+    const date = TOMORROW;
 
     for (const [driverId, driverType, assignedVehicleId] of [
       [fleteroId, 'fletero', undefined],
@@ -159,7 +182,7 @@ describe('Loading Schedule Routes', () => {
       url: '/api/loading/schedules',
       headers: { authorization: `Bearer ${token}` },
       payload: {
-        schedule_date: '2026-11-01',
+        schedule_date: TODAY,
         time_slot: '04:00',
         driver_type: 'fletero',
         driver_id: driverId,
@@ -194,7 +217,7 @@ describe('Loading Schedule Routes', () => {
         url: '/api/loading/schedules',
         headers: { authorization: `Bearer ${token}` },
         payload: {
-          schedule_date: '2026-11-15',
+          schedule_date: TOMORROW,
           time_slot: '04:30',
           driver_type: 'fletero',
           driver_id: did,
@@ -208,7 +231,7 @@ describe('Loading Schedule Routes', () => {
       url: '/api/loading/schedules',
       headers: { authorization: `Bearer ${token}` },
       payload: {
-        schedule_date: '2026-11-15',
+        schedule_date: TOMORROW,
         time_slot: '06:00',
         driver_type: 'fletero',
         driver_id: d4,
@@ -231,7 +254,7 @@ describe('Loading Schedule Routes', () => {
     // Verify d4 is successfully in 04:30
     const getRes = await app.inject({
       method: 'GET',
-      url: '/api/loading/schedules?date=2026-11-15',
+      url: `/api/loading/schedules?date=${TOMORROW}`,
       headers: { authorization: `Bearer ${token}` },
     });
     const list = JSON.parse(getRes.body);
@@ -272,7 +295,7 @@ describe('Loading Schedule Routes', () => {
     assert.strictEqual(res.statusCode, 401);
   });
 
-  it('admin can deactivate and delete a loading batch transactionally', async () => {
+  it('admin can deactivate a past batch, but not delete it', async () => {
     const d1 = seedDriver(db, 'Batch Admin Driver A', 'BAD-1');
     const d2 = seedDriver(db, 'Batch Admin Driver B', 'BAD-2');
     db.prepare(`
@@ -310,19 +333,121 @@ describe('Loading Schedule Routes', () => {
       url: '/api/loading/schedules/batch/2026-06-19',
       headers: { authorization: `Bearer ${token}` },
     });
-    assert.strictEqual(deleted.statusCode, 204);
-    assert.strictEqual((db.prepare('SELECT COUNT(*) AS count FROM loading_schedules WHERE schedule_date = ?').get('2026-06-19') as any).count, 0);
+    assert.strictEqual(deleted.statusCode, 409, 'a closed day is deactivated, never erased');
+    assert.strictEqual(JSON.parse(deleted.body).code, 'LOADING_HISTORY_FROZEN');
+    assert.strictEqual((db.prepare('SELECT COUNT(*) AS count FROM loading_schedules WHERE schedule_date = ?').get('2026-06-19') as any).count, 2);
   });
 
-  it('worker can delete only loading history records it owns', async () => {
+  it('deletes a future draft batch transactionally', async () => {
+    const d1 = seedDriver(db, 'Batch Draft Driver A', 'BDD-1');
+    db.prepare(`
+      INSERT INTO loading_schedules (id, schedule_date, time_slot, driver_id, driver_type, user_id, created_at)
+      VALUES (32010, ?, '04:00', ?, 'fletero', NULL, datetime('now'))
+    `).run(DISCARD_DAY, d1);
+
+    const deleted = await app.inject({
+      method: 'DELETE',
+      url: `/api/loading/schedules/batch/${DISCARD_DAY}`,
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.strictEqual(deleted.statusCode, 204);
+    assert.strictEqual((db.prepare('SELECT COUNT(*) AS count FROM loading_schedules WHERE schedule_date = ?').get(DISCARD_DAY) as any).count, 0);
+  });
+
+  it('worker can delete only the records it owns, and only today', async () => {
     const workerToken = await loginAs(app, fixtures.worker.username, fixtures.worker.password);
     const driverId = seedDriver(db, 'Worker Delete Driver', 'WRK-1');
-    db.prepare(`INSERT INTO loading_schedules (id, schedule_date, time_slot, driver_id, driver_type, user_id) VALUES (9203, '2026-06-18', '05:00', ?, 'fletero', ?)`).run(driverId, fixtures.admin.id);
+    db.prepare(`INSERT INTO loading_schedules (id, schedule_date, time_slot, driver_id, driver_type, user_id) VALUES (9203, ?, '05:00', ?, 'fletero', ?)`).run(TODAY, driverId, fixtures.admin.id);
     const res = await app.inject({ method: 'DELETE', url: '/api/loading/schedules/9203', headers: { authorization: `Bearer ${workerToken}` } });
     assert.strictEqual(res.statusCode, 403);
     db.prepare('UPDATE loading_schedules SET user_id = ? WHERE id = 9203').run(fixtures.worker.id);
     const ownRes = await app.inject({ method: 'DELETE', url: '/api/loading/schedules/9203', headers: { authorization: `Bearer ${workerToken}` } });
     assert.strictEqual(ownRes.statusCode, 204);
+  });
+
+  it('refuses every write dated before today with LOADING_HISTORY_FROZEN', async () => {
+    const driverId = seedDriver(db, 'Past Day Driver', 'PST-1');
+    db.prepare(`INSERT INTO loading_schedules (id, schedule_date, time_slot, driver_id, driver_type, user_id) VALUES (9204, ?, '04:00', ?, 'fletero', ?)`).run(YESTERDAY, driverId, fixtures.admin.id);
+
+    for (const attempt of [
+      app.inject({
+        method: 'POST',
+        url: '/api/loading/schedules',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { schedule_date: YESTERDAY, time_slot: '05:00', driver_type: 'fletero', driver_id: driverId },
+      }),
+      app.inject({
+        method: 'PATCH',
+        url: '/api/loading/schedules/9204',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { time_slot: '05:00' },
+      }),
+      app.inject({
+        method: 'DELETE',
+        url: '/api/loading/schedules/9204',
+        headers: { authorization: `Bearer ${token}` },
+      }),
+    ]) {
+      const response = await attempt;
+      assert.strictEqual(response.statusCode, 409);
+      assert.strictEqual(JSON.parse(response.body).code, 'LOADING_HISTORY_FROZEN');
+    }
+
+    const stored = db.prepare('SELECT time_slot FROM loading_schedules WHERE id = 9204').get() as { time_slot: string } | undefined;
+    assert.strictEqual(stored?.time_slot, '04:00', 'a refused write leaves the row untouched');
+  });
+
+  it('answers LOADING_BATCH_DEACTIVATED instead of a duplicate when the day was closed', async () => {
+    const driverId = seedDriver(db, 'Deactivated Day Driver', 'DEA-1');
+    db.prepare(`INSERT INTO loading_schedules (id, schedule_date, time_slot, driver_id, driver_type, user_id, is_active) VALUES (9205, ?, '04:00', ?, 'fletero', ?, 0)`).run(CLOSED_BATCH_DAY, driverId, fixtures.admin.id);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/loading/schedules',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { schedule_date: CLOSED_BATCH_DAY, time_slot: '05:00', driver_type: 'fletero', driver_id: driverId },
+    });
+
+    assert.strictEqual(res.statusCode, 409);
+    assert.strictEqual(JSON.parse(res.body).code, 'LOADING_BATCH_DEACTIVATED');
+    assert.strictEqual((db.prepare('SELECT COUNT(*) AS count FROM loading_schedules WHERE schedule_date = ?').get(CLOSED_BATCH_DAY) as any).count, 1);
+  });
+
+  it('reads a deactivated day whole only when includeInactive asks for it', async () => {
+    const first = seedDriver(db, 'Whole Day First', 'WHD-1');
+    const second = seedDriver(db, 'Whole Day Second', 'WHD-2');
+    db.prepare(`INSERT INTO loading_schedules (id, schedule_date, time_slot, driver_id, driver_type, user_id, is_active) VALUES (9206, ?, '04:00', ?, 'fletero', ?, 1)`).run(WHOLE_DAY, first, fixtures.admin.id);
+    db.prepare(`INSERT INTO loading_schedules (id, schedule_date, time_slot, driver_id, driver_type, user_id, is_active) VALUES (9207, ?, '04:30', ?, 'fletero', ?, 0)`).run(WHOLE_DAY, second, fixtures.admin.id);
+
+    const active = await app.inject({
+      method: 'GET',
+      url: `/api/loading/schedules?date=${WHOLE_DAY}`,
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.strictEqual(active.statusCode, 200);
+    assert.strictEqual(JSON.parse(active.body).schedules.length, 1, 'the operational grid keeps hiding inactive rows');
+    assert.strictEqual(JSON.parse(active.body).dayActive, true);
+
+    const whole = await app.inject({
+      method: 'GET',
+      url: `/api/loading/schedules?date=${WHOLE_DAY}&includeInactive=1`,
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.strictEqual(whole.statusCode, 200);
+    assert.strictEqual(JSON.parse(whole.body).schedules.length, 2);
+
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/loading/schedules/batch/${WHOLE_DAY}/deactivate`,
+      headers: { authorization: `Bearer ${token}` },
+    });
+    const closed = await app.inject({
+      method: 'GET',
+      url: `/api/loading/schedules?date=${WHOLE_DAY}&includeInactive=1`,
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.strictEqual(JSON.parse(closed.body).schedules.length, 2, 'a closed day is still readable');
+    assert.strictEqual(JSON.parse(closed.body).dayActive, false);
   });
 
 });

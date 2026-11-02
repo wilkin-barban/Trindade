@@ -4,6 +4,16 @@ import type { FastifyInstance } from 'fastify';
 import type Database from 'better-sqlite3';
 
 import { buildLoadingTestApp, type TestFixtures } from './loading-test-helper.js';
+import { getSaoPauloDateString } from '../../utils/date.js';
+
+/** A São Paulo date shifted by whole days: only today stays writable, so the fixtures write today. */
+function dateIn(days: number): string {
+  const anchor = new Date(`${getSaoPauloDateString()}T12:00:00Z`);
+  anchor.setUTCDate(anchor.getUTCDate() + days);
+  return anchor.toISOString().slice(0, 10);
+}
+
+const TODAY = dateIn(0);
 
 async function login(app: FastifyInstance, username: string, password: string): Promise<string> {
   const response = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { username, password } });
@@ -17,8 +27,8 @@ function insertDriver(db: Database.Database, name: string): number {
 function insertSchedule(db: Database.Database, driverId: number, userId: number, createdAt = "datetime('now')", active = 1): number {
   return Number(db.prepare(
     `INSERT INTO loading_schedules (schedule_date, time_slot, driver_id, driver_type, user_id, created_at, is_active)
-     VALUES ('2026-08-25', '04:00', ?, 'fletero', ?, ${createdAt}, ?)`
-  ).run(driverId, userId, active).lastInsertRowid);
+     VALUES (?, '04:00', ?, 'fletero', ?, ${createdAt}, ?)`
+  ).run(TODAY, driverId, userId, active).lastInsertRowid);
 }
 
 describe('Loading route security', () => {
@@ -44,8 +54,8 @@ describe('Loading route security', () => {
     const beforeAudit = (db.prepare('SELECT COUNT(*) AS count FROM audit_logs').get() as { count: number }).count;
     for (const request of [
       { method: 'PATCH', url: `/api/loading/schedules/${id}/deactivate` },
-      { method: 'PATCH', url: '/api/loading/schedules/batch/2026-08-25/deactivate' },
-      { method: 'DELETE', url: '/api/loading/schedules/batch/2026-08-25' },
+      { method: 'PATCH', url: `/api/loading/schedules/batch/${TODAY}/deactivate` },
+      { method: 'DELETE', url: `/api/loading/schedules/batch/${TODAY}` },
     ] as const) {
       const response = await app.inject({ ...request, headers: { authorization: `Bearer ${workerToken}` } });
       assert.equal(response.statusCode, 403);
@@ -66,7 +76,7 @@ describe('Loading route security', () => {
     assert.equal((db.prepare('SELECT COUNT(*) AS count FROM audit_logs WHERE action = ? AND entity_type = ?').get('delete', 'loading') as { count: number }).count, 1);
   });
 
-  it('allows workers to permanently delete own inactive, old, and future records', async () => {
+  it('allows workers to permanently delete their own records on an open day', async () => {
     const ids = [
       insertSchedule(db, insertDriver(db, 'Inactive'), fixtures.worker.id, "datetime('now', '-2 hours')", 0),
       insertSchedule(db, insertDriver(db, 'Old'), fixtures.worker.id, "datetime('now', '-2 hours')"),
@@ -83,9 +93,9 @@ describe('Loading route security', () => {
     const id = insertSchedule(db, insertDriver(db, 'Mutation'), fixtures.admin.id);
     const deactivate = await app.inject({ method: 'PATCH', url: `/api/loading/schedules/${id}/deactivate`, headers: { authorization: `Bearer ${adminToken}` } });
     assert.equal(deactivate.statusCode, 200);
-    const batch = await app.inject({ method: 'PATCH', url: '/api/loading/schedules/batch/2026-08-25/deactivate', headers: { authorization: `Bearer ${adminToken}` } });
+    const batch = await app.inject({ method: 'PATCH', url: `/api/loading/schedules/batch/${TODAY}/deactivate`, headers: { authorization: `Bearer ${adminToken}` } });
     assert.equal(batch.statusCode, 200);
-    const removal = await app.inject({ method: 'DELETE', url: '/api/loading/schedules/batch/2026-08-25', headers: { authorization: `Bearer ${adminToken}` } });
+    const removal = await app.inject({ method: 'DELETE', url: `/api/loading/schedules/batch/${TODAY}`, headers: { authorization: `Bearer ${adminToken}` } });
     assert.equal(removal.statusCode, 204);
     assert.equal((db.prepare(`SELECT COUNT(*) AS count FROM audit_logs WHERE entity_type IN ('loading', 'loading_batch')`).get() as { count: number }).count >= 3, true);
     assert.equal((await app.inject({ method: 'PATCH', url: '/api/loading/schedules/nope/deactivate', headers: { authorization: `Bearer ${adminToken}` } })).statusCode, 400);

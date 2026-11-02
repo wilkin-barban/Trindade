@@ -4,6 +4,30 @@ import type { FastifyInstance } from 'fastify';
 import type Database from 'better-sqlite3';
 
 import { buildLoadingTestApp, type TestFixtures } from './loading-test-helper.js';
+import { getSaoPauloDateString } from '../../utils/date.js';
+
+/**
+ * A São Paulo date shifted by whole days.
+ *
+ * These fixtures used to name fixed 2026 dates. Once a past day became read-only, each of those
+ * writes would have been refused by the calendar instead of exercising the rule it covers, so every
+ * writing test now names a day the plant can still accept.
+ */
+function dateIn(days: number): string {
+  const anchor = new Date(`${getSaoPauloDateString()}T12:00:00Z`);
+  anchor.setUTCDate(anchor.getUTCDate() + days);
+  return anchor.toISOString().slice(0, 10);
+}
+
+const TODAY = dateIn(0);
+const LIST_DAY = dateIn(10);
+const EMPTY_DAY = dateIn(11);
+const QUOTA_DAY = dateIn(12);
+const ROLLING_DAY = dateIn(13);
+const CONSTRAINTS_DAY = dateIn(14);
+const DUPLICATE_DAY = dateIn(15);
+const CLOSED_BATCH_DAY = dateIn(16);
+const PAST_DAY = dateIn(-1);
 
 /**
  * Helper: login as admin and return the JWT token.
@@ -67,7 +91,7 @@ describe('Loading Schedule Routes', () => {
       url: '/api/loading/schedules',
       headers: { authorization: `Bearer ${token}` },
       payload: {
-        schedule_date: '2026-06-15',
+        schedule_date: TODAY,
         time_slot: '04:00',
         driver_type: 'fletero',
         driver_id: driverId,
@@ -77,7 +101,7 @@ describe('Loading Schedule Routes', () => {
     assert.strictEqual(res.statusCode, 201);
     const body = JSON.parse(res.body);
     assert.ok(body.schedule, 'schedule should be present');
-    assert.strictEqual(body.schedule.schedule_date, '2026-06-15');
+    assert.strictEqual(body.schedule.schedule_date, TODAY);
     assert.strictEqual(body.schedule.time_slot, '04:00');
     assert.strictEqual(body.schedule.driver_type, 'fletero');
     assert.strictEqual(body.schedule.driver_id, driverId);
@@ -98,7 +122,7 @@ describe('Loading Schedule Routes', () => {
       url: '/api/loading/schedules',
       headers: { authorization: `Bearer ${token}` },
       payload: {
-        schedule_date: '2026-06-20',
+        schedule_date: LIST_DAY,
         time_slot: '06:00',
         driver_type: 'fletero',
         driver_id: d1,
@@ -110,7 +134,7 @@ describe('Loading Schedule Routes', () => {
       url: '/api/loading/schedules',
       headers: { authorization: `Bearer ${token}` },
       payload: {
-        schedule_date: '2026-06-20',
+        schedule_date: LIST_DAY,
         time_slot: '04:00',
         driver_type: 'fletero',
         driver_id: d2,
@@ -119,7 +143,7 @@ describe('Loading Schedule Routes', () => {
 
     const res = await app.inject({
       method: 'GET',
-      url: '/api/loading/schedules?date=2026-06-20',
+      url: `/api/loading/schedules?date=${LIST_DAY}`,
       headers: { authorization: `Bearer ${token}` },
     });
 
@@ -136,7 +160,7 @@ describe('Loading Schedule Routes', () => {
   it('GET /schedules returns empty array for date with no entries', async () => {
     const res = await app.inject({
       method: 'GET',
-      url: '/api/loading/schedules?date=2026-12-31',
+      url: `/api/loading/schedules?date=${EMPTY_DAY}`,
       headers: { authorization: `Bearer ${token}` },
     });
 
@@ -163,13 +187,13 @@ describe('Loading Schedule Routes', () => {
     const d2 = seedDriver(db, 'Fletero Quota B', 'QTA0002');
     const d3 = seedDriver(db, 'Fletero Quota C', 'QTA0003');
 
-    // Slot: 04:30 on 2026-07-01
+    // Slot: 04:30 on a dedicated day
     await app.inject({
       method: 'POST',
       url: '/api/loading/schedules',
       headers: { authorization: `Bearer ${token}` },
       payload: {
-        schedule_date: '2026-07-01',
+        schedule_date: QUOTA_DAY,
         time_slot: '04:30',
         driver_type: 'fletero',
         driver_id: d1,
@@ -180,7 +204,7 @@ describe('Loading Schedule Routes', () => {
       url: '/api/loading/schedules',
       headers: { authorization: `Bearer ${token}` },
       payload: {
-        schedule_date: '2026-07-01',
+        schedule_date: QUOTA_DAY,
         time_slot: '04:30',
         driver_type: 'fletero',
         driver_id: d2,
@@ -192,7 +216,7 @@ describe('Loading Schedule Routes', () => {
       url: '/api/loading/schedules',
       headers: { authorization: `Bearer ${token}` },
       payload: {
-        schedule_date: '2026-07-01',
+        schedule_date: QUOTA_DAY,
         time_slot: '04:30',
         driver_type: 'fletero',
         driver_id: d3,
@@ -210,7 +234,7 @@ describe('Loading Schedule Routes', () => {
       url: '/api/loading/schedules',
       headers: { authorization: `Bearer ${token}` },
       payload: {
-        schedule_date: '2026-07-01',
+        schedule_date: QUOTA_DAY,
         time_slot: '04:30',
         driver_type: 'fletero',
         driver_id: d4,
@@ -235,19 +259,19 @@ describe('Loading Schedule Routes', () => {
       method: 'POST',
       url: '/api/loading/schedules',
       headers: { authorization: `Bearer ${token}` },
-      payload: { schedule_date: '2026-12-20', time_slot: '04:00', driver_type: 'fletero', driver_id: d1 },
+      payload: { schedule_date: ROLLING_DAY, time_slot: '04:00', driver_type: 'fletero', driver_id: d1 },
     });
     await app.inject({
       method: 'POST',
       url: '/api/loading/schedules',
       headers: { authorization: `Bearer ${token}` },
-      payload: { schedule_date: '2026-12-20', time_slot: '04:00', driver_type: 'fletero', driver_id: d2 },
+      payload: { schedule_date: ROLLING_DAY, time_slot: '04:00', driver_type: 'fletero', driver_id: d2 },
     });
     await app.inject({
       method: 'POST',
       url: '/api/loading/schedules',
       headers: { authorization: `Bearer ${token}` },
-      payload: { schedule_date: '2026-12-20', time_slot: '04:00', driver_type: 'fletero', driver_id: d3 },
+      payload: { schedule_date: ROLLING_DAY, time_slot: '04:00', driver_type: 'fletero', driver_id: d3 },
     });
 
     // 2. Schedule a 4th fletero at 04:30 (should succeed, since it is now informative).
@@ -255,7 +279,7 @@ describe('Loading Schedule Routes', () => {
       method: 'POST',
       url: '/api/loading/schedules',
       headers: { authorization: `Bearer ${token}` },
-      payload: { schedule_date: '2026-12-20', time_slot: '04:30', driver_type: 'fletero', driver_id: d4 },
+      payload: { schedule_date: ROLLING_DAY, time_slot: '04:30', driver_type: 'fletero', driver_id: d4 },
     });
     assert.strictEqual(res4.statusCode, 201, '4th fletero at 04:30 should be allowed');
 
@@ -264,7 +288,7 @@ describe('Loading Schedule Routes', () => {
       method: 'POST',
       url: '/api/loading/schedules',
       headers: { authorization: `Bearer ${token}` },
-      payload: { schedule_date: '2026-12-20', time_slot: '05:00', driver_type: 'fletero', driver_id: d5 },
+      payload: { schedule_date: ROLLING_DAY, time_slot: '05:00', driver_type: 'fletero', driver_id: d5 },
     });
     assert.strictEqual(res5.statusCode, 201, '1st fletero at 05:00 should be accepted');
 
@@ -272,7 +296,7 @@ describe('Loading Schedule Routes', () => {
       method: 'POST',
       url: '/api/loading/schedules',
       headers: { authorization: `Bearer ${token}` },
-      payload: { schedule_date: '2026-12-20', time_slot: '05:00', driver_type: 'fletero', driver_id: d6 },
+      payload: { schedule_date: ROLLING_DAY, time_slot: '05:00', driver_type: 'fletero', driver_id: d6 },
     });
     assert.strictEqual(res6.statusCode, 201, '2nd fletero at 05:00 should be accepted');
 
@@ -280,7 +304,7 @@ describe('Loading Schedule Routes', () => {
       method: 'POST',
       url: '/api/loading/schedules',
       headers: { authorization: `Bearer ${token}` },
-      payload: { schedule_date: '2026-12-20', time_slot: '05:00', driver_type: 'fletero', driver_id: d7 },
+      payload: { schedule_date: ROLLING_DAY, time_slot: '05:00', driver_type: 'fletero', driver_id: d7 },
     });
     assert.strictEqual(res7.statusCode, 201, '3rd fletero at 05:00 should be accepted');
 
@@ -288,7 +312,7 @@ describe('Loading Schedule Routes', () => {
       method: 'POST',
       url: '/api/loading/schedules',
       headers: { authorization: `Bearer ${token}` },
-      payload: { schedule_date: '2026-12-20', time_slot: '05:00', driver_type: 'fletero', driver_id: d8 },
+      payload: { schedule_date: ROLLING_DAY, time_slot: '05:00', driver_type: 'fletero', driver_id: d8 },
     });
     assert.strictEqual(res8.statusCode, 201, '4th fletero at 05:00 should be accepted');
   });
@@ -303,7 +327,7 @@ describe('Loading Schedule Routes', () => {
       url: '/api/loading/schedules',
       headers: { authorization: `Bearer ${token}` },
       payload: {
-        schedule_date: '2026-12-21',
+        schedule_date: CONSTRAINTS_DAY,
         time_slot: '04:00',
         driver_type: 'casa',
         driver_id: casaDriverId,
@@ -317,7 +341,7 @@ describe('Loading Schedule Routes', () => {
       url: '/api/loading/schedules',
       headers: { authorization: `Bearer ${token}` },
       payload: {
-        schedule_date: '2026-12-21',
+        schedule_date: CONSTRAINTS_DAY,
         time_slot: '04:00',
         driver_type: 'casa',
         driver_id: casaDriverId,
@@ -332,7 +356,7 @@ describe('Loading Schedule Routes', () => {
       url: '/api/loading/schedules',
       headers: { authorization: `Bearer ${token}` },
       payload: {
-        schedule_date: '2026-12-21',
+        schedule_date: CONSTRAINTS_DAY,
         time_slot: '04:30',
         driver_type: 'fletero',
         driver_id: fleteroDriverId,
@@ -347,7 +371,7 @@ describe('Loading Schedule Routes', () => {
       url: '/api/loading/schedules',
       headers: { authorization: `Bearer ${token}` },
       payload: {
-        schedule_date: '2026-12-21',
+        schedule_date: CONSTRAINTS_DAY,
         time_slot: '04:30',
         driver_type: 'fletero',
         driver_id: fleteroDriverId,
@@ -367,7 +391,7 @@ describe('Loading Schedule Routes', () => {
       url: '/api/loading/schedules',
       headers: { authorization: `Bearer ${token}` },
       payload: {
-        schedule_date: '2026-08-01',
+        schedule_date: DUPLICATE_DAY,
         time_slot: '05:00',
         driver_type: 'fletero',
         driver_id: driverId,
@@ -380,7 +404,7 @@ describe('Loading Schedule Routes', () => {
       url: '/api/loading/schedules',
       headers: { authorization: `Bearer ${token}` },
       payload: {
-        schedule_date: '2026-08-01',
+        schedule_date: DUPLICATE_DAY,
         time_slot: '06:00',
         driver_type: 'fletero',
         driver_id: driverId,
@@ -396,25 +420,25 @@ describe('Loading Schedule Routes', () => {
   });
 
   /**
-   * The day that is already in the history answers with a code, not only with a sentence.
+   * A day the plant already deactivated answers with its own code, in the language of the request.
    *
-   * The sentence is written here, in the language of the request, so a client can only recognize the refusal
-   * by reading it -- and it arrives as a 400, the same status a bad driver arrives with. The code is what
-   * tells the two apart without depending on the wording or on the language.
+   * The sentence is translated, so a client that reads only the text can recognize the refusal only by
+   * matching prose -- and the old answer was the duplicate message, a 400, on a day whose real problem
+   * was that it was closed. The code is stable across languages; the sentence is not.
    */
-  it('POST /schedules names the closed day with its code, in both languages', async () => {
+  it('POST /schedules names a deactivated day with its code, in both languages', async () => {
     const driverId = seedDriver(db, 'Fletero Cerrado', 'CER0001');
     const first = await app.inject({
       method: 'POST',
       url: '/api/loading/schedules',
       headers: { authorization: `Bearer ${token}` },
-      payload: { schedule_date: '2026-08-05', time_slot: '05:00', driver_type: 'fletero', driver_id: driverId },
+      payload: { schedule_date: CLOSED_BATCH_DAY, time_slot: '05:00', driver_type: 'fletero', driver_id: driverId },
     });
     assert.strictEqual(first.statusCode, 201);
     // The day is closed: its entries stay, all inactive, and that is the day the history already holds.
     const closed = await app.inject({
       method: 'PATCH',
-      url: '/api/loading/schedules/batch/2026-08-05/deactivate',
+      url: `/api/loading/schedules/batch/${CLOSED_BATCH_DAY}/deactivate`,
       headers: { authorization: `Bearer ${token}` },
     });
     assert.strictEqual(closed.statusCode, 200, 'the day is closed');
@@ -424,17 +448,44 @@ describe('Loading Schedule Routes', () => {
         method: 'POST',
         url: '/api/loading/schedules',
         headers: { authorization: `Bearer ${token}`, 'accept-language': lang },
-        payload: { schedule_date: '2026-08-05', time_slot: '07:00', driver_type: 'fletero', driver_id: driverId },
+        payload: { schedule_date: CLOSED_BATCH_DAY, time_slot: '07:00', driver_type: 'fletero', driver_id: driverId },
       });
       const body = JSON.parse(res.body);
 
-      assert.strictEqual(res.statusCode, 400, `${lang}: refused`);
-      assert.strictEqual(body.code, 'scheduleAlreadyExists', `${lang}: names the code`);
+      assert.strictEqual(res.statusCode, 409, `${lang}: refused`);
+      assert.strictEqual(body.code, 'LOADING_BATCH_DEACTIVATED', `${lang}: names the code`);
       assert.ok(
-        body.error.includes(lang === 'es' ? 'historial' : 'histórico'),
+        body.error.includes(lang === 'es' ? 'Reactivá' : 'Reative'),
         `${lang}: keeps the sentence in the language of the request`
       );
     }
+  });
+
+  it('POST /schedules names a past day with its code, in both languages', async () => {
+    const driverId = seedDriver(db, 'Fletero Pasado', 'PAS0001');
+
+    for (const lang of ['pt-BR', 'es']) {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/loading/schedules',
+        headers: { authorization: `Bearer ${token}`, 'accept-language': lang },
+        payload: { schedule_date: PAST_DAY, time_slot: '04:00', driver_type: 'fletero', driver_id: driverId },
+      });
+      const body = JSON.parse(res.body);
+
+      assert.strictEqual(res.statusCode, 409, `${lang}: refused as a history matter, not as a bad body`);
+      assert.strictEqual(body.code, 'LOADING_HISTORY_FROZEN', `${lang}: names the code`);
+      assert.ok(
+        body.error.includes(lang === 'es' ? 'cerrado' : 'fechado'),
+        `${lang}: keeps the sentence in the language of the request`
+      );
+    }
+
+    assert.strictEqual(
+      (db.prepare('SELECT COUNT(*) AS count FROM loading_schedules WHERE schedule_date = ?').get(PAST_DAY) as { count: number }).count,
+      0,
+      'a refused draft leaves no row behind'
+    );
   });
 
   // ---- Schedules: Delete ----
