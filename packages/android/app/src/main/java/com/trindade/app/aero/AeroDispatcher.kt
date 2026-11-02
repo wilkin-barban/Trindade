@@ -20,11 +20,28 @@ interface AeroErpPort {
 }
 
 interface AeroMirrorPort {
-    /** Stores the whole day's snapshot on the backend and returns its two lens counts. */
-    suspend fun saveMovements(date: String, movements: List<AeroErpMovement>): AeroMovementsSaved?
+    /** Stores the whole day's snapshot on the backend and says what the backend did with it. */
+    suspend fun saveMovements(date: String, movements: List<AeroErpMovement>): AeroSnapshotSave
 
     /** Reports one integration event to the shared audit log. Never throws: a lost log line is not a lost launch. */
     suspend fun log(request: com.trindade.app.network.AeroAuditLogRequest)
+}
+
+/**
+ * What the backend did with a day's snapshot.
+ *
+ * Three outcomes, because the three have three different answers: stored, refused with a reason the operator
+ * can act on, or never heard. Collapsing them into `null` -- as this port used to -- made a closed day look
+ * like a lost network, and the screen offered a retry that could never work.
+ */
+sealed interface AeroSnapshotSave {
+    data class Saved(val counts: AeroMovementsSaved) : AeroSnapshotSave
+
+    /** The backend answered no: [code] is its own name for the reason, when it sent one. */
+    data class Refused(val status: Int, val code: String?) : AeroSnapshotSave
+
+    /** Nothing came back: the request never reached the backend or its answer never arrived. */
+    data object Unreachable : AeroSnapshotSave
 }
 
 /**
@@ -214,24 +231,32 @@ class AeroDispatcher(
 
         return when (read) {
             is AeroMovementsResult.Ok -> {
-                val saved = mirror.saveMovements(date, read.movements)
+                val save = mirror.saveMovements(date, read.movements)
+                val saved = (save as? AeroSnapshotSave.Saved)?.counts
                 mirror.log(
                     AeroAudit.request(
                         event = AeroAudit.Event.SYNC,
                         destinationUrl = destination,
                         phase = "response",
-                        httpStatus = if (saved == null) null else 200,
+                        httpStatus = when (save) {
+                            is AeroSnapshotSave.Saved -> 200
+                            is AeroSnapshotSave.Refused -> save.status
+                            AeroSnapshotSave.Unreachable -> null
+                        },
                         durationMs = elapsed,
                         detail = "date=$date · seats=${read.movements.size} · saved=${saved?.saved ?: 0}",
                         // The ERP answered but the backend would not store the snapshot: the day is read and
                         // lost, which is a different failure from an unreachable plant.
-                        error = AeroFailureCode.SNAPSHOT_REFUSED.auditCode.takeIf { saved == null },
+                        error = (save as? AeroSnapshotSave.Refused)?.code
+                            ?: AeroFailureCode.SNAPSHOT_REFUSED.auditCode.takeIf { save !is AeroSnapshotSave.Saved },
                     ),
                 )
-                if (saved == null) {
-                    AeroSyncOutcome.Failed(AeroFailure(AeroFailureCode.SNAPSHOT_REFUSED))
-                } else {
-                    AeroSyncOutcome.Synced(saved)
+                when (save) {
+                    is AeroSnapshotSave.Saved -> AeroSyncOutcome.Synced(save.counts)
+                    is AeroSnapshotSave.Refused -> AeroSyncOutcome.Failed(
+                        AeroFailure(AeroFailureCode.SNAPSHOT_REFUSED, serverStatus = save.status, serverCode = save.code),
+                    )
+                    AeroSnapshotSave.Unreachable -> AeroSyncOutcome.Failed(AeroFailure(AeroFailureCode.SNAPSHOT_REFUSED))
                 }
             }
 

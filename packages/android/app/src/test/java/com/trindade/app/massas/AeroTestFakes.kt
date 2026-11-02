@@ -11,6 +11,7 @@ import com.trindade.app.aero.AeroQueuePort
 import com.trindade.app.aero.AeroReachabilityPort
 import com.trindade.app.aero.AeroSettings
 import com.trindade.app.aero.AeroSettingsPort
+import com.trindade.app.aero.AeroSnapshotSave
 import com.trindade.app.aero.AeroWriteResult
 import com.trindade.app.aero.TabletAckPort
 import com.trindade.app.network.AeroAuditLogRequest
@@ -117,15 +118,20 @@ class FakeErpPort : AeroErpPort {
 class FakeMirrorPort : AeroMirrorPort {
     val logs = mutableListOf<AeroAuditLogRequest>()
     val snapshots = mutableListOf<Pair<String, List<AeroErpMovement>>>()
-    var saved: AeroMovementsSaved? = AeroMovementsSaved(saved = 0, massas = 0, insumos = 0)
+    var saved: AeroMovementsSaved = AeroMovementsSaved(saved = 0, massas = 0, insumos = 0)
     var failSnapshot = false
+    var refusedSnapshot: AeroSnapshotSave.Refused? = null
 
     override suspend fun saveMovements(
         date: String,
         movements: List<AeroErpMovement>,
-    ): AeroMovementsSaved? {
+    ): AeroSnapshotSave {
         snapshots += date to movements
-        return if (failSnapshot) null else saved
+        return when {
+            refusedSnapshot != null -> refusedSnapshot!!
+            failSnapshot -> AeroSnapshotSave.Unreachable
+            else -> AeroSnapshotSave.Saved(saved)
+        }
     }
 
     override suspend fun log(request: AeroAuditLogRequest) {

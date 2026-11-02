@@ -42,15 +42,21 @@ class AeroMirrorAdapter @Inject constructor(
     private val api: MassasApi,
 ) : AeroMirrorPort {
 
-    override suspend fun saveMovements(date: String, movements: List<AeroErpMovement>): AeroMovementsSaved? {
+    override suspend fun saveMovements(date: String, movements: List<AeroErpMovement>): AeroSnapshotSave {
         val body = AeroMovementsSnapshotRequest(
             date = date,
             movements = movements.map { it.toStored() },
         )
-        return runCatchingCancellable { api.saveMovements(body) }
-            .getOrNull()
-            ?.takeIf { it.isSuccessful }
-            ?.body()
+        // A refused day is an answer, not a lost request. Keeping the status and the backend's own code is
+        // what lets the screen say "the plant already closed this day" instead of offering a retry forever.
+        val response = runCatchingCancellable { api.saveMovements(body) }.getOrNull()
+            ?: return AeroSnapshotSave.Unreachable
+        if (!response.isSuccessful) {
+            val code = response.errorBody()?.string()?.let(::serverCodeOf)
+            return AeroSnapshotSave.Refused(response.code(), code)
+        }
+        val saved = response.body() ?: return AeroSnapshotSave.Unreachable
+        return AeroSnapshotSave.Saved(saved)
     }
 
     /**
@@ -68,6 +74,15 @@ class AeroMirrorAdapter @Inject constructor(
         }
     }
 
+    /**
+     * The backend's `code` from an error body, without pulling a JSON parser into the adapter.
+     *
+     * The body is a small envelope (`error`, `code`, optional `details`), and the only field wanted here is
+     * the stable upper-case code. A body that does not carry one answers null and the caller keeps the status.
+     */
+    private fun serverCodeOf(body: String): String? =
+        SERVER_CODE.find(body)?.groupValues?.getOrNull(1)
+
     fun AeroErpMovement.toStored() = AeroStoredMovement(
         entLan = entLan,
         productCode = productCode,
@@ -81,6 +96,7 @@ class AeroMirrorAdapter @Inject constructor(
 
     private companion object {
         const val LOG_TAG = "AeroAudit"
+        val SERVER_CODE = Regex("\"code\"\\s*:\\s*\"([A-Z0-9_]+)\"")
     }
 }
 

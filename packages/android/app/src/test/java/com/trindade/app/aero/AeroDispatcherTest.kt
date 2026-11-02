@@ -63,9 +63,9 @@ class AeroDispatcherTest {
         private val recorder: Recorder,
         private val saved: AeroMovementsSaved?,
     ) : AeroMirrorPort {
-        override suspend fun saveMovements(date: String, movements: List<AeroErpMovement>): AeroMovementsSaved? {
+        override suspend fun saveMovements(date: String, movements: List<AeroErpMovement>): AeroSnapshotSave {
             recorder.calls += "mirror:save:$date:${movements.size}"
-            return saved
+            return saved?.let { AeroSnapshotSave.Saved(it) } ?: AeroSnapshotSave.Unreachable
         }
 
         override suspend fun log(request: AeroAuditLogRequest) {

@@ -63,6 +63,10 @@ enum class AeroFailureCode {
 data class AeroFailure(
     val code: AeroFailureCode,
     val detail: String? = null,
+    /** The HTTP status the backend answered with, when a refusal came from Trindade rather than the plant. */
+    val serverStatus: Int? = null,
+    /** The backend's own stable code for the refusal, so screens branch on it instead of on prose. */
+    val serverCode: String? = null,
 ) {
     /** The one sentence this failure earns, in the operator's language. */
     fun describe(): UiText = when (code) {

@@ -389,8 +389,9 @@ private class FakeReportErpPort : com.trindade.app.aero.AeroErpPort {
 
 private class RecordingReportMirrorPort : com.trindade.app.aero.AeroMirrorPort {
     val snapshots = mutableListOf<List<com.trindade.app.aero.AeroErpMovement>>()
-    override suspend fun saveMovements(date: String, movements: List<com.trindade.app.aero.AeroErpMovement>): com.trindade.app.network.AeroMovementsSaved =
-        com.trindade.app.network.AeroMovementsSaved(0, 0).also { snapshots.add(movements) }
+    override suspend fun saveMovements(date: String, movements: List<com.trindade.app.aero.AeroErpMovement>): com.trindade.app.aero.AeroSnapshotSave =
+        com.trindade.app.aero.AeroSnapshotSave.Saved(com.trindade.app.network.AeroMovementsSaved(0, 0))
+            .also { snapshots.add(movements) }
     override suspend fun log(request: com.trindade.app.network.AeroAuditLogRequest) = Unit
 }
 

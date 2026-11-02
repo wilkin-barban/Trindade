@@ -117,7 +117,8 @@ class ReportGeneratorViewModelTest {
         val mirror = object : com.trindade.app.aero.AeroMirrorPort {
             val snapshots = mutableListOf<String>()
             override suspend fun saveMovements(date: String, movements: List<com.trindade.app.aero.AeroErpMovement>) =
-                com.trindade.app.network.AeroMovementsSaved(0, 0).also { snapshots.add(date) }
+                com.trindade.app.aero.AeroSnapshotSave.Saved(com.trindade.app.network.AeroMovementsSaved(0, 0))
+                    .also { snapshots.add(date) }
 
             override suspend fun log(request: com.trindade.app.network.AeroAuditLogRequest) = Unit
         }
@@ -167,7 +168,7 @@ class ReportGeneratorViewModelTest {
         movements: com.trindade.app.aero.AeroMovementsResult,
         mirror: com.trindade.app.aero.AeroMirrorPort = object : com.trindade.app.aero.AeroMirrorPort {
             override suspend fun saveMovements(date: String, movements: List<com.trindade.app.aero.AeroErpMovement>) =
-                com.trindade.app.network.AeroMovementsSaved(0, 0)
+                com.trindade.app.aero.AeroSnapshotSave.Saved(com.trindade.app.network.AeroMovementsSaved(0, 0))
 
             override suspend fun log(request: com.trindade.app.network.AeroAuditLogRequest) = Unit
         },
