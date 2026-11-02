@@ -713,6 +713,23 @@ S19 — D5/D7, verbatim:
   Wi-Fi, no un error genérico; no queda código muerto de reachability.
 - **Commit esperado.** `refactor(android): one failure model and a real Wi-Fi message` · ~260 líneas.
 - **Depende.** T21.
+- **Cerrada.** Dos commits, en este orden:
+  1. `e3da0c1` — el modelo y la red: `AeroFailure` (código + `describe()`), `AeroDiagnosis` como dato puro,
+     `AeroFailureTest` (tabla código → recurso, negativa del ERP citada, negativa vacía como «sin respuesta»,
+     códigos de auditoría estables).
+  2. `3ac3f50` — los consumidores y el guardia: `AeroDispatchOutcome`/`AeroSyncOutcome` llevan `AeroFailure`,
+     el despachador pregunta por la red antes de cada viaje con código `AERO_NO_PLANT_WIFI` en el registro,
+     masas ×3, historial de reportes y generador pasan a `describe()`, y el generador deja de tener ocho
+     constantes en portugués.
+  - Tests corridos: suite Android completa, 1241/1241. Nuevos: `AeroFailureTest` 9 casos y dos casos de
+    guardia en `AeroDispatcherTest` (sin Wi-Fi no sale ningún asiento; el día no se guarda encima del
+    anterior).
+  - Rojo verificado: con el guardia anulado, los dos casos de red de `AeroDispatcherTest` fallan
+    (líneas 99 y 115).
+  - Decisión: no se lee el SSID. Pide `ACCESS_FINE_LOCATION` desde API 27, y pedirle la ubicación a un
+    operario para probar un socket es peor negocio que la precisión que agrega. El mensaje dice «el celular
+    no está en el Wi-Fi de la fábrica», que es la acción, no el nombre de la red.
+  - Se borraron ocho cadenas: las seis del panel que el modelo reemplaza y las dos muertas del sondeo.
 
 ### T23 · Android: cola persistente y guardia contra el doble asiento
 
