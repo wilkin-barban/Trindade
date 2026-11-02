@@ -585,6 +585,25 @@ S19 — D5/D7, verbatim:
   no queda texto duplicado en portugués dentro de la UI española. Verificado en 390×844 y en escritorio (S18).
 - **Commit esperado.** `feat(web): open and retry a loading day from its history` · ~240 líneas.
 - **Depende.** T17.
+- **Estado.** Hecho, en cuatro commits.
+  - **1ee69f4** — el historial reintenta la lectura que falló sin perder los filtros (antes sólo quedaba
+    recargar la página, y con eso se iban el día y el operario elegidos), y la tarjeta escribe la cantidad y la
+    fecha de carga desde el catálogo: se iban `📦 4 carregamentos` y `Carregamento:` escritos en el marcado.
+  - **a379a7c** — la grilla gana el lápiz por fila, que abre `/loading/edit?date=…&edit=<id>` con esa fila ya
+    en edición; las dos acciones de la fila miden 48×48 y el emoji del aviso de cuota pasa a ícono decorativo.
+  - **da2f9ef** — e2e: la tarjeta abre el día que nombra, con sus filas, y una lectura que falla una vez se
+    reintenta desde la alerta con el filtro todavía puesto.
+  - **407b1c9** — el horario vacío tiene su propia frase: antes era la del día cortada en el primer punto, y en
+    un día con cuatro camiones a las 04:00 la tarjeta de las 04:30 decía que no había ninguna carga ese día.
+  - **9760daa** — las acciones de un lote (desactivar, eliminar) también miden 48×48 y la píldora de cantidad
+    deja de partirse en dos líneas.
+  - Pruebas: `LoadingHistoryPage.test.tsx` (reintento, textos y plurales, área de toque), `ScheduleGrid.test.tsx`
+    (lápiz con su destino, filas sin permiso sin lápiz, 48×48, frase del horario vacío), `LoadingEditPage.test.tsx`
+    (la fila señalada abre en edición) y `src/__e2e__/loading-history.spec.ts` (8/8, incluidos los dos casos
+    nuevos). Suite: 511/511 `node:test`, 17 archivos / 72 tests vitest, `tsc --noEmit` limpio.
+  - Visto en 390×844 y 1280×900 (`/tmp/t18-grid-phone.png`, `/tmp/t18-edit-phone.png`,
+    `/tmp/t18-history-phone.png` y sus pares de escritorio): el lápiz abre la fila 12 en edición en los dos
+    tamaños, y la tarjeta del historial lee «6 carregamentos» y «Carregamento: 03/11/2026» sin emoji.
 
 ### T19 · Web: errores y recursos del cronograma
 
