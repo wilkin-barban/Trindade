@@ -743,6 +743,20 @@ S19 — D5/D7, verbatim:
   tras conciliar.
 - **Commit esperado.** `feat(android): keep the ERP queue across restarts and refuse duplicated seats` · ~340 líneas.
 - **Depende.** T4.
+- **Cerrada.** Dos commits, en este orden:
+  1. `32a5c18` — la cola y su archivo: `AeroQueue` (TTL 8 h, tope 8 por viaje, `enqueue` que no duplica y
+     descarta lo que no se puede mandar, `settle`), `AeroQueueStore` sobre las mismas preferencias de la
+     integración, y `AeroQueueTest` 9 casos.
+  2. `8c8ac51` — las tres puertas: el lote encola antes de despachar y liquida al enviar, el reintento de una
+     fila pasa por la misma cola, y `loadDay` la vacía después de refrescar el espejo. Guarda de doble
+     asiento contra `reconciledLaunchIds` antes de mandar y en el reintento.
+  - Tests corridos: suite Android completa, 1253/1253 (12 nuevos).
+  - Rojo verificado: sin la guarda de conciliación, `un asiento ya conciliado no se reenvía` manda la petición
+    y falla (`erpPort.payloads` = 1).
+  - Decisión: la cola guarda unidades humanas y no el payload escalado por cien — es trabajo, no la forma en
+    que Firebird lo lee. Y no se cifra: no hay credencial en ella.
+  - Decisión: el vaciado automático no reporta fallos; la tabla ya muestra las filas pendientes y una alarma
+    por algo que se reintenta solo en cada apertura no se puede apagar.
 
 ### T24 · Backend y clientes: multioperario real por asiento
 
