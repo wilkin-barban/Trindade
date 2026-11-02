@@ -55,6 +55,8 @@ data class MassasUnifiedRow(
     val ownerUserId: Int? = null,
     /** `active`, `inactive` or `missing`, when the backend resolved the owner of this seat. */
     val ownerStatus: String? = null,
+    /** Units in one box for this product, so a row that cannot be imported can say the size it misses. */
+    val unitsPerBox: Int = 0,
 )
 
 /**
@@ -284,6 +286,7 @@ fun massasUnifiedRows(input: MassasUnifiedInput, operatorFilter: String = ""): L
                 importable = false,
                 tabletAcked = !reconciled && launch.id in input.ackedLaunchIds,
                 ownerUserId = launch.userId,
+                unitsPerBox = productFor(input.products, launch.productCode)?.unitsPerBox ?: 0,
             ),
         )
     }
@@ -312,6 +315,7 @@ fun massasUnifiedRows(input: MassasUnifiedInput, operatorFilter: String = ""): L
                 tabletAcked = false,
                 ownerUserId = seat.ownerUserId,
                 ownerStatus = seat.ownerStatus,
+                unitsPerBox = product.unitsPerBox,
             ),
         )
     }

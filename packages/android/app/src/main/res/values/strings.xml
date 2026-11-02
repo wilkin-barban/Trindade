@@ -935,6 +935,12 @@
     <string name="massas_state_erp_only">Só ERP</string>
     <string name="massas_action_send">Enviar</string>
     <string name="massas_action_on_tablet">Já na tablet</string>
+    <string name="massas_action_undo_on_tablet">Desfazer</string>
+    <string name="massas_import_hint_whole_boxes">%1$d un não fecham caixas inteiras de %2$d un: importe pela web ou ajuste o lançamento.</string>
+    <string name="massas_import_hint_unknown_product">O produto deste assento não está no catálogo da fábrica.</string>
+    <string name="massas_import_hint_not_an_entry">Este movimento é uma saída de estoque, não produção.</string>
+    <string name="massas_queue_retry">Reenviar pendentes (%1$d)</string>
+    <string name="massas_queue_retry_done">Pendentes reenviados.</string>
     <string name="massas_action_import">Importar</string>
     <string name="massas_action_create_operator">+ Criar Operário: %1$s</string>
     <string name="massas_error_operator_not_linked">O operador deste lançamento do ERP não está vinculado no Trindade: cadastre o operário antes de importar</string>

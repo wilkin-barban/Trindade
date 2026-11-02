@@ -44,6 +44,7 @@ fun MassasUnifiedTable(
     state: MassasLaunchViewModel.UiState,
     onSend: (MassasUnifiedRow) -> Unit,
     onAcknowledge: (MassasUnifiedRow) -> Unit,
+    onUndoAcknowledge: (MassasUnifiedRow) -> Unit = onAcknowledge,
     onImport: (MassasUnifiedRow) -> Unit,
     onCreateOperator: ((MassasUnifiedRow) -> Unit)? = null,
     modifier: Modifier = Modifier,
@@ -52,6 +53,9 @@ fun MassasUnifiedTable(
     val balance = state.unifiedBalance
     val viewer = state.currentUser
     val isAdmin = viewer?.role == ADMIN_ROLE
+    val products = state.dayView?.products.orEmpty().map {
+        AeroImportProduct(code = it.code, name = it.name, unitsPerBox = it.unitsPerBox)
+    }
 
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
@@ -96,8 +100,10 @@ fun MassasUnifiedTable(
                         canImport = canImport,
                         canCreate = canCreate,
                         isInactive = isInactive,
+                        importHint = massasImportHint(row, products),
                         onSend = { onSend(row) },
                         onAcknowledge = { onAcknowledge(row) },
+                        onUndoAcknowledge = { onUndoAcknowledge(row) },
                         onImport = { onImport(row) },
                         onCreateOperator = { onCreateOperator?.invoke(row) },
                     )
@@ -142,8 +148,9 @@ private fun BalanceBar(balance: MassasBalance, modifier: Modifier = Modifier) {
 /**
  * One row: who, what, how many, and the one action that state allows.
  *
- * A box that does not fit whole is not importable and says nothing about why: the plant's own seat stays in the
- * ERP untouched, and inventing a half box would create a launch nobody counted.
+ * A box that does not fit whole is not importable, and the row says why: the plant's own seat stays in the ERP
+ * untouched, inventing a half box would create a launch nobody counted, and the operator would otherwise be left
+ * with a line and no explanation.
  */
 @Composable
 private fun UnifiedRow(
@@ -153,8 +160,10 @@ private fun UnifiedRow(
     canImport: Boolean,
     canCreate: Boolean,
     isInactive: Boolean,
+    importHint: MassasImportHint?,
     onSend: () -> Unit,
     onAcknowledge: () -> Unit,
+    onUndoAcknowledge: () -> Unit,
     onImport: () -> Unit,
     onCreateOperator: () -> Unit,
 ) {
@@ -190,8 +199,14 @@ private fun UnifiedRow(
                 MassasRowState.PENDING_ERP -> ActionRow(
                     primaryLabel = stringResource(R.string.massas_action_send),
                     onPrimary = onSend,
-                    secondaryLabel = if (row.tabletAcked) null else stringResource(R.string.massas_action_on_tablet),
-                    onSecondary = onAcknowledge,
+                    // Una fila ya marcada ofrece deshacer: el ack es la palabra del operario, y una palabra se
+                    // puede decir dos veces. Sin esto, la fila quedaba muda para siempre.
+                    secondaryLabel = if (row.tabletAcked) {
+                        stringResource(R.string.massas_action_undo_on_tablet)
+                    } else {
+                        stringResource(R.string.massas_action_on_tablet)
+                    },
+                    onSecondary = if (row.tabletAcked) onUndoAcknowledge else onAcknowledge,
                 )
                 MassasRowState.ERP_ONLY -> when {
                     canImport -> {
@@ -224,7 +239,7 @@ private fun UnifiedRow(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    else -> Unit
+                    else -> ImportHint(importHint, row)
                 }
             }
         }
@@ -293,4 +308,27 @@ private fun StateBadge(state: MassasRowState) {
                 .padding(horizontal = 8.dp, vertical = 3.dp),
         )
     }
+}
+
+/**
+ * Why this line offers no import action.
+ *
+ * The seat is real -- the plant recorded it -- so hiding it would be worse than explaining it. Each reason has
+ * its own sentence because they ask the operator for different things: nothing for a stock exit, and a word with
+ * the office for a quantity that does not fill whole boxes.
+ */
+@Composable
+private fun ImportHint(hint: MassasImportHint?, row: MassasUnifiedRow) {
+    if (hint == null) return
+    val text = when (hint) {
+        MassasImportHint.NOT_WHOLE_BOXES ->
+            stringResource(R.string.massas_import_hint_whole_boxes, row.units, row.unitsPerBox)
+        MassasImportHint.UNKNOWN_PRODUCT -> stringResource(R.string.massas_import_hint_unknown_product)
+        MassasImportHint.NOT_AN_ENTRY -> stringResource(R.string.massas_import_hint_not_an_entry)
+    }
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }

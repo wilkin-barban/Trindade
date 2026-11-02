@@ -231,9 +231,22 @@ fun MassasLaunchScreen(
             state = state,
             onSend = viewModel::sendPendingLaunch,
             onAcknowledge = viewModel::acknowledgeLaunch,
+            onUndoAcknowledge = viewModel::undoAcknowledgeLaunch,
             onImport = viewModel::importErpSeat,
             onCreateOperator = viewModel::createOperatorFromSeat,
         )
+
+        // Lo que quedó en la cola se puede mandar sin cerrar la app, que es lo que hace el operario cuando
+        // vuelve al Wi-Fi de la planta y ve la fila todavía pendiente.
+        if (state.queuedLaunches > 0 && !state.isReadOnly) {
+            OutlinedButton(
+                onClick = viewModel::retryPendingLaunches,
+                enabled = !state.isSubmitting,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.massas_queue_retry, state.queuedLaunches))
+            }
+        }
 
         if (!state.isReadOnly) {
             // BLOQUE 1: Lançar Produção do Dia (Cálculo e Inputs)
