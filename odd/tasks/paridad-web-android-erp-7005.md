@@ -548,6 +548,29 @@ S19 — D5/D7, verbatim:
   escritorio (S18).
 - **Commit esperado.** `fix(web): count the loading quota by window and stop shifting edited rows` · ~200 líneas.
 - **Depende.** T16.
+- **Estado.** Hecho, en tres commits más las pruebas de cada uno.
+  - **06ca846** — `lib/loading-quota.ts` con `countInWindow`, `quotaIfMoved` e `isQuotaExceeded`, y la grilla
+    usando esa regla para la insignia y para el aviso: antes la insignia contaba por minuto exacto y el aviso
+    por ventana, así que un horario con un fletero decía «1/3» junto a «límite alcanzado». Se va el código
+    muerto `isRollingQuotaMaxed`.
+  - **1d6c51c** — la grilla dibuja los horarios de la lista **y** los que aparecen en las filas, ordenados por
+    hora: una carga en 23:30 no se veía, contaba para la cuota y sólo se podía borrar por API.
+  - **d992e5b** — `LoadingEditPage` cuenta con la misma regla y deja la fila fuera de su propia ventana antes de
+    sumarla donde va: mover una fila a la hora que ya tenía la mostraba con un fletero de más. Su selector
+    ofrece siempre la hora que la fila ya ocupa.
+  - **89ddc56** — el spinner del horario vuelve a ser el de la primera lectura. Lo que `df59d9d` había dejado
+    a medias: la condición miraba cuántas filas había, y un día vacío tiene cero, así que cada recarga volvía a
+    tapar la pantalla con el spinner y se llevaba el modal con las filas rechazadas.
+  - Pruebas nuevas: `src/lib/loading-quota.test.ts` (8 casos `node:test`: bordes de la hora, casa vs fletero,
+    exclusión de la fila que se mueve), `src/components/loading/ScheduleGrid.test.tsx` (cuota del turno,
+    aviso, hora huérfana dibujada y ordenada), `src/pages/LoadingEditPage.test.tsx` (off-by-one rojo con
+    `3/3` donde hay dos, hora propia ofrecida) y `src/pages/LoadingSchedulePage.test.tsx` (el modal sobrevive
+    la recarga de una tanda a medias, con el día vacío como caso duro). Las dos últimas se vieron en rojo
+    contra el código anterior: `04:00 (3/3)` y el spinner reemplazando la grilla.
+  - Suite: 511/511 en `node:test`, 16 archivos / 64 tests en vitest, `tsc --noEmit` limpio.
+  - Visto en 390×844 y 1280×900 (`/tmp/t17-grid-phone.png`, `/tmp/t17-edit-phone.png` y sus pares de
+    escritorio): 04:30, 05:00 y 05:30 leen 3/3 (el mismo turno), 04:00 lee 0/3 (la hora exacta anterior ya es
+    otro turno), 23:30 se dibuja con su «1/3» y en la edición su select abre en 23:30 y ofrece esa hora.
 
 ### T18 · Web: historial de cargas y grilla con paridad Android
 
