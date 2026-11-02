@@ -867,7 +867,7 @@ S19 — D5/D7, verbatim:
   `v0.7.0` no se movió.
 - **Commit esperado.** `chore(android): hand the plant the 7005 build as the v0.7.0 asset` · binario + docs.
 - **Depende.** Todas las anteriores.
-- **Cerrada.** `1a4b1d5`.
+- **Cerrada.** `799e673`.
   - Build `7005` desde `/tmp/andrelease.sh :app:assembleRelease -PversionName=0.7.0 -PversionCode=7005
     -PrequireSigned=true`: `aapt2 dump badging` → `versionCode='7005' versionName='0.7.0'`, `signingReport` →
     alias `trindade`, certificado `ee0e404b…`, 11.220.352 bytes.
@@ -986,7 +986,7 @@ recorta alcance **con aprobación explícita**, nunca moviéndolas a otro ODD po
 | T24 | H P0-7, S17 | `08cc333` + `2249394` `feat(massas): let each seat carry its own operator` | `massas.service.test.ts` 18/18, `massas.routes.test.ts` 26/26, `aero-mirror.test.ts` 19/19, `MassasImportPayloadTest.kt` |
 | T25 | G | `1be3908` `fix(web): stop reporting a nameless connection as a known operator` | `aero-integration.test.ts` 86/86, `aero-connection.test.ts` 10/10, `aero-probe-copy.test.ts` 3/3, node 526/526 |
 | T26 | H P1 | `c1c2c0c` + `bb6ac45` `feat(android): send ERP launches in eights and retry only what failed` | `AeroQueueTest.kt` 12/12, `MassasUnifiedTest.kt` 23/23, `MassasLaunchViewModelTest.kt` 41/41, `MassasUnifiedTableTest.kt` 3/3 |
-| T27 | S9, S10 | `1a4b1d5` `chore(android): hand the plant the 7005 build as the v0.7.0 asset` | `aapt2` (`versionCode 7005`), `signingReport` (`ee0e404b…`), 1268/1268 Android, `sha256sum -c` en los cinco destinos, e2e web |
+| T27 | S9, S10 | `799e673` `chore(android): hand the plant the 7005 build as the v0.7.0 asset` | `aapt2` (`versionCode 7005`), `signingReport` (`ee0e404b…`), 1268/1268 Android, `sha256sum -c` en los cinco destinos, e2e web |
 
 ## Log
 
