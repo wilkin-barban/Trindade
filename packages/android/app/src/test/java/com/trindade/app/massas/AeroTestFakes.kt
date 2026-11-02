@@ -1,10 +1,12 @@
 package com.trindade.app.massas
 
+import com.trindade.app.aero.AeroDiagnosis
 import com.trindade.app.aero.AeroEntryPayload
 import com.trindade.app.aero.AeroErpMovement
 import com.trindade.app.aero.AeroErpPort
 import com.trindade.app.aero.AeroMirrorPort
 import com.trindade.app.aero.AeroMovementsResult
+import com.trindade.app.aero.AeroReachabilityPort
 import com.trindade.app.aero.AeroSettings
 import com.trindade.app.aero.AeroSettingsPort
 import com.trindade.app.aero.AeroWriteResult
@@ -98,5 +100,24 @@ class FakeMirrorPort : AeroMirrorPort {
 
     override suspend fun log(request: AeroAuditLogRequest) {
         logs += request
+    }
+}
+
+/**
+ * The phone's network, as the gate asks it.
+ *
+ * On the plant Wi-Fi with the host answering is the ordinary case and the default, because a test that is not
+ * about the network must not have to say so. A test that is about it flips one of the two and asserts the
+ * sentence the operator reads.
+ */
+class FakeReachability(
+    var wifiConnected: Boolean = true,
+    var hostReachable: Boolean? = true,
+) : AeroReachabilityPort {
+    var calls = 0
+
+    override suspend fun diagnose(wsUrl: String?, timeoutMillis: Int): AeroDiagnosis {
+        calls++
+        return AeroDiagnosis(wifiConnected = wifiConnected, hostReachable = hostReachable)
     }
 }

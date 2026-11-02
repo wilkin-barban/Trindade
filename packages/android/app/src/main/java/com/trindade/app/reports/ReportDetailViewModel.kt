@@ -168,17 +168,10 @@ class ReportDetailViewModel @Inject constructor(
                         )
                     }
                 }
-                is AeroSyncOutcome.Unreachable -> {
-                    _state.update {
-                        it.copy(isSyncingErp = false, message = UiText.of(R.string.report_error_offline))
-                    }
-                }
                 is AeroSyncOutcome.Failed -> {
+                    // The same sentence the table shows for the same problem: one vocabulary, one copy.
                     _state.update {
-                        it.copy(
-                            isSyncingErp = false,
-                            message = UiText.of(R.string.report_erp_sync_failed, outcome.reason ?: "-"),
-                        )
+                        it.copy(isSyncingErp = false, message = outcome.failure.describe())
                     }
                 }
             }

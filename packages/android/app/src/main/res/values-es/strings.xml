@@ -571,16 +571,12 @@
     <string name="massas_aero_launch_missing">Ese lanzamiento ya no está en el día. Actualizá e intentá de nuevo.</string>
     <string name="massas_aero_sent">Enviado al ERP.</string>
     <string name="massas_aero_imported">Importado del ERP.</string>
-    <string name="massas_aero_dispatch_unreachable">%1$d lanzamiento(s) guardado(s), sin conexión con el ERP de la fábrica. Quedaron pendientes en la tabla.</string>
     <string name="massas_aero_batch_sent">%1$d masas sincronizadas con éxito</string>
     <string name="massas_aero_batch_partial">%1$d de %2$d masas sincronizadas; %3$d siguen pendientes.</string>
-    <string name="massas_aero_dispatch_refused">El ERP rechazó %1$d lanzamiento(s). Revisá el producto y reenvialo desde la tabla.</string>
     <string name="massas_aero_dispatch_local_only">Lanzamientos guardados en este dispositivo. La integración con el ERP no está configurada, así que no fueron a la fábrica: reenvialos desde la tabla después de configurarla.</string>
     <string name="massas_aero_pending_hint">%1$d pendiente(s): enviá desde la tabla cuando vuelva la red de la fábrica.</string>
     <string name="massas_aero_not_configured">Configurá la integración con el ERP en Administración antes de sincronizar.</string>
-    <string name="massas_aero_unreachable">Sin conexión con la red de la fábrica.</string>
     <string name="massas_aero_sync_done">Movimientos del ERP sincronizados: %1$d registro(s).</string>
-    <string name="massas_aero_sync_failed">No se pudo sincronizar: %1$s</string>
     <string name="massas_success">¡Lanzamiento registrado con éxito!</string>
     <string name="massas_collective_summary">Resumen Colectivo del Día</string>
     <string name="massas_recent_launches">Lanzamientos Individuales del Día</string>
@@ -909,6 +905,8 @@
     <string name="report_error_outside_window">Fuera del plazo de edición: este informe es de solo lectura.</string>
     <string name="report_error_incomplete">Faltan temperaturas por completar para generar el texto.</string>
     <string name="report_error_offline">Sin conexión con el servidor. Verifique la red e intente de nuevo.</string>
+    <string name="report_error_already_exists">Ya existe un reporte para ese turno hoy.</string>
+    <string name="report_error_save_failed">No se pudo guardar el reporte. Volvé a intentar.</string>
     <string name="report_error_generic">No se pudo completar. Intente de nuevo.</string>
     <string name="report_error_photo_too_large">La foto quedó demasiado grande. Intente de nuevo.</string>
     <string name="report_error_photo_type">El archivo no es una imagen aceptada.</string>

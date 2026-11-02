@@ -57,6 +57,7 @@ class MassasLaunchViewModelTest {
     private lateinit var ackPort: FakeAckPort
     private lateinit var erpPort: FakeErpPort
     private lateinit var mirrorPort: FakeMirrorPort
+    private lateinit var reachability: FakeReachability
 
     private class FakeTokenStore : TokenStore {
         private var access: String? = null
@@ -108,6 +109,7 @@ class MassasLaunchViewModelTest {
         ackPort = FakeAckPort()
         erpPort = FakeErpPort()
         mirrorPort = FakeMirrorPort()
+        reachability = FakeReachability()
 
         viewModel = newViewModel(massasRepository)
     }
@@ -242,7 +244,7 @@ class MassasLaunchViewModelTest {
         repository = repository,
         authRepository = authRepository,
         aeroSettingsStore = settingsPort,
-        aeroDispatcher = AeroDispatcher(erpPort, mirrorPort),
+        aeroDispatcher = AeroDispatcher(erpPort, mirrorPort, reachability),
         tabletAckStore = ackPort,
         usersRepository = usersRepository,
     ).also { createdViewModels += it }
@@ -1001,10 +1003,12 @@ class MassasLaunchViewModelTest {
 
         // The launch exists locally; only its dispatch failed. Saying otherwise would invite a second launch.
         assertFalse(testVm.state.value.resultDialogIsSuccess)
+        // La respuesta del ERP es su propia frase, y viaja dentro de la oración compartida de rechazo.
         assertEquals(
-            R.string.massas_aero_dispatch_refused,
+            R.string.aero_failure_erp_refused,
             testVm.state.value.resultDialogMessage?.resId,
         )
+        assertEquals(listOf("saldo insuficiente"), testVm.state.value.resultDialogMessage?.args)
         assertEquals(
             R.string.massas_aero_pending_hint,
             testVm.state.value.noticeMessage?.resId,
@@ -1025,7 +1029,7 @@ class MassasLaunchViewModelTest {
         testScheduler.runCurrent()
 
         assertEquals(
-            R.string.massas_aero_dispatch_unreachable,
+            R.string.aero_failure_no_answer,
             testVm.state.value.resultDialogMessage?.resId,
         )
     }
@@ -1059,7 +1063,7 @@ class MassasLaunchViewModelTest {
         testVm.syncAeroDay()
         testScheduler.runCurrent()
 
-        assertEquals(R.string.massas_aero_unreachable, testVm.state.value.resultDialogMessage?.resId)
+        assertEquals(R.string.aero_failure_no_answer, testVm.state.value.resultDialogMessage?.resId)
         assertFalse(testVm.state.value.resultDialogIsSuccess)
         // Nothing was stored: an empty snapshot reads as "the plant produced nothing today".
         assertTrue(mirrorPort.snapshots.isEmpty())

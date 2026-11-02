@@ -53,16 +53,21 @@ data class AeroDispatchRequest(
 sealed interface AeroSyncOutcome {
     data class Synced(val saved: AeroMovementsSaved) : AeroSyncOutcome
 
-    /** The plant did not answer, so the previous snapshot stands. */
-    data object Unreachable : AeroSyncOutcome
-
-    /** The ERP answered with a refusal, or the backend refused to store the snapshot. */
-    data class Failed(val reason: String?) : AeroSyncOutcome
+    /** Nothing was stored, and the previous snapshot stands. The reason says whose fault that was. */
+    data class Failed(val failure: AeroFailure) : AeroSyncOutcome
 }
 
 class AeroDispatcher(
     private val erp: AeroErpPort,
     private val mirror: AeroMirrorPort,
+    /**
+     * The question asked before every trip: is this phone even on the plant's network?
+     *
+     * A port and not the Android class, because the rule it enforces -- a call from another network never had
+     * a chance, so say that instead of the socket's exception -- is what the tests assert. In the app it is
+     * [AeroReachability], wired in `AeroModule`.
+     */
+    private val reachability: AeroReachabilityPort,
 ) {
 
     /**
@@ -91,7 +96,23 @@ class AeroDispatcher(
                     error = ERROR_NOT_CONFIGURED,
                 ),
             )
-            return AeroDispatchOutcome.Refused("not-configured")
+            return AeroDispatchOutcome.Failed(AeroFailure.notConfigured)
+        }
+
+        // The plant is on the factory LAN. A phone on mobile data, or on the guest Wi-Fi, is not going to
+        // reach it, and the useful sentence is about the network -- not the exception the socket threw.
+        val preflight = reachability.diagnose(normalized).failure()
+        if (preflight != null) {
+            mirror.log(
+                AeroAudit.request(
+                    event = AeroAudit.Event.DISPATCH,
+                    destinationUrl = aeroEndpoint(normalized, "entradasitem"),
+                    phase = "requested",
+                    detail = "launch #${request.launchId} · ${preflight.code.name.lowercase()}",
+                    error = preflight.code.auditCode,
+                ),
+            )
+            return AeroDispatchOutcome.Failed(preflight)
         }
 
         val payload = buildEntradaItemPayload(
@@ -126,6 +147,11 @@ class AeroDispatcher(
             // recorded on its side and the row can be resent later.
             is AeroWriteResult.Failed -> {
                 val unreachable = result.message == null
+                val readFailure = if (unreachable) {
+                    AeroFailure(AeroFailureCode.NO_ANSWER)
+                } else {
+                    AeroFailure(AeroFailureCode.ERP_REFUSED, result.message)
+                }
                 mirror.log(
                     AeroAudit.request(
                         event = AeroAudit.Event.DISPATCH,
@@ -136,10 +162,10 @@ class AeroDispatcher(
                         detail = "launch #${request.launchId} · ${if (unreachable) "sem resposta" else result.message}",
                         // A code, not the ERP's sentence: the log is filtered by it, and the sentence is
                         // already in the note above, where a person reads it.
-                        error = if (unreachable) "AERO_ERP_UNREACHABLE" else "AERO_ERP_REFUSED",
+                        error = readFailure.code.auditCode,
                     ),
                 )
-                if (unreachable) AeroDispatchOutcome.Unreachable else AeroDispatchOutcome.Refused(result.message)
+                AeroDispatchOutcome.Failed(readFailure)
             }
         }
     }
@@ -162,7 +188,23 @@ class AeroDispatcher(
                     error = ERROR_NOT_CONFIGURED,
                 ),
             )
-            return AeroSyncOutcome.Failed("not-configured")
+            return AeroSyncOutcome.Failed(AeroFailure.notConfigured)
+        }
+
+        // Same gate as a dispatch: a read from the wrong network costs the operator two seconds and answers
+        // nothing, so the network is asked first and the ERP is left alone.
+        val preflight = reachability.diagnose(normalized).failure()
+        if (preflight != null) {
+            mirror.log(
+                AeroAudit.request(
+                    event = AeroAudit.Event.SYNC,
+                    destinationUrl = aeroMovementsUrl(normalized),
+                    phase = "requested",
+                    detail = "date=$date · ${preflight.code.name.lowercase()}",
+                    error = preflight.code.auditCode,
+                ),
+            )
+            return AeroSyncOutcome.Failed(preflight)
         }
 
         val startedAt = System.currentTimeMillis()
@@ -183,10 +225,14 @@ class AeroDispatcher(
                         detail = "date=$date · seats=${read.movements.size} · saved=${saved?.saved ?: 0}",
                         // The ERP answered but the backend would not store the snapshot: the day is read and
                         // lost, which is a different failure from an unreachable plant.
-                        error = if (saved == null) "AERO_SNAPSHOT_REFUSED" else null,
+                        error = AeroFailureCode.SNAPSHOT_REFUSED.auditCode.takeIf { saved == null },
                     ),
                 )
-                if (saved == null) AeroSyncOutcome.Failed("snapshot-refused") else AeroSyncOutcome.Synced(saved)
+                if (saved == null) {
+                    AeroSyncOutcome.Failed(AeroFailure(AeroFailureCode.SNAPSHOT_REFUSED))
+                } else {
+                    AeroSyncOutcome.Synced(saved)
+                }
             }
 
             is AeroMovementsResult.Failed -> {
@@ -198,10 +244,10 @@ class AeroDispatcher(
                         httpStatus = null,
                         durationMs = elapsed,
                         detail = "date=$date · ${read.message ?: "sem resposta"}",
-                        error = if (read.message == null) "AERO_ERP_UNREACHABLE" else "AERO_ERP_REFUSED",
+                        error = read.failure.code.auditCode,
                     ),
                 )
-                if (read.message == null) AeroSyncOutcome.Unreachable else AeroSyncOutcome.Failed(read.message)
+                AeroSyncOutcome.Failed(read.failure)
             }
         }
     }
@@ -238,6 +284,7 @@ class AeroDispatcher(
         /** The local route an imported seat is written to. */
         const val IMPORT_DESTINATION = "/api/massas-launch"
 
+        /** Kept as the constant the earlier log lines already wrote; the model owns every other code. */
         const val ERROR_NOT_CONFIGURED = "AERO_NOT_CONFIGURED"
     }
 }

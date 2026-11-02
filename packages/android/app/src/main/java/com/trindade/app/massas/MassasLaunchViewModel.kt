@@ -5,6 +5,7 @@ import com.trindade.app.R
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trindade.app.aero.AeroDispatchOutcome
+import com.trindade.app.aero.AeroFailure
 import com.trindade.app.aero.AeroDispatchRequest
 import com.trindade.app.aero.AeroDispatcher
 import com.trindade.app.aero.AeroErpMovement
@@ -416,8 +417,9 @@ class MassasLaunchViewModel @Inject constructor(
         val unitsByCode = items.associate { it.productCode to it.units }
         val namesByCode = items.associate { it.productCode to it.productName }
         var sent = 0
-        var refused = 0
-        var unreachable = 0
+        // The batch keeps the first failure instead of counting kinds: the dialog says the rest of the answer,
+        // and one sentence about the network is worth more than a tally of codes nobody asked for.
+        var firstFailure: AeroFailure? = null
 
         for (launch in created) {
             val request = AeroDispatchRequest(
@@ -433,22 +435,20 @@ class MassasLaunchViewModel @Inject constructor(
                 // credits one person for everybody's work.
                 operatorName = launch.displayName.ifBlank { launch.username },
             )
-            when (aeroDispatcher.dispatch(settings, request)) {
+            when (val outcome = aeroDispatcher.dispatch(settings, request)) {
                 is AeroDispatchOutcome.Sent -> sent++
-                is AeroDispatchOutcome.Refused -> refused++
-                is AeroDispatchOutcome.Unreachable -> unreachable++
+                is AeroDispatchOutcome.Failed -> if (firstFailure == null) firstFailure = outcome.failure
             }
         }
 
         // One answer for the batch, not one per row: the dialog is already open, and three outcomes replacing
         // each other would leave the operator reading whichever arrived last.
-        val failed = refused + unreachable
+        val failed = created.size - sent
         val answer = when {
-            failed == 0 -> UiText.of(R.string.massas_aero_batch_sent, sent)
-            sent == 0 -> UiText.of(
-                if (unreachable > 0) R.string.massas_aero_dispatch_unreachable else R.string.massas_aero_dispatch_refused,
-                failed,
-            )
+            firstFailure == null -> UiText.of(R.string.massas_aero_batch_sent, sent)
+            // Nothing arrived: the reason is the whole answer, and it is the same sentence the single-row send
+            // produces for the same network problem.
+            sent == 0 -> firstFailure!!.describe()
             else -> UiText.of(R.string.massas_aero_batch_partial, sent, created.size, failed)
         }
         _state.value = _state.value.copy(
@@ -498,18 +498,12 @@ class MassasLaunchViewModel @Inject constructor(
                     )
                     refreshMirror(current.date)
                 }
-                is AeroSyncOutcome.Unreachable -> {
-                    // The previous snapshot stands: saying "sem conexão" is the whole message.
-                    _state.value = _state.value.copy(
-                        isSyncingAero = false,
-                        resultDialogMessage = UiText.of(R.string.massas_aero_unreachable),
-                        resultDialogIsSuccess = false,
-                    )
-                }
                 is AeroSyncOutcome.Failed -> {
+                    // The previous snapshot stands, and the reason is the shared sentence for it: no plant
+                    // Wi-Fi, the host not answering, or the ERP refusing all read the same here as anywhere.
                     _state.value = _state.value.copy(
                         isSyncingAero = false,
-                        resultDialogMessage = UiText.of(R.string.massas_aero_sync_failed, outcome.reason ?: "-"),
+                        resultDialogMessage = outcome.failure.describe(),
                         resultDialogIsSuccess = false,
                     )
                 }
@@ -554,12 +548,8 @@ class MassasLaunchViewModel @Inject constructor(
                     refreshMirror(state.value.date)
                     _state.value = _state.value.copy(noticeMessage = UiText.of(R.string.massas_aero_sent))
                 }
-                is AeroDispatchOutcome.Unreachable ->
-                    _state.value = _state.value.copy(errorMessage = UiText.of(R.string.massas_aero_unreachable))
-                is AeroDispatchOutcome.Refused ->
-                    _state.value = _state.value.copy(
-                        errorMessage = UiText.of(R.string.massas_aero_sync_failed, outcome.reason ?: "-"),
-                    )
+                is AeroDispatchOutcome.Failed ->
+                    _state.value = _state.value.copy(errorMessage = outcome.failure.describe())
             }
         }
     }

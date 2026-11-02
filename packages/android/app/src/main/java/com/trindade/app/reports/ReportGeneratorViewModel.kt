@@ -11,9 +11,12 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import com.trindade.app.R
 import com.trindade.app.aero.AeroDispatcher
+import com.trindade.app.aero.AeroFailure
 import com.trindade.app.aero.AeroSettingsPort
 import com.trindade.app.aero.AeroSyncOutcome
+import com.trindade.app.ui.UiText
 import com.trindade.app.contract.models.MassasReportDayView
 import com.trindade.app.contract.models.ReportReceipts
 import com.trindade.app.massas.MassasDaySource
@@ -94,7 +97,7 @@ class ReportGeneratorViewModel @Inject constructor(
         /** The report the server created, which is what the next screen needs. */
         val createdReportId: Int? = null,
         /** What the last action answered, shown in a dialog; null when nothing has been answered yet. */
-        val message: String? = null,
+        val message: UiText? = null,
         /** Whether that answer is a refusal, which is what the dialog's tone is drawn from. */
         val messageIsError: Boolean = false,
         val showValidation: Boolean = false,
@@ -289,7 +292,7 @@ class ReportGeneratorViewModel @Inject constructor(
         val dispatcher = aeroDispatcher
         val store = aeroSettingsStore
         if (dispatcher == null || store == null) {
-            _state.update { it.copy(message = ERP_NOT_CONFIGURED, messageIsError = true) }
+            _state.update { it.copy(message = AeroFailure.notConfigured.describe(), messageIsError = true) }
             return
         }
         val date = MassasLaunchViewModel.saopauloToday()
@@ -297,7 +300,7 @@ class ReportGeneratorViewModel @Inject constructor(
         viewModelScope.launch {
             val settings = store.load()
             if (!settings.ready) {
-                _state.update { it.copy(message = ERP_NOT_CONFIGURED, messageIsError = true) }
+                _state.update { it.copy(message = AeroFailure.notConfigured.describe(), messageIsError = true) }
                 return@launch
             }
             _state.update { it.copy(isSyncingErp = true, message = null, messageIsError = false) }
@@ -311,20 +314,18 @@ class ReportGeneratorViewModel @Inject constructor(
                             isSyncingErp = false,
                             massasDay = massas ?: it.massasDay,
                             receipts = receipts ?: it.receipts,
-                            message = ERP_SYNC_DONE,
+                            message = UiText.of(R.string.report_erp_sync_success),
                             messageIsError = false,
                         )
                     }
                 }
-                is AeroSyncOutcome.Unreachable ->
-                    _state.update {
-                        it.copy(isSyncingErp = false, message = ERP_UNREACHABLE, messageIsError = true)
-                    }
                 is AeroSyncOutcome.Failed ->
                     _state.update {
                         it.copy(
                             isSyncingErp = false,
-                            message = ERP_SYNC_FAILED.format(outcome.reason ?: "-"),
+                            // The same sentence the table shows for the same problem: no plant Wi-Fi, the host
+                            // not answering and the ERP refusing all read here exactly as they read there.
+                            message = outcome.failure.describe(),
                             messageIsError = true,
                         )
                     }
@@ -433,7 +434,11 @@ class ReportGeneratorViewModel @Inject constructor(
                         messageIsError = true,
                     )
                     ReportWriteResult.Unreachable ->
-                        previous.copy(submitting = false, message = UNREACHABLE, messageIsError = true)
+                        previous.copy(
+                            submitting = false,
+                            message = UiText.of(R.string.report_error_offline),
+                            messageIsError = true,
+                        )
                 }
             }
         }
@@ -459,15 +464,15 @@ class ReportGeneratorViewModel @Inject constructor(
      * server resolves its codes into the operator's language before answering, so a body with a sentence is
      * the truth and the reading below is only what is left when no sentence arrived.
      */
-    private fun refusalMessage(statusCode: Int, serverMessage: String?): String = when {
-        !serverMessage.isNullOrBlank() -> serverMessage
+    private fun refusalMessage(statusCode: Int, serverMessage: String?): UiText = when {
+        !serverMessage.isNullOrBlank() -> UiText.literal(serverMessage)
         // A report for that shift and day already exists; the server refuses a second one. The wording is the
         // server's own -- and the web's -- for the case where the refusal arrived with no body to read.
-        statusCode == 409 -> ALREADY_EXISTS
+        statusCode == 409 -> UiText.of(R.string.report_error_already_exists)
         // The body failed validation and said nothing about it, which leaves the one part of the payload this
         // client builds and checks: a reading set it would not have sent without every reading.
-        statusCode == 400 -> INCOMPLETE
-        else -> GENERIC
+        statusCode == 400 -> UiText.of(R.string.report_error_incomplete)
+        else -> UiText.of(R.string.report_error_save_failed)
     }
 
     /**
@@ -480,22 +485,4 @@ class ReportGeneratorViewModel @Inject constructor(
             .flatMap { it.tasks }
             .filter { it.taskType == ReportCategoryTasksInner.TaskType.temperature }
             .associate { task -> task.id to List(task.temperatureReadings) { "" } }
-
-    private companion object {
-        /** Said when the ERP bridge has no settings yet, in the same words the launch screen uses. */
-        const val ERP_NOT_CONFIGURED = "Configure a integração com o ERP em Administração antes de sincronizar."
-        const val ERP_SYNC_DONE = "Movimentações do ERP atualizadas."
-        const val ERP_UNREACHABLE = "Sem conexão com o ERP. Verifique a rede e tente de novo."
-        const val ERP_SYNC_FAILED = "Falha ao sincronizar com o ERP: %s"
-
-        const val UNREACHABLE = "Sem conexão com o servidor. Verifique a rede e tente de novo."
-
-        /** The duplicate refusal, in the server's and the web's own words. */
-        const val ALREADY_EXISTS = "Já existe um relatório para esse turno hoje."
-
-        /** The fallback for a 400 that arrived with no sentence at all. */
-        const val INCOMPLETE = "Relatório incompleto. Preencha todas as temperaturas e tente de novo."
-
-        const val GENERIC = "Não foi possível salvar o relatório. Tente de novo."
-    }
 }

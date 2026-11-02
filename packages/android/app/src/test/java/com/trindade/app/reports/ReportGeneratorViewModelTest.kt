@@ -96,8 +96,9 @@ class ReportGeneratorViewModelTest {
 
         model.syncErp()
 
+        // La misma oración que dice la tabla cuando la integración no está configurada.
         assertEquals(
-            "Configure a integração com o ERP em Administração antes de sincronizar.",
+            com.trindade.app.ui.UiText.of(com.trindade.app.R.string.aero_failure_not_configured),
             model.state.value.message,
         )
         // A press that could not even reach the plant is a refusal, not an answer.
@@ -132,7 +133,10 @@ class ReportGeneratorViewModelTest {
         model.syncErp()
 
         assertEquals(1, mirror.snapshots.size)
-        assertEquals("Movimentações do ERP atualizadas.", model.state.value.message)
+        assertEquals(
+            com.trindade.app.ui.UiText.of(com.trindade.app.R.string.report_erp_sync_success),
+            model.state.value.message,
+        )
         assertFalse(model.state.value.messageIsError)
         assertNotNull(model.state.value.receipts)
         assertFalse(model.state.value.isSyncingErp)
@@ -151,7 +155,10 @@ class ReportGeneratorViewModelTest {
 
         model.syncErp()
 
-        assertEquals("Falha ao sincronizar com o ERP: sem permissão", model.state.value.message)
+        assertEquals(
+            com.trindade.app.ui.UiText.of(com.trindade.app.R.string.aero_failure_erp_refused, "sem permissão"),
+            model.state.value.message,
+        )
         assertTrue(model.state.value.messageIsError)
         assertFalse(model.state.value.isSyncingErp)
     }
@@ -174,6 +181,7 @@ class ReportGeneratorViewModelTest {
             override suspend fun readMovements(settings: com.trindade.app.aero.AeroSettings, date: String) = movements
         },
         mirror = mirror,
+        reachability = com.trindade.app.massas.FakeReachability(),
     )
 
     private fun settingsPort(ready: Boolean) = object : com.trindade.app.aero.AeroSettingsPort {
@@ -384,9 +392,12 @@ class ReportGeneratorViewModelTest {
         model.submit()
 
         assertNull(model.state.value.createdReportId)
-        // Case-insensitive on purpose: pinning the exact wording would make this test fail on a copy
-        // edit that broke nothing, and what it is checking is which refusal was recognised.
-        assertEquals(true, model.state.value.message!!.contains("existe", ignoreCase = true))
+        // Lo que se mira es cuál rechazo se reconoció, no la redacción exacta: el 409 tiene su propia
+        // oración traducida y no la copia en portugués pegada en el código.
+        assertEquals(
+            com.trindade.app.ui.UiText.of(com.trindade.app.R.string.report_error_already_exists),
+            model.state.value.message,
+        )
     }
     // ---- The prerequisites, named instead of left as an empty form (AND-02) ----
 
@@ -594,7 +605,7 @@ class ReportGeneratorViewModelTest {
         fillTemperatures(model)
         model.submit()
 
-        assertEquals(duplicate, model.state.value.message)
+        assertEquals(com.trindade.app.ui.UiText.literal(duplicate), model.state.value.message)
     }
 
     @Test
@@ -606,7 +617,10 @@ class ReportGeneratorViewModelTest {
         fillTemperatures(model)
         model.submit()
 
-        assertEquals(true, model.state.value.message!!.contains("incompleto", ignoreCase = true))
+        assertEquals(
+            com.trindade.app.ui.UiText.of(com.trindade.app.R.string.report_error_incomplete),
+            model.state.value.message,
+        )
     }
 
     @Test
@@ -616,7 +630,10 @@ class ReportGeneratorViewModelTest {
         fillTemperatures(model)
         model.submit()
 
-        assertEquals(true, model.state.value.message!!.contains("incompleto", ignoreCase = true))
+        assertEquals(
+            com.trindade.app.ui.UiText.of(com.trindade.app.R.string.report_error_incomplete),
+            model.state.value.message,
+        )
     }
 
     /**

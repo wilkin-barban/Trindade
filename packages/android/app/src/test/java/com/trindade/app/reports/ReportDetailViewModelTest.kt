@@ -268,7 +268,11 @@ class ReportDetailViewModelTest {
         val settingsPort = RecordingReportSettingsPort(
             com.trindade.app.aero.AeroSettings(wsUrl = "http://plant.lan/ws", username = "trindade", password = "secret"),
         )
-        val dispatcher = com.trindade.app.aero.AeroDispatcher(erp = erpPort, mirror = mirrorPort)
+        val dispatcher = com.trindade.app.aero.AeroDispatcher(
+            erp = erpPort,
+            mirror = mirrorPort,
+            reachability = com.trindade.app.massas.FakeReachability(),
+        )
 
         val massasDay = MassasReportDayView(
             date = "2026-10-30",

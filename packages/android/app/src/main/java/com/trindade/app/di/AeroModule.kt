@@ -48,8 +48,17 @@ object AeroModule {
     @Singleton
     fun provideReachabilityPort(reachability: AeroReachability): AeroReachabilityPort = reachability
 
+    /**
+     * The dispatcher, with the network gate the app runs before every trip.
+     *
+     * The reachability port goes in here rather than in each screen: one place asks whether this phone is on
+     * the plant's network, so a launch, a day's read and a report's sync are all stopped by the same rule.
+     */
     @Provides
     @Singleton
-    fun provideDispatcher(erp: AeroErpPort, mirror: AeroMirrorPort): AeroDispatcher =
-        AeroDispatcher(erp = erp, mirror = mirror)
+    fun provideDispatcher(
+        erp: AeroErpPort,
+        mirror: AeroMirrorPort,
+        reachability: AeroReachabilityPort,
+    ): AeroDispatcher = AeroDispatcher(erp = erp, mirror = mirror, reachability = reachability)
 }

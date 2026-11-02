@@ -5,6 +5,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import com.trindade.app.network.AeroMovementsSaved
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -78,10 +79,51 @@ class AeroDispatcherTest {
         entry: AeroWriteResult = AeroWriteResult.Ok(null),
         movements: AeroMovementsResult = AeroMovementsResult.Ok(emptyList(), skipped = 0),
         saved: AeroMovementsSaved? = AeroMovementsSaved(saved = 0, massas = 0, insumos = 0),
+        reachability: AeroDiagnosis = AeroDiagnosis(wifiConnected = true, hostReachable = true),
     ) = AeroDispatcher(
         erp = FakeErp(recorder, entry, movements),
         mirror = FakeMirror(recorder, saved),
+        reachability = object : AeroReachabilityPort {
+            override suspend fun diagnose(wsUrl: String?, timeoutMillis: Int) = reachability
+        },
     )
+
+    /**
+     * The phone off the plant's Wi-Fi is told so, and the ERP is never called.
+     *
+     * The failure this covers is the ordinary one: an operator on mobile data taps "enviar ao ERP" and gets an
+     * error from a request that never had a chance. Saying "no se pudo hablar con el ERP" sends them to check
+     * the address; the truth is that they are on the wrong network, and the fix is a different one.
+     */
+    @Test
+    fun `a phone off the plant's Wi-Fi is reported as a network problem and nothing is sent`() = runTest {
+        val recorder = Recorder()
+
+        val outcome = dispatcher(recorder, reachability = AeroDiagnosis(wifiConnected = false, hostReachable = null))
+            .dispatch(settings, request)
+
+        assertEquals(
+            AeroDispatchOutcome.Failed(AeroFailure(AeroFailureCode.DIFFERENT_NETWORK)),
+            outcome,
+        )
+        assertTrue("no salió ningún asiento", recorder.payloads.isEmpty())
+        assertFalse("la llamada al ERP no se hizo", recorder.calls.any { it.startsWith("erp:") })
+        assertTrue("la línea del registro existe", recorder.logs.any { it.error == "AERO_NO_PLANT_WIFI" })
+    }
+
+    @Test
+    fun `a day's read on the wrong network is not stored over the previous one`() = runTest {
+        val recorder = Recorder()
+
+        val outcome = dispatcher(recorder, reachability = AeroDiagnosis(wifiConnected = true, hostReachable = false))
+            .syncDay(settings, "2026-10-30")
+
+        assertEquals(
+            AeroSyncOutcome.Failed(AeroFailure(AeroFailureCode.HOST_UNREACHABLE)),
+            outcome,
+        )
+        assertTrue("el snapshot anterior sigue en pie", recorder.calls.none { it.startsWith("mirror:save") })
+    }
 
     @Test
     fun `a dispatch sends the units with the launch named in the observation`() = runTest {
@@ -121,7 +163,7 @@ class AeroDispatcherTest {
 
         val outcome = dispatcher(recorder, entry = AeroWriteResult.Failed(null)).dispatch(settings, request)
 
-        assertEquals(AeroDispatchOutcome.Unreachable, outcome)
+        assertEquals(AeroDispatchOutcome.Failed(AeroFailure(AeroFailureCode.NO_ANSWER)), outcome)
         val log = recorder.logs.single()
         assertEquals("dispatch", log.event)
         assertNull("A transport failure has no status to report", log.httpStatus)
@@ -135,7 +177,10 @@ class AeroDispatcherTest {
 
         val outcome = dispatcher(recorder, entry = AeroWriteResult.Failed("produto inexistente")).dispatch(settings, request)
 
-        assertEquals(AeroDispatchOutcome.Refused("produto inexistente"), outcome)
+        assertEquals(
+            AeroDispatchOutcome.Failed(AeroFailure(AeroFailureCode.ERP_REFUSED, "produto inexistente")),
+            outcome,
+        )
         assertEquals(200, recorder.logs.single().httpStatus)
     }
 
@@ -145,7 +190,7 @@ class AeroDispatcherTest {
 
         val outcome = dispatcher(recorder).dispatch(AeroSettings(), request)
 
-        assertEquals(AeroDispatchOutcome.Refused("not-configured"), outcome)
+        assertEquals(AeroDispatchOutcome.Failed(AeroFailure.notConfigured), outcome)
         // The ERP is never touched, and that is the point: no entry payload, no read, nothing against the plant.
         assertEquals(emptyList<String>(), recorder.payloads.map { it.productCode })
         // And it is no longer silent: the log keeps the attempt, the launch it was about and the reason.
@@ -162,7 +207,7 @@ class AeroDispatcherTest {
 
         val outcome = dispatcher(recorder).syncDay(AeroSettings(), "2026-10-30")
 
-        assertEquals(AeroSyncOutcome.Failed("not-configured"), outcome)
+        assertEquals(AeroSyncOutcome.Failed(AeroFailure.notConfigured), outcome)
         assertEquals(emptyList<String>(), recorder.calls.filter { it.startsWith("erp:") })
         val line = recorder.logs.single()
         assertEquals(AeroAudit.Event.SYNC, line.event)
@@ -234,7 +279,7 @@ class AeroDispatcherTest {
         val outcome = dispatcher(recorder, movements = AeroMovementsResult.Failed(null))
             .syncDay(settings, "2026-10-30")
 
-        assertEquals(AeroSyncOutcome.Unreachable, outcome)
+        assertEquals(AeroSyncOutcome.Failed(AeroFailure(AeroFailureCode.NO_ANSWER)), outcome)
         assertEquals(
             "a network blip must leave yesterday's snapshot standing",
             false,
@@ -248,7 +293,7 @@ class AeroDispatcherTest {
 
         val outcome = dispatcher(recorder, saved = null).syncDay(settings, "2026-10-30")
 
-        assertEquals(AeroSyncOutcome.Failed("snapshot-refused"), outcome)
+        assertEquals(AeroSyncOutcome.Failed(AeroFailure(AeroFailureCode.SNAPSHOT_REFUSED)), outcome)
     }
 }
 

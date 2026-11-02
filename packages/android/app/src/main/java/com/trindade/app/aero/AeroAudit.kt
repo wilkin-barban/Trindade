@@ -125,15 +125,14 @@ object AeroAudit {
 }
 
 /**
- * Why an attempt ended, in the three answers the operator can act on.
+ * Why an attempt ended, in the two answers the operator can act on: it arrived, or it did not and here is why.
  *
- * The distinction matters more than the message: `Unreachable` is the factory network and invites a retry
- * later, `Refused` is the ERP saying no to this payload and invites a correction.
+ * The reason travels as [AeroFailure] and not as a sentence, so the same network problem reads the same on the
+ * table, in the report and in the admin panel.
  */
 sealed interface AeroDispatchOutcome {
     data object Sent : AeroDispatchOutcome
-    data object Unreachable : AeroDispatchOutcome
-    data class Refused(val reason: String?) : AeroDispatchOutcome
+    data class Failed(val failure: AeroFailure) : AeroDispatchOutcome
 }
 
 /** The User-Agent this app sends, so the plant's log can attribute a request to the APK that made it. */

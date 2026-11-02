@@ -31,6 +31,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trindade.app.R
+import com.trindade.app.ui.resolve
 import com.trindade.app.ui.components.ActionResultDialog
 import com.trindade.app.ui.components.AdminPrimaryButton
 import com.trindade.app.ui.components.HelpSection
@@ -72,7 +73,9 @@ fun ReportGeneratorScreen(
     // Every action that answers speaks here: an ERP sync, a saved report, a refusal. A dialog floats over the
     // list rather than growing it, which is the whole point -- a form taller than the phone cannot be pushed
     // down by the sentence that explains what just happened.
-    val answer = state.message
+    // The view model hands over the resource and not a sentence, so a Spanish operator reads the refusal in
+    // Spanish; the one place a `String` is still needed is this dialog, and the locale is resolved here.
+    val answer = state.message?.resolve()
         ?: state.createdReportId?.let { stringResource(R.string.report_created, it) }
     if (answer != null) {
         ActionResultDialog(

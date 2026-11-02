@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.trindade.app.R
+import com.trindade.app.ui.UiText
 import com.trindade.app.contract.models.CategoriesResponseCategoriesInner
 import com.trindade.app.contract.models.ProductsResponse
 import com.trindade.app.contract.models.ReportCategoryTasksInner
@@ -199,7 +200,9 @@ class ReportGeneratorScreenTest {
     fun `closing the answer returns to the form`() {
         var dismissed = 0
         render(
-            state(listOf(category(8, "Higiene"))).copy(message = "Movimentações do ERP atualizadas."),
+            state(listOf(category(8, "Higiene"))).copy(
+                message = UiText.of(R.string.report_erp_sync_success),
+            ),
             onDismissResult = { dismissed++ },
         )
 
@@ -213,7 +216,7 @@ class ReportGeneratorScreenTest {
     fun `a refusal is titled as one`() {
         render(
             state(listOf(category(8, "Higiene"))).copy(
-                message = "Servidor recusou o relatório.",
+                message = UiText.literal("Servidor recusou o relatório."),
                 messageIsError = true,
             ),
         )
@@ -231,7 +234,11 @@ class ReportGeneratorScreenTest {
      */
     @Test
     fun `the answer to an action is drawn in a dialog`() {
-        render(state(listOf(category(8, "Higiene"))).copy(message = "Servidor recusou o relatório."))
+        render(
+            state(listOf(category(8, "Higiene"))).copy(
+                message = UiText.literal("Servidor recusou o relatório."),
+            ),
+        )
 
         composeRule.onNode(isDialog()).assertExists()
         // And exactly once: the dialog replaced the inline line rather than joining it.
