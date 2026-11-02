@@ -3,6 +3,7 @@ package com.trindade.app.loading
 import com.trindade.app.contract.models.DriversResponseDriversInner
 import com.trindade.app.contract.models.SchedulesResponse
 import com.trindade.app.contract.models.SchedulesResponseSchedulesInner
+import com.trindade.app.contract.models.VehiclesResponseVehiclesInner
 import com.trindade.app.export.PdfGenerator
 import com.trindade.app.export.ShareManager
 import com.trindade.app.network.LoadingApi
@@ -460,6 +461,85 @@ class LoadingViewModelTest {
         assertTrue(model.state.value.assignedDriverIds.contains(FakeLoadingApi.FLETERO_DRIVER_ID))
         assertFalse(model.state.value.availableDrivers.any { it.id == FakeLoadingApi.FLETERO_DRIVER_ID })
         assertTrue(model.state.value.availableDrivers.any { it.id == FakeLoadingApi.CASA_DRIVER_ID })
+    }
+
+    @Test
+    fun `lists an already scheduled driver with the slot where he is`() {
+        val api = FakeLoadingApi(
+            schedulesToReturn = listOf(
+                FakeLoadingApi.entry(id = 1, slot = "04:00").copy(driverId = FakeLoadingApi.FLETERO_DRIVER_ID),
+            ),
+        )
+        val model = viewModel(api)
+
+        // Still on the list, with the hour that explains it: a name that vanished would leave the operator
+        // looking for a driver the day already has.
+        assertTrue(model.state.value.fleteroCandidates.any { it.id == FakeLoadingApi.FLETERO_DRIVER_ID })
+        assertEquals("04:00", model.state.value.assignedSlotOf(FakeLoadingApi.FLETERO_DRIVER_ID))
+        assertNull(model.state.value.assignedSlotOf(FakeLoadingApi.CASA_DRIVER_ID))
+    }
+
+    @Test
+    fun `does not pick an occupied driver`() {
+        val api = FakeLoadingApi(
+            schedulesToReturn = listOf(
+                FakeLoadingApi.entry(id = 1, slot = "04:00").copy(driverId = FakeLoadingApi.FLETERO_DRIVER_ID),
+            ),
+        )
+        val model = viewModel(api)
+        model.startAdding("07:00")
+        model.toggleFletero(FakeLoadingApi.FLETERO_DRIVER_ID, picked = true)
+
+        // The row is drawn disabled, and the pick is refused here too: an occupied driver in the batch is a
+        // row the server rejects, which is not something to discover as a 409.
+        assertEquals(emptySet<Int>(), model.state.value.pickedFleteros)
+    }
+
+    @Test
+    fun `offers only free plates to the picker`() {
+        val second = VehiclesResponseVehiclesInner(id = 21, description = "HR", licensePlate = "AAA1111")
+        val api = FakeLoadingApi(
+            schedulesToReturn = listOf(
+                FakeLoadingApi.entry(id = 1, slot = "04:00")
+                    .copy(driverId = FakeLoadingApi.FLETERO_DRIVER_ID, vehicleId = FakeLoadingApi.VEHICLE_ID),
+            ),
+            vehiclesToReturn = FakeLoadingApi.defaultVehicles() + second,
+        )
+        val model = viewModel(api)
+        model.startAdding("07:00")
+        model.toggleCasa(FakeLoadingApi.CASA_DRIVER_ID, picked = true)
+        model.pickCasaVehicle(FakeLoadingApi.CASA_DRIVER_ID, 21)
+
+        // The day's own plate is gone, the one this batch picked stays because it is what the row shows.
+        assertEquals(listOf(21), model.state.value.vehicleOptionsFor(FakeLoadingApi.CASA_DRIVER_ID).map { it.id })
+    }
+
+    @Test
+    fun `does not send two rows with the same vehicle`() {
+        val second = VehiclesResponseVehiclesInner(id = 21, description = "HR", licensePlate = "AAA1111")
+        val secondDriver = DriversResponseDriversInner(
+            id = 12,
+            name = "Pedro",
+            licensePlate = null,
+            phone = null,
+            driverType = DriversResponseDriversInner.DriverType.casa,
+        )
+        val api = FakeLoadingApi(
+            driversToReturn = FakeLoadingApi.defaultDrivers() + secondDriver,
+            vehiclesToReturn = FakeLoadingApi.defaultVehicles() + second,
+        )
+        val model = viewModel(api)
+        model.startAdding("04:00")
+        model.toggleCasa(FakeLoadingApi.CASA_DRIVER_ID, picked = true)
+        model.toggleCasa(12, picked = true)
+        model.pickCasaVehicle(FakeLoadingApi.CASA_DRIVER_ID, FakeLoadingApi.VEHICLE_ID)
+        model.pickCasaVehicle(12, FakeLoadingApi.VEHICLE_ID)
+        model.confirmAdd()
+
+        // One plate, one row: the second row naming the same vehicle is the 409 the picker already prevents,
+        // and the batch the operator asked for is not lost to it.
+        assertEquals(1, api.createdBodies.size)
+        assertEquals(FakeLoadingApi.VEHICLE_ID, api.createdBodies.single().vehicleId)
     }
 
     @Test

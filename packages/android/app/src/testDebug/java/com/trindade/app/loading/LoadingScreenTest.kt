@@ -313,6 +313,42 @@ class LoadingScreenTest {
     }
 
     @Test
+    fun `the driver row explains the slot of an occupied driver`() {
+        renderPicker(
+            state = addingState().copy(
+                schedules = listOf(
+                    editable.copy(timeSlot = "04:00", driverId = FakeLoadingApi.FLETERO_DRIVER_ID),
+                ),
+            ),
+        )
+
+        // Named and explained, and still on the list: "Fletero já está nas 04:00." is the sentence the
+        // disappearing name never gave. The row is the control, so it is the one that has to say disabled.
+        val row = composeRule.onNodeWithText("Fletero já está nas 04:00.").performScrollTo()
+        row.assertIsDisplayed()
+        row.assertIsNotEnabled()
+    }
+
+    @Test
+    fun `the plate picker lists a taken plate as unavailable`() {
+        renderPicker(
+            state = addingState(
+                tab = LoadingPickerTab.CASA,
+                pickedCasa = mapOf(FakeLoadingApi.CASA_DRIVER_ID to null),
+            ).copy(
+                schedules = listOf(
+                    editable.copy(timeSlot = "04:00", vehicleId = FakeLoadingApi.VEHICLE_ID),
+                ),
+            ),
+        )
+
+        // The only plate this day already drives, so the menu opens empty rather than offering a vehicle
+        // the server would refuse.
+        composeRule.onNodeWithText("Chapa").performScrollTo().performClick()
+        composeRule.onNodeWithText("XYZ9876 · Fiorino").assertDoesNotExist()
+    }
+
+    @Test
     fun `a plate cannot be chosen for a company driver nobody picked`() {
         renderPicker(state = addingState(tab = LoadingPickerTab.CASA))
 
@@ -1352,11 +1388,11 @@ class LoadingScreenTest {
     }
 
     /**
-     * A driver already on the day is not offered again.
+     * A driver already on the day stays on the list, disabled.
      *
-     * The picker's list is the repository's own answer, so what this leg checks is that the screen draws
-     * that answer: with the only fletero of the fleet already assigned, the fleteros tab says there is
-     * nobody left instead of offering a second row the server would refuse as a duplicate.
+     * It used to disappear, which made the picker answer "nobody is available" about a fleet that still
+     * had the driver -- a name the operator is looking for, silently gone. S54 keeps the row and puts the
+     * hour under it, and the empty line is reserved for a tab where the fleet really has nobody.
      */
     @Test
     fun `a fletero already on the day is not offered again`() {
@@ -1367,8 +1403,8 @@ class LoadingScreenTest {
             ),
         )
 
-        composeRule.onNodeWithText("Nenhum motorista disponível.").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Fletero").assertDoesNotExist()
+        composeRule.onNodeWithText("Fletero já está nas 06:00.").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Nenhum motorista disponível.").assertDoesNotExist()
     }
 
     private companion object {
