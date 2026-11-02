@@ -417,6 +417,14 @@ Cada tarea declara objetivo, archivos, tests exactos, aceptación, commit espera
 - **Aceptación**: un lote desactivado se reactiva desde la tarjeta; el caso `canActivate=false` no dibuja nada.
 - **Commit**: `feat(android): reactivate a deactivated batch from the history` (~300 líneas).
 - **Depende de**: T2.
+- **Estado.** Hecho en dos commits (**96478b1** código, 229 líneas; **7115ce2** tests, 307), para no pasar
+  de 400 por slice. La tarjeta dibuja **Reativar** sólo con `canActivate == true`, la confirmación es un
+  `AlertDialog` con el nombre del día y el resultado sale en `ActionResultDialog` desde
+  `state.resultMessage: UiText?`, no desde un `remember` de la pantalla: la recarga que sigue a la
+  activación redibuja la tarjeta y un mensaje recordado en la pantalla se perdería en el `recomposition`.
+  `activateBatch`/`activate` recorren el mismo `lifecycle` que desactivar y borrar, así que heredan el
+  `busy` y la lectura de los tres rechazos (403/404/genérico). El contrato publicado no traía
+  `canActivate` y se regeneró (`7eb1928`), que es lo que había quedado pendiente de T3.
 
 #### T8 — Día inactivo completo y en solo lectura
 - **Specs**: S32, S26, S27.
@@ -444,6 +452,11 @@ Cada tarea declara objetivo, archivos, tests exactos, aceptación, commit espera
 - **Aceptación**: la píldora mide 36 dp con `ic_history` y coincide con Cargamento/Massas/Stock.
 - **Commit**: `fix(android): use the shared history button on the report form` (~40 líneas).
 - **Depende de**: ninguna.
+- **Estado.** Hecho (**b1ca32f**). El header del generador de relatórios usa `ModuleHistoryButton` como
+  Cargamento, Massas y Stock: píldora de 36 dp con el touch target de 48 dp, sin tocar el resto del header.
+  El test mide la cápsula con el tag del componente compartido (`36.dp` de alto) y comprueba que el
+  nombre accesible sigue siendo una sola vez el del histórico: el texto del botón, no un
+  `contentDescription` extra que lo repetiría.
 
 #### T11 — Día pasado en solo lectura (Android)
 - **Specs**: S22, S32.
@@ -557,6 +570,14 @@ Cada tarea declara objetivo, archivos, tests exactos, aceptación, commit espera
 - **Aceptación**: cambiar de día durante el sync no pinta el espejo del día anterior; un día cerrado no ofrece sincronizar; una cola con un ítem de ayer se vacía en la primera apertura y el ítem no vuelve.
 - **Commit**: `fix(massas): sync only the open day and ignore a stale mirror` (~180 líneas).
 - **Depende de**: T5.
+- **Estado.** Hecho (**3b055cc**, 13 archivos). Android: `MassasDayHeader(readOnly = true)` no dibuja el
+  botón; `refreshMirror` guarda la fecha que pidió y descarta la respuesta si el día cambió (el test
+  `drops the mirror answer when the day changed` falla sin esa guarda, comprobado revirtiéndola);
+  `AeroFailureCode.BACKEND_DAY_CLOSED` con `BACKEND_DAY_CLOSED = "MASSAS_HISTORY_FROZEN"`, mapeado desde el
+  409 y no reintentable; la cola descarta los ítems de un día que no es hoy con una línea
+  `aero_queue_rejected` que nombra `date=` y `launchIds=` (sin ese filtro, el test de la cola falla y el
+  ítem viaja al ERP). Web: el botón de sync no se ofrece en un día pasado y el e2e
+  `the sync action is not offered on a past day` lo comprueba.
 
 ### Fase 7 — Brechas restantes
 
