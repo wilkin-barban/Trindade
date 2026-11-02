@@ -123,6 +123,9 @@ class AeroDispatcher(
                         httpStatus = if (unreachable) null else 200,
                         durationMs = elapsed,
                         detail = "launch #${request.launchId} · ${if (unreachable) "sem resposta" else result.message}",
+                        // A code, not the ERP's sentence: the log is filtered by it, and the sentence is
+                        // already in the note above, where a person reads it.
+                        error = if (unreachable) "AERO_ERP_UNREACHABLE" else "AERO_ERP_REFUSED",
                     ),
                 )
                 if (unreachable) AeroDispatchOutcome.Unreachable else AeroDispatchOutcome.Refused(result.message)
@@ -156,6 +159,9 @@ class AeroDispatcher(
                         httpStatus = if (saved == null) null else 200,
                         durationMs = elapsed,
                         detail = "date=$date · seats=${read.movements.size} · saved=${saved?.saved ?: 0}",
+                        // The ERP answered but the backend would not store the snapshot: the day is read and
+                        // lost, which is a different failure from an unreachable plant.
+                        error = if (saved == null) "AERO_SNAPSHOT_REFUSED" else null,
                     ),
                 )
                 if (saved == null) AeroSyncOutcome.Failed("snapshot-refused") else AeroSyncOutcome.Synced(saved)
@@ -170,6 +176,7 @@ class AeroDispatcher(
                         httpStatus = null,
                         durationMs = elapsed,
                         detail = "date=$date · ${read.message ?: "sem resposta"}",
+                        error = if (read.message == null) "AERO_ERP_UNREACHABLE" else "AERO_ERP_REFUSED",
                     ),
                 )
                 if (read.message == null) AeroSyncOutcome.Unreachable else AeroSyncOutcome.Failed(read.message)

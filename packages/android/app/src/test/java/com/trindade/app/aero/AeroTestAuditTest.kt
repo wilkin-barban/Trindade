@@ -119,4 +119,70 @@ class AeroTestAuditTest {
             listOf(AeroAudit.Event.DISPATCH, AeroAudit.Event.SYNC, AeroAudit.Event.TEST, AeroAudit.Event.IMPORT),
         )
     }
+
+    /**
+     * Every line names the app and belongs to one attempt, without the call site having to remember either.
+     *
+     * The server column holds 64 characters; a UUID fits and is generated here so a caller cannot forget it.
+     */
+    @Test
+    fun `every line names android and carries its own attempt id`() {
+        val first = AeroAudit.request(
+            event = AeroAudit.Event.DISPATCH,
+            destinationUrl = "http://192.168.25.250:1453/api/entradasitem",
+        )
+        val second = AeroAudit.request(
+            event = AeroAudit.Event.DISPATCH,
+            destinationUrl = "http://192.168.25.250:1453/api/entradasitem",
+        )
+
+        assertEquals("android", first.client)
+        assertTrue(first.attemptId!!.isNotBlank())
+        assertTrue(first.attemptId!!.length <= 64)
+        assertTrue("two attempts are not the same attempt", first.attemptId != second.attemptId)
+    }
+
+    @Test
+    fun `a caller can correlate a requested and a result line through the same attempt id`() {
+        val attempt = AeroAudit.newAttemptId()
+
+        val requested = AeroAudit.request(
+            event = AeroAudit.Event.DISPATCH,
+            destinationUrl = "http://192.168.25.250:1453/api/entradasitem",
+            attemptId = attempt,
+        )
+        val result = AeroAudit.request(
+            event = AeroAudit.Event.DISPATCH,
+            destinationUrl = "http://192.168.25.250:1453/api/entradasitem",
+            attemptId = attempt,
+        )
+
+        assertEquals(requested.attemptId, result.attemptId)
+    }
+
+    @Test
+    fun `a long failure is trimmed to the column instead of being refused`() {
+        val request = AeroAudit.request(
+            event = AeroAudit.Event.DISPATCH,
+            destinationUrl = "http://192.168.25.250:1453/api/entradasitem",
+            error = "E".repeat(3000),
+            detail = "d".repeat(400),
+        )
+
+        assertEquals(AeroAudit.ERROR_MAX, request.error!!.length)
+        assertEquals(AeroAudit.NOTE_MAX, request.note!!.length)
+    }
+
+    @Test
+    fun `a refusal of the audit endpoint is reported with the backend code`() {
+        assertEquals(
+            "audit log refused: HTTP 400 INVALID_AERO_LOG",
+            AeroAudit.rejection(400, """{"error":"Evento de integração inválido","code":"INVALID_AERO_LOG"}"""),
+        )
+        assertEquals("audit log refused: HTTP 503", AeroAudit.rejection(503, "<html>"))
+        assertEquals(
+            "audit log unreachable: the event was not recorded",
+            AeroAudit.rejection(null, null),
+        )
+    }
 }

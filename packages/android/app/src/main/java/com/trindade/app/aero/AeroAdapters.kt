@@ -1,5 +1,6 @@
 package com.trindade.app.aero
 
+import android.util.Log
 import com.trindade.app.network.AeroAuditLogRequest
 import com.trindade.app.network.AeroMovementsSaved
 import com.trindade.app.network.AeroMovementsSnapshotRequest
@@ -52,8 +53,19 @@ class AeroMirrorAdapter @Inject constructor(
             ?.body()
     }
 
+    /**
+     * Appends one line and, when the backend refuses it, says so locally.
+     *
+     * The call was already best-effort, and it stays best-effort: a refused log line must not fail a launch
+     * that reached the plant. What it must not do is vanish. The refusal is written to logcat with the status
+     * and the backend's own code, so the next person to read the trail can tell a lost line from a line nobody
+     * wrote, and from a line the server would not take because of one field.
+     */
     override suspend fun log(request: AeroAuditLogRequest) {
-        runCatchingCancellable { api.logEvent(request) }
+        val response = runCatchingCancellable { api.logEvent(request) }.getOrNull()
+        if (response == null || !response.isSuccessful) {
+            Log.w(LOG_TAG, AeroAudit.rejection(response?.code(), response?.errorBody()?.string()))
+        }
     }
 
     fun AeroErpMovement.toStored() = AeroStoredMovement(
@@ -65,6 +77,10 @@ class AeroMirrorAdapter @Inject constructor(
         operatorName = operatorName,
         movementType = movementType,
     )
+
+    private companion object {
+        const val LOG_TAG = "AeroAudit"
+    }
 }
 
 /**

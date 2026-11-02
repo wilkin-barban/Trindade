@@ -140,6 +140,12 @@ data class AeroAuditLogRequest(
     val httpStatus: Int? = null,
     val durationMs: Long? = null,
     val note: String? = null,
+    /** Which app wrote the line. The log has three authors and the reader should not have to infer it. */
+    val client: String? = null,
+    /** Correlates the lines of one attempt, so a failure and its retry are readable together. */
+    val attemptId: String? = null,
+    /** Stable code first, detail after: the column is filtered by `grep AERO_`. */
+    val error: String? = null,
 )
 
 /**
