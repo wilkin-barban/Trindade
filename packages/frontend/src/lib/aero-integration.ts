@@ -103,6 +103,34 @@ export const DEFAULT_AERO_SETTINGS: AeroSettings = {
   lastSyncAt: null,
 };
 
+/**
+ * The ERP password, in this tab's memory and nowhere else.
+ *
+ * It used to live in `localStorage` in clear, next to the IP of the plant: any script on the page, any backup
+ * of the profile and any other tab of the same origin could read the company's credentials, for as long as the
+ * phone was switched on. Keeping it out of the browser's storage is the most this side can do while the ERP
+ * stays inside the plant's LAN -- a server-side vault needs the on-prem bridge, which does not exist yet.
+ *
+ * The cost is deliberate and visible: the password is asked again when the session opens, which is what the
+ * panel says out loud. Everything else in the settings is not a secret and stays where it was.
+ */
+let sessionPassword = '';
+
+/** The password this tab holds, or an empty string when none was typed since it opened. */
+export function aeroSessionPassword(): string {
+  return sessionPassword;
+}
+
+/** Remembers the password for the rest of the tab. Never reaches storage. */
+export function setAeroSessionPassword(value: string): void {
+  sessionPassword = value;
+}
+
+/** Forgets it: used when the settings are cleared. */
+export function clearAeroSessionPassword(): void {
+  sessionPassword = '';
+}
+
 export interface StorageLike {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
@@ -150,10 +178,19 @@ export function loadAeroSettings(storage?: Pick<Storage, 'getItem'> | StorageLik
       return { ...DEFAULT_AERO_SETTINGS };
     }
 
+    // A phone that used the old version carries the password in the payload. It is removed here, once, and
+    // it is not adopted: the session opens without a password and asks for it, which is the whole point.
+    if (Object.hasOwn(parsed, 'password')) {
+      const { password: _legacy, ...rest } = parsed;
+      if ('setItem' in target && typeof target.setItem === 'function') {
+        target.setItem(AERO_SETTINGS_STORAGE_KEY, JSON.stringify(rest));
+      }
+    }
+
     return {
       wsUrl: typeof parsed.wsUrl === 'string' ? parsed.wsUrl : DEFAULT_AERO_SETTINGS.wsUrl,
       username: typeof parsed.username === 'string' ? parsed.username : DEFAULT_AERO_SETTINGS.username,
-      password: typeof parsed.password === 'string' ? parsed.password : DEFAULT_AERO_SETTINGS.password,
+      password: aeroSessionPassword(),
       shortcutName: aeroShortcutName(parsed.shortcutName, AERO_DEFAULT_SHORTCUT_NAME),
       syncEnabled:
         typeof parsed.syncEnabled === 'boolean' ? parsed.syncEnabled : DEFAULT_AERO_SETTINGS.syncEnabled,
@@ -171,9 +208,14 @@ export function saveAeroSettings(
   settings: AeroSettings,
   storage?: Pick<Storage, 'setItem'> | StorageLike | null,
 ): AeroSettings {
+  // The password stays in the tab: what is written is the settings without it. A save with a typed password
+  // is also what opens the session, so the envelope can be built right after without asking again.
+  if (settings.password) setAeroSessionPassword(settings.password);
+  const { password: _secret, ...persisted } = settings;
+
   const target = storage ?? (typeof localStorage !== 'undefined' ? localStorage : null);
   if (target) {
-    target.setItem(AERO_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+    target.setItem(AERO_SETTINGS_STORAGE_KEY, JSON.stringify(persisted));
   }
   return settings;
 }
@@ -182,10 +224,29 @@ export function saveAeroSettings(
  * Removes company WebService settings from local storage.
  */
 export function clearAeroSettings(storage?: Pick<Storage, 'removeItem'> | StorageLike | null): void {
+  clearAeroSessionPassword();
   const target = storage ?? (typeof localStorage !== 'undefined' ? localStorage : null);
   if (target) {
     target.removeItem(AERO_SETTINGS_STORAGE_KEY);
   }
+}
+
+/**
+ * What is missing before an action can reach the ERP, if anything.
+ *
+ * `setup` is an address or a user nobody filled in; `password` is a configured integration whose tab no longer
+ * holds the secret. The two are different sentences on screen: sending the operator to retype a URL that is
+ * already saved gives up the configuration for lost, and saying only «no configurado» hides the one thing the
+ * person has to do.
+ */
+export function aeroMissingSetup(
+  settings: Pick<AeroSettings, 'wsUrl' | 'username' | 'password'> | null | undefined,
+): 'setup' | 'password' | null {
+  if (!settings) return 'setup';
+  if (!normalizeAeroWsUrl(settings.wsUrl ?? '')) return 'setup';
+  if (!settings.username || !settings.username.trim()) return 'setup';
+  if (!settings.password) return 'password';
+  return null;
 }
 
 /**

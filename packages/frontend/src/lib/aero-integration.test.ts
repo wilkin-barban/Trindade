@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { beforeEach, describe, it } from 'node:test';
 import {
   AERO_DEFAULT_BRIDGE_SHORTCUT_NAME,
   AERO_DEFAULT_SHORTCUT_NAME,
@@ -15,7 +15,10 @@ import {
   aeroBridgeShortcutRecipe,
   aeroConnectionBlocker,
   aeroEndpoint,
+  aeroMissingSetup,
+  aeroSessionPassword,
   aeroSettingsReady,
+  clearAeroSessionPassword,
   aeroShortcutTriggerUrl,
   basicAuthHeader,
   buildAeroBridgeEnvelope,
@@ -105,6 +108,9 @@ describe('aero-integration: access control', () => {
 });
 
 describe('aero-integration: settings persistence', () => {
+  // The password lives in this tab's memory, so it outlives a call and every test has to start without one.
+  beforeEach(() => clearAeroSessionPassword());
+
   it('returns default settings when storage is empty or unsupplied', () => {
     const storage = new FakeStorage();
     const settings = loadAeroSettings(storage);
@@ -125,6 +131,93 @@ describe('aero-integration: settings persistence', () => {
     saveAeroSettings(custom, storage);
     const loaded = loadAeroSettings(storage);
     assert.deepEqual(loaded, custom);
+  });
+
+  /**
+   * The password is the one thing the browser must not keep.
+   *
+   * It sat in `localStorage` in clear, next to the IP of the plant, for as long as the phone was on: any
+   * script on the page, any backup of the profile, any other tab of the same origin could read the company's
+   * credentials. The rest of the settings are not secrets and stay; the password returns to the memory of the
+   * tab and is typed again when the session opens.
+   */
+  it('never writes the password into storage', () => {
+    const storage = new FakeStorage();
+
+    saveAeroSettings({ ...DEFAULT_AERO_SETTINGS, username: 'wilkin', password: 'secreta' }, storage);
+
+    const raw = storage.getItem(AERO_SETTINGS_STORAGE_KEY) ?? '';
+    assert.ok(!raw.includes('secreta'), 'the password is not on disk');
+    assert.equal(JSON.parse(raw).password, undefined, 'and the field is not there empty either');
+    assert.equal(JSON.parse(raw).username, 'wilkin', 'the rest of the settings still travel');
+  });
+
+  it('keeps the password for the tab that typed it', () => {
+    const storage = new FakeStorage();
+
+    saveAeroSettings({ ...DEFAULT_AERO_SETTINGS, username: 'wilkin', password: 'secreta' }, storage);
+
+    // Same session: the envelope can be built without asking again.
+    assert.equal(aeroSessionPassword(), 'secreta');
+    assert.equal(loadAeroSettings(storage).password, 'secreta');
+  });
+
+  it('drops the stored password once and does not fill the session with it', () => {
+    const storage = new FakeStorage();
+    // A phone that used the old version carries the password in the payload.
+    storage.setItem(
+      AERO_SETTINGS_STORAGE_KEY,
+      JSON.stringify({ ...DEFAULT_AERO_SETTINGS, username: 'wilkin', password: 'vieja' })
+    );
+
+    const loaded = loadAeroSettings(storage);
+
+    assert.equal(loaded.password, '', 'the migration does not adopt the value it purges');
+    assert.ok(!(storage.getItem(AERO_SETTINGS_STORAGE_KEY) ?? '').includes('vieja'), 'the old value is gone');
+    // Once is enough: the second read finds a payload that no longer carries it.
+    assert.equal(JSON.parse(storage.getItem(AERO_SETTINGS_STORAGE_KEY) ?? '{}').password, undefined);
+    assert.equal(loadAeroSettings(storage).username, 'wilkin', 'the rest survives the purge');
+  });
+
+  it('purges the password and forgets the session value when cleared', () => {
+    const storage = new FakeStorage();
+    saveAeroSettings({ ...DEFAULT_AERO_SETTINGS, username: 'wilkin', password: 'secreta' }, storage);
+
+    clearAeroSettings(storage);
+
+    assert.equal(aeroSessionPassword(), '');
+    assert.equal(storage.getItem(AERO_SETTINGS_STORAGE_KEY), null);
+  });
+
+  /**
+   * Two different problems, two different sentences.
+   *
+   * An integration with no address is not set up; one with an address and no session password is set up and
+   * waiting for the person. Collapsing them into «no configurado» sends the operator to retype a URL that is
+   * already saved, and tells nobody that the tab needs the password again.
+   */
+  it('separates a missing setup from a missing session password', () => {
+    assert.equal(aeroMissingSetup({ ...DEFAULT_AERO_SETTINGS }), 'setup');
+    assert.equal(
+      aeroMissingSetup({ ...DEFAULT_AERO_SETTINGS, wsUrl: 'http://192.168.25.250:1453/api', username: 'wilkin' }),
+      'password'
+    );
+    assert.equal(
+      aeroMissingSetup({
+        ...DEFAULT_AERO_SETTINGS,
+        wsUrl: 'http://192.168.25.250:1453/api',
+        username: 'wilkin',
+        password: 'secreta',
+      }),
+      null
+    );
+    // `ready` keeps its old meaning -- address, user and a password in hand -- so every guard that already
+    // consulted it still holds; `aeroMissingSetup` is what tells the two gaps apart.
+    assert.equal(
+      aeroSettingsReady({ ...DEFAULT_AERO_SETTINGS, wsUrl: '', username: 'wilkin', password: 'secreta' }),
+      false
+    );
+    assert.equal(aeroSettingsReady({ ...DEFAULT_AERO_SETTINGS, username: 'wilkin' }), false);
   });
 
   it('tolerates corrupted or non-object JSON and falls back to defaults', () => {
