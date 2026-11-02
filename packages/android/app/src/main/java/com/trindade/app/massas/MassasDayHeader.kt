@@ -44,6 +44,11 @@ fun MassasDayHeader(
     isSyncing: Boolean,
     onSync: () -> Unit,
     modifier: Modifier = Modifier,
+    /**
+     * Whether the day still accepts writes. A closed day keeps its date and its last read, and loses the one
+     * action that would end in a 409: there is nothing to sync into a record.
+     */
+    readOnly: Boolean = false,
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
@@ -67,8 +72,9 @@ fun MassasDayHeader(
                     modifier = Modifier.weight(1f, fill = false),
                 )
                 // Tonal, not outlined: it is the screen's one refresh, it sits next to the date it refreshes,
-                // and it keeps the 48dp the rest of the module's actions use.
-                FilledTonalButton(
+                // and it keeps the 48dp the rest of the module's actions use. A closed day draws no button at
+                // all: an action that cannot run is not explained by dimming it.
+                if (!readOnly) FilledTonalButton(
                     onClick = onSync,
                     // Only the sync itself withholds the action: a bridge without settings is a reason the
                     // press explains in the result dialog, not a reason to remove the press.

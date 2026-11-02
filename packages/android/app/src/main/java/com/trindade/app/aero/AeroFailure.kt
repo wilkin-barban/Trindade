@@ -25,6 +25,14 @@ import com.trindade.app.ui.UiText
  * - [AeroFailureCode.ERP_REFUSED] is the plant answering no to this payload, and the fix is correcting the row.
  * - [AeroFailureCode.NO_ANSWER] is a transport failure with no sentence: nothing was recorded on the ERP side.
  */
+/**
+ * The backend's stable code for a write to a date that is already history.
+ *
+ * One spelling for both readers: the sync maps it to [AeroFailureCode.BACKEND_DAY_CLOSED] and the queue drops
+ * what carries it. A literal in each place is how a rename in the backend becomes two silent mismatches.
+ */
+const val AERO_CLOSED_DAY_CODE = "MASSAS_HISTORY_FROZEN"
+
 enum class AeroFailureCode {
     /** The integration has no address or credentials on this device yet. */
     NOT_CONFIGURED,
@@ -52,6 +60,15 @@ enum class AeroFailureCode {
 
     /** The ERP answered, but the backend would not store what was read. */
     SNAPSHOT_REFUSED,
+
+    /**
+     * The backend closed the day the phone tried to write.
+     *
+     * It is the mirror image of [SNAPSHOT_REFUSED]: there the server could not keep the read, here it refuses
+     * on purpose because the day is history. Retrying cannot work until someone reopens the day, so the item
+     * that produced it is dropped instead of being carried back to the next launch.
+     */
+    BACKEND_DAY_CLOSED,
 }
 
 /**
@@ -78,6 +95,7 @@ data class AeroFailure(
         AeroFailureCode.REFUSED_CONNECTION -> UiText.of(R.string.aero_failure_refused_connection)
         AeroFailureCode.NO_ANSWER -> UiText.of(R.string.aero_failure_no_answer)
         AeroFailureCode.SNAPSHOT_REFUSED -> UiText.of(R.string.aero_failure_snapshot_refused)
+        AeroFailureCode.BACKEND_DAY_CLOSED -> UiText.of(R.string.aero_failure_day_closed)
         // The plant's own sentence is the whole message; without one, the generic refusal is all that is left.
         AeroFailureCode.ERP_REFUSED -> detail?.trim()?.takeIf { it.isNotEmpty() }
             ?.let { UiText.of(R.string.aero_failure_erp_refused, it) }
@@ -97,6 +115,8 @@ data class AeroFailure(
             -> true
             AeroFailureCode.NOT_CONFIGURED,
             AeroFailureCode.ERP_REFUSED,
+            // The day is closed until a person reopens it: the same press would be refused again.
+            AeroFailureCode.BACKEND_DAY_CLOSED,
             -> false
         }
 
@@ -124,6 +144,7 @@ val AeroFailureCode.auditCode: String
         AeroFailureCode.NO_ANSWER -> "AERO_ERP_UNREACHABLE"
         AeroFailureCode.ERP_REFUSED -> "AERO_ERP_REFUSED"
         AeroFailureCode.SNAPSHOT_REFUSED -> "AERO_SNAPSHOT_REFUSED"
+        AeroFailureCode.BACKEND_DAY_CLOSED -> "AERO_BACKEND_DAY_CLOSED"
     }
 
 /**

@@ -1070,7 +1070,9 @@ export function MassasLaunchPage() {
             </div>
           </div>
           <p className="text-sm text-gray-500 mt-1">{t('massas.subtitle')}</p>
-          {aeroAllowed && (
+          {/* Today is the only day the ERP can still be told about: a closed day is a record, and a header
+              that offers to refresh it would be offering an action the API answers with a refusal. */}
+          {aeroAllowed && !dayIsClosed && (
             <div className="mt-3 flex flex-wrap items-center gap-2" data-testid="massas-sync-header">
               <button
                 type="button"

@@ -37,6 +37,7 @@ class MassasDayHeaderTest {
     private fun draw(
         syncedAt: String? = null,
         isSyncing: Boolean = false,
+        readOnly: Boolean = false,
         onSync: () -> Unit = {},
     ) {
         composeRule.setContent {
@@ -46,6 +47,7 @@ class MassasDayHeaderTest {
                     syncedAt = syncedAt,
                     isSyncing = isSyncing,
                     onSync = onSync,
+                    readOnly = readOnly,
                 )
             }
         }
@@ -76,6 +78,25 @@ class MassasDayHeaderTest {
 
         composeRule.onNodeWithTag(MASSAS_SYNC_SPINNER_TAG).assertIsDisplayed()
         composeRule.onNodeWithTag(MASSAS_SYNC_TAG).assertIsNotEnabled()
+    }
+
+    /**
+     * A closed day does not offer a write.
+     *
+     * The date and the last read stay: the day is a record and reading it is exactly what history is for.
+     * What leaves is the button, because pressing it would end in the backend's 409 and the operator would
+     * have spent the trip of a sync to learn something the header could have said by not offering it.
+     */
+    @Test
+    fun `hides the sync button on a closed day`() {
+        draw(syncedAt = "30/10 18:12", readOnly = true)
+
+        assertEquals(
+            0,
+            composeRule.onAllNodesWithTag(MASSAS_SYNC_TAG).fetchSemanticsNodes().size,
+        )
+        composeRule.onNodeWithText(string(R.string.massas_production_date, "30/10/2025")).assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.massas_synced_at, "30/10 18:12")).assertIsDisplayed()
     }
 
     @Test

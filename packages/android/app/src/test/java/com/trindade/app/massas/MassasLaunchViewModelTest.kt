@@ -25,6 +25,7 @@ import com.trindade.app.network.MassaIndividualLaunch
 import com.trindade.app.network.MassasApi
 import com.trindade.app.network.MassasLaunchDayView
 import kotlinx.serialization.json.JsonObject
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
@@ -916,6 +917,101 @@ class MassasLaunchViewModelTest {
             UiText.of(com.trindade.app.R.string.massas_error_reconciled),
             testVm.state.value.errorMessage,
         )
+    }
+
+    /**
+     * La respuesta del espejo pertenece al día que la pidió.
+     *
+     * Cambiar de fecha mientras la lectura está en vuelo dibujaba los asientos del día anterior sobre la fecha
+     * nueva: el operario veía en 31/10 lo que la planta registró el 30. El día es el testigo, y una respuesta
+     * que ya no es la del día en pantalla se descarta en lugar de mezclarse.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `drops the mirror answer when the day changed`() = runTest {
+        val monday = "2026-10-26"
+        val tuesday = "2026-10-27"
+        val mondayMirror = CompletableDeferred<Unit>()
+        val stored = com.trindade.app.network.AeroMovementsStoredDay(
+            date = monday,
+            movements = listOf(
+                com.trindade.app.network.AeroStoredMovement(
+                    entLan = 35900,
+                    productCode = "1045",
+                    productDesc = "MASSA CASEIRA",
+                    quantity = 30.0,
+                    entryDate = monday,
+                    operatorName = "WILKIN",
+                    movementType = "E",
+                ),
+            ),
+        )
+        val repo = object : MassasRepository(massasApi) {
+            override suspend fun day(date: String): MassasLaunchDayView = MassasLaunchDayView(date = date)
+
+            override suspend fun storedAeroMovements(
+                date: String,
+            ): com.trindade.app.network.AeroMovementsStoredDay? {
+                // Monday's read hangs until the operator has already moved to Tuesday.
+                if (date == monday) mondayMirror.await()
+                return if (date == monday) stored else null
+            }
+        }
+        val testVm = newViewModel(repo)
+
+        testVm.loadDay(monday)
+        testScheduler.runCurrent()
+        testVm.loadDay(tuesday)
+        testScheduler.runCurrent()
+
+        mondayMirror.complete(Unit)
+        testScheduler.runCurrent()
+
+        assertEquals(tuesday, testVm.state.value.date)
+        assertTrue("el espejo de ayer no se pinta sobre hoy", testVm.state.value.aeroMirror.isEmpty())
+    }
+
+    /**
+     * Un pendiente de un día cerrado no se reintenta: se descarta con su línea.
+     *
+     * La cola conserva lo que no salió porque el próximo intento puede funcionar. Un día que el backend ya
+     * cerró es lo contrario: reintentarlo es un 409 garantizado, y dejarlo ahí deja una fila pendiente que
+     * ningún toque puede vaciar. Sale de la cola en la primera apertura y queda escrito por qué.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `drops a queued item the backend closed instead of retrying it`() = runTest {
+        val today = MassasLaunchViewModel.saopauloToday()
+        val yesterday = java.time.LocalDate.parse(today).minusDays(1).toString()
+        queuePort = FakeQueuePort(
+            AeroQueue(
+                createdAt = System.currentTimeMillis(),
+                date = yesterday,
+                items = listOf(
+                    AeroQueueItem(
+                        productCode = "001045",
+                        productName = "MASSA CASEIRA",
+                        quantity = 30.0,
+                        operatorName = "JAIME",
+                        launchIds = listOf(4001),
+                        date = yesterday,
+                    ),
+                ),
+            ),
+        )
+        val repo = DayRepository(massasApi, dayWith())
+        val testVm = newViewModel(repo)
+        advanceUntilIdle()
+
+        assertEquals("un día cerrado no viaja al ERP", 0, erpPort.payloads.size)
+        assertEquals("la cola queda vacía", null, queuePort.stored)
+
+        val line = mirrorPort.logs.single { it.note?.contains("aero_queue_rejected") == true }
+        assertTrue("la línea nombra el día", line.note!!.contains("date=$yesterday"))
+        assertTrue("la línea nombra el asiento", line.note!!.contains("launchIds=4001"))
+        assertEquals("MASSAS_HISTORY_FROZEN", line.error)
+        // El operario no ve una alarma por algo que la app resolvió sola.
+        assertNull(testVm.state.value.noticeMessage)
     }
 
     /**

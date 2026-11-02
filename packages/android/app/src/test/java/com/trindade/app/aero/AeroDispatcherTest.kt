@@ -62,9 +62,11 @@ class AeroDispatcherTest {
     private class FakeMirror(
         private val recorder: Recorder,
         private val saved: AeroMovementsSaved?,
+        private val refusal: AeroSnapshotSave.Refused? = null,
     ) : AeroMirrorPort {
         override suspend fun saveMovements(date: String, movements: List<AeroErpMovement>): AeroSnapshotSave {
             recorder.calls += "mirror:save:$date:${movements.size}"
+            refusal?.let { return it }
             return saved?.let { AeroSnapshotSave.Saved(it) } ?: AeroSnapshotSave.Unreachable
         }
 
@@ -79,10 +81,11 @@ class AeroDispatcherTest {
         entry: AeroWriteResult = AeroWriteResult.Ok(null),
         movements: AeroMovementsResult = AeroMovementsResult.Ok(emptyList(), skipped = 0),
         saved: AeroMovementsSaved? = AeroMovementsSaved(saved = 0, massas = 0, insumos = 0),
+        refusal: AeroSnapshotSave.Refused? = null,
         reachability: AeroDiagnosis = AeroDiagnosis(wifiConnected = true, hostReachable = true),
     ) = AeroDispatcher(
         erp = FakeErp(recorder, entry, movements),
-        mirror = FakeMirror(recorder, saved),
+        mirror = FakeMirror(recorder, saved, refusal),
         reachability = object : AeroReachabilityPort {
             override suspend fun diagnose(wsUrl: String?, timeoutMillis: Int) = reachability
         },
@@ -285,6 +288,32 @@ class AeroDispatcherTest {
             false,
             recorder.calls.any { it.startsWith("mirror:save") },
         )
+    }
+
+    /**
+     * A day the backend closed is named as such, and nothing about it invites a retry.
+     *
+     * The ERP read worked and the snapshot arrived; the server refused it because that date is already
+     * history. Reporting the generic "the server did not keep the day" sends the operator to try again on a
+     * write that cannot succeed until somebody reopens the day, so the closed-day code is its own failure and
+     * is not retryable.
+     */
+    @Test
+    fun `maps a closed-day snapshot to a non retryable failure`() = runTest {
+        val recorder = Recorder()
+
+        val outcome = dispatcher(
+            recorder,
+            refusal = AeroSnapshotSave.Refused(status = 409, code = "MASSAS_HISTORY_FROZEN"),
+        ).syncDay(settings, "2026-10-30")
+
+        val failure = (outcome as AeroSyncOutcome.Failed).failure
+        assertEquals(AeroFailureCode.BACKEND_DAY_CLOSED, failure.code)
+        assertEquals(409, failure.serverStatus)
+        assertEquals("MASSAS_HISTORY_FROZEN", failure.serverCode)
+        assertEquals(false, failure.retryable)
+        // The log line keeps the backend's own code, so the reason survives in the trail.
+        assertEquals("MASSAS_HISTORY_FROZEN", recorder.logs.single().error)
     }
 
     @Test

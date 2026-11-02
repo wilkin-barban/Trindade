@@ -224,6 +224,7 @@ fun MassasLaunchScreen(
             syncedAt = state.aeroSyncedAt,
             isSyncing = state.isSyncingAero,
             onSync = viewModel::syncAeroDay,
+            readOnly = state.isReadOnly,
         )
 
         // La tabla unificada: lo lanzado aquí, lo que el ERP ya tiene y lo que sólo está en el ERP.

@@ -977,6 +977,7 @@
     <string name="aero_failure_no_answer">Sin respuesta del ERP. Revisá la red y volvé a intentar.</string>
     <string name="aero_failure_erp_refused">El ERP rechazó: %1$s</string>
     <string name="aero_failure_snapshot_refused">El ERP respondió, pero el servidor no guardó el día. Volvé a intentar.</string>
+    <string name="aero_failure_day_closed">El día ya está cerrado y no acepta sincronización. Reabrí el día para volver a enviar.</string>
     <string name="admin_integration_probe_ok">Conectado al ERP: %1$s.</string>
     <string name="admin_integration_probe_refused">El ERP rechazó el usuario o la contraseña.</string>
     <plurals name="loading_history_loadings">

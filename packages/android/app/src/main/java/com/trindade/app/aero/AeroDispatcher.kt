@@ -253,8 +253,19 @@ class AeroDispatcher(
                 )
                 when (save) {
                     is AeroSnapshotSave.Saved -> AeroSyncOutcome.Synced(save.counts)
+                    // A closed day is not a transport problem: the server understood the snapshot and refused
+                    // it because that date is already history. Naming it apart is what lets the queue drop the
+                    // item instead of carrying it back to the next launch forever.
                     is AeroSnapshotSave.Refused -> AeroSyncOutcome.Failed(
-                        AeroFailure(AeroFailureCode.SNAPSHOT_REFUSED, serverStatus = save.status, serverCode = save.code),
+                        AeroFailure(
+                            if (save.code == AERO_CLOSED_DAY_CODE) {
+                                AeroFailureCode.BACKEND_DAY_CLOSED
+                            } else {
+                                AeroFailureCode.SNAPSHOT_REFUSED
+                            },
+                            serverStatus = save.status,
+                            serverCode = save.code,
+                        ),
                     )
                     AeroSnapshotSave.Unreachable -> AeroSyncOutcome.Failed(AeroFailure(AeroFailureCode.SNAPSHOT_REFUSED))
                 }
@@ -284,6 +295,26 @@ class AeroDispatcher(
      * duration to report. What is worth keeping is which seat was taken, in how many boxes, and whether the
      * backend kept it -- `ent_lan` is the only field that pairs this launch with the company's own record.
      */
+    /**
+     * Records a queued item that will never be sent, and why.
+     *
+     * The queue used to keep whatever did not leave, which is the right answer for a plant that is down: the
+     * work waits and the next launch tries again. It is the wrong answer for a day the backend has closed --
+     * retrying is refused by definition, so the item would ride along forever and re-open the same 409 on
+     * every launch. Dropping it is what makes the queue finite; the line is what makes the drop visible.
+     */
+    suspend fun logQueueRejected(date: String, launchIds: List<Int>, code: String) {
+        mirror.log(
+            AeroAudit.request(
+                event = AeroAudit.Event.SYNC,
+                destinationUrl = IMPORT_DESTINATION,
+                phase = "response",
+                detail = "aero_queue_rejected · date=$date · launchIds=${launchIds.joinToString(",")} · code=$code",
+                error = code,
+            ),
+        )
+    }
+
     suspend fun logImport(
         date: String,
         entLan: Int,

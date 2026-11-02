@@ -10,6 +10,19 @@ import { loginAsAeroOwner } from './aero-owner';
  */
 const API = 'http://localhost:3099/api';
 
+/** The plant's day, not the browser's: the server closes on São Paulo's clock. */
+function today(): string {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const parts = formatter.formatToParts(new Date());
+  const pick = (type: string) => parts.find((part) => part.type === type)?.value;
+  return `${pick('year')}-${pick('month')}-${pick('day')}`;
+}
+
 test.use({ viewport: { width: 375, height: 667 } });
 
 test.describe('sync in the header', () => {
@@ -22,7 +35,8 @@ test.describe('sync in the header', () => {
     const token = (await login.json()).token as string;
 
     await page.goto('/massas-launch');
-    const date = '2026-09-16';
+    // Today: the open day is the only one whose header offers the sync at all.
+    const date = today();
     await page.locator('[data-testid="massas-launch-date"]').fill(date);
     await expect(page.locator('[data-testid="massas-launch-date"]')).toHaveValue(date);
 
@@ -64,5 +78,30 @@ test.describe('sync in the header', () => {
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
     expect(overflow).toBeLessThanOrEqual(0);
+  });
+
+  /**
+   * A closed day keeps its mirror, not its button.
+   *
+   * Yesterday is already recorded and the API refuses to reopen it, so offering "Sincronizar com ERP" there
+   * would promise a write that comes back as 409. The row disappears with the button: an action that cannot
+   * run is not explained by dimming it, it is simply not offered.
+   */
+  test('the sync action is not offered on a past day', async ({ page }) => {
+    await loginAsAeroOwner(page);
+    await page.goto('/massas-launch');
+
+    const yesterday = new Date(`${today()}T12:00:00Z`);
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    const past = yesterday.toISOString().slice(0, 10);
+
+    await page.locator('[data-testid="massas-launch-date"]').fill(past);
+    await expect(page.locator('[data-testid="massas-launch-date"]')).toHaveValue(past);
+
+    await expect(page.locator('[data-testid="massas-sync-erp"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="massas-sync-header"]')).toHaveCount(0);
+
+    // The day itself is still readable: what closed is the writing, not the record.
+    await expect(page.locator('text=Produção do dia')).toBeVisible();
   });
 });

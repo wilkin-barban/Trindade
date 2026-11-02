@@ -27,12 +27,31 @@ class AeroFailureTest {
             AeroFailureCode.REFUSED_CONNECTION,
             AeroFailureCode.NO_ANSWER,
             AeroFailureCode.SNAPSHOT_REFUSED,
+            AeroFailureCode.BACKEND_DAY_CLOSED,
         )
 
         val resources = networkCodes.map { AeroFailure(it).describe().resId }
 
         assertEquals("una oración por código", networkCodes.size, resources.toSet().size)
         assertTrue("ninguna quedó sin oración", resources.none { it == 0 })
+    }
+
+    /**
+     * A closed day is not a connection problem, and pressing again does not fix it.
+     *
+     * The queue reads this flag to decide whether an item waits for the next launch or is dropped, so a
+     * retryable closed day would keep a yesterday's seat in the phone forever.
+     */
+    @Test
+    fun `BACKEND_DAY_CLOSED is not retryable`() {
+        val closed = AeroFailure(AeroFailureCode.BACKEND_DAY_CLOSED, serverCode = "MASSAS_HISTORY_FROZEN")
+
+        assertEquals(false, closed.retryable)
+        assertEquals("AERO_BACKEND_DAY_CLOSED", closed.code.auditCode)
+        assertEquals(R.string.aero_failure_day_closed, closed.describe().resId)
+        // Retryable and not retryable are decided per code, and every other code still says what it said.
+        assertEquals(true, AeroFailure(AeroFailureCode.TIMEOUT).retryable)
+        assertEquals(false, AeroFailure(AeroFailureCode.NOT_CONFIGURED).retryable)
     }
 
     @Test

@@ -4,6 +4,7 @@ import androidx.annotation.StringRes
 import com.trindade.app.R
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trindade.app.aero.AERO_CLOSED_DAY_CODE
 import com.trindade.app.aero.AeroDispatchOutcome
 import com.trindade.app.aero.AeroFailure
 import com.trindade.app.aero.AeroDispatchRequest
@@ -172,8 +173,16 @@ class MassasLaunchViewModel @Inject constructor(
             refreshMirror(state.value.date)
         }
     }
+    /**
+     * Fills the mirror with what Trindade stored for [date], unless the operator already moved on.
+     *
+     * The read is a round trip and the date can change inside it: opening 30/10 and jumping to 31/10 used to
+     * paint the first answer over the second day, which reads as the ERP having seats for a day it never saw.
+     * The date is the token -- an answer for a day that is no longer on screen is dropped, not merged.
+     */
     private suspend fun refreshMirror(date: String) {
         val stored = repository.storedAeroMovements(date) ?: return
+        if (state.value.date != date) return
         _state.value = _state.value.copy(
             aeroMirror = stored.movements.map { it.toLogic() },
             aeroSyncedAt = stored.syncedAt ?: state.value.aeroSyncedAt,
@@ -631,8 +640,19 @@ class MassasLaunchViewModel @Inject constructor(
         // Lo que la planta ya registró no se vuelve a mandar. La guarda se aplica antes de tomar el lote, así
         // que un turno cerrado en otra tableta no cuesta ni una petición.
         var queue = stored.settle(settledLaunchIds())
+
+        // Un día cerrado no se reintenta: lo que quedó de una fecha que ya no es hoy se descarta aquí, con su
+        // línea en el registro. Dejarlo en la cola sería reabrir el mismo 409 en cada apertura, y el operario
+        // vería una fila pendiente que ningún toque puede vaciar.
+        val closed = queue.items.filter { it.date != saopauloToday() }
+        for (item in closed) {
+            queue = queue.settle(item.launchIds)
+            aeroDispatcher.logQueueRejected(item.date, item.launchIds, AERO_CLOSED_DAY_CODE)
+        }
+
         if (queue.isEmpty) {
             aeroQueueStore.clear()
+            refreshQueuedCount()
             return
         }
 
