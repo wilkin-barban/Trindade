@@ -1120,6 +1120,32 @@ describe('Reports Routes', () => {
     assert.strictEqual((db.prepare('SELECT COUNT(*) AS count FROM report_photos WHERE report_id = 9103').get() as any).count, 0);
   });
 
+  it('reactivates a deactivated report and audits it', async () => {
+    db.prepare(`INSERT INTO reports (id, user_id, turno, report_date, notes, is_active) VALUES (9105, 1, 'tarde', '2026-06-18', 'Reactivate me', 0)`).run();
+    db.prepare(`INSERT INTO report_items (report_id, task_id, checked) VALUES (9105, 1, 1)`).run();
+
+    const reactivated = await app.inject({ method: 'PATCH', url: '/api/reports/9105/activate', headers: { authorization: `Bearer ${token}` } });
+    assert.strictEqual(reactivated.statusCode, 200, reactivated.body);
+    assert.deepStrictEqual(JSON.parse(reactivated.body), { success: true });
+    assert.strictEqual((db.prepare('SELECT is_active FROM reports WHERE id = 9105').get() as any).is_active, 1);
+
+    const audit = db.prepare("SELECT entity_id FROM audit_logs WHERE action = 'activate' AND entity_type = 'report' ORDER BY id DESC").get() as any;
+    assert.strictEqual(audit.entity_id, 9105);
+
+    const missing = await app.inject({ method: 'PATCH', url: '/api/reports/99999/activate', headers: { authorization: `Bearer ${token}` } });
+    assert.strictEqual(missing.statusCode, 404);
+  });
+
+  it('worker is denied (403) from report reactivation', async () => {
+    db.prepare(`INSERT INTO reports (id, user_id, turno, report_date, notes, is_active) VALUES (9106, ?, 'tarde', '2026-06-18', 'Worker cannot reactivate', 0)`).run(workerUserId);
+
+    const denied = await app.inject({ method: 'PATCH', url: '/api/reports/9106/activate', headers: { authorization: `Bearer ${workerToken}` } });
+    assert.strictEqual(denied.statusCode, 403);
+    assert.strictEqual((db.prepare('SELECT is_active FROM reports WHERE id = 9106').get() as any).is_active, 0);
+
+    db.prepare('DELETE FROM reports WHERE id = 9106').run();
+  });
+
   it('worker is denied (403) from report deactivate and delete', async () => {
     db.prepare(
       `INSERT INTO reports (id, user_id, turno, report_date, notes, is_active) VALUES (9104, ?, 'tarde', '2026-06-18', 'Worker cannot deactivate or delete', 1)`

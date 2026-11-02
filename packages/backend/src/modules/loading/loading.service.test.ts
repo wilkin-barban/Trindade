@@ -208,6 +208,30 @@ describe('loading service direct persistence contract', () => {
     assert.ok(batch > 0);
   });
 
+  it('reactivates a whole batch and a single row, and reports a miss without touching data', () => {
+    const db = buildDb();
+    const rowId = schedule(db, { date: TOMORROW, driverId: driver(db, 'R') });
+    assert.equal(loading.deactivateBatch(db, TOMORROW), true);
+    assert.equal((db.prepare('SELECT is_active FROM loading_schedules WHERE schedule_date = ?').get(TOMORROW) as { is_active: number }).is_active, 0);
+
+    assert.equal(loading.activateBatch(db, TOMORROW), true);
+    assert.equal((db.prepare('SELECT is_active FROM loading_schedules WHERE schedule_date = ?').get(TOMORROW) as { is_active: number }).is_active, 1);
+    assert.equal(loading.activateBatch(db, TOMORROW), true, 'reactivating an open day is not an error');
+    assert.equal(loading.activateBatch(db, 'missing'), false);
+
+    assert.equal(loading.deactivate(db, rowId), true);
+    assert.equal(loading.activate(db, rowId), true);
+    assert.equal(loading.activate(db, rowId), true, 'an already active row is not a miss');
+    assert.equal(loading.activate(db, 999), false);
+  });
+
+  it('reactivates a batch dated before today, because the lifecycle is not a content edit', () => {
+    const db = buildDb();
+    schedule(db, { date: YESTERDAY, driverId: driver(db, 'P') });
+    assert.equal(loading.deactivateBatch(db, YESTERDAY), true);
+    assert.equal(loading.activateBatch(db, YESTERDAY), true);
+  });
+
   it('lists active drivers/vehicles and parses configured or fallback time slots', () => {
     const db = buildDb();
     driver(db, 'Inactive', 'fletero', 0);

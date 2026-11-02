@@ -177,6 +177,11 @@ export function deactivateReport(db: Database.Database, reportId: number): boole
   return result.changes > 0;
 }
 
+export function activateReport(db: Database.Database, reportId: number): boolean {
+  const result = db.prepare("UPDATE reports SET is_active = 1, updated_at = datetime('now') WHERE id = ?").run(reportId);
+  return result.changes > 0;
+}
+
 export function cleanupExpiredPhotos(db: Database.Database, photosDir: string, retentionDays = 30): { deleted: number; errors: number } {
   const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
   const expired = db

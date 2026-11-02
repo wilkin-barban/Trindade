@@ -27,6 +27,8 @@ const YESTERDAY = dateIn(-1);
 const CLOSED_BATCH_DAY = dateIn(3);
 const WHOLE_DAY = dateIn(4);
 const DISCARD_DAY = dateIn(5);
+const REACTIVATION_DAY = dateIn(6);
+const PAST_REACTIVATION_DAY = dateIn(-3);
 
 /**
  * Helper: login as admin and return the JWT token.
@@ -448,6 +450,81 @@ describe('Loading Schedule Routes', () => {
     });
     assert.strictEqual(JSON.parse(closed.body).schedules.length, 2, 'a closed day is still readable');
     assert.strictEqual(JSON.parse(closed.body).dayActive, false);
+  });
+
+  it('reactivates a deactivated batch and audits it once per action', async () => {
+    const first = seedDriver(db, 'Reactivate A', 'REA-1');
+    const second = seedDriver(db, 'Reactivate B', 'REA-2');
+    db.prepare(`INSERT INTO loading_schedules (id, schedule_date, time_slot, driver_id, driver_type, user_id, is_active) VALUES (33000, ?, '04:00', ?, 'fletero', ?, 0)`).run(REACTIVATION_DAY, first, fixtures.admin.id);
+    db.prepare(`INSERT INTO loading_schedules (id, schedule_date, time_slot, driver_id, driver_type, user_id, is_active) VALUES (33001, ?, '04:30', ?, 'fletero', ?, 0)`).run(REACTIVATION_DAY, second, fixtures.admin.id);
+    const before = (db.prepare("SELECT COUNT(*) AS count FROM audit_logs WHERE action = 'activate' AND entity_type = 'loading_batch'").get() as { count: number }).count;
+
+    for (const attempt of [1, 2]) {
+      const response = await app.inject({
+        method: 'PATCH',
+        url: `/api/loading/schedules/batch/${REACTIVATION_DAY}/activate`,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      assert.strictEqual(response.statusCode, 200, `attempt ${attempt}: ${response.body}`);
+      assert.deepStrictEqual(JSON.parse(response.body), { success: true });
+    }
+
+    assert.strictEqual((db.prepare('SELECT COUNT(*) AS count FROM loading_schedules WHERE schedule_date = ? AND is_active = 1').get(REACTIVATION_DAY) as { count: number }).count, 2);
+    const audits = db.prepare("SELECT details FROM audit_logs WHERE action = 'activate' AND entity_type = 'loading_batch' ORDER BY id").all() as { details: string }[];
+    assert.strictEqual(audits.length - before, 2, 'each reactivation leaves one audit line');
+    assert.strictEqual(JSON.parse(audits[audits.length - 1].details).scheduleDate, REACTIVATION_DAY);
+  });
+
+  it('reactivates a past batch, which the calendar freezes to content edits only', async () => {
+    const driverId = seedDriver(db, 'Reactivate Past', 'REP-1');
+    db.prepare(`INSERT INTO loading_schedules (id, schedule_date, time_slot, driver_id, driver_type, user_id, is_active) VALUES (33002, ?, '04:00', ?, 'fletero', ?, 0)`).run(PAST_REACTIVATION_DAY, driverId, fixtures.admin.id);
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: `/api/loading/schedules/batch/${PAST_REACTIVATION_DAY}/activate`,
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.strictEqual(response.statusCode, 200, response.body);
+    assert.strictEqual((db.prepare('SELECT is_active FROM loading_schedules WHERE id = 33002').get() as { is_active: number }).is_active, 1);
+  });
+
+  it('denies reactivation to a worker and answers 404 for a day without rows', async () => {
+    const driverId = seedDriver(db, 'Reactivate Denied', 'RED-1');
+    db.prepare(`INSERT INTO loading_schedules (id, schedule_date, time_slot, driver_id, driver_type, user_id, is_active) VALUES (33003, ?, '04:00', ?, 'fletero', ?, 0)`).run(DISCARD_DAY, driverId, fixtures.admin.id);
+    const workerToken = await loginAs(app, fixtures.worker.username, fixtures.worker.password);
+
+    const denied = await app.inject({
+      method: 'PATCH',
+      url: `/api/loading/schedules/batch/${DISCARD_DAY}/activate`,
+      headers: { authorization: `Bearer ${workerToken}` },
+    });
+    assert.strictEqual(denied.statusCode, 403);
+    assert.strictEqual((db.prepare('SELECT is_active FROM loading_schedules WHERE id = 33003').get() as { is_active: number }).is_active, 0, 'a denied reactivation leaves the row inactive');
+
+    const missing = await app.inject({
+      method: 'PATCH',
+      url: `/api/loading/schedules/batch/${dateIn(90)}/activate`,
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.strictEqual(missing.statusCode, 404);
+  });
+
+  it('reactivates a single row by id and answers 400 or 404 for a bad target', async () => {
+    const driverId = seedDriver(db, 'Reactivate Row', 'RER-1');
+    db.prepare(`INSERT INTO loading_schedules (id, schedule_date, time_slot, driver_id, driver_type, user_id, is_active) VALUES (33004, ?, '04:00', ?, 'fletero', ?, 0)`).run(REACTIVATION_DAY, driverId, fixtures.admin.id);
+
+    const reactivated = await app.inject({
+      method: 'PATCH',
+      url: '/api/loading/schedules/33004/activate',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.strictEqual(reactivated.statusCode, 200, reactivated.body);
+    assert.strictEqual((db.prepare('SELECT is_active FROM loading_schedules WHERE id = 33004').get() as { is_active: number }).is_active, 1);
+    const audit = db.prepare("SELECT entity_id FROM audit_logs WHERE action = 'activate' AND entity_type = 'loading' ORDER BY id DESC").get() as { entity_id: number };
+    assert.strictEqual(audit.entity_id, 33004);
+
+    assert.strictEqual((await app.inject({ method: 'PATCH', url: '/api/loading/schedules/nope/activate', headers: { authorization: `Bearer ${token}` } })).statusCode, 400);
+    assert.strictEqual((await app.inject({ method: 'PATCH', url: '/api/loading/schedules/99999/activate', headers: { authorization: `Bearer ${token}` } })).statusCode, 404);
   });
 
 });

@@ -703,6 +703,43 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
   });
 
   registry.registerPath({
+    method: 'patch',
+    path: '/api/loading/schedules/batch/{date}/activate',
+    summary: 'Reactivate every entry of one date',
+    description:
+      'Deactivation is the reversible half of the loading lifecycle: this works on a closed day too, ' +
+      'because it changes the state of the batch without editing its content. Reactivating a day that ' +
+      'is already active is a success, not a conflict.',
+    tags: ['loading'],
+    request: { params: BATCH_DATE_PARAMS },
+    responses: {
+      200: jsonResponse('The batch was reactivated transactionally', SuccessResponseSchema),
+      400: errorResponse('The date is not in YYYY-MM-DD form'),
+      401: UNAUTHORIZED,
+      403: errorResponse('Administrador only'),
+      404: errorResponse('No batch on that date'),
+    },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/api/loading/schedules/{id}/activate',
+    summary: 'Reactivate one schedule entry',
+    description:
+      'One row at a time, for a detail view. The history reactivates whole days: an operator closes ' +
+      'a day, not a row.',
+    tags: ['loading'],
+    request: { params: SCHEDULE_ID_PARAMS },
+    responses: {
+      200: jsonResponse('The entry was reactivated', SuccessResponseSchema),
+      400: errorResponse('The identifier is not a number'),
+      401: UNAUTHORIZED,
+      403: errorResponse('Administrador only'),
+      404: errorResponse('No such schedule entry'),
+    },
+  });
+
+  registry.registerPath({
     method: 'delete',
     path: '/api/loading/schedules/batch/{date}',
     summary: 'Delete every entry of one date',
@@ -948,6 +985,22 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
     request: { params: REPORT_ID_PARAMS },
     responses: {
       200: jsonResponse('The report was deactivated', SuccessResponseSchema),
+      400: errorResponse('The identifier is not a number'),
+      401: UNAUTHORIZED,
+      403: errorResponse('Administrador only'),
+      404: errorResponse('No such report'),
+    },
+  });
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/api/reports/{id}/activate',
+    summary: 'Reactivate a report',
+    description: 'Administrador only. Reactivating an active report is a success, not a conflict.',
+    tags: ['reports'],
+    request: { params: REPORT_ID_PARAMS },
+    responses: {
+      200: jsonResponse('The report was reactivated', SuccessResponseSchema),
       400: errorResponse('The identifier is not a number'),
       401: UNAUTHORIZED,
       403: errorResponse('Administrador only'),

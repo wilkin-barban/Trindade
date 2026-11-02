@@ -425,6 +425,31 @@ export function deactivate(db: Database.Database, id: number): boolean {
   return result.changes > 0;
 }
 
+/**
+ * Brings a single row back into the day. Deactivation is the reversible half of the lifecycle, and
+ * the calendar does not refuse it: a past day is frozen to content edits, not to its state.
+ */
+export function activate(db: Database.Database, id: number): boolean {
+  const result = db.prepare("UPDATE loading_schedules SET is_active = 1, updated_at = datetime('now') WHERE id = ?").run(id);
+  return result.changes > 0;
+}
+
+/**
+ * Brings every row of one date back into the day.
+ *
+ * The existence check is what separates "there is no batch on that date" from "every row was already
+ * active": SQLite reports the matched rows, so the second UPDATE is a success too.
+ */
+export function activateBatch(db: Database.Database, date: string): boolean {
+  const tx = db.transaction(() => {
+    const existing = db.prepare('SELECT COUNT(*) AS count FROM loading_schedules WHERE schedule_date = ?').get(date) as { count: number };
+    if (existing.count === 0) return false;
+    db.prepare("UPDATE loading_schedules SET is_active = 1, updated_at = datetime('now') WHERE schedule_date = ?").run(date);
+    return true;
+  });
+  return tx();
+}
+
 export function deactivateBatch(db: Database.Database, date: string): boolean {
   const tx = db.transaction(() => {
     const existing = db.prepare('SELECT COUNT(*) AS count FROM loading_schedules WHERE schedule_date = ?').get(date) as { count: number };

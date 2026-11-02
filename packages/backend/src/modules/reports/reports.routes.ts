@@ -203,6 +203,20 @@ export async function reportsRoutes(fastify: FastifyInstance, opts: ReportsRoute
     }
   );
 
+  fastify.patch(
+    '/:id/activate',
+    { preHandler: [fastify.authenticate] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      if (request.user!.role !== 'Administrador') return reply.status(403).send({ error: 'Insufficient permissions' });
+      const { id } = request.params as { id: string };
+      const reportId = parseInt(id, 10);
+      if (isNaN(reportId)) return reply.status(400).send({ error: 'Invalid report ID' });
+      if (!lifecycle.activateReport(fastify.db, reportId)) return reply.status(404).send({ error: 'Report not found' });
+      auditLog(fastify.db, { userId: request.user!.sub, action: 'activate', entityType: 'report', entityId: reportId, ipAddress: request.ip });
+      return reply.send({ success: true });
+    }
+  );
+
   fastify.delete(
     '/:id',
     { preHandler: [fastify.authenticate] },
