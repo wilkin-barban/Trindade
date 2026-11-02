@@ -577,6 +577,9 @@ private fun DriverPickerDialog(
                             CandidateRow(
                                 name = driver.name,
                                 picked = driver.id in state.pickedFleteros,
+                                // The slot the server already has this driver in, or null. Drawn disabled
+                                // with the hour rather than dropped: see `assignedSlotOf`.
+                                busySlot = state.assignedSlotOf(driver.id),
                                 onPickedChange = { picked -> onFleteroPicked(driver.id, picked) },
                             )
                         }
@@ -590,10 +593,12 @@ private fun DriverPickerDialog(
                             CandidateRow(
                                 name = driver.name,
                                 picked = picked,
+                                busySlot = state.assignedSlotOf(driver.id),
                                 onPickedChange = { value -> onCasaPicked(driver.id, value) },
                             ) {
                                 PlatePicker(
-                                    vehicles = state.vehicles,
+                                    // Free plates only: the day's, and this batch's, minus this row's own.
+                                    vehicles = state.vehicleOptionsFor(driver.id),
                                     chosenVehicleId = state.pickedCasa[driver.id],
                                     // A plate belongs to a driver the operator picked: offering it on a row
                                     // nobody selected would set one the request would then ignore.
@@ -665,18 +670,36 @@ private fun CandidateRow(
     name: String,
     picked: Boolean,
     onPickedChange: (Boolean) -> Unit,
+    busySlot: String? = null,
     trailing: @Composable (() -> Unit)? = null,
 ) {
+    val occupied = busySlot != null
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = 48.dp)
-            .toggleable(value = picked, role = Role.Checkbox, onValueChange = onPickedChange),
+            // Disabled rather than absent: the name stays on the list, and the sentence under it says when
+            // and where the driver already is, which is the question a disappearance used to leave open.
+            .toggleable(
+                value = picked,
+                role = Role.Checkbox,
+                enabled = !occupied,
+                onValueChange = onPickedChange,
+            ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Checkbox(checked = picked, onCheckedChange = null)
-        Text(text = name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Checkbox(checked = picked, onCheckedChange = null, enabled = !occupied)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = name, style = MaterialTheme.typography.bodyLarge)
+            busySlot?.let { slot ->
+                Text(
+                    text = stringResource(R.string.loading_picker_driver_busy, name, slot),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
         trailing?.invoke()
     }
 }
@@ -684,10 +707,11 @@ private fun CandidateRow(
 /**
  * The plate a company driver will drive, chosen from the day's own vehicles.
  *
- * A menu rather than a list of radio rows: the vehicles belong to the fleet and the same plate may be given
- * to several drivers of the slot, so the choice is a value on this driver's row and not a slot-wide
- * selection. The button says "Chapa" until something is chosen, because an empty value has to be visible as
- * missing rather than as a blank.
+ * A menu rather than a list of radio rows: a plate belongs to one driver of the slot, so the choice is a
+ * value on this driver's row and not a slot-wide selection. It is offered the free plates and no more --
+ * the fleet minus what the day already drives and what this batch already picked, keeping this row's own --
+ * because a plate the server will refuse is not a choice. The button says "Chapa" until something is
+ * chosen, because an empty value has to be visible as missing rather than as a blank.
  */
 @Composable
 private fun PlatePicker(

@@ -130,6 +130,32 @@ class LoadingViewModel @Inject constructor(
         val availableDrivers: List<DriversResponseDriversInner>
             get() = drivers.filter { it.id !in assignedDriverIds }
 
+        /**
+         * The slot where this driver already sits on this day, or null when they are free.
+         *
+         * The picker lists an occupied driver rather than dropping them: a name that disappears with no
+         * explanation reads as a fleet that lost it, and the operator has no way to learn that the row
+         * they are looking for is already on the day. The slot is what makes the row answer the question
+         * the disappearance used to raise.
+         */
+        fun assignedSlotOf(driverId: Int): String? =
+            schedules.firstOrNull { it.driverId == driverId }?.timeSlot
+
+        /**
+         * The plates the picker may offer one company driver, as free plates and no more.
+         *
+         * Free of the day -- a plate already driving a slot cannot drive a second one -- and free of this
+         * batch, because the operator is filling several rows at once and the server refuses the second
+         * row that names the same vehicle. The driver's own choice stays in the list, since it is the value
+         * the row already shows and a menu that omitted it would draw the pick as missing.
+         */
+        fun vehicleOptionsFor(driverId: Int): List<VehiclesResponseVehiclesInner> {
+            val takenByDay = schedules.mapNotNull { it.vehicleId }.toSet()
+            val takenByBatch = pickedCasa.filterKeys { it != driverId }.values.filterNotNull().toSet()
+            val own = pickedCasa[driverId]
+            return vehicles.filter { it.id !in takenByDay && (it.id !in takenByBatch || it.id == own) }
+        }
+
         /** What the counter shows. A display: see [FleteroQuota] for why it may not refuse anything. */
         fun fleteroCountIn(slot: String): Int = FleteroQuota.countInWindow(schedules, slot)
 
@@ -154,12 +180,18 @@ class LoadingViewModel @Inject constructor(
                 .filter { waMeNumber(it.phone.orEmpty()).isNotEmpty() }
         }
 
-        /** The drivers of the day the picker may still offer, split the way its two tabs are. */
+        /**
+         * The fleet, split the way the picker's two tabs are.
+         *
+         * Every driver, not only the free ones: an occupied name is drawn disabled with its slot instead
+         * of being left out, which is S54's whole point. [assignedSlotOf] is the question a row asks to
+         * know which of the two it is.
+         */
         val fleteroCandidates: List<DriversResponseDriversInner>
-            get() = availableDrivers.filter { it.driverType == DriversResponseDriversInner.DriverType.fletero }
+            get() = drivers.filter { it.driverType == DriversResponseDriversInner.DriverType.fletero }
 
         val casaCandidates: List<DriversResponseDriversInner>
-            get() = availableDrivers.filter { it.driverType == DriversResponseDriversInner.DriverType.casa }
+            get() = drivers.filter { it.driverType == DriversResponseDriversInner.DriverType.casa }
 
         val pickedCount: Int
             get() = pickedFleteros.size + pickedCasa.size
@@ -328,13 +360,22 @@ class LoadingViewModel @Inject constructor(
      * picker keeps a set and the answer to a tap is that set with this driver in it or out of it.
      */
     fun toggleFletero(driverId: Int, picked: Boolean) = _state.update { current ->
+        // A driver already on the day is drawn disabled, and this is the same refusal one layer down: the
+        // pick would be a row the server rejects, so it never becomes a pick.
+        val occupied = picked && current.assignedSlotOf(driverId) != null
         current.copy(
-            pickedFleteros = if (picked) current.pickedFleteros + driverId else current.pickedFleteros - driverId,
+            pickedFleteros = when {
+                occupied -> current.pickedFleteros
+                picked -> current.pickedFleteros + driverId
+                else -> current.pickedFleteros - driverId
+            },
         )
     }
 
     /** Picks or drops one company driver; dropping takes the plate that was given to it. */
     fun toggleCasa(driverId: Int, picked: Boolean) = _state.update { current ->
+        // The company tab's half of the same rule; see `toggleFletero`.
+        if (picked && current.assignedSlotOf(driverId) != null) return@update current
         current.copy(
             pickedCasa = if (picked) {
                 // Re-selecting keeps the plate already chosen: the operator correcting a list must not lose
@@ -377,14 +418,16 @@ class LoadingViewModel @Inject constructor(
 
         val requests = current.pickedFleteros.mapNotNull { id -> current.drivers.firstOrNull { it.id == id } }
             .map { driver -> scheduleRequest(current.date, slot, driver, vehicleId = null) } +
-            current.pickedCasa.entries.mapNotNull { (driverId, vehicleId) ->
-                val driver = current.drivers.firstOrNull { it.id == driverId }
-                if (driver == null || vehicleId == null) {
-                    null
-                } else {
-                    scheduleRequest(current.date, slot, driver, vehicleId = vehicleId)
+            // One plate, one row. The picker no longer offers a taken plate, and this is the same rule at
+            // the point the requests are built: two rows naming one vehicle is a 409 for the second, and
+            // the operator asked for a batch that the screen already said was possible.
+            current.pickedCasa.entries
+                .filter { (_, vehicleId) -> vehicleId != null }
+                .distinctBy { (_, vehicleId) -> vehicleId }
+                .mapNotNull { (driverId, vehicleId) ->
+                    current.drivers.firstOrNull { it.id == driverId }
+                        ?.let { driver -> scheduleRequest(current.date, slot, driver, vehicleId = vehicleId) }
                 }
-            }
         if (requests.isEmpty()) return
 
         _state.update { it.copy(busy = true, message = null) }
