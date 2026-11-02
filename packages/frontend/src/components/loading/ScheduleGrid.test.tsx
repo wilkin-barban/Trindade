@@ -210,6 +210,36 @@ describe('ScheduleGrid quota', () => {
     expect(screen.queryByTestId('driver-select-04-00')).toBeNull();
   });
 
+  /**
+   * A fletero's plate belongs to him, not to the plant's truck, and the grid is about the plant's trucks.
+   *
+   * The plate on his record is an old spreadsheet cell -- Celso carries «RXK», Fabiano «RKM» -- and drawing it
+   * beside his name reads as if he were driving one of our vehicles. The data stays in the answer; the grid
+   * stops borrowing it.
+   */
+  it('does not draw the plate of a fletero', () => {
+    renderGrid([{ ...fletero(1, '04:00'), license_plate: 'RXK' }]);
+
+    const row = screen.getByTestId('entry-1');
+    expect(row).toHaveTextContent('Fletero 1');
+    expect(row).not.toHaveTextContent('RXK');
+  });
+
+  it('keeps the plate of a company row', () => {
+    renderGrid([
+      {
+        ...fletero(2, '04:00'),
+        driver_type: 'casa' as const,
+        driver_name: 'Silvana',
+        vehicle_id: 11,
+        vehicle_plate: 'TRK-1A11',
+        vehicle_description: 'Volvo FH 540',
+      },
+    ]);
+
+    expect(screen.getByTestId('entry-2')).toHaveTextContent('TRK-1A11');
+  });
+
   it('says the hour is empty, not the whole day', () => {
     renderGrid([fletero(1, '04:00')], ['04:00', '05:00']);
 

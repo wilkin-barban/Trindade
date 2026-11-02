@@ -562,6 +562,10 @@ Cada tarea declara objetivo, archivos, tests exactos, aceptación, commit espera
 - **Aceptación**: ninguna vista web muestra la chapa del fletero; los datos históricos no se tocan.
 - **Commit**: `fix(web): hide the fletero plate in the grid and the editor` (~80 líneas).
 - **Depende de**: ninguna.
+- **Estado.** Hecho: `getDisplayPlate` devuelve vacío para un fletero y la edición sólo dibuja
+  `vehicle_plate` de una fila de casa; la chapa sigue en la respuesta. Tests: `ScheduleGrid`
+  (`does not draw the plate of a fletero`, `keeps the plate of a company row`) y `LoadingEditPage`
+  (`hides the fletero plate in the editor`); 110 vitest en verde.
 
 #### T22 — Contrato del log ERP con cuerpos reales
 - **Specs**: S50, S49.

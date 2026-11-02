@@ -104,13 +104,14 @@ export function ScheduleGrid({
     return '-';
   }
 
+  /**
+   * The plate the grid draws: the plant's truck, never the driver's own record.
+   *
+   * A fletero brings his truck, and the plate on his record is an old spreadsheet cell; drawing it beside his
+   * name read as if he were driving one of ours. The data stays in the answer for the history.
+   */
   function getDisplayPlate(entry: ScheduleRow): string {
-    if (entry.driver_type === 'casa') {
-      return entry.vehicle_plate || '';
-    }
-    if (entry.license_plate) return entry.license_plate;
-    if (entry.vehicle_plate) return entry.vehicle_plate;
-    return '';
+    return entry.driver_type === 'casa' ? entry.vehicle_plate || '' : '';
   }
 
   async function handleDelete(id: number) {

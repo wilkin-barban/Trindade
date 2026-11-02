@@ -119,6 +119,21 @@ describe('LoadingEditPage', () => {
     expect(option).not.toBeNull();
   });
 
+  it('hides the fletero plate in the editor', async () => {
+    get.mockImplementation(async (url: string) => {
+      if (url.startsWith('/loading/schedules')) {
+        return { schedules: [{ ...schedule(1, '04:00', 'Celso'), license_plate: 'RXK' }] };
+      }
+      return { timeSlots: ['04:00'] };
+    });
+    renderPage();
+
+    // The row is drawn with his name and his hour; «RXK» is a spreadsheet cell of his, not a truck of ours.
+    await waitFor(() => expect(screen.getByTestId('edit-entry-1')).toBeInTheDocument());
+    expect(screen.getByTestId('edit-entry-1')).toHaveTextContent('Celso');
+    expect(screen.getByTestId('edit-entry-1')).not.toHaveTextContent('RXK');
+  });
+
   it('shows the read-only banner and ignores edit= on a past day', async () => {
     get.mockImplementation(async (url: string) => {
       if (url.startsWith('/loading/schedules')) {

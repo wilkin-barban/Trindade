@@ -275,10 +275,10 @@ export function LoadingEditPage() {
                           <span className="ml-1 text-yellow-600">({currentQuota}/3 fleteros)</span>
                         )}
                       </span>
-                      {(entry.license_plate || entry.vehicle_plate) && (
-                        <span className="text-xs text-gray-400 ml-2">
-                          {entry.license_plate || entry.vehicle_plate}
-                        </span>
+                      {/* A fletero's plate is on his record, not on the plant's truck: the editor moves rows
+                          between hours, and his own plate is not part of that. */}
+                      {entry.driver_type === 'casa' && entry.vehicle_plate && (
+                        <span className="text-xs text-gray-400 ml-2">{entry.vehicle_plate}</span>
                       )}
                     </div>
                     <div className="flex items-center gap-1">
