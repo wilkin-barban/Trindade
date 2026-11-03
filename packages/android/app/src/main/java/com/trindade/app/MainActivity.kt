@@ -285,6 +285,7 @@ class MainActivity : ComponentActivity() {
                                     currentVersionName = com.trindade.app.BuildConfig.APP_VERSION_NAME,
                                     currentBuildTimeMillis = com.trindade.app.BuildConfig.BUILD_TIME,
                                     installedSizeBytes = com.trindade.app.update.InstalledAppInfo.getInstalledApkSize(this@MainActivity),
+                                    currentBuildNumber = com.trindade.app.BuildConfig.APP_VERSION_CODE,
                                 )
                                 updateAvailable = availability.isUpdateAvailable
                                 if (availability.isUpdateAvailable) {

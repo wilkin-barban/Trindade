@@ -10,6 +10,23 @@ hashes y verificaciones está en [docs/release-android-historial.md](docs/releas
 
 ---
 
+## [0.7.1] — 2026-11-03
+
+### Cambiado
+
+- **La actualización Android ya no depende del tamaño del APK.** `/api/app/latest-release` expone el
+  `buildNumber` interno y el detector lo compara cuando la versión pública es la misma. Una rebuild futura
+  con igual `versionName` y tamaño sigue siendo detectable.
+- **Versión pública 0.7.1 servida por `/latest-release`.** Los clientes 0.7.0 la ven como `NEW_RELEASE`; la
+  build interna es superior a la instalada y Android acepta la actualización. No se instaló en el emulador.
+
+### Distribución Android
+
+- APK de producción: `versionName 0.7.1`, 11.277.888 bytes, sha256
+  `41f87a148e28cc1f40bb2ac25a2e70f31587c598e806f2c65efa37411a46c545`. El código de build es interno.
+
+---
+
 ## [0.7.0] — 2026-11-03
 
 ### Corregido

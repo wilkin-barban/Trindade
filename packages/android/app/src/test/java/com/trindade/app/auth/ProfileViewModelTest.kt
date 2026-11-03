@@ -1192,12 +1192,14 @@ private fun latestRelease(
     version: String,
     apkUrl: String = "https://trindademasas.duckdns.org/api/app/download-apk",
     apkSize: Long = 11_149_040L,
+    buildNumber: Int? = null,
     publishedAt: String? = "2026-10-31T06:24:08.000Z",
 ) = LatestReleaseResponse(
     version = version,
     apkUrl = apkUrl,
     apkName = "trindade.apk",
     apkSize = java.math.BigDecimal(apkSize),
+    buildNumber = buildNumber,
     publishedAt = publishedAt,
     webUrl = "https://trindademasas.duckdns.org",
 )

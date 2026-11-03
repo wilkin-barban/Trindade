@@ -82,6 +82,7 @@ private fun release(apkUrl: String, apkName: String) = LatestReleaseResponse(
     apkUrl = apkUrl,
     apkName = apkName,
     apkSize = null,
+    buildNumber = null,
     publishedAt = null,
     webUrl = "https://trindademasas.duckdns.org",
 )

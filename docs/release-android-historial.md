@@ -32,17 +32,17 @@ La guía de firma y publicación está en [release-android.md](release-android.m
 | 0.7.0 | 7004 | 2026-11-01 | Reemplazada | Acciones y filtros de históricos, Compartilhar App con el APK y resumen único del inicio | `7622756da304157904a1e47eccacff04e65d97d46615ecc804d62d24f0d1674f` |
 | 0.7.0 | 7005 | 2026-11-02 | Reemplazada | Paridad web/Android del ERP: cola drenada con ack reversible, multioperario por asiento y fallos de Aero unificados | `87f9a6a36166d0206031a23aa223bc1ea857e749304045ef79ea06877549ba75` |
 | 0.7.0 | 7006 | 2026-11-02 | Reemplazada | Histórico de cargamento cerrado en solo lectura, reactivación de lote y reporte, selector de chapas libres, rechazos de tanda en un paso y sync ERP limitado al día abierto | `f77643b7a5442cf2a74d721f621a3977612ae074d2624c4fe735bb38441f3702` |
-| 0.7.0 | — | 2026-11-03 | **Publicada** | Payload de movimientos alineado con el puente web, vista de solo lectura de días cerrados en el Histórico de Cargamento y orden de Lanzamiento de Masas de la web; asset de GitHub y binario de producción | `5dd77e331edb1aace6e2b656e899697819a506068dc375528c8dc6f5a5ade922` |
+| 0.7.0 | — | 2026-11-03 | Reemplazada | Payload de movimientos alineado con el puente web, vista de solo lectura de días cerrados en el Histórico de Cargamento y orden de Lanzamiento de Masas de la web; asset de GitHub | `5dd77e331edb1aace6e2b656e899697819a506068dc375528c8dc6f5a5ade922` |
+| 0.7.1 | — | 2026-11-03 | **Publicada** | Versión pública servida por `latest-release`; el endpoint expone el `buildNumber` interno y el detector lo usa cuando la versión no cambia | `41f87a148e28cc1f40bb2ac25a2e70f31587c598e806f2c65efa37411a46c545` |
 
 Notas:
 
 - **Interna** significa distribuida por `GET /api/app/download-apk`, sin tag ni release de GitHub.
-- **Reemplazo del 2026-11-03:** el asset actual de GitHub, su `.sha256`,
-  `packages/backend/apk/trindade-0.7.0.apk`, la copia de escritorio y
-  `https://trindademasas.duckdns.org/api/app/download-apk` apuntan al mismo digest
-  `5dd77e331edb1aace6e2b656e899697819a506068dc375528c8dc6f5a5ade922` (11.277.888 bytes). Incluye el payload
-  de movimientos alineado con el puente web, la vista de solo lectura del Histórico de Cargamento y el orden
-  de Lanzamiento de Masas de la web. El `versionCode` es interno y no se publica.
+- **Publicación del 2026-11-03 (0.7.1):** la instancia de producción sirve
+  `packages/backend/apk/trindade-0.7.1.apk` por `GET /api/app/download-apk` y
+  `GET /api/app/latest-release` publica `v0.7.1` con el `buildNumber` interno. Digest
+  `41f87a148e28cc1f40bb2ac25a2e70f31587c598e806f2c65efa37411a46c545` (11.277.888 bytes). El código de build
+  es interno y no se publica. No se instaló en el emulador.
 - **Reemplazo del 2026-11-02 (build 7006):** la build **7006** reemplazó al asset de GitHub y al binario que
   servía producción. El asset, su `.sha256`, `packages/backend/apk/trindade-0.7.0.apk`, la copia de escritorio
   y `https://trindademasas.duckdns.org/api/app/download-apk` apuntaron al mismo digest
@@ -65,34 +65,33 @@ Notas:
 ## 2. Verificar una descarga
 
 ```bash
-# 1. Descargar el APK y su sidecar
-curl -LO https://github.com/wilkinbarban/Trindade/releases/download/v0.7.0/trindade-0.7.0.apk
-curl -LO https://github.com/wilkinbarban/Trindade/releases/download/v0.7.0/trindade-0.7.0.apk.sha256
+# 1. Descargar el APK de producción
+curl -L https://trindademasas.duckdns.org/api/app/download-apk -o trindade-0.7.1.apk
 
-# 2. Comprobar el hash
-sha256sum -c trindade-0.7.0.apk.sha256
+# 2. Comprobar el hash contra el digest documentado
+sha256sum trindade-0.7.1.apk
 
 # 3. Comprobar la firma y el certificado
-apksigner verify --verbose --print-certs trindade-0.7.0.apk
+apksigner verify --verbose --print-certs trindade-0.7.1.apk
 
 # 4. Comprobar la versión declarada
-aapt2 dump badging trindade-0.7.0.apk | head -1
+aapt2 dump badging trindade-0.7.1.apk | head -1
 ```
 
-Resultado esperado para el asset actual de `v0.7.0`:
+Resultado esperado para el APK actual de producción:
 
 - `sha256sum -c` imprime `OK` y el digest es
-  `5dd77e331edb1aace6e2b656e899697819a506068dc375528c8dc6f5a5ade922`.
+  `41f87a148e28cc1f40bb2ac25a2e70f31587c598e806f2c65efa37411a46c545`.
 - `apksigner` reporta `Verifies` con APK Signature Scheme v2 y un solo firmante.
 - El certificado SHA-256 es
   `ee0e404b211052b311ae0e0730606e9c7d5554315463d02f9ef33c9573c431f6`.
-- `aapt2` reporta `versionName='0.7.0'`; el `versionCode` es interno, no se publica y debe ser mayor al
+- `aapt2` reporta `versionName='0.7.1'`; el `versionCode` es interno, no se publica y debe ser mayor al
   instalado.
 - El tamaño es de `11.277.888` bytes.
 
-El APK servido por producción (`GET /api/app/download-apk`) es el **mismo build actual**: el asset de GitHub, su
-`.sha256`, `packages/backend/apk/trindade-0.7.0.apk` y la descarga de producción comparten el digest
-`5dd77e331edb1aace6e2b656e899697819a506068dc375528c8dc6f5a5ade922`. Verificar siempre con `aapt2`, no solo con
+El APK servido por producción (`GET /api/app/download-apk`) es el **mismo build actual**: su `.sha256`,
+`packages/backend/apk/trindade-0.7.1.apk` y la descarga de producción comparten el digest
+`41f87a148e28cc1f40bb2ac25a2e70f31587c598e806f2c65efa37411a46c545`. Verificar siempre con `aapt2`, no solo con
 el nombre del archivo.
 
 ## 3. Verificar la instalación en un dispositivo

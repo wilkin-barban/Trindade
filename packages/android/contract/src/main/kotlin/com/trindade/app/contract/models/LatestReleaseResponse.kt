@@ -35,6 +35,7 @@ import kotlinx.serialization.Contextual
  * @param apkUrl 
  * @param apkName 
  * @param apkSize 
+ * @param buildNumber 
  * @param publishedAt 
  * @param webUrl 
  */
@@ -53,6 +54,9 @@ data class LatestReleaseResponse (
 
     @Contextual @SerialName(value = "apkSize")
     val apkSize: java.math.BigDecimal?,
+
+    @SerialName(value = "buildNumber")
+    val buildNumber: kotlin.Int?,
 
     @SerialName(value = "publishedAt")
     val publishedAt: kotlin.String?,

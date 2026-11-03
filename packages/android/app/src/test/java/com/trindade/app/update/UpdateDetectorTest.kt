@@ -21,6 +21,7 @@ class UpdateDetectorTest {
     private fun release(
         version: String,
         apkSize: Long? = null,
+        buildNumber: Int? = null,
         publishedAt: String? = null,
         apkUrl: String = "https://trindademasas.duckdns.org/api/app/download-apk",
     ) = LatestReleaseResponse(
@@ -28,6 +29,7 @@ class UpdateDetectorTest {
         apkUrl = apkUrl,
         apkName = "trindade.apk",
         apkSize = apkSize?.let(::BigDecimal),
+        buildNumber = buildNumber,
         publishedAt = publishedAt,
         webUrl = "https://trindademasas.duckdns.org",
     )
@@ -109,6 +111,41 @@ class UpdateDetectorTest {
 
         assertEquals(UpdateType.NONE, availability.type)
         assertFalse(availability.isUpdateAvailable)
+    }
+
+    @Test
+    fun `the same version with a higher build number is a patch even when the size matches`() {
+        val availability = UpdateDetector.checkUpdate(
+            release = release("v0.7.1", apkSize = 11_149_040L, buildNumber = 7012),
+            currentVersionName = "0.7.1",
+            currentBuildTimeMillis = 0L,
+            installedSizeBytes = 11_149_040L,
+            currentBuildNumber = 7011,
+        )
+
+        assertEquals(UpdateType.SAME_RELEASE_PATCH, availability.type)
+        assertTrue(availability.isUpdateAvailable)
+    }
+
+    @Test
+    fun `the same or an older build number is not an update`() {
+        val same = UpdateDetector.checkUpdate(
+            release = release("v0.7.1", apkSize = 11_149_040L, buildNumber = 7011),
+            currentVersionName = "0.7.1",
+            currentBuildTimeMillis = 0L,
+            installedSizeBytes = 11_149_040L,
+            currentBuildNumber = 7011,
+        )
+        val older = UpdateDetector.checkUpdate(
+            release = release("v0.7.1", apkSize = 11_149_040L, buildNumber = 7010),
+            currentVersionName = "0.7.1",
+            currentBuildTimeMillis = 0L,
+            installedSizeBytes = 11_149_040L,
+            currentBuildNumber = 7011,
+        )
+
+        assertEquals(UpdateType.NONE, same.type)
+        assertEquals(UpdateType.NONE, older.type)
     }
 
     @Test

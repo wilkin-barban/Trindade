@@ -423,6 +423,7 @@ class ProfileViewModel @Inject constructor(
             currentVersionName = BuildConfig.APP_VERSION_NAME,
             currentBuildTimeMillis = BuildConfig.BUILD_TIME,
             installedSizeBytes = context?.let { InstalledAppInfo.getInstalledApkSize(it) } ?: -1L,
+            currentBuildNumber = BuildConfig.APP_VERSION_CODE,
         )
 
         return when (availability.type) {
