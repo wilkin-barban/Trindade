@@ -28,11 +28,14 @@ object UpdateDetector {
      *    mandatory dialog whose only action led to a downgrade the installer refuses.
      * 3. A version this client cannot read is undetermined: `v0.3.0-rc1` is not something to compare, and a
      *    guess is worse than saying so.
-     * 4. The same version, with both sizes known, is a patch when they differ and up to date when they match.
-     *    The size is the whole binary, so it moves whenever the build does.
-     * 5. The same version without a comparable size falls back to the moment the APK was published, strictly
-     *    after this build's own time. There is no digest rule: the API publishes none, and a rule over a field
-     *    that does not exist is a claim this check cannot keep.
+     * 4. The same version, with a build number on both sides, is a patch when the remote build is higher.
+     *    This is the identity that survives a rebuild whose public version and compressed size stay equal.
+     * 5. The same version without comparable build numbers, with both sizes known, is a patch when they
+     *    differ and up to date when they match. The size is the whole binary, so it usually moves whenever
+     *    the build does.
+     * 6. The same version without a build number or a comparable size falls back to the moment the APK was
+     *    published, strictly after this build's own time. There is no digest rule: the API publishes none,
+     *    and a rule over a field that does not exist is a claim this check cannot keep.
      *
      * A size of zero, or none at all, is *not known* rather than *empty*: the route reports what it measured
      * on disk, and reading a missing measurement as a zero-byte file would call every build a patch forever.
@@ -42,6 +45,7 @@ object UpdateDetector {
         currentVersionName: String,
         currentBuildTimeMillis: Long,
         installedSizeBytes: Long = -1L,
+        currentBuildNumber: Int = -1,
     ): UpdateAvailability {
         when (ReleaseVersion.compare(release.version, currentVersionName)) {
             is ReleaseVersion.Comparison.Undetermined ->
@@ -54,6 +58,15 @@ object UpdateDetector {
                 return UpdateAvailability(UpdateType.NONE, release)
 
             is ReleaseVersion.Comparison.SameVersion -> Unit
+        }
+
+        val remoteBuildNumber = release.buildNumber ?: 0
+        if (currentBuildNumber > 0 && remoteBuildNumber > 0) {
+            return if (remoteBuildNumber > currentBuildNumber) {
+                UpdateAvailability(UpdateType.SAME_RELEASE_PATCH, release)
+            } else {
+                UpdateAvailability(UpdateType.NONE, release)
+            }
         }
 
         val remoteSize = release.apkSize?.toLong() ?: 0L

@@ -1455,6 +1455,12 @@
               "null"
             ]
           },
+          "buildNumber": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
           "publishedAt": {
             "type": [
               "string",
@@ -1470,6 +1476,7 @@
           "apkUrl",
           "apkName",
           "apkSize",
+          "buildNumber",
           "publishedAt",
           "webUrl"
         ]

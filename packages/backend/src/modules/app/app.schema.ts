@@ -5,6 +5,7 @@ export const LatestReleaseResponseSchema = z.object({
   apkUrl: z.string(),
   apkName: z.string(),
   apkSize: z.number().nullable(),
+  buildNumber: z.number().int().nullable(),
   publishedAt: z.string().nullable(),
   webUrl: z.string(),
 });

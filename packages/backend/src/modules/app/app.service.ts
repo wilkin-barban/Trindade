@@ -7,7 +7,7 @@ export const TRINDADE_APK_DOWNLOAD_URL =
   'https://trindademasas.duckdns.org/api/app/download-apk';
 
 export const FALLBACK_UPSTREAM_APK_URL =
-  'https://github.com/wilkinbarban/Trindade/releases/download/v0.6.3/trindade-0.6.3.apk';
+  'https://github.com/wilkinbarban/Trindade/releases/download/v0.7.1/trindade-0.7.1.apk';
 
 /**
  * The signed APK this project ships.
@@ -16,7 +16,17 @@ export const FALLBACK_UPSTREAM_APK_URL =
  * backend and is served from disk. Resolving it from this module and not from `process.cwd()` keeps the same
  * path in `tsx` (src/modules/app) and in the image (dist/modules/app), three levels below `packages/backend`.
  */
-export const LOCAL_APK_FILENAME = 'trindade-0.7.0.apk';
+export const LOCAL_APK_FILENAME = 'trindade-0.7.1.apk';
+
+/**
+ * The internal build the file on disk carries.
+ *
+ * `versionName` alone cannot distinguish two rebuilds of the same public version, and APK size is a
+ * weak accident of compression. The app compares this number when the public version is unchanged;
+ * `versionCode` stays out of the public release notes, but the update endpoint has to expose the
+ * identity the installed client needs to make the decision.
+ */
+export const LOCAL_APK_BUILD_NUMBER = 7011;
 
 const LOCAL_APK_PATH = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -47,10 +57,11 @@ function localApk(): { path: string; size: number; modifiedAt: string } | null {
 }
 
 export const FALLBACK_RELEASE: LatestReleaseResponse = {
-  version: 'v0.7.0',
+  version: 'v0.7.1',
   apkUrl: TRINDADE_APK_DOWNLOAD_URL,
   apkName: 'trindade.apk',
   apkSize: null,
+  buildNumber: LOCAL_APK_BUILD_NUMBER,
   publishedAt: null,
   webUrl: 'https://trindademasas.duckdns.org',
 };
@@ -142,6 +153,7 @@ export async function getLatestRelease(options: { forceRefresh?: boolean } = {})
       apkUrl: TRINDADE_APK_DOWNLOAD_URL,
       apkName: 'trindade.apk',
       apkSize,
+      buildNumber: null,
       publishedAt,
       webUrl: 'https://trindademasas.duckdns.org',
     };
