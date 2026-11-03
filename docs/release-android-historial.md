@@ -32,7 +32,7 @@ La guía de firma y publicación está en [release-android.md](release-android.m
 | 0.7.0 | 7004 | 2026-11-01 | Reemplazada | Acciones y filtros de históricos, Compartilhar App con el APK y resumen único del inicio | `7622756da304157904a1e47eccacff04e65d97d46615ecc804d62d24f0d1674f` |
 | 0.7.0 | 7005 | 2026-11-02 | Reemplazada | Paridad web/Android del ERP: cola drenada con ack reversible, multioperario por asiento y fallos de Aero unificados | `87f9a6a36166d0206031a23aa223bc1ea857e749304045ef79ea06877549ba75` |
 | 0.7.0 | 7006 | 2026-11-02 | Reemplazada | Histórico de cargamento cerrado en solo lectura, reactivación de lote y reporte, selector de chapas libres, rechazos de tanda en un paso y sync ERP limitado al día abierto | `f77643b7a5442cf2a74d721f621a3977612ae074d2624c4fe735bb38441f3702` |
-| 0.7.0 | — | 2026-11-03 | **Publicada** | Payload de movimientos alineado con el puente web y vista de solo lectura de días cerrados en el Histórico de Cargamento; asset de GitHub y binario de producción | `b863bb265af7bb047d25aaac91c9824bb1e50904b4719fe4595b78b0c09ac055` |
+| 0.7.0 | — | 2026-11-03 | **Publicada** | Payload de movimientos alineado con el puente web, vista de solo lectura de días cerrados en el Histórico de Cargamento y orden de Lanzamiento de Masas de la web; asset de GitHub y binario de producción | `5dd77e331edb1aace6e2b656e899697819a506068dc375528c8dc6f5a5ade922` |
 
 Notas:
 
@@ -40,9 +40,9 @@ Notas:
 - **Reemplazo del 2026-11-03:** el asset actual de GitHub, su `.sha256`,
   `packages/backend/apk/trindade-0.7.0.apk`, la copia de escritorio y
   `https://trindademasas.duckdns.org/api/app/download-apk` apuntan al mismo digest
-  `b863bb265af7bb047d25aaac91c9824bb1e50904b4719fe4595b78b0c09ac055` (11.277.888 bytes). Incluye el payload
-  de movimientos alineado con el puente web y la vista de solo lectura del Histórico de Cargamento. El
-  `versionCode` es interno y no se publica.
+  `5dd77e331edb1aace6e2b656e899697819a506068dc375528c8dc6f5a5ade922` (11.277.888 bytes). Incluye el payload
+  de movimientos alineado con el puente web, la vista de solo lectura del Histórico de Cargamento y el orden
+  de Lanzamiento de Masas de la web. El `versionCode` es interno y no se publica.
 - **Reemplazo del 2026-11-02 (build 7006):** la build **7006** reemplazó al asset de GitHub y al binario que
   servía producción. El asset, su `.sha256`, `packages/backend/apk/trindade-0.7.0.apk`, la copia de escritorio
   y `https://trindademasas.duckdns.org/api/app/download-apk` apuntaron al mismo digest
@@ -82,7 +82,7 @@ aapt2 dump badging trindade-0.7.0.apk | head -1
 Resultado esperado para el asset actual de `v0.7.0`:
 
 - `sha256sum -c` imprime `OK` y el digest es
-  `b863bb265af7bb047d25aaac91c9824bb1e50904b4719fe4595b78b0c09ac055`.
+  `5dd77e331edb1aace6e2b656e899697819a506068dc375528c8dc6f5a5ade922`.
 - `apksigner` reporta `Verifies` con APK Signature Scheme v2 y un solo firmante.
 - El certificado SHA-256 es
   `ee0e404b211052b311ae0e0730606e9c7d5554315463d02f9ef33c9573c431f6`.
@@ -92,7 +92,7 @@ Resultado esperado para el asset actual de `v0.7.0`:
 
 El APK servido por producción (`GET /api/app/download-apk`) es el **mismo build actual**: el asset de GitHub, su
 `.sha256`, `packages/backend/apk/trindade-0.7.0.apk` y la descarga de producción comparten el digest
-`b863bb265af7bb047d25aaac91c9824bb1e50904b4719fe4595b78b0c09ac055`. Verificar siempre con `aapt2`, no solo con
+`5dd77e331edb1aace6e2b656e899697819a506068dc375528c8dc6f5a5ade922`. Verificar siempre con `aapt2`, no solo con
 el nombre del archivo.
 
 ## 3. Verificar la instalación en un dispositivo
