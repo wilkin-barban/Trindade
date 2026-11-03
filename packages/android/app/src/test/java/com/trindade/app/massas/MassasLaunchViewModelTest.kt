@@ -1477,4 +1477,252 @@ class MassasLaunchViewModelTest {
         assertTrue(testVm.state.value.inactiveOperators.contains("INATIVO"))
         assertEquals(R.string.massas_error_operator_inactive, testVm.state.value.errorMessage?.resId)
     }
+
+    // ---- La lectura del día después de lanzar (auto-conciliación) ----
+
+    private fun seat(
+        entLan: Int,
+        quantity: Double = 30.0,
+        productCode: String = "1045",
+        operatorName: String = "Wilkin",
+        date: String = MassasLaunchViewModel.saopauloToday(),
+    ) = com.trindade.app.aero.AeroErpMovement(
+        entLan = entLan,
+        productCode = productCode,
+        productDesc = "MASSA CASEIRA",
+        quantity = quantity,
+        entryDate = date,
+        operatorName = operatorName,
+        movementType = "E",
+        ownerUserId = null,
+        ownerStatus = null,
+    )
+
+    /**
+     * Un lote de tres productos es una lectura del día, no tres.
+     *
+     * El envío ya dejó las tres filas en la planta; lo que faltaba era preguntar una vez por el asiento que
+     * la planta publicó, para que la tabla deje de mostrarlas como pendientes sin que nadie toque el botón.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `el lote termina con una sola lectura del dia`() = runTest {
+        val repo = DayRepository(
+            massasApi,
+            dayWith(
+                launch(7, username = "jonas", displayName = "Jonas"),
+                launch(8, username = "jaime", displayName = "Jaime"),
+                launch(9, username = "viviane", displayName = "Viviane"),
+            ),
+        )
+        repo.created = listOf(
+            launch(7, username = "jonas", displayName = "Jonas"),
+            launch(8, username = "jaime", displayName = "Jaime"),
+            launch(9, username = "viviane", displayName = "Viviane"),
+        )
+        erpPort.movementsResult =
+            com.trindade.app.aero.AeroMovementsResult.Ok(listOf(seat(500)), skipped = 0)
+        val testVm = newViewModel(repo)
+
+        testVm.onQuantityChange("1045", "3")
+        testVm.requestLaunchConfirmation()
+        testVm.confirmLaunch()
+        advanceUntilIdle()
+
+        assertEquals(3, erpPort.payloads.size)
+        assertEquals(listOf(MassasLaunchViewModel.saopauloToday()), erpPort.readDates)
+        assertEquals(1, mirrorPort.snapshots.size)
+        assertEquals(MassasLaunchViewModel.saopauloToday(), mirrorPort.snapshots.single().first)
+        assertNotNull(settingsPort.syncedAt(MassasLaunchViewModel.saopauloToday()))
+    }
+
+    /**
+     * El operario primero sabe si su trabajo salió; la lectura no le cambia la respuesta por otra.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `el veredicto del lote sigue en el dialogo despues de leer`() = runTest {
+        val repo = DayRepository(massasApi, dayWith(launch(7)))
+        repo.created = listOf(launch(7))
+        val testVm = newViewModel(repo)
+
+        testVm.onQuantityChange("1045", "3")
+        testVm.requestLaunchConfirmation()
+        testVm.confirmLaunch()
+        advanceUntilIdle()
+
+        assertEquals(1, erpPort.readDates.size)
+        assertEquals(R.string.massas_aero_batch_sent, testVm.state.value.resultDialogMessage?.resId)
+        assertTrue(testVm.state.value.resultDialogIsSuccess)
+        assertNull(testVm.state.value.noticeMessage)
+    }
+
+    /**
+     * Sin envíos no hay asiento nuevo que buscar: la lectura sería una petición que no responde a nada.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `un lote sin envios no lee`() = runTest {
+        reachability.wifiConnected = false
+        val repo = DayRepository(massasApi, dayWith())
+        repo.created = listOf(launch(7))
+        val testVm = newViewModel(repo)
+
+        testVm.onQuantityChange("1045", "3")
+        testVm.requestLaunchConfirmation()
+        testVm.confirmLaunch()
+        advanceUntilIdle()
+
+        assertEquals(0, erpPort.payloads.size)
+        assertTrue(erpPort.readDates.isEmpty())
+    }
+
+    /**
+     * La planta recibió el envío y la lectura falló: el lanzamiento está hecho, y lo que falta se dice.
+     *
+     * Decir que el lanzamiento falló sería invitar a un segundo envío que duplica la caja; callarse dejaría la
+     * fila pendiente sin explicación.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `un fallo de lectura deja el lanzamiento hecho y el motivo visible`() = runTest {
+        val repo = DayRepository(massasApi, dayWith(launch(7)))
+        repo.created = listOf(launch(7))
+        erpPort.movementsResult = com.trindade.app.aero.AeroMovementsResult.Failed(null)
+        val testVm = newViewModel(repo)
+
+        testVm.onQuantityChange("1045", "3")
+        testVm.requestLaunchConfirmation()
+        testVm.confirmLaunch()
+        advanceUntilIdle()
+
+        assertEquals(1, erpPort.payloads.size)
+        assertEquals(0, mirrorPort.snapshots.size)
+        assertEquals(R.string.massas_aero_batch_sent, testVm.state.value.resultDialogMessage?.resId)
+        assertTrue(testVm.state.value.resultDialogIsSuccess)
+        assertEquals(R.string.aero_failure_no_answer, testVm.state.value.noticeMessage?.resId)
+    }
+
+    /**
+     * Mientras la lectura automática viaja, el botón no abre una segunda.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `el boton durante la lectura automatica no dispara otra`() = runTest {
+        val repo = DayRepository(massasApi, dayWith(launch(7)))
+        repo.created = listOf(launch(7))
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        erpPort.readGate = gate
+        val testVm = newViewModel(repo)
+
+        testVm.onQuantityChange("1045", "3")
+        testVm.requestLaunchConfirmation()
+        testVm.confirmLaunch()
+        testScheduler.runCurrent()
+
+        assertEquals(1, erpPort.readDates.size)
+        // El camino automático no muestra el indicador: no hay un botón esperando.
+        assertFalse(testVm.state.value.isSyncingAero)
+        testVm.syncAeroDay()
+        testScheduler.runCurrent()
+        assertEquals(1, erpPort.readDates.size)
+        assertEquals(R.string.massas_aero_batch_sent, testVm.state.value.resultDialogMessage?.resId)
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(1, erpPort.readDates.size)
+        assertEquals(R.string.massas_aero_batch_sent, testVm.state.value.resultDialogMessage?.resId)
+    }
+
+    /**
+     * La fila suelta también deja el espejo al día: es el mismo turno y el mismo asiento.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `el envio individual tambien deja el espejo al dia`() = runTest {
+        val repo = DayRepository(massasApi, dayWith(launch(89, boxes = 280, units = 2800)))
+        val testVm = newViewModel(repo)
+        testScheduler.runCurrent()
+        testVm.loadDay(MassasLaunchViewModel.saopauloToday())
+        testScheduler.runCurrent()
+
+        testVm.sendPendingLaunch(
+            MassasUnifiedRow(
+                key = "launch-89",
+                state = MassasRowState.PENDING_ERP,
+                operatorName = "Wilkin",
+                operatorKey = "wilkin",
+                productCode = "1045",
+                productName = "MASSA CASEIRA",
+                boxes = 280,
+                units = 2800,
+                launchIds = listOf(89),
+                entLans = emptyList(),
+                importable = false,
+                tabletAcked = false,
+                ownerUserId = 1,
+            ),
+        )
+        advanceUntilIdle()
+
+        assertEquals(1, erpPort.payloads.size)
+        assertEquals(1, erpPort.readDates.size)
+        assertEquals(1, mirrorPort.snapshots.size)
+        assertEquals(R.string.massas_aero_sent, testVm.state.value.noticeMessage?.resId)
+    }
+
+    /**
+     * La cola lee antes de liquidar: lo que la planta ya publicó sale de la cola, no viaja de nuevo.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `la cola no reenvia lo que el espejo fresco ya tiene`() = runTest {
+        val today = MassasLaunchViewModel.saopauloToday()
+        queuePort = FakeQueuePort(queueWith(listOf(3010), today))
+        val repo = DayRepository(massasApi, dayWith(launch(3010, boxes = 3, units = 30)))
+        erpPort.movementsResult =
+            com.trindade.app.aero.AeroMovementsResult.Ok(listOf(seat(500)), skipped = 0)
+        // El backend guarda el día que la lectura trajo, y la relectura del espejo devuelve eso mismo.
+        mirrorPort.onSave = { date, movements ->
+            repo.stored = com.trindade.app.network.AeroMovementsStoredDay(
+                date = date,
+                movements = movements.map { movement ->
+                    com.trindade.app.network.AeroStoredMovement(
+                        entLan = movement.entLan,
+                        productCode = movement.productCode,
+                        productDesc = movement.productDesc,
+                        quantity = movement.quantity,
+                        entryDate = movement.entryDate,
+                        operatorName = movement.operatorName,
+                        movementType = movement.movementType,
+                        ownerStatus = movement.ownerStatus,
+                    )
+                },
+                syncedAt = "$date 09:00",
+            )
+        }
+        val testVm = newViewModel(repo)
+        advanceUntilIdle()
+
+        assertEquals(0, erpPort.payloads.size)
+        assertNull(queuePort.stored)
+        assertEquals(listOf(today), erpPort.readDates)
+        assertEquals(0, testVm.state.value.queuedLaunches)
+    }
+
+    /**
+     * La cola de un día que ya pasó no se lee: la planta no tiene nada nuevo que decir de esa fecha.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `la cola no lee un dia pasado`() = runTest {
+        queuePort = FakeQueuePort(queueWith(listOf(3031), "2025-10-30"))
+        val repo = DayRepository(massasApi, dayWith())
+        val testVm = newViewModel(repo)
+        advanceUntilIdle()
+
+        assertTrue(erpPort.readDates.isEmpty())
+        assertNull(queuePort.stored)
+    }
+
 }

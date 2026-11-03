@@ -148,6 +148,14 @@ class MassasLaunchViewModel @Inject constructor(
     private var pollingJob: Job? = null
     private var isScreenActive: Boolean = false
 
+    /**
+     * Una lectura del día en vuelo, venga del botón o del camino automático.
+     *
+     * No es `isSyncingAero`: aquel dibuja el indicador del botón, y la lectura que sigue a un lanzamiento no
+     * tiene un botón esperando. Este sólo impide que dos lecturas se pisen; el indicador queda para la prensa.
+     */
+    private var readInFlight = false
+
     init {
         loadCurrentUser()
         loadAeroSettings()
@@ -499,12 +507,70 @@ class MassasLaunchViewModel @Inject constructor(
         }
         val refreshed = repository.day(state.value.date)
         if (refreshed != null) _state.value = _state.value.copy(dayView = refreshed)
+
+        // El envío ya está contestado: una sola lectura del día deja el asiento conciliado sin otro toque.
+        // Un fallo de lectura no cambia el veredicto; se dice aparte y la fila queda pendiente con su motivo.
+        if (sent > 0) {
+            val failure = readAeroDayAfterLaunch(state.value.date)
+            if (failure != null) _state.value = _state.value.copy(noticeMessage = failure.describe())
+        }
+    }
+
+    /**
+     * Reads the plant's day and stores it on the backend, without touching the verdict dialog.
+     *
+     * Returns null when nothing was attempted: another read is in flight, or this device holds no credentials.
+     * The caller decides how to tell a failure, because the button replaces the dialog and the automatic path
+     * must leave it alone.
+     */
+    private suspend fun readAeroDay(date: String): AeroSyncOutcome? {
+        if (readInFlight) return null
+        val settings = state.value.aeroSettings
+        if (!settings.ready) return null
+        readInFlight = true
+        return try {
+            val outcome = aeroDispatcher.syncDay(settings, date)
+            if (outcome is AeroSyncOutcome.Synced) {
+                // El backend guardó el día: la hora del teléfono y el espejo recién guardado son la prueba.
+                aeroSettingsStore.markSynced(date, nowLabel())
+                refreshMirror(date)
+                if (state.value.date == date) {
+                    _state.value = _state.value.copy(aeroSyncedAt = nowLabel())
+                }
+            }
+            outcome
+        } finally {
+            readInFlight = false
+        }
+    }
+
+    /**
+     * The one read after a launch, for the day on screen and only when it is today.
+     *
+     * Never writes the verdict: the batch already answered, and a second sentence over it would leave the
+     * operator reading whichever arrived last. Returns the failure so each caller says it in its own place.
+     */
+    private suspend fun readAeroDayAfterLaunch(date: String): AeroFailure? {
+        if (date != saopauloToday() || state.value.date != date) return null
+        return when (val outcome = readAeroDay(date)) {
+            is AeroSyncOutcome.Synced -> {
+                // El espejo cambió: el día se relee para que la tabla tenga las dos mitades frescas.
+                val refreshed = repository.day(date)
+                if (refreshed != null && state.value.date == date) {
+                    _state.value = _state.value.copy(dayView = refreshed)
+                }
+                null
+            }
+            is AeroSyncOutcome.Failed -> outcome.failure
+            // Otra lectura está en vuelo: esa va a dejar el espejo al día y no hay error que mostrar.
+            null -> null
+        }
     }
 
     /** Reads the plant's day and stores it on the backend, then reloads what was stored. */
     fun syncAeroDay() {
         val current = state.value
-        if (current.isSyncingAero) return
+        if (current.isSyncingAero || readInFlight) return
         val settings = current.aeroSettings
         if (!settings.ready) {
             // The bridge has no settings yet: the press is what says so, because a disabled button over a
@@ -526,16 +592,13 @@ class MassasLaunchViewModel @Inject constructor(
                 errorMessage = null,
                 noticeMessage = null,
             )
-            when (val outcome = aeroDispatcher.syncDay(settings, current.date)) {
+            when (val outcome = readAeroDay(current.date)) {
                 is AeroSyncOutcome.Synced -> {
-                    aeroSettingsStore.markSynced(current.date, nowLabel())
                     _state.value = _state.value.copy(
                         isSyncingAero = false,
-                        aeroSyncedAt = nowLabel(),
                         resultDialogMessage = UiText.of(R.string.massas_aero_sync_done, outcome.saved.saved),
                         resultDialogIsSuccess = true,
                     )
-                    refreshMirror(current.date)
                 }
                 is AeroSyncOutcome.Failed -> {
                     // The previous snapshot stands, and the reason is the shared sentence for it: no plant
@@ -546,6 +609,8 @@ class MassasLaunchViewModel @Inject constructor(
                         resultDialogIsSuccess = false,
                     )
                 }
+                // Otra lectura estaba en vuelo: la prensa no tiene una segunda respuesta que dar.
+                null -> _state.value = _state.value.copy(isSyncingAero = false)
             }
         }
     }
@@ -597,10 +662,12 @@ class MassasLaunchViewModel @Inject constructor(
             when (val outcome = aeroDispatcher.dispatch(settings, request)) {
                 is AeroDispatchOutcome.Sent -> {
                     aeroQueueStore.write(queue.settle(listOf(request.launchId)))
-                    val refreshed = repository.day(state.value.date)
-                    if (refreshed != null) _state.value = _state.value.copy(dayView = refreshed)
-                    refreshMirror(state.value.date)
-                    _state.value = _state.value.copy(noticeMessage = UiText.of(R.string.massas_aero_sent))
+                    // El asiento recién enviado se busca en el mismo viaje que el lote: una lectura, y la
+                    // fila deja de estar pendiente sin que el operario toque «Sincronizar con ERP».
+                    val failure = readAeroDayAfterLaunch(state.value.date)
+                    _state.value = _state.value.copy(
+                        noticeMessage = failure?.describe() ?: UiText.of(R.string.massas_aero_sent),
+                    )
                 }
                 is AeroDispatchOutcome.Failed ->
                     _state.value = _state.value.copy(errorMessage = outcome.failure.describe())
@@ -639,15 +706,19 @@ class MassasLaunchViewModel @Inject constructor(
         val settings = state.value.aeroSettings
         if (!settings.ready) return
         val stored = aeroQueueStore.read() ?: return
+        val today = saopauloToday()
 
-        // Lo que la planta ya registró no se vuelve a mandar. La guarda se aplica antes de tomar el lote, así
-        // que un turno cerrado en otra tableta no cuesta ni una petición.
+        // Lo que la planta ya registró no se vuelve a mandar, y la única forma de saberlo es leer el día
+        // antes de liquidar. Una lectura por apertura con pendientes de hoy, no una por fila; la cola de una
+        // fecha que ya pasó no se lee porque no hay nada nuevo que la planta pueda decir de ella.
+        if (stored.items.any { it.date == today }) readAeroDay(today)
+
         var queue = stored.settle(settledLaunchIds())
 
         // Un día cerrado no se reintenta: lo que quedó de una fecha que ya no es hoy se descarta aquí, con su
         // línea en el registro. Dejarlo en la cola sería reabrir el mismo 409 en cada apertura, y el operario
         // vería una fila pendiente que ningún toque puede vaciar.
-        val closed = queue.items.filter { it.date != saopauloToday() }
+        val closed = queue.items.filter { it.date != today }
         for (item in closed) {
             queue = queue.settle(item.launchIds)
             aeroDispatcher.logQueueRejected(item.date, item.launchIds, AERO_CLOSED_DAY_CODE)
@@ -690,11 +761,16 @@ class MassasLaunchViewModel @Inject constructor(
         aeroQueueStore.write(queue)
 
         if (sent > 0) {
-            val refreshed = repository.day(state.value.date)
-            if (refreshed != null) _state.value = _state.value.copy(dayView = refreshed)
-            refreshMirror(state.value.date)
-            _state.value = _state.value.copy(noticeMessage = UiText.of(R.string.massas_aero_sent))
+            // Una lectura de confirmación después de la tanda: el asiento puede haberse publicado mientras
+            // viajaba. Lo que la planta ya tiene se saca de la cola aquí, no en la próxima apertura.
+            val failure = readAeroDayAfterLaunch(today)
+            val settled = queue.settle(settledLaunchIds())
+            if (settled.isEmpty) aeroQueueStore.clear() else aeroQueueStore.write(settled)
+            _state.value = _state.value.copy(
+                noticeMessage = failure?.describe() ?: UiText.of(R.string.massas_aero_sent),
+            )
         }
+        refreshQueuedCount()
     }
 
     /**
