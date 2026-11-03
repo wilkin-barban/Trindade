@@ -10,11 +10,14 @@ import com.trindade.app.aero.AeroSettings
 import com.trindade.app.aero.AeroSettingsPort
 import com.trindade.app.aero.AeroSettingsPermissions
 import com.trindade.app.aero.AeroTestResult
+import com.trindade.app.aero.aeroEndpoint
 import com.trindade.app.aero.aeroSettingsEditable
 import com.trindade.app.aero.AeroAudit
+import com.trindade.app.aero.AeroAuditAttempt
 import com.trindade.app.aero.AeroDiagnosis
 import com.trindade.app.aero.AeroFailure
 import com.trindade.app.aero.AeroFailureCode
+import com.trindade.app.aero.auditCode
 import com.trindade.app.aero.failure
 import com.trindade.app.aero.toFailure
 import com.trindade.app.R
@@ -235,15 +238,32 @@ class IntegrationSettingsViewModel @Inject constructor(
             }
             else -> Triple("sem-resposta", null, null)
         }
+        val errorCode = when {
+            !settings.ready -> AeroFailureCode.NOT_CONFIGURED.auditCode
+            !diagnosis.plantReachable -> diagnosis.failure()?.code?.auditCode
+            answer is AeroErpClient.Probe.Unreachable -> answer.reason.toFailure().code.auditCode
+            answer is AeroErpClient.Probe.Answered && answer.test is AeroTestResult.Failed ->
+                AeroFailureCode.ERP_REFUSED.auditCode
+            else -> null
+        }
+        val attempt = AeroAuditAttempt(
+            event = AeroAudit.Event.TEST,
+            destinationUrl = aeroEndpoint(address, "usuarios"),
+        )
 
         viewModelScope.launch {
             audit.log(
-                AeroAudit.testRequest(
-                    normalizedWsUrl = address,
-                    elapsedMs = elapsedMs,
+                attempt.requested(
+                    detail = "wifi=${diagnosis.wifiConnected} host=${diagnosis.hostReachable}",
+                ),
+            )
+            audit.log(
+                attempt.result(
+                    detail = listOfNotNull(outcome, detail?.trim()?.takeIf { it.isNotEmpty() })
+                        .joinToString(" · "),
                     httpStatus = status,
-                    outcome = outcome,
-                    detail = detail,
+                    durationMs = elapsedMs,
+                    error = errorCode,
                 ),
             )
         }

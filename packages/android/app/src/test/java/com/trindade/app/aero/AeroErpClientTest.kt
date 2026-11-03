@@ -91,7 +91,35 @@ class AeroErpClientTest {
             payload = buildEntradaItemPayload("1192", "MASSA QUADRADA", 15.0, "2026-10-30", "7"),
         )
 
-        assertEquals(AeroWriteResult.Failed("Produto nao cadastrado"), result)
+        assertEquals(
+            AeroWriteResult.Failed(
+                "Produto nao cadastrado",
+                httpStatus = 200,
+                code = AeroFailureCode.ERP_REFUSED,
+            ),
+            result,
+        )
+    }
+
+    @Test
+    fun `an http refusal keeps its real status and is not reported as a network fault`() = runBlocking {
+        server.enqueue(MockResponse().setResponseCode(500))
+
+        val result = client.postEntry(
+            wsUrl = wsUrl(),
+            username = "wilkin",
+            password = "secret",
+            payload = buildEntradaItemPayload("1192", "MASSA QUADRADA", 15.0, "2026-10-30", "7"),
+        )
+
+        assertEquals(
+            AeroWriteResult.Failed(
+                "HTTP 500",
+                httpStatus = 500,
+                code = AeroFailureCode.ERP_REFUSED,
+            ),
+            result,
+        )
     }
 
     @Test
@@ -105,7 +133,10 @@ class AeroErpClientTest {
             payload = buildEntradaItemPayload("1192", "MASSA QUADRADA", 15.0, "2026-10-30", "7"),
         )
 
-        assertEquals(AeroWriteResult.Failed(null), result)
+        assertEquals(
+            AeroWriteResult.Failed(null, code = AeroFailureCode.REFUSED_CONNECTION),
+            result,
+        )
     }
 
     @Test

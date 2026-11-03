@@ -1,5 +1,7 @@
 package com.trindade.app.di
 
+import com.trindade.app.aero.AeroAuditOutbox
+import com.trindade.app.aero.AeroAuditOutboxPort
 import com.trindade.app.aero.AeroDispatcher
 import com.trindade.app.aero.AeroErpAdapter
 import com.trindade.app.aero.AeroErpPort
@@ -37,6 +39,10 @@ object AeroModule {
     @Provides
     @Singleton
     fun provideMirrorPort(adapter: AeroMirrorAdapter): AeroMirrorPort = adapter
+
+    @Provides
+    @Singleton
+    fun provideAuditOutbox(store: AeroAuditOutbox): AeroAuditOutboxPort = store
 
     @Provides
     @Singleton

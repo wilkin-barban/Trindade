@@ -986,6 +986,7 @@
     <string name="aero_failure_not_configured">Configure a integração com o ERP em Administração.</string>
     <string name="aero_failure_different_network">O celular não está no Wi-Fi da fábrica. Conecte-se a ele e tente de novo.</string>
     <string name="aero_failure_host_unreachable">A rede da fábrica está aí, mas o ERP não respondeu no endereço configurado.</string>
+    <string name="aero_failure_cleartext_blocked">O endereço do ERP usa HTTP e este APK não permite conexão sem HTTPS para esse host. Ajuste o endereço ou a política de rede.</string>
     <string name="aero_failure_timeout">O ERP demorou demais para responder. Tente de novo.</string>
     <string name="aero_failure_no_route">Não há caminho até o endereço do ERP. Confira a rede da fábrica.</string>
     <string name="aero_failure_refused_connection">O endereço do ERP recusou a conexão.</string>

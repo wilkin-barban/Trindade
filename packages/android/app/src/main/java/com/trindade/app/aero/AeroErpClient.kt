@@ -74,7 +74,7 @@ class AeroErpClient @Inject constructor(
      * Why no answer arrived. The screen turns each into one sentence in the operator's language; this file
      * deliberately carries no copy.
      */
-    enum class ProbeFailure { TIMEOUT, NO_ROUTE, REFUSED, UNKNOWN }
+    enum class ProbeFailure { TIMEOUT, NO_ROUTE, REFUSED, CLEARTEXT, UNKNOWN }
 
     /**
      * `POST /usuarios` with the operator's credentials.
@@ -129,20 +129,33 @@ class AeroErpClient @Inject constructor(
             api.postEntry(url, basicAuthHeader(username, password), payload)
         }.fold(
             onSuccess = { response ->
-                val body = response.body()
-                if (body != null) {
-                    readAeroWriteResult(body)
-                } else if (response.isSuccessful) {
-                    // A 2xx with no body is the ERP accepting the entry: Firebird answered with nothing to
-                    // read, which is not the same as refusing it.
-                    AeroWriteResult.Ok(null)
+                if (!response.isSuccessful) {
+                    // The ERP answered the HTTP frame and refused the request: keep the status instead of
+                    // folding it into the transport answer.
+                    AeroWriteResult.Failed(
+                        "HTTP ${response.code()}",
+                        httpStatus = response.code(),
+                        code = AeroFailureCode.ERP_REFUSED,
+                    )
                 } else {
-                    AeroWriteResult.Failed("HTTP ${response.code()}")
+                    val body = response.body()
+                    if (body != null) {
+                        val parsed = readAeroWriteResult(body)
+                        if (parsed is AeroWriteResult.Failed) {
+                            parsed.copy(httpStatus = response.code(), code = parsed.code ?: AeroFailureCode.ERP_REFUSED)
+                        } else {
+                            parsed
+                        }
+                    } else {
+                        // A 2xx with no body is the ERP accepting the entry: Firebird answered with nothing
+                        // to read, which is not the same as refusing it.
+                        AeroWriteResult.Ok(null)
+                    }
                 }
             },
-            // No sentence: a transport failure is the same answer for every request, and the screen
-            // already knows how to say "sem conexão com a rede da fábrica".
-            onFailure = { AeroWriteResult.Failed(null) },
+            onFailure = { error ->
+                AeroWriteResult.Failed(null, code = error.toAeroFailureCode())
+            },
         )
     }
 
@@ -162,14 +175,33 @@ class AeroErpClient @Inject constructor(
             )
         }.fold(
             onSuccess = { response ->
-                val body: JsonElement? = response.body()
-                if (body != null) {
-                    readAeroMovements(body)
+                if (!response.isSuccessful) {
+                    AeroMovementsResult.Failed(
+                        "HTTP ${response.code()}",
+                        httpStatus = response.code(),
+                        code = AeroFailureCode.ERP_REFUSED,
+                    )
                 } else {
-                    AeroMovementsResult.Failed("HTTP ${response.code()}")
+                    val body: JsonElement? = response.body()
+                    if (body != null) {
+                        val parsed = readAeroMovements(body)
+                        if (parsed is AeroMovementsResult.Failed) {
+                            parsed.copy(httpStatus = response.code(), code = parsed.code ?: AeroFailureCode.ERP_REFUSED)
+                        } else {
+                            parsed
+                        }
+                    } else {
+                        AeroMovementsResult.Failed(
+                            "HTTP ${response.code()}",
+                            httpStatus = response.code(),
+                            code = AeroFailureCode.ERP_REFUSED,
+                        )
+                    }
                 }
             },
-            onFailure = { AeroMovementsResult.Failed(null) },
+            onFailure = { error ->
+                AeroMovementsResult.Failed(null, code = error.toAeroFailureCode())
+            },
         )
     }
 
@@ -178,6 +210,12 @@ class AeroErpClient @Inject constructor(
         is java.net.UnknownHostException -> ProbeFailure.NO_ROUTE
         is java.net.NoRouteToHostException -> ProbeFailure.NO_ROUTE
         is java.net.ConnectException -> ProbeFailure.REFUSED
+        is java.net.UnknownServiceException ->
+            if (message?.contains("CLEARTEXT", ignoreCase = true) == true) {
+                ProbeFailure.CLEARTEXT
+            } else {
+                ProbeFailure.UNKNOWN
+            }
         else -> ProbeFailure.UNKNOWN
     }
 

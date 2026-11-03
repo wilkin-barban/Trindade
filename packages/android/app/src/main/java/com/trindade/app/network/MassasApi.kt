@@ -7,6 +7,7 @@ import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
@@ -156,6 +157,11 @@ data class AeroAuditLogRequest(
     val attemptId: String? = null,
     /** Stable code first, detail after: the column is filtered by `grep AERO_`. */
     val error: String? = null,
+    /** The launch this line is about, when it is about one. */
+    val launchId: Int? = null,
+    /** The APK that wrote the line, so a behavior can be attributed to a build. */
+    val appVersion: String? = null,
+    val buildNumber: Int? = null,
 )
 
 /**
@@ -191,6 +197,7 @@ interface MassasApi {
     @POST("api/integration/aero/movements")
     suspend fun saveMovements(
         @Body request: AeroMovementsSnapshotRequest,
+        @Header("X-Trindade-Client") client: String = "android",
     ): Response<AeroMovementsSaved>
 
     @GET("api/integration/aero/movements")

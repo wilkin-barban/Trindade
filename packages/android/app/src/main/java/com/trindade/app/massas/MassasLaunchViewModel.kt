@@ -262,6 +262,9 @@ class MassasLaunchViewModel @Inject constructor(
             // Always, and regardless of this phone's ERP credentials: the day the plant lived is already in
             // Trindade's database, and opening it is a read of that, not a trip to the factory.
             refreshMirror(date)
+            // Una línea de auditoría que no llegó al backend se reintenta al abrir el día; el lanzamiento
+            // nunca depende de este intento.
+            aeroDispatcher.flushAudit()
             // Con el espejo del día ya leído, la cola sabe qué quedó pendiente en un turno anterior y puede
             // preguntar por lo que la planta todavía no tiene. Va después del espejo a propósito: la guarda de
             // un asiento ya registrado se lee de ahí y no del reloj del teléfono.

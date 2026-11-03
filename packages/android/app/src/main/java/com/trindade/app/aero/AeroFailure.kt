@@ -2,6 +2,11 @@ package com.trindade.app.aero
 
 import com.trindade.app.R
 import com.trindade.app.ui.UiText
+import java.net.ConnectException
+import java.net.NoRouteToHostException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
+import java.net.UnknownServiceException
 
 /**
  * Why a conversation with the plant did not produce what it was asked for, in one vocabulary.
@@ -42,6 +47,9 @@ enum class AeroFailureCode {
 
     /** Wi-Fi, but the ERP host did not accept a connection. */
     HOST_UNREACHABLE,
+
+    /** The address is HTTP and this APK's network security config does not allow cleartext to it. */
+    CLEARTEXT_BLOCKED,
 
     /** The host accepted and never answered within the client's budget. */
     TIMEOUT,
@@ -90,6 +98,7 @@ data class AeroFailure(
         AeroFailureCode.NOT_CONFIGURED -> UiText.of(R.string.aero_failure_not_configured)
         AeroFailureCode.DIFFERENT_NETWORK -> UiText.of(R.string.aero_failure_different_network)
         AeroFailureCode.HOST_UNREACHABLE -> UiText.of(R.string.aero_failure_host_unreachable)
+        AeroFailureCode.CLEARTEXT_BLOCKED -> UiText.of(R.string.aero_failure_cleartext_blocked)
         AeroFailureCode.TIMEOUT -> UiText.of(R.string.aero_failure_timeout)
         AeroFailureCode.NO_ROUTE -> UiText.of(R.string.aero_failure_no_route)
         AeroFailureCode.REFUSED_CONNECTION -> UiText.of(R.string.aero_failure_refused_connection)
@@ -114,6 +123,7 @@ data class AeroFailure(
             AeroFailureCode.SNAPSHOT_REFUSED,
             -> true
             AeroFailureCode.NOT_CONFIGURED,
+            AeroFailureCode.CLEARTEXT_BLOCKED,
             AeroFailureCode.ERP_REFUSED,
             // The day is closed until a person reopens it: the same press would be refused again.
             AeroFailureCode.BACKEND_DAY_CLOSED,
@@ -138,6 +148,7 @@ val AeroFailureCode.auditCode: String
         AeroFailureCode.NOT_CONFIGURED -> "AERO_NOT_CONFIGURED"
         AeroFailureCode.DIFFERENT_NETWORK -> "AERO_NO_PLANT_WIFI"
         AeroFailureCode.HOST_UNREACHABLE -> "AERO_ERP_UNREACHABLE"
+        AeroFailureCode.CLEARTEXT_BLOCKED -> "AERO_CLEARTEXT_BLOCKED"
         AeroFailureCode.TIMEOUT -> "AERO_ERP_TIMEOUT"
         AeroFailureCode.NO_ROUTE -> "AERO_ERP_NO_ROUTE"
         AeroFailureCode.REFUSED_CONNECTION -> "AERO_ERP_CONNECTION_REFUSED"
@@ -182,15 +193,36 @@ data class AeroDiagnosis(
  */
 val AeroWriteResult.Failed.failure: AeroFailure
     get() = AeroFailure(
-        if (message == null) AeroFailureCode.NO_ANSWER else AeroFailureCode.ERP_REFUSED,
+        code ?: if (message == null) AeroFailureCode.NO_ANSWER else AeroFailureCode.ERP_REFUSED,
         message,
+        serverStatus = httpStatus,
     )
 
 val AeroMovementsResult.Failed.failure: AeroFailure
     get() = AeroFailure(
-        if (message == null) AeroFailureCode.NO_ANSWER else AeroFailureCode.ERP_REFUSED,
+        code ?: if (message == null) AeroFailureCode.NO_ANSWER else AeroFailureCode.ERP_REFUSED,
         message,
+        serverStatus = httpStatus,
     )
+
+/**
+ * The transport code a launch or a day's read failed with.
+ *
+ * The two calls share this mapper instead of collapsing every exception into `NO_ANSWER`: a timeout, a
+ * bad route and a cleartext policy refusal are different answers, both for the operator and for the log.
+ */
+fun Throwable.toAeroFailureCode(): AeroFailureCode = when (this) {
+    is SocketTimeoutException -> AeroFailureCode.TIMEOUT
+    is UnknownHostException, is NoRouteToHostException -> AeroFailureCode.NO_ROUTE
+    is ConnectException -> AeroFailureCode.REFUSED_CONNECTION
+    is UnknownServiceException ->
+        if (message?.contains("CLEARTEXT", ignoreCase = true) == true) {
+            AeroFailureCode.CLEARTEXT_BLOCKED
+        } else {
+            AeroFailureCode.NO_ANSWER
+        }
+    else -> AeroFailureCode.NO_ANSWER
+}
 
 /** The failure a probe's transport error explains, in the shared vocabulary. */
 fun AeroErpClient.ProbeFailure.toFailure(): AeroFailure = AeroFailure(
@@ -198,6 +230,7 @@ fun AeroErpClient.ProbeFailure.toFailure(): AeroFailure = AeroFailure(
         AeroErpClient.ProbeFailure.TIMEOUT -> AeroFailureCode.TIMEOUT
         AeroErpClient.ProbeFailure.NO_ROUTE -> AeroFailureCode.NO_ROUTE
         AeroErpClient.ProbeFailure.REFUSED -> AeroFailureCode.REFUSED_CONNECTION
+        AeroErpClient.ProbeFailure.CLEARTEXT -> AeroFailureCode.CLEARTEXT_BLOCKED
         AeroErpClient.ProbeFailure.UNKNOWN -> AeroFailureCode.NO_ANSWER
     },
 )
