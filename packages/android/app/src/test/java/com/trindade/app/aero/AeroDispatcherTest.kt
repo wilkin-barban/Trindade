@@ -135,8 +135,19 @@ class AeroDispatcherTest {
         val outcome = dispatcher(recorder).dispatch(settings, request)
 
         assertEquals(AeroDispatchOutcome.Sent, outcome)
-        assertEquals("erp:entry:001192:1500:Trindade #42", recorder.calls.first())
-        assertTrue(recorder.calls.contains("mirror:log:dispatch:response"))
+        assertTrue(recorder.calls.contains("erp:entry:001192:1500:Trindade #42"))
+        assertEquals(
+            listOf("mirror:log:launch_sync:requested", "mirror:log:launch_sync:result"),
+            recorder.calls.filter { it.startsWith("mirror:log") },
+        )
+        val pair = recorder.logs.filter { it.event == AeroAudit.Event.DISPATCH }
+        assertEquals(2, pair.size)
+        assertEquals("requested", pair[0].phase)
+        assertEquals("result", pair[1].phase)
+        assertEquals("the two lines are one attempt", pair[0].attemptId, pair[1].attemptId)
+        assertEquals(42, pair[1].launchId)
+        assertTrue("the APK version travels with the line", !pair[1].appVersion.isNullOrBlank())
+        assertTrue("the build number travels with the line", (pair[1].buildNumber ?: 0) > 0)
     }
 
     @Test
@@ -167,8 +178,9 @@ class AeroDispatcherTest {
         val outcome = dispatcher(recorder, entry = AeroWriteResult.Failed(null)).dispatch(settings, request)
 
         assertEquals(AeroDispatchOutcome.Failed(AeroFailure(AeroFailureCode.NO_ANSWER)), outcome)
-        val log = recorder.logs.single()
-        assertEquals("dispatch", log.event)
+        val log = recorder.logs.last()
+        assertEquals(AeroAudit.Event.DISPATCH, log.event)
+        assertEquals("result", log.phase)
         assertNull("A transport failure has no status to report", log.httpStatus)
         assertTrue(log.note!!.startsWith(AeroAudit.PREFIX))
         assertTrue(log.note!!.contains("launch #42"))
@@ -178,13 +190,26 @@ class AeroDispatcherTest {
     fun `an ERP that refuses keeps its own sentence`() = runTest {
         val recorder = Recorder()
 
-        val outcome = dispatcher(recorder, entry = AeroWriteResult.Failed("produto inexistente")).dispatch(settings, request)
+        val outcome = dispatcher(
+            recorder,
+            entry = AeroWriteResult.Failed(
+                "produto inexistente",
+                httpStatus = 200,
+                code = AeroFailureCode.ERP_REFUSED,
+            ),
+        ).dispatch(settings, request)
 
         assertEquals(
-            AeroDispatchOutcome.Failed(AeroFailure(AeroFailureCode.ERP_REFUSED, "produto inexistente")),
+            AeroDispatchOutcome.Failed(
+                AeroFailure(
+                    AeroFailureCode.ERP_REFUSED,
+                    "produto inexistente",
+                    serverStatus = 200,
+                ),
+            ),
             outcome,
         )
-        assertEquals(200, recorder.logs.single().httpStatus)
+        assertEquals(200, recorder.logs.last().httpStatus)
     }
 
     @Test
@@ -197,7 +222,7 @@ class AeroDispatcherTest {
         // The ERP is never touched, and that is the point: no entry payload, no read, nothing against the plant.
         assertEquals(emptyList<String>(), recorder.payloads.map { it.productCode })
         // And it is no longer silent: the log keeps the attempt, the launch it was about and the reason.
-        val line = recorder.logs.single()
+        val line = recorder.logs.last()
         assertEquals(AeroAudit.Event.DISPATCH, line.event)
         assertEquals("AERO_NOT_CONFIGURED", line.error)
         assertEquals("unconfigured", line.destinationUrl)
@@ -212,7 +237,7 @@ class AeroDispatcherTest {
 
         assertEquals(AeroSyncOutcome.Failed(AeroFailure.notConfigured), outcome)
         assertEquals(emptyList<String>(), recorder.calls.filter { it.startsWith("erp:") })
-        val line = recorder.logs.single()
+        val line = recorder.logs.last()
         assertEquals(AeroAudit.Event.SYNC, line.event)
         assertEquals("AERO_NOT_CONFIGURED", line.error)
         assertTrue(line.note!!.contains("date=2026-10-30"))
@@ -269,10 +294,15 @@ class AeroDispatcherTest {
 
         assertEquals(AeroSyncOutcome.Synced(AeroMovementsSaved(saved = 1, massas = 1, insumos = 0)), outcome)
         assertEquals(
-            listOf("erp:movements:2026-10-30", "mirror:save:2026-10-30:1", "mirror:log:sync:response"),
+            listOf(
+                "mirror:log:read_history:requested",
+                "erp:movements:2026-10-30",
+                "mirror:save:2026-10-30:1",
+                "mirror:log:read_history:result",
+            ),
             recorder.calls,
         )
-        assertTrue(recorder.logs.single().note!!.contains("saved=1"))
+        assertTrue(recorder.logs.last().note!!.contains("saved=1"))
     }
 
     @Test
@@ -313,7 +343,7 @@ class AeroDispatcherTest {
         assertEquals("MASSAS_HISTORY_FROZEN", failure.serverCode)
         assertEquals(false, failure.retryable)
         // The log line keeps the backend's own code, so the reason survives in the trail.
-        assertEquals("MASSAS_HISTORY_FROZEN", recorder.logs.single().error)
+        assertEquals("MASSAS_HISTORY_FROZEN", recorder.logs.last().error)
     }
 
     @Test
@@ -360,15 +390,15 @@ class AeroAuditTest {
         val request = AeroAudit.request(
             event = AeroAudit.Event.DISPATCH,
             destinationUrl = "http://192.168.25.250:1453/api/entradasitem",
-            phase = "response",
+            phase = "result",
             httpStatus = 200,
-            durationMs = 1200,
-            detail = "launch #7",
+            durationMs = 1840,
+            detail = "launch #42",
         )
 
-        assertEquals("dispatch", request.event)
-        assertEquals("response", request.phase)
+        assertEquals(AeroAudit.Event.DISPATCH, request.event)
+        assertEquals("result", request.phase)
         assertEquals(200, request.httpStatus)
-        assertEquals("${AeroAudit.PREFIX} · launch #7", request.note)
+        assertEquals("${AeroAudit.PREFIX} · launch #42", request.note)
     }
 }

@@ -38,14 +38,16 @@ object AeroAudit {
     /**
      * The events this app reports.
      *
-     * The same names the web uses, because the log is one table and a screen filtering by event must not have
-     * to know which client wrote the line.
+     * The canonical names are the web's, so one filter finds both clients. The backend still accepts the
+     * old `dispatch`/`sync`/`test` aliases for historical lines; this client writes only the canonical
+     * spelling from now on.
      */
     object Event {
-        const val DISPATCH = "dispatch"
-        const val SYNC = "sync"
-        const val TEST = "test"
+        const val DISPATCH = "launch_sync"
+        const val SYNC = "read_history"
+        const val TEST = "test_connection"
         const val IMPORT = "import"
+        const val QUEUE_REJECTED = "queue_rejected"
     }
 
     fun request(
@@ -57,6 +59,9 @@ object AeroAudit {
         detail: String? = null,
         error: String? = null,
         attemptId: String = newAttemptId(),
+        launchId: Int? = null,
+        appVersion: String = BuildConfig.APP_VERSION_NAME,
+        buildNumber: Int = BuildConfig.APP_VERSION_CODE,
     ): AeroAuditLogRequest = AeroAuditLogRequest(
         event = event,
         destinationUrl = destinationUrl,
@@ -67,6 +72,9 @@ object AeroAudit {
         client = CLIENT,
         attemptId = attemptId,
         error = error?.take(ERROR_MAX),
+        launchId = launchId,
+        appVersion = appVersion,
+        buildNumber = buildNumber,
     )
 
     /**
@@ -112,16 +120,62 @@ object AeroAudit {
         httpStatus: Int?,
         outcome: String,
         detail: String? = null,
+        attemptId: String = newAttemptId(),
+        phase: String = "result",
+        error: String? = null,
     ): AeroAuditLogRequest = request(
         event = Event.TEST,
         destinationUrl = aeroEndpoint(normalizedWsUrl, "usuarios"),
-        phase = "response",
+        phase = phase,
         httpStatus = httpStatus,
         durationMs = elapsedMs,
         detail = listOfNotNull(outcome, detail?.trim()?.takeIf { it.isNotEmpty() }).joinToString(SEPARATOR),
+        attemptId = attemptId,
+        error = error,
     )
 
     private const val SEPARATOR = " · "
+}
+
+/**
+ * One ERP attempt, with the same id on its start and its terminal line.
+ *
+ * The backend stores one row per call; a reader needs both rows to answer "how long did it take" and
+ * "what did the phone try". Keeping the id here is what makes that pair possible without a second
+ * identifier invented at each call site.
+ */
+class AeroAuditAttempt(
+    val event: String,
+    val destinationUrl: String,
+    val launchId: Int? = null,
+) {
+    val attemptId: String = AeroAudit.newAttemptId()
+
+    fun requested(detail: String? = null): AeroAuditLogRequest = AeroAudit.request(
+        event = event,
+        destinationUrl = destinationUrl,
+        phase = "requested",
+        detail = detail,
+        attemptId = attemptId,
+        launchId = launchId,
+    )
+
+    fun result(
+        detail: String? = null,
+        httpStatus: Int? = null,
+        durationMs: Long? = null,
+        error: String? = null,
+    ): AeroAuditLogRequest = AeroAudit.request(
+        event = event,
+        destinationUrl = destinationUrl,
+        phase = "result",
+        httpStatus = httpStatus,
+        durationMs = durationMs,
+        detail = detail,
+        error = error,
+        attemptId = attemptId,
+        launchId = launchId,
+    )
 }
 
 /**

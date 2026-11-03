@@ -25,6 +25,9 @@ interface AeroMirrorPort {
 
     /** Reports one integration event to the shared audit log. Never throws: a lost log line is not a lost launch. */
     suspend fun log(request: com.trindade.app.network.AeroAuditLogRequest)
+
+    /** Retries the lines the device kept when the audit endpoint was unreachable. */
+    suspend fun flushAudit() {}
 }
 
 /**
@@ -99,17 +102,26 @@ class AeroDispatcher(
         request: AeroDispatchRequest,
     ): AeroDispatchOutcome {
         val normalized = settings.normalizedWsUrl
-        if (normalized == null || !settings.ready) {
-            // Nothing is sent to the plant, and the line says so: a launch that stayed local and a launch
+        val configured = normalized != null && settings.ready
+        val destination = if (configured) aeroEndpoint(normalized!!, "entradasitem") else UNCONFIGURED
+        val startedAt = System.currentTimeMillis()
+        val attempt = AeroAuditAttempt(
+            event = AeroAudit.Event.DISPATCH,
+            destinationUrl = destination,
+            launchId = request.launchId,
+        )
+        val requestedDetail = "launch #${request.launchId}"
+        mirror.log(attempt.requested(requestedDetail))
+
+        if (!configured) {
+            // Nothing is sent to the plant, and the pair says so: a launch that stayed local and a launch
             // that was refused used to read the same in the log -- both silent -- and the operator had no
             // way to tell whether the phone ever tried. The destination is marked as unconfigured instead
             // of naming an endpoint that was never called.
             mirror.log(
-                AeroAudit.request(
-                    event = AeroAudit.Event.DISPATCH,
-                    destinationUrl = UNCONFIGURED,
-                    phase = "requested",
-                    detail = "launch #${request.launchId} · integração não configurada",
+                attempt.result(
+                    detail = "$requestedDetail · integração não configurada",
+                    durationMs = System.currentTimeMillis() - startedAt,
                     error = ERROR_NOT_CONFIGURED,
                 ),
             )
@@ -121,11 +133,9 @@ class AeroDispatcher(
         val preflight = reachability.diagnose(normalized).failure()
         if (preflight != null) {
             mirror.log(
-                AeroAudit.request(
-                    event = AeroAudit.Event.DISPATCH,
-                    destinationUrl = aeroEndpoint(normalized, "entradasitem"),
-                    phase = "requested",
-                    detail = "launch #${request.launchId} · ${preflight.code.name.lowercase()}",
+                attempt.result(
+                    detail = "$requestedDetail · ${preflight.code.name.lowercase()}",
+                    durationMs = System.currentTimeMillis() - startedAt,
                     error = preflight.code.auditCode,
                 ),
             )
@@ -141,42 +151,31 @@ class AeroDispatcher(
             userCode = request.operatorName?.takeIf { it.isNotBlank() } ?: settings.userCode,
             launchIds = listOf(request.launchId),
         )
-        val startedAt = System.currentTimeMillis()
         val result = erp.postEntry(settings, payload)
         val elapsed = System.currentTimeMillis() - startedAt
 
         return when (result) {
             is AeroWriteResult.Ok -> {
                 mirror.log(
-                    AeroAudit.request(
-                        event = AeroAudit.Event.DISPATCH,
-                        destinationUrl = aeroEndpoint(normalized, "entradasitem"),
-                        phase = "response",
+                    attempt.result(
+                        detail = requestedDetail,
                         httpStatus = 200,
                         durationMs = elapsed,
-                        detail = "launch #${request.launchId}",
                     ),
                 )
                 AeroDispatchOutcome.Sent
             }
 
             // A refusal with no sentence is a transport failure: the ERP never answered, so nothing was
-            // recorded on its side and the row can be resent later.
+            // recorded on its side and the row can be resent later. The failure carries the transport
+            // code, and the HTTP status is kept when the ERP did answer.
             is AeroWriteResult.Failed -> {
-                val unreachable = result.message == null
-                val readFailure = if (unreachable) {
-                    AeroFailure(AeroFailureCode.NO_ANSWER)
-                } else {
-                    AeroFailure(AeroFailureCode.ERP_REFUSED, result.message)
-                }
+                val readFailure = result.failure
                 mirror.log(
-                    AeroAudit.request(
-                        event = AeroAudit.Event.DISPATCH,
-                        destinationUrl = aeroEndpoint(normalized, "entradasitem"),
-                        phase = "response",
-                        httpStatus = if (unreachable) null else 200,
+                    attempt.result(
+                        detail = "$requestedDetail · ${result.message ?: "sem resposta"}",
+                        httpStatus = result.httpStatus,
                         durationMs = elapsed,
-                        detail = "launch #${request.launchId} · ${if (unreachable) "sem resposta" else result.message}",
                         // A code, not the ERP's sentence: the log is filtered by it, and the sentence is
                         // already in the note above, where a person reads it.
                         error = readFailure.code.auditCode,
@@ -195,13 +194,21 @@ class AeroDispatcher(
      */
     suspend fun syncDay(settings: AeroSettings, date: String): AeroSyncOutcome {
         val normalized = settings.normalizedWsUrl
-        if (normalized == null || !settings.ready) {
+        val configured = normalized != null && settings.ready
+        val destination = if (configured) aeroMovementsUrl(normalized!!) else UNCONFIGURED
+        val startedAt = System.currentTimeMillis()
+        val attempt = AeroAuditAttempt(
+            event = AeroAudit.Event.SYNC,
+            destinationUrl = destination,
+        )
+        val requestedDetail = "date=$date"
+        mirror.log(attempt.requested(requestedDetail))
+
+        if (!configured) {
             mirror.log(
-                AeroAudit.request(
-                    event = AeroAudit.Event.SYNC,
-                    destinationUrl = UNCONFIGURED,
-                    phase = "requested",
-                    detail = "date=$date · integração não configurada",
+                attempt.result(
+                    detail = "$requestedDetail · integração não configurada",
+                    durationMs = System.currentTimeMillis() - startedAt,
                     error = ERROR_NOT_CONFIGURED,
                 ),
             )
@@ -213,38 +220,31 @@ class AeroDispatcher(
         val preflight = reachability.diagnose(normalized).failure()
         if (preflight != null) {
             mirror.log(
-                AeroAudit.request(
-                    event = AeroAudit.Event.SYNC,
-                    destinationUrl = aeroMovementsUrl(normalized),
-                    phase = "requested",
-                    detail = "date=$date · ${preflight.code.name.lowercase()}",
+                attempt.result(
+                    detail = "$requestedDetail · ${preflight.code.name.lowercase()}",
+                    durationMs = System.currentTimeMillis() - startedAt,
                     error = preflight.code.auditCode,
                 ),
             )
             return AeroSyncOutcome.Failed(preflight)
         }
 
-        val startedAt = System.currentTimeMillis()
         val read = erp.readMovements(settings, date)
         val elapsed = System.currentTimeMillis() - startedAt
-        val destination = aeroMovementsUrl(normalized)
 
         return when (read) {
             is AeroMovementsResult.Ok -> {
                 val save = mirror.saveMovements(date, read.movements)
                 val saved = (save as? AeroSnapshotSave.Saved)?.counts
                 mirror.log(
-                    AeroAudit.request(
-                        event = AeroAudit.Event.SYNC,
-                        destinationUrl = destination,
-                        phase = "response",
+                    attempt.result(
                         httpStatus = when (save) {
                             is AeroSnapshotSave.Saved -> 200
                             is AeroSnapshotSave.Refused -> save.status
                             AeroSnapshotSave.Unreachable -> null
                         },
                         durationMs = elapsed,
-                        detail = "date=$date · seats=${read.movements.size} · saved=${saved?.saved ?: 0}",
+                        detail = "$requestedDetail · seats=${read.movements.size} · saved=${saved?.saved ?: 0}",
                         // The ERP answered but the backend would not store the snapshot: the day is read and
                         // lost, which is a different failure from an unreachable plant.
                         error = (save as? AeroSnapshotSave.Refused)?.code
@@ -272,18 +272,16 @@ class AeroDispatcher(
             }
 
             is AeroMovementsResult.Failed -> {
+                val readFailure = read.failure
                 mirror.log(
-                    AeroAudit.request(
-                        event = AeroAudit.Event.SYNC,
-                        destinationUrl = destination,
-                        phase = "response",
-                        httpStatus = null,
+                    attempt.result(
+                        httpStatus = read.httpStatus,
                         durationMs = elapsed,
-                        detail = "date=$date · ${read.message ?: "sem resposta"}",
-                        error = read.failure.code.auditCode,
+                        detail = "$requestedDetail · ${read.message ?: "sem resposta"}",
+                        error = readFailure.code.auditCode,
                     ),
                 )
-                AeroSyncOutcome.Failed(read.failure)
+                AeroSyncOutcome.Failed(readFailure)
             }
         }
     }
@@ -306,14 +304,17 @@ class AeroDispatcher(
     suspend fun logQueueRejected(date: String, launchIds: List<Int>, code: String) {
         mirror.log(
             AeroAudit.request(
-                event = AeroAudit.Event.SYNC,
+                event = AeroAudit.Event.QUEUE_REJECTED,
                 destinationUrl = IMPORT_DESTINATION,
-                phase = "response",
+                phase = "result",
                 detail = "aero_queue_rejected · date=$date · launchIds=${launchIds.joinToString(",")} · code=$code",
                 error = code,
             ),
         )
     }
+
+    /** Retries the audit outbox without waiting for another ERP call. */
+    suspend fun flushAudit() = mirror.flushAudit()
 
     suspend fun logImport(
         date: String,

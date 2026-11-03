@@ -40,7 +40,11 @@ class AeroErpAdapter @Inject constructor(
 @Singleton
 class AeroMirrorAdapter @Inject constructor(
     private val api: MassasApi,
+    private val auditOutbox: AeroAuditOutboxPort,
 ) : AeroMirrorPort {
+
+    /** Test/legacy construction: sends immediately without Android-backed persistence. */
+    constructor(api: MassasApi) : this(api, InMemoryAeroAuditOutbox())
 
     override suspend fun saveMovements(date: String, movements: List<AeroErpMovement>): AeroSnapshotSave {
         val body = AeroMovementsSnapshotRequest(
@@ -68,9 +72,31 @@ class AeroMirrorAdapter @Inject constructor(
      * wrote, and from a line the server would not take because of one field.
      */
     override suspend fun log(request: AeroAuditLogRequest) {
-        val response = runCatchingCancellable { api.logEvent(request) }.getOrNull()
-        if (response == null || !response.isSuccessful) {
-            Log.w(LOG_TAG, AeroAudit.rejection(response?.code(), response?.errorBody()?.string()))
+        // The line is kept before it is sent. A successful POST removes it; a failed one leaves it for the
+        // next launch, sync or screen open. The launch itself never waits on this outcome.
+        auditOutbox.enqueue(request)
+        flushAudit()
+    }
+
+    override suspend fun flushAudit() {
+        for (queued in auditOutbox.pending()) {
+            val response = runCatchingCancellable { api.logEvent(queued.request) }.getOrNull()
+            if (response == null) {
+                warn(AeroAudit.rejection(null, null))
+                break
+            }
+            if (response.isSuccessful) {
+                auditOutbox.remove(listOf(queued))
+                continue
+            }
+            warn(AeroAudit.rejection(response.code(), response.errorBody()?.string()))
+            // A malformed line is not retried forever: the server rejected its shape, not its timing.
+            // Authentication and server failures stay in the outbox for a later attempt.
+            if (response.code() == 400 || response.code() == 404 || response.code() == 422) {
+                auditOutbox.remove(listOf(queued))
+                continue
+            }
+            break
         }
     }
 
@@ -82,6 +108,11 @@ class AeroMirrorAdapter @Inject constructor(
      */
     private fun serverCodeOf(body: String): String? =
         SERVER_CODE.find(body)?.groupValues?.getOrNull(1)
+
+    /** Logcat in the app; a no-op in JVM tests, where `android.util.Log` is a stub. */
+    private fun warn(message: String) {
+        runCatching { Log.w(LOG_TAG, message) }
+    }
 
     fun AeroErpMovement.toStored() = AeroStoredMovement(
         entLan = entLan,

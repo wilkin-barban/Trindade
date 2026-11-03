@@ -304,7 +304,11 @@ sealed interface AeroMovementsResult {
      */
     data class Ok(val movements: List<AeroErpMovement>, val skipped: Int) : AeroMovementsResult
 
-    data class Failed(val message: String?) : AeroMovementsResult
+    data class Failed(
+        val message: String?,
+        val httpStatus: Int? = null,
+        val code: AeroFailureCode? = null,
+    ) : AeroMovementsResult
 }
 
 /** The `/usuarios` authentication answer, as the integration test needs it. */
@@ -323,7 +327,11 @@ sealed interface AeroWriteResult {
      * `message` is the ERP's own sentence when it sent one. A null one means the client has to say it its
      * own way, in the operator's language: no Portuguese copy is hardcoded in this file.
      */
-    data class Failed(val message: String?) : AeroWriteResult
+    data class Failed(
+        val message: String?,
+        val httpStatus: Int? = null,
+        val code: AeroFailureCode? = null,
+    ) : AeroWriteResult
 }
 
 /**

@@ -29,8 +29,8 @@ class AeroTestAuditTest {
 
         // `/usuarios` without the trailing slash: the slash is the 301 that turns a POST into a GET.
         assertEquals("$ws/usuarios", request.destinationUrl)
-        assertEquals("test", request.event)
-        assertEquals("response", request.phase)
+        assertEquals("test_connection", request.event)
+        assertEquals("result", request.phase)
         assertNull(request.httpStatus)
         assertEquals(1234L, request.durationMs)
         assertTrue(request.note!!.endsWith("sem-resposta · TIMEOUT"))
@@ -97,14 +97,14 @@ class AeroTestAuditTest {
         val request = AeroAudit.request(
             event = AeroAudit.Event.DISPATCH,
             destinationUrl = "http://192.168.25.250:1453/api/entradasitem",
-            phase = "response",
+            phase = "result",
             httpStatus = 200,
             durationMs = 1840,
             detail = "launch #42",
         )
 
-        assertEquals("dispatch", request.event)
-        assertEquals("response", request.phase)
+        assertEquals("launch_sync", request.event)
+        assertEquals("result", request.phase)
         assertEquals("http://192.168.25.250:1453/api/entradasitem", request.destinationUrl)
         assertEquals(200, request.httpStatus)
         assertEquals(1840L, request.durationMs)
@@ -115,8 +115,14 @@ class AeroTestAuditTest {
     fun `every event name this app writes is one the backend accepts`() {
         // Written out as literals on purpose: comparing the constants to themselves would pin nothing.
         assertEquals(
-            listOf("dispatch", "sync", "test", "import"),
-            listOf(AeroAudit.Event.DISPATCH, AeroAudit.Event.SYNC, AeroAudit.Event.TEST, AeroAudit.Event.IMPORT),
+            listOf("launch_sync", "read_history", "test_connection", "import", "queue_rejected"),
+            listOf(
+                AeroAudit.Event.DISPATCH,
+                AeroAudit.Event.SYNC,
+                AeroAudit.Event.TEST,
+                AeroAudit.Event.IMPORT,
+                AeroAudit.Event.QUEUE_REJECTED,
+            ),
         )
     }
 
@@ -158,6 +164,27 @@ class AeroTestAuditTest {
         )
 
         assertEquals(requested.attemptId, result.attemptId)
+    }
+
+    @Test
+    fun `an attempt keeps its id and fields across requested and result`() {
+        val attempt = AeroAuditAttempt(
+            event = AeroAudit.Event.DISPATCH,
+            destinationUrl = "http://192.168.25.250:1453/api/entradasitem",
+            launchId = 42,
+        )
+
+        val requested = attempt.requested("launch #42")
+        val result = attempt.result("launch #42", httpStatus = 200, durationMs = 1840)
+
+        assertEquals(requested.attemptId, result.attemptId)
+        assertEquals("requested", requested.phase)
+        assertEquals("result", result.phase)
+        assertEquals(42, requested.launchId)
+        assertEquals(42, result.launchId)
+        assertEquals(200, result.httpStatus)
+        assertTrue(!requested.appVersion.isNullOrBlank())
+        assertTrue((requested.buildNumber ?: 0) > 0)
     }
 
     @Test
