@@ -163,7 +163,7 @@ class AeroErpClientTest {
     }
 
     @Test
-    fun `reads the day from movimentoitem with the patch override in the query`() = runBlocking {
+    fun `reads the day from movimentoitem with the certified web payload`() = runBlocking {
         server.enqueue(
             MockResponse().setBody(
                 """{"success":true,"data":[{"ENT_LAN":901,"PRO_COD":"001192","PRO_DES":"MASSA QUADRADA",""" +
@@ -178,8 +178,10 @@ class AeroErpClientTest {
 
         val recorded = server.takeRequest()
         assertEquals("/api/movimentoitem?_method=PATCH", recorded.path)
+        // The body is deliberately identical to `aeroMovementsEnvelope` in the web bridge: body-level
+        // `_method`, entries only (`E`), and explicit nulls for the filters left open.
         assertEquals(
-            """{"CODFOR":null,"NOMUSU":null,"CODPRO":null,"DTINI":"2026-10-30","DTFIM":"2026-10-30","ENTSAI":null}""",
+            """{"_method":"PATCH","CODFOR":null,"NOMUSU":null,"CODPRO":null,"DTINI":"2026-10-30","DTFIM":"2026-10-30","ENTSAI":"E"}""",
             body(recorded),
         )
     }

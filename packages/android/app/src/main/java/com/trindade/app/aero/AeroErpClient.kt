@@ -171,7 +171,9 @@ class AeroErpClient @Inject constructor(
             api.postMovements(
                 url = url,
                 authorization = basicAuthHeader(username, password),
-                body = buildMovimentoItemPayload(userName = null, startDate = date),
+                // The mirror is the entries side of Aero32, exactly like the certified web bridge: E,
+                // not null, and `_method` in the body so the Delphi router selects PATCH.
+                body = buildMovimentoItemPayload(userName = null, startDate = date, movementType = "E"),
             )
         }.fold(
             onSuccess = { response ->
