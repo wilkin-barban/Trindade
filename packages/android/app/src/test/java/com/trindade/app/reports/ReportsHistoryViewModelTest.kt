@@ -2,7 +2,6 @@ package com.trindade.app.reports
 
 import com.trindade.app.contract.models.ReportHistoryResponse
 import com.trindade.app.contract.models.ScheduleHistoryResponsePagination
-import com.trindade.app.contract.models.SuccessResponse
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -482,7 +481,7 @@ class ReportsHistoryViewModelTest {
         model.deactivate(1)
         assertEquals(listOf(1), api.deactivatedIds)
 
-        api.deactivateResponse = Response.success(SuccessResponse(success = SuccessResponse.Success.entries.first()))
+        api.deactivateResponse = Response.success(Unit)
         model.retry()
 
         assertEquals("the refused write is sent again", listOf(1, 1), api.deactivatedIds)

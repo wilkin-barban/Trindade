@@ -3,7 +3,6 @@ package com.trindade.app.loading
 import com.trindade.app.contract.models.ScheduleHistoryResponse
 import com.trindade.app.contract.models.ScheduleHistoryResponseItemsInner
 import com.trindade.app.contract.models.ScheduleHistoryResponsePagination
-import com.trindade.app.contract.models.SuccessResponse
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -563,8 +562,7 @@ class LoadingHistoryViewModelTest {
         model.deactivateBatch("2026-09-18")
         assertEquals(1, api.deactivatedBatchDates.size)
 
-        api.deactivateBatchResponse =
-            Response.success(SuccessResponse(success = SuccessResponse.Success.entries.first()))
+        api.deactivateBatchResponse = Response.success(Unit)
         model.retry()
 
         assertEquals("the refused write is sent again", 2, api.deactivatedBatchDates.size)

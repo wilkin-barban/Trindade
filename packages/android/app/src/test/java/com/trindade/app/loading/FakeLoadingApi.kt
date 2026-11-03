@@ -11,7 +11,6 @@ import com.trindade.app.contract.models.ScheduleHistoryResponsePagination
 import com.trindade.app.contract.models.ScheduleResponse
 import com.trindade.app.contract.models.SchedulesResponse
 import com.trindade.app.contract.models.SchedulesResponseSchedulesInner
-import com.trindade.app.contract.models.SuccessResponse
 import com.trindade.app.contract.models.TextResponse
 import com.trindade.app.contract.models.TimeSlotsResponse
 import com.trindade.app.contract.models.UpdateScheduleRequest
@@ -134,11 +133,9 @@ class FakeLoadingApi(
      * A `var` because the retry tests set it after the fake is built: the first attempt has to be the
      * one that fails, and the second the one that does not.
      */
-    var deactivateBatchResponse: Response<SuccessResponse> =
-        Response.success(SuccessResponse(success = SuccessResponse.Success.entries.first())),
+    var deactivateBatchResponse: Response<Unit> = Response.success(Unit),
     /** What a batch reactivation answers, the same 200-with-a-body as its pair. */
-    var activateBatchResponse: Response<SuccessResponse> =
-        Response.success(SuccessResponse(success = SuccessResponse.Success.entries.first())),
+    var activateBatchResponse: Response<Unit> = Response.success(Unit),
     /** What a batch deletion answers, 204 with no body in practice, and the same convention for a refusal. */
     var deleteBatchResponse: Response<Unit> = Response.success(Unit),
     /** Null is the server refusing to render the text, which is the only failure the export has. */
@@ -420,14 +417,14 @@ class FakeLoadingApi(
             ?.let { found -> found.copy(timeSlot = timeSlot ?: found.timeSlot) }
             ?: entry(id = id, slot = timeSlot.orEmpty())
 
-    override suspend fun deactivateSchedule(id: Int): Response<SuccessResponse> = error(NOT_USED)
+    override suspend fun deactivateSchedule(id: Int): Response<Unit> = error(NOT_USED)
 
-    override suspend fun deactivateBatch(date: String): Response<SuccessResponse> {
+    override suspend fun deactivateBatch(date: String): Response<Unit> {
         deactivatedBatchDates += date
         return deactivateBatchResponse
     }
 
-    override suspend fun activateBatch(date: String): Response<SuccessResponse> {
+    override suspend fun activateBatch(date: String): Response<Unit> {
         activatedBatchDates += date
         return activateBatchResponse
     }

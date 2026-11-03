@@ -7,7 +7,6 @@ import com.trindade.app.contract.models.DriversResponse
 import com.trindade.app.contract.models.ScheduleHistoryResponse
 import com.trindade.app.contract.models.ScheduleResponse
 import com.trindade.app.contract.models.SchedulesResponse
-import com.trindade.app.contract.models.SuccessResponse
 import com.trindade.app.contract.models.TextResponse
 import com.trindade.app.contract.models.TimeSlotsResponse
 import com.trindade.app.contract.models.UpdateScheduleRequest
@@ -111,20 +110,25 @@ interface LoadingApi {
     suspend fun deleteSchedule(@Path("id") id: Int): Response<Unit>
 
     @PATCH("api/loading/schedules/{id}/deactivate")
-    suspend fun deactivateSchedule(@Path("id") id: Int): Response<SuccessResponse>
+    suspend fun deactivateSchedule(@Path("id") id: Int): Response<Unit>
 
     @PATCH("api/loading/schedules/batch/{date}/deactivate")
-    suspend fun deactivateBatch(@Path("date") date: String): Response<SuccessResponse>
+    suspend fun deactivateBatch(@Path("date") date: String): Response<Unit>
 
     /**
      * Brings a deactivated batch back, with every entry it had.
      *
      * The mirror of `deactivateBatch`, and the only way back: an inactive batch is not deleted, so the day
      * still exists in the history and reactivating it is a state change rather than a new batch. Answers
-     * `SuccessResponse` and refuses with 403 and 404 exactly like its pair.
+     * 200 with a success body and refuses with 403 and 404 exactly like its pair.
+     *
+     * The body is deliberately not typed: the server writes `{"success":true}`, while the generated
+     * `SuccessResponse` model expects an enum whose wire value is the string `"true"`. A status-only
+     * call that parsed it turned a 200 into a decoding exception the repository reported as an
+     * unreachable server.
      */
     @PATCH("api/loading/schedules/batch/{date}/activate")
-    suspend fun activateBatch(@Path("date") date: String): Response<SuccessResponse>
+    suspend fun activateBatch(@Path("date") date: String): Response<Unit>
 
     @DELETE("api/loading/schedules/batch/{date}")
     suspend fun deleteBatch(@Path("date") date: String): Response<Unit>
