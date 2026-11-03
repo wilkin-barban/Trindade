@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { Calendar } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { formatDateLabel } from '../../lib/date';
+import { formatDateLabel, formatMonthLabel } from '../../lib/date';
 
 interface DateFieldProps {
   id: string;
@@ -13,6 +13,8 @@ interface DateFieldProps {
   max?: string;
   testId?: string;
   className?: string;
+  /** A day or a month; the visible trigger and the native picker use the same type. */
+  type?: 'date' | 'month';
   /**
    * `inline` is the compact box beside other controls; `panel` is a full-width surface whose whole body is
    * the day. The panel exists because a ten-character date is the smallest thing to read on a screen that
@@ -55,9 +57,14 @@ export function DateField({
   max,
   testId,
   className,
+  type = 'date',
   variant = 'inline',
 }: DateFieldProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const isMonth = type === 'month';
+  const displayedValue = value
+    ? isMonth ? formatMonthLabel(value) : formatDateLabel(value)
+    : isMonth ? 'mm/aaaa' : 'dd/mm/aaaa';
 
   /**
    * Opens the native calendar from the click the operator just made.
@@ -96,9 +103,13 @@ export function DateField({
         {panel && <span className="text-xs text-gray-500">{label}</span>}
         <span
           aria-hidden="true"
-          className={cn('tabular-nums', panel ? 'truncate text-lg font-semibold' : '')}
+          className={cn(
+            'tabular-nums',
+            panel ? 'truncate text-lg font-semibold' : '',
+            !value && 'text-gray-400',
+          )}
         >
-          {formatDateLabel(value)}
+          {displayedValue}
         </span>
       </span>
       <Calendar
@@ -111,7 +122,7 @@ export function DateField({
       <input
         ref={inputRef}
         id={id}
-        type="date"
+        type={type}
         value={value}
         min={min}
         max={max}

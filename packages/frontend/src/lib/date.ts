@@ -57,3 +57,11 @@ export function formatDateLabel(iso: string): string {
   const [, year, month, day] = match;
   return `${day}/${month}/${year}`;
 }
+
+/** The month as the trigger of a month field shows it: MM/YYYY. */
+export function formatMonthLabel(iso: string): string {
+  const match = /^(\d{4})-(\d{2})$/.exec(iso);
+  if (!match) return iso;
+  const [, year, month] = match;
+  return `${month}/${year}`;
+}
