@@ -2084,7 +2084,8 @@
               "dispatch",
               "sync",
               "test",
-              "import"
+              "import",
+              "queue_rejected"
             ]
           },
           "phase": {
@@ -2155,6 +2156,16 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 600000
+          },
+          "appVersion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32
+          },
+          "buildNumber": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2000000000
           }
         },
         "required": [
