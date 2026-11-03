@@ -218,9 +218,16 @@ fun buildAeroEntryPayload(
     observation = observation,
 )
 
-/** POST /movimentoitem's body, in the order the ERP's parser expects. */
+/**
+ * POST /movimentoitem's body, in the order the ERP's parser expects.
+ *
+ * `_method` travels in the body as well as in the query string: that is the shape the certified web
+ * bridge sends, and the shape the Delphi router consumes. The query-only variant is what produced the
+ * old "POST method is not supported" answer.
+ */
 @Serializable
 data class AeroMovimentoPayload(
+    @SerialName("_method") val method: String,
     @SerialName("CODFOR") val supplierCode: String?,
     @SerialName("NOMUSU") val userName: String?,
     @SerialName("CODPRO") val productCode: String?,
@@ -246,6 +253,7 @@ fun buildMovimentoItemPayload(
     val code = productCode?.trim().orEmpty()
 
     return AeroMovimentoPayload(
+        method = "PATCH",
         supplierCode = null,
         userName = aeroMovementUserName(userName),
         productCode = if (code.isEmpty()) null else formatAeroProductCode(code),

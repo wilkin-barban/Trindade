@@ -105,7 +105,7 @@ class AeroLogicTest {
         )
         val written = json.encodeToJsonElement(AeroMovimentoPayload.serializer(), payload).jsonObject.toString()
         assertEquals(
-            "{\"CODFOR\":null,\"NOMUSU\":null,\"CODPRO\":null,\"DTINI\":\"2026-10-30\"," +
+            "{\"_method\":\"PATCH\",\"CODFOR\":null,\"NOMUSU\":null,\"CODPRO\":null,\"DTINI\":\"2026-10-30\"," +
                 "\"DTFIM\":\"2026-10-30\",\"ENTSAI\":null}",
             written,
         )
