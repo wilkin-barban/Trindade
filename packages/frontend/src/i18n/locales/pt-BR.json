@@ -708,7 +708,7 @@
       "syncOk_other": "{{count}} massas sincronizadas do ERP para {{date}}.",
       "syncEmpty": "Nenhuma massa sincronizada do ERP para {{date}}.",
       "syncError": "Não foi possível ler as massas do ERP. Tente de novo pelo atalho.",
-      "mirrorHint": "Sincronizado com o ERP. Atualize a aba «Espelho do ERP» para ver seu novo lançamento contábil.",
+      "mirrorHint": "Sincronizado com o ERP. O Trindade lê o dia para o lançamento aparecer no espelho.",
       "storeFailed": "As massas chegaram, mas não foi possível guardá-las. Sincronize de novo.",
       "batchOkTitle": "Lançamentos Sincronizados",
       "batchPartialTitle": "Sincronização Parcial",

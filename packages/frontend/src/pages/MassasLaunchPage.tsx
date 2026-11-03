@@ -79,6 +79,7 @@ import {
 import { AERO_BATCH_MAX, buildAeroLaunchTrips } from '../lib/aero-batch';
 import { formatDateLabel } from '../lib/date';
 import { AeroResultDialog } from './massas/AeroResultDialog';
+import { armAeroAutoRead, consumeAeroAutoRead } from '../lib/aero-auto-read';
 import { AeroDeviceBanner } from '../components/aero/AeroDeviceBanner';
 import { useDevice } from '../contexts/DeviceContext';
 import { canControlAero } from '../lib/device-detection';
@@ -878,6 +879,8 @@ export function MassasLaunchPage() {
           }
           clearAeroQueue();
           setSyncAwaiting(null);
+          // El producto quedó en la planta: este veredicto deja el día debiendo una lectura.
+          if (batch.ok === 1) armAeroAutoRead(date);
           setResultModal(
             batch.ok === 1
               ? { type: 'success', message: t('massas.aero.syncConfirmYes'), sentToErp: true }
@@ -898,6 +901,10 @@ export function MassasLaunchPage() {
         else clearAeroQueue();
         setSyncAwaiting(rest && rest.items.length > 0 ? { date: rest.date, remaining: rest.items.length } : null);
 
+        // Lo que la planta confirmó deja el día debiendo una lectura, y se paga al cerrar este veredicto:
+        // leer es otro viaje del atajo, y salir ahora sería dejar al operario sin la respuesta que pidió.
+        // Un lote parcial no la arma: lo que falta sigue en la cola y el próximo veredicto la arma.
+        if (batch.ok > 0 && !rest?.items.length) armAeroAutoRead(date);
         setResultModal({
           type: feedback.tone === 'ok' ? 'success' : feedback.tone === 'warn' ? 'warn' : 'error',
           title: t(feedback.titleKey),
@@ -961,6 +968,7 @@ export function MassasLaunchPage() {
         setSyncAwaiting(null);
       }
 
+      if (outcome.status === 'ok') armAeroAutoRead(date);
       setResultModal(
         outcome.status === 'ok'
           ? { type: 'success', message: outcome.message ?? t('massas.aero.syncConfirmYes'), sentToErp: true }
@@ -990,12 +998,13 @@ export function MassasLaunchPage() {
 
     clearAeroQueue();
     setSyncAwaiting(null);
+    if (parsed.status === 'ok') armAeroAutoRead(date);
     setResultModal(
       parsed.status === 'ok'
         ? { type: 'success', message: parsed.message ?? t('massas.aero.syncConfirmYes') }
         : { type: 'error', message: parsed.message ?? t('massas.aero.syncConfirmNo') },
     );
-  }, [aeroDestination, aeroSettings.wsUrl, handleMovementsCallback, t, triggerAeroSync]);
+  }, [aeroDestination, aeroSettings.wsUrl, date, handleMovementsCallback, t, triggerAeroSync]);
 
   /**
    * The operator came back from the phone without a verdict.
@@ -1043,6 +1052,18 @@ export function MassasLaunchPage() {
   }
 
 
+
+  /**
+   * Closes the verdict, and only now pays the read the launch left owed.
+   *
+   * Both the backdrop and the button come through here: the mark is the only thing that decides, so a
+   * dialog the operator dismissed last of a day that owes nothing costs no trip.
+   */
+  const closeResultModal = () => {
+    setResultModal(null);
+    if (!consumeAeroAutoRead(date)) return;
+    handleSyncFromErp();
+  };
 
   const handleToggleAck = (row: MassasUnifiedRow) => {
     const launchId = row.launchIds[0];
@@ -1333,7 +1354,7 @@ export function MassasLaunchPage() {
       {resultModal && (
         <Dialog
           open={resultModal !== null}
-          onClose={() => setResultModal(null)}
+          onClose={closeResultModal}
           labelledBy="massa-result-title"
           panelTestId="massa-result-modal"
         >
@@ -1369,7 +1390,7 @@ export function MassasLaunchPage() {
                 </Button>
               ) : null}
               <Button
-                onClick={() => setResultModal(null)}
+                onClick={closeResultModal}
                 className={`min-h-[44px] w-full font-semibold ${
                   resultModal.type === 'success'
                     ? 'bg-green-600 hover:bg-green-700 text-white'
