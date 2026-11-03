@@ -9,6 +9,7 @@ import { Card } from '../components/ui/card';
 import { LoadingSpinner } from '../components/ui/loading-spinner';
 import { ConfirmDialog } from '../components/ui/confirm-dialog';
 import { ModuleHelpModal } from '../components/ui/ModuleHelpModal';
+import { HistoryFilters } from '../components/history/HistoryFilters';
 import { historyActionErrorMessageKey, historyAffordances } from '../lib/history-permissions';
 
 interface UserOption { id: number; display_name: string }
@@ -135,25 +136,20 @@ export function ReportHistoryPage() {
         <Link className="w-full sm:w-auto shrink-0" to="/reports" data-testid="history-new-report-btn"><Button variant="outline" size="sm" className="w-full sm:w-auto">{t('reports.newReport')}</Button></Link>
       </div>
 
-      <Card className="p-3 mb-4 grid grid-cols-1 sm:grid-cols-4 gap-2">
-        <input type="date" value={date} max={today} onChange={(e) => { setDate(e.target.value); if (e.target.value) setMonth(''); }} aria-label={t('history.filterDate')} className="h-11 rounded-lg border px-3 text-sm sm:h-9" data-testid="history-date-filter" />
-        <input type="month" value={month} max={today.slice(0, 7)} onChange={(e) => { setMonth(e.target.value); if (e.target.value) setDate(''); }} aria-label={t('history.filterMonth')} className="h-11 rounded-lg border px-3 text-sm sm:h-9" data-testid="history-month-filter" />
-        <select value={userId} onChange={(e) => setUserId(e.target.value)} aria-label={t('history.filterUser')} className="rounded-lg border px-3 py-2 text-sm" data-testid="history-user-filter">
-          <option value="">{t('history.allUsers')}</option>
-          {users.map((u) => <option key={u.id} value={u.id}>{u.display_name}</option>)}
-        </select>
-        <div className="flex gap-2">
-          <Button size="sm" onClick={() => void fetchReports(1)} data-testid="history-apply-filters">{t('reports.filter')}</Button>
-          {/* Limpiar aparece solo cuando hay algo que limpiar: un botón que no haría nada es una promesa
-              vacía, y el filtro por usuario se conserva porque es una ventaja de la web que el teléfono no
-              tiene. */}
-          {hasFilters && (
-            <Button size="sm" variant="outline" onClick={clearFilters} data-testid="history-clear-filters">
-              {t('history.clearFilters')}
-            </Button>
-          )}
-        </div>
-      </Card>
+      <HistoryFilters
+        prefix="history"
+        date={date}
+        month={month}
+        userId={userId}
+        users={users}
+        today={today}
+        hasFilters={hasFilters}
+        onDateChange={(value) => { setDate(value); if (value) setMonth(''); }}
+        onMonthChange={(value) => { setMonth(value); if (value) setDate(''); }}
+        onUserChange={setUserId}
+        onApply={() => void fetchReports(1)}
+        onClear={clearFilters}
+      />
 
       {loading && <div className="flex items-center justify-center py-12"><LoadingSpinner /></div>}
       {error && <div role="alert" className="p-4 text-red-700 bg-red-50 border rounded-lg mb-4">{error}</div>}

@@ -131,13 +131,13 @@ describe('LoadingHistoryPage', () => {
     renderPage();
 
     // The day the plant already closed is history: the card still offers a way to see how it was distributed,
-    // but the URL carries the read-only view and never the editor.
+    // but the URL carries the read-only view and never the editor. The card stays compact, like a report.
     await waitFor(() => expect(screen.getByTestId('loading-history-closed-2026-10-30')).toBeInTheDocument());
+    expect(screen.getByTestId('loading-history-closed-2026-10-30')).toHaveTextContent('Solo lectura');
     const view = screen.getByTestId('view-loading-batch-2026-10-30');
     expect(view).toHaveAttribute('href', '/loading/edit?date=2026-10-30&view=1');
-    expect(view).toHaveTextContent('Ver cronograma');
-    // On a phone it shares the row with the icons instead of floating at the right edge next to a gap.
-    expect(view).toHaveClass('max-sm:flex-1');
+    expect(view).toHaveAttribute('aria-label', 'Ver cronograma del 30/10/2026');
+    expect(view).toHaveClass('min-h-12', 'min-w-12');
     expect(screen.queryByRole('link', { name: 'Editar' })).toBeNull();
   });
 
@@ -155,17 +155,19 @@ describe('LoadingHistoryPage', () => {
     await waitFor(() => expect(patch).toHaveBeenCalledWith('/loading/schedules/batch/2026-11-01/activate', {}));
   });
 
-  it('offers edit as a link that carries the button classes, not a button inside a link', async () => {
+  it('makes the card summary the edit link and keeps the view as a compact icon', async () => {
     get.mockImplementation(async (url: string) => {
       if (url.startsWith('/users/options')) return { users: [] };
       return { items: [batch('2026-11-02')], pagination: { page: 1, pageSize: 30, total: 1, totalPages: 1 } };
     });
     renderPage();
 
-    const edit = await screen.findByRole('link', { name: 'Editar' });
+    const edit = await screen.findByRole('link', { name: 'Editar carga del 02/11/2026' });
     expect(edit).toHaveAttribute('href', '/loading/edit?date=2026-11-02');
-    // A button inside an anchor is invalid markup and two targets for one thumb.
-    expect(edit.querySelector('button')).toBeNull();
+    // The eye is the view action; it does not turn the whole card into a second editor.
+    const view = screen.getByTestId('view-loading-batch-2026-11-02');
+    expect(view).toHaveAttribute('href', '/loading/edit?date=2026-11-02&view=1');
+    expect(view).toHaveClass('min-h-12', 'min-w-12');
   });
 
   it('gives the batch actions a target a thumb can hit', async () => {

@@ -109,7 +109,7 @@ test.describe('Loading History — Filters and pagination', () => {
     await expect(page.locator('[data-testid="edit-schedule-list"]')).toContainText(`Hist ${stamp}`);
   });
 
-  test('keeps the date and the actions on separate rows at 390x844', async ({ page }) => {
+  test('keeps the date and the actions on one compact row at 390x844', async ({ page }) => {
     const date = await seedBatch(page);
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/loading/history');
@@ -122,10 +122,12 @@ test.describe('Loading History — Filters and pagination', () => {
     const actionBox = await deactivate.boundingBox();
     expect(summaryBox).not.toBeNull();
     expect(actionBox).not.toBeNull();
+    if (!summaryBox || !actionBox) return;
 
-    // On a phone the date owns the width and the controls take the row below: side by side the date was
-    // squeezed into a sliver and the thumb missed the icons.
-    expect(actionBox!.y).toBeGreaterThanOrEqual(summaryBox!.y + summaryBox!.height - 1);
+    // Report-card shape: the date owns the flexible left side, the icon owns a thumb-sized slot on the
+    // right, and neither needs a second control row.
+    expect(actionBox.x).toBeGreaterThanOrEqual(summaryBox.x + summaryBox.width - 1);
+    expect(Math.abs((summaryBox.y + summaryBox.height / 2) - (actionBox.y + actionBox.height / 2))).toBeLessThan(2);
   });
 
   test('does not nest the edit button inside the link', async ({ page }) => {

@@ -40,32 +40,25 @@ async function openClosedHistory(page: Page) {
 }
 
 test.describe('Closed day note layout', () => {
-  test('on a 390 phone the note takes its own line and spans the card', async ({ page }) => {
+  test('on a 390 phone the read-only mark stays a compact chip inside the card', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await openClosedHistory(page);
 
     const card = page.getByTestId('loading-history-card-2026-10-28');
     const note = page.getByTestId('loading-history-closed-2026-10-28');
-    const date = card.getByText('28/10/2026', { exact: true });
-
     const noteBox = await note.boundingBox();
-    const dateBox = await date.boundingBox();
     const cardBox = await card.boundingBox();
     expect(noteBox).not.toBeNull();
-    expect(dateBox).not.toBeNull();
     expect(cardBox).not.toBeNull();
-    if (!noteBox || !dateBox || !cardBox) return;
+    if (!noteBox || !cardBox) return;
 
-    // Below the date line: the note's top is at or under the bottom of the date.
-    expect(noteBox.y).toBeGreaterThanOrEqual(dateBox.y + dateBox.height - 1);
-    // One line, not five: it is as wide as the card's padding allows, not a sliver of the row.
-    expect(noteBox.width).toBeGreaterThanOrEqual(cardBox.width - 40);
-    expect(noteBox.x).toBeLessThan(dateBox.x + 1);
-    // And what the note used to do -- break into a tall column -- no longer happens.
-    expect(noteBox.height).toBeLessThan(dateBox.height * 2.5);
+    expect(noteBox.x).toBeGreaterThanOrEqual(cardBox.x);
+    expect(noteBox.x + noteBox.width).toBeLessThanOrEqual(cardBox.x + cardBox.width);
+    expect(noteBox.width).toBeLessThan(cardBox.width - 80);
+    expect(noteBox.height).toBeLessThan(30);
   });
 
-  test('on a 390 phone the view action fills the row beside the batch icon', async ({ page }) => {
+  test('on a 390 phone the view action is a thumb target beside the batch icon', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await openClosedHistory(page);
 
@@ -80,14 +73,16 @@ test.describe('Closed day note layout', () => {
     expect(cardBox).not.toBeNull();
     if (!viewBox || !activateBox || !cardBox) return;
 
-    // The action used to float at the right edge with a wide empty gap to its left. It now takes the
-    // remaining width of the card and the batch icon sits beside it, on the same optical line.
-    expect(viewBox.width).toBeGreaterThan(cardBox.width * 0.5);
+    // Compact like a report card, but still a 48px target: the eye sits at the card's edge and the
+    // batch action is next to it, on the same optical line.
+    expect(viewBox.width).toBeGreaterThanOrEqual(48);
+    expect(viewBox.height).toBeGreaterThanOrEqual(48);
+    expect(viewBox.x).toBeGreaterThan(cardBox.x + cardBox.width * 0.5);
     expect(activateBox.x).toBeGreaterThanOrEqual(viewBox.x + viewBox.width);
     expect(Math.abs((viewBox.y + viewBox.height / 2) - (activateBox.y + activateBox.height / 2))).toBeLessThan(2);
   });
 
-  test('on a 1440 desktop the note stays inline after the marks', async ({ page }) => {
+  test('on a 1440 desktop the read-only mark sits in the metadata row', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await openClosedHistory(page);
 
@@ -101,8 +96,8 @@ test.describe('Closed day note layout', () => {
     expect(dateBox).not.toBeNull();
     if (!noteBox || !dateBox) return;
 
-    // Same line: the note's own height is one line, and it starts to the right of the date.
-    expect(noteBox.x).toBeGreaterThan(dateBox.x + dateBox.width);
-    expect(noteBox.y).toBeLessThan(dateBox.y + dateBox.height);
+    // The chip belongs to the metadata line below the header, not to the crowded header row.
+    expect(noteBox.y).toBeGreaterThanOrEqual(dateBox.y + dateBox.height - 1);
+    expect(noteBox.x).toBeLessThan(dateBox.x + 1);
   });
 });

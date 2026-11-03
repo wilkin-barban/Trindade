@@ -106,4 +106,24 @@ describe('DateField', () => {
     expect(screen.getByLabelText('Data do relatório')).toHaveValue('2026-10-28');
     expect(screen.getByText('28/10/2026')).toBeInTheDocument();
   });
+
+  it('renders a month through the same visible trigger', () => {
+    render(<DateField id="month" label="Mês" value="2026-10" onChange={() => {}} type="month" testId="month" />);
+
+    expect(screen.getByTestId('month')).toHaveAttribute('type', 'month');
+    expect(screen.getByTestId('month')).toHaveValue('2026-10');
+    expect(screen.getByText('10/2026')).toBeInTheDocument();
+  });
+
+  it('never shows an empty box when the filter has no value yet', () => {
+    render(
+      <>
+        <DateField id="day" label="Data" value="" onChange={() => {}} variant="panel" />
+        <DateField id="month" label="Mês" value="" onChange={() => {}} type="month" variant="panel" />
+      </>,
+    );
+
+    expect(screen.getByText('dd/mm/aaaa')).toBeInTheDocument();
+    expect(screen.getByText('mm/aaaa')).toBeInTheDocument();
+  });
 });

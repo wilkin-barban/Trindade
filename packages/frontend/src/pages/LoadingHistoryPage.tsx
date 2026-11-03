@@ -4,11 +4,12 @@ import { useTranslation } from 'react-i18next';
 import { LucideBan, LucideCalendar, LucideEye, LucideRotateCcw, LucideTrash2, LucideTruck } from 'lucide-react';
 import { api } from '../api/client';
 import { saoPauloToday } from '../lib/date';
-import { Button, buttonVariants } from '../components/ui/button';
+import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { LoadingSpinner } from '../components/ui/loading-spinner';
 import { ConfirmDialog } from '../components/ui/confirm-dialog';
 import { ModuleHelpModal } from '../components/ui/ModuleHelpModal';
+import { HistoryFilters } from '../components/history/HistoryFilters';
 import { historyActionErrorMessageKey, historyAffordances } from '../lib/history-permissions';
 
 interface UserOption { id: number; display_name: string }
@@ -136,22 +137,20 @@ export function LoadingHistoryPage() {
         <Link className="w-full sm:w-auto shrink-0" to="/loading" data-testid="back-to-schedule-link"><Button variant="outline" size="sm" className="w-full sm:w-auto">{t('loading.title')}</Button></Link>
       </div>
 
-      <Card className="p-3 mb-4 grid grid-cols-1 sm:grid-cols-4 gap-2">
-        <input type="date" value={date} max={today} onChange={(e) => { setDate(e.target.value); if (e.target.value) setMonth(''); }} aria-label={t('history.filterDate')} className="h-11 rounded-lg border px-3 text-sm sm:h-9" data-testid="loading-history-date-filter" />
-        <input type="month" value={month} max={today.slice(0, 7)} onChange={(e) => { setMonth(e.target.value); if (e.target.value) setDate(''); }} aria-label={t('history.filterMonth')} className="h-11 rounded-lg border px-3 text-sm sm:h-9" data-testid="loading-history-month-filter" />
-        <select value={userId} onChange={(e) => setUserId(e.target.value)} aria-label={t('history.filterUser')} className="rounded-lg border px-3 py-2 text-sm" data-testid="loading-history-user-filter">
-          <option value="">{t('history.allUsers')}</option>
-          {users.map((u) => <option key={u.id} value={u.id}>{u.display_name}</option>)}
-        </select>
-        <div className="flex gap-2">
-          <Button size="sm" onClick={() => void fetchItems(1)} data-testid="loading-history-apply-filters">{t('reports.filter')}</Button>
-          {hasFilters && (
-            <Button size="sm" variant="outline" onClick={clearFilters} data-testid="history-clear-filters">
-              {t('history.clearFilters')}
-            </Button>
-          )}
-        </div>
-      </Card>
+      <HistoryFilters
+        prefix="loading-history"
+        date={date}
+        month={month}
+        userId={userId}
+        users={users}
+        today={today}
+        hasFilters={hasFilters}
+        onDateChange={(value) => { setDate(value); if (value) setMonth(''); }}
+        onMonthChange={(value) => { setMonth(value); if (value) setDate(''); }}
+        onUserChange={setUserId}
+        onApply={() => void fetchItems(1)}
+        onClear={clearFilters}
+      />
 
       {loading && <div className="flex items-center justify-center py-12"><LoadingSpinner /></div>}
       {error && (
@@ -172,68 +171,57 @@ export function LoadingHistoryPage() {
         <div className="space-y-3">
           {items.map((batch) => {
             const affordances = historyAffordances(batch);
-            // A past day is read-only: the summary is not a link, so the operator never lands on a form the
-            // server is going to refuse. The rest of the card keeps its count and its read-only mark.
-            const summary = (
-              <>
-                <div className="flex flex-wrap items-center gap-2 mb-1">
-                  <span className="text-sm font-semibold">{formatDate(batch.batch_date)}</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100" data-testid={`loading-history-count-${batch.batch_date}`}>
-                    {t('loading.historyBatchCount', { count: batch.total_loadings })}
-                  </span>
-                  {!batch.isActive && <span className="text-xs text-amber-700">{t('history.inactive')}</span>}
-                  {affordances.closedDay && (
-                    <span className="basis-full text-xs text-gray-500 sm:basis-auto" data-testid={`loading-history-closed-${batch.batch_date}`}>
-                      {t('loading.closedDayReadOnly')}
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-gray-500">
-                  <LucideCalendar className="h-3 w-3 inline mr-1" />
-                  {t('loading.historyLoadingDay', { date: formatDate(batch.loading_date) })} —{' '}
-                  {batch.creator?.display_name ?? t('history.legacy')}
-                </p>
-              </>
-            );
+            const dateLabel = formatDate(batch.batch_date);
+            const detailHref = affordances.closedDay
+              ? `/loading/edit?date=${batch.batch_date}&view=1`
+              : `/loading/edit?date=${batch.batch_date}`;
+            // The summary is the card's main target, like a report card: a closed day opens the read-only
+            // view, an open day opens the editor. The eye repeats the view for a thumb and never changes
+            // what the summary does.
             return (
             <Card key={batch.batch_date} className={`p-4 ${!batch.isActive ? 'opacity-70' : ''}`} data-testid={`loading-history-card-${batch.batch_date}`}>
-              {/* Stacked on a phone: a row that forces the date and five controls together squeezes the date into
-                  a sliver. The actions take their own row and stay right-aligned. */}
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                {affordances.closedDay ? (
-                  <div className="min-w-0 flex-1">{summary}</div>
-                ) : (
-                  <Link to={`/loading/edit?date=${batch.batch_date}`} className="min-w-0 flex-1">{summary}</Link>
-                )}
-                <div className="flex min-w-0 shrink-0 items-center justify-end gap-2">
-                {affordances.closedDay && (
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center justify-between gap-2">
                   <Link
-                    to={`/loading/edit?date=${batch.batch_date}&view=1`}
-                    className={`${buttonVariants({ variant: 'outline', size: 'sm' })} max-sm:min-h-12 max-sm:flex-1 sm:w-9 sm:px-0`}
-                    aria-label={t('dashboard.viewSchedule')}
-                    title={t('dashboard.viewSchedule')}
-                    data-testid={`view-loading-batch-${batch.batch_date}`}
+                    to={detailHref}
+                    className="min-w-0 flex-1"
+                    aria-label={t(affordances.closedDay ? 'history.viewLoading' : 'history.editLoading', { date: dateLabel })}
                   >
-                    <LucideEye className="h-4 w-4" />
-                    <span className="sm:sr-only">{t('dashboard.viewSchedule')}</span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-semibold">{dateLabel}</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100" data-testid={`loading-history-count-${batch.batch_date}`}>
+                        {t('loading.historyBatchCount', { count: batch.total_loadings })}
+                      </span>
+                      {!batch.isActive && <span className="text-xs text-amber-700">{t('history.inactive')}</span>}
+                    </div>
                   </Link>
-                )}
-                <div className="flex items-center justify-end gap-1 sm:gap-2">
-                  {affordances.showReactivate && <button onClick={() => activateBatch(batch.batch_date)} disabled={busyKey === batch.batch_date} aria-label={t('history.reactivateLoading', { date: formatDate(batch.batch_date) })} className="inline-flex min-h-12 min-w-12 items-center justify-center rounded text-emerald-600 hover:bg-emerald-50 disabled:opacity-50" data-testid={`activate-loading-batch-${batch.batch_date}`}><LucideRotateCcw className="h-4 w-4" /></button>}
-                  {/* A button inside a link is invalid markup and a double target for a thumb: the link carries the
-                      button's own classes instead. */}
-                  {affordances.showEdit && (
+                  <div className="flex shrink-0 items-center justify-end gap-1">
                     <Link
-                      to={`/loading/edit?date=${batch.batch_date}`}
-                      className={buttonVariants({ variant: 'outline', size: 'sm' })}
+                      to={`/loading/edit?date=${batch.batch_date}&view=1`}
+                      className="inline-flex min-h-12 min-w-12 items-center justify-center rounded text-gray-500 hover:bg-gray-50"
+                      aria-label={t('history.viewLoading', { date: dateLabel })}
+                      title={t('history.viewLoading', { date: dateLabel })}
+                      data-testid={`view-loading-batch-${batch.batch_date}`}
                     >
-                      {t('loading.editEntry')}
+                      <LucideEye className="h-4 w-4" />
                     </Link>
+                    {affordances.showReactivate && <button onClick={() => activateBatch(batch.batch_date)} disabled={busyKey === batch.batch_date} aria-label={t('history.reactivateLoading', { date: dateLabel })} className="inline-flex min-h-12 min-w-12 items-center justify-center rounded text-emerald-600 hover:bg-emerald-50 disabled:opacity-50" data-testid={`activate-loading-batch-${batch.batch_date}`}><LucideRotateCcw className="h-4 w-4" /></button>}
+                    {affordances.showDeactivate && <button onClick={() => deactivateBatch(batch.batch_date)} disabled={busyKey === batch.batch_date} aria-label={t('history.deactivateLoading', { date: dateLabel })} className="inline-flex min-h-12 min-w-12 items-center justify-center rounded text-amber-600 hover:bg-amber-50 disabled:opacity-50" data-testid={`deactivate-loading-batch-${batch.batch_date}`}><LucideBan className="h-4 w-4" /></button>}
+                    {affordances.showDelete && <button onClick={() => setPendingDelete(batch)} disabled={busyKey === batch.batch_date} aria-label={t('history.deleteLoading', { date: dateLabel })} className="inline-flex min-h-12 min-w-12 items-center justify-center rounded text-red-600 hover:bg-red-50 disabled:opacity-50" data-testid={`delete-loading-batch-${batch.batch_date}`}><LucideTrash2 className="h-4 w-4" /></button>}
+                  </div>
+                </div>
+                <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
+                  {affordances.closedDay && (
+                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-600" data-testid={`loading-history-closed-${batch.batch_date}`}>
+                      {t('history.readOnly')}
+                    </span>
                   )}
-                  {affordances.showDeactivate && <button onClick={() => deactivateBatch(batch.batch_date)} disabled={busyKey === batch.batch_date} aria-label={t('history.deactivateLoading', { date: formatDate(batch.batch_date) })} className="inline-flex min-h-12 min-w-12 items-center justify-center rounded text-amber-600 hover:bg-amber-50 disabled:opacity-50" data-testid={`deactivate-loading-batch-${batch.batch_date}`}><LucideBan className="h-4 w-4" /></button>}
-                  {affordances.showDelete && <button onClick={() => setPendingDelete(batch)} disabled={busyKey === batch.batch_date} aria-label={t('history.deleteLoading', { date: formatDate(batch.batch_date) })} className="inline-flex min-h-12 min-w-12 items-center justify-center rounded text-red-600 hover:bg-red-50 disabled:opacity-50" data-testid={`delete-loading-batch-${batch.batch_date}`}><LucideTrash2 className="h-4 w-4" /></button>}
-                </div>
-                </div>
+                  <span>
+                    <LucideCalendar className="h-3 w-3 inline mr-1" />
+                    {t('loading.historyLoadingDay', { date: formatDate(batch.loading_date) })} —{' '}
+                    {batch.creator?.display_name ?? t('history.legacy')}
+                  </span>
+                </p>
               </div>
             </Card>
             );
