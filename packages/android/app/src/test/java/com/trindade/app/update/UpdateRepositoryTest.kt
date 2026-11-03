@@ -68,6 +68,7 @@ class UpdateRepositoryTest {
                         "apkUrl": "https://trindademasas.duckdns.org/api/app/download-apk",
                         "apkName": "trindade.apk",
                         "apkSize": 11149040,
+                        "buildNumber": 7011,
                         "publishedAt": "2026-10-31T06:24:08.000Z",
                         "webUrl": "https://trindademasas.duckdns.org"
                     }
@@ -84,6 +85,7 @@ class UpdateRepositoryTest {
             release?.apkUrl,
         )
         assertEquals(11149040L, release?.apkSize?.toLong())
+        assertEquals(7011, release?.buildNumber)
         assertEquals("2026-10-31T06:24:08.000Z", release?.publishedAt)
 
         // The route, from the request that was really made: the whole point of the change is that this app
