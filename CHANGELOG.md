@@ -10,6 +10,49 @@ hashes y verificaciones está en [docs/release-android-historial.md](docs/releas
 
 ---
 
+## [0.7.0+7006] — 2026-11-02
+
+### Cambiado
+
+- **Un día de cargamento cerrado ya no se puede tocar, y se lee entero.** La grilla de un día pasado abre en
+  solo lectura y explica por qué; un lote desactivado se muestra completo, con sus tandas y sus horarios, en
+  lugar de aparecer vacío. El servidor rechaza cualquier mutación sobre un día cerrado con `409` y el código
+  estable `LOADING_HISTORY_FROZEN`, en vez de aceptarla y dejar el histórico inconsistente.
+- **Un administrador puede reactivar un lote o un reporte desde el histórico.** La tarjeta inactiva ofrece la
+  reactivación, con confirmación explícita, y el día vuelve para todo el mundo como estaba, con los mismos
+  lanzamientos. La misma operación existe en la web y en la aplicación.
+- **El selector de motoristas ofrece solo chapas libres y explica las ocupadas.** Una chapa ya asignada al día
+  o a la tanda en curso no se repite, y un conductor ocupado dice a qué hora: "já está nas HH:MM". La tanda
+  descarta duplicados antes de salir.
+- **Una tanda rechazada se informa fila por fila en un solo paso.** El resultado deja de ser un mensaje que se
+  pierde al releer el día: el diálogo conserva la lista de rechazos —conductor ocupado, vehículo ocupado— y el
+  resto de la tanda se carga igual.
+- **La sincronización con el ERP se limita al día abierto.** En un día pasado el botón no aparece y la cola
+  descarta el envío en lugar de reintentarlo contra un día congelado; el lanzamiento responde `409`
+  `MASSAS_HISTORY_FROZEN` si alguien lo fuerza.
+- **El botón de Histórico es el mismo en todos los módulos.** Relatório usa la píldora compartida de Horários y
+  Massas, en la misma posición y con el mismo tamaño.
+
+### Corregido
+
+- **Editar un cargamento pasado ya no es posible desde la web.** El histórico deja de abrir el editor en un día
+  cerrado y el resultado de la tanda se muestra dentro de la misma ventana.
+- **El histórico de la carga dejó de mostrar respuestas viejas.** Abrir el selector relee el día antes de
+  ofrecer nombres, y las pestañas descartan la respuesta de una consulta anterior que llega tarde.
+- **La placa del fletero ya no ocupa la grilla ni el editor.** Se conserva en la respuesta y en el PDF, y deja
+  de competir con la fila de la empresa.
+- **El registro de auditoría del ERP recibe lo que los emisores reales mandan.** El contrato se fija con los
+  cuerpos de la web y del backend, incluido el par `attemptId`, en lugar de fixtures inventados.
+
+### Distribución Android
+
+- Build **7006** es el asset de GitHub Release `v0.7.0` (`trindade-0.7.0.apk` y su `.sha256`) y la que sirve
+  `GET /api/app/download-apk`, con `versionCode 7006`, `versionName 0.7.0`, 11.260.812 bytes y sha256
+  `f77643b7…`.
+- El tag `v0.7.0` no se movió: se reemplazaron los assets de la misma release.
+
+---
+
 ## [0.7.0+7005] — 2026-11-02
 
 ### Cambiado

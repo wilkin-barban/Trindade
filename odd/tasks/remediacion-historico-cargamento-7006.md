@@ -632,6 +632,22 @@ Cada tarea declara objetivo, archivos, tests exactos, aceptación, commit espera
 - **Aceptación**: APK 7006 con digest verificado, release `v0.7.0` con el asset reemplazado y el sidecar correcto, tag sin mover, web sirviendo los bundles nuevos, capturas sin errores de consola, `origin/main` actualizado.
 - **Commit**: `chore(release): ship Android 7006 with the loading history fixes` (~200 líneas de docs y versión).
 - **Depende de**: T1–T22. **Requiere autorización explícita de publicación** antes de tocar GitHub.
+- **Estado.** Hecho en lo verificable sin intervención del operador. Suites completas en verde: backend
+  `npm test` 703/703, frontend node 542/542, vitest 111/111, Android `:app:testDebugUnitTest` 1319 tests con
+  0 fallos. APK firmado con la clave oficial (huella `ee0e404b…31f6`), `versionCode 7006`,
+  `versionName 0.7.0`, 11.260.812 bytes, sha256 `f77643b7a5442cf2a74d721f621a3977612ae074d2624c4fe735bb38441f3702`;
+  `apksigner verify` y `aapt2 dump badging` en verde. `sha256sum -c` correcto en `packages/backend/apk` y en la
+  copia de escritorio; el APK servido por `GET /api/app/download-apk` da el mismo digest y `latest-release`
+  informa `apkSize 11260812`. Imágenes `api` y `web` reconstruidas y levantadas el 2026-11-02 (adelantado
+  respecto del orden del plan: la app instalada mostraba el diálogo de actualización obligatoria porque el
+  binario servido todavía era la 7005). Instalado sobre la 7005 en `emulator-5554` (Android 14) y recorrido:
+  inicio sin diálogo de actualización, día de hoy desactivado y en solo lectura con su aviso, histórico con
+  píldora `Inativo` y acción de reactivar —confirmación verificada y cancelada para no mutar producción—,
+  píldora de Histórico compartida en Relatório, Massas del día abierto con `Sincronizar ERP` y Massas del
+  30/10 sin ese botón. **Pendiente y bloqueado por autorización:** reemplazar los assets de la release
+  `v0.7.0` con `gh release upload` y el push de los commits de release. El selector de chapas y el diálogo de
+  rechazos no se pudieron recorrer en el emulador porque el único día editable (hoy) tiene el lote desactivado
+  en producción; quedan cubiertos por los tests de T17 y T19.
 
 ---
 
@@ -723,7 +739,7 @@ Los pasos 2, 3 y 4 son **publicación**: se ejecutan solo con autorización expl
 | T20 | S29, S53 | `3b055cc` | `MassasLaunchViewModelTest.kt`, `AeroDispatcherTest.kt`, `massas-sync-header.spec.ts` | hecho |
 | T21 | S48 | `769636a` | `ScheduleGrid.test.tsx`, `LoadingEditPage.test.tsx` | hecho |
 | T22 | S49, S50 | `5f9a131` | `aero.log.contract.test.ts` | hecho |
-| T23 | S51 | — | build + emulador + capturas | pendiente |
+| T23 | S51 | `chore(release): ship Android 7006 with the loading history fixes` | build firmado + `sha256sum -c` + `emulator-5554` | hecho (asset de GitHub pendiente de autorización) |
 
 ---
 
@@ -791,3 +807,16 @@ Correcciones que esta verificación introduce sobre el brief: el hallazgo B est�
 - `message` sigue llevando la frase del lote desactivado, porque además voltea el día a solo lectura y el test existente de S27 la espera ahí.
 - `FakeLoadingApi` gana `createAnswers` por request (null cae al `createResponse` fijo) para poder rechazar una fila y dejar entrar las otras.
 - Evidencia: `LoadingViewModelTest` 51/51, `LoadingScreenTest` 28/28, `LocaleStringsParityTest` 2/2 (`BUILD SUCCESSFUL in 7m 12s`).
+
+**L10 (cierre de T23, evidencia)**
+
+- Suites completas, con código de salida observado: `npm test` en la raíz → backend 703/703, frontend node 542/542, vitest 19 archivos y 111/111, exit 0; `:app:testDebugUnitTest` → `BUILD SUCCESSFUL`, 1319 tests, 0 fallos, 0 omitidos (suma de los XML de `test-results`).
+- Build firmado local con el keystore oficial montado en `/keys:ro` y las cuatro variables por `--env-file`, nunca en el repositorio: `assembleRelease -PapiBaseUrl=https://trindademasas.duckdns.org/ -PversionName=0.7.0 -PversionCode=7006 -PrequireSigned=true`. `BUILD SUCCESSFUL in 17m 59s`.
+- Verificación del binario: `apksigner verify --print-certs` da `CN=Trindade Massas Operacoes…` y huella SHA-256 `ee0e404b211052b311ae0e0730606e9c7d5554315463d02f9ef33c9573c431f6`, la oficial; `aapt2 dump badging` declara `versionCode='7006' versionName='0.7.0'`. Tamaño 11.260.812 bytes, sha256 `f77643b7a5442cf2a74d721f621a3977612ae074d2624c4fe735bb38441f3702`.
+- El sidecar se regeneró con `sha256sum trindade-0.7.0.apk > trindade-0.7.0.apk.sha256` (formato `hash  nombre`, que es el que consume `sha256sum -c` y el que escribe el job `publish`). El primer intento guardó solo el hash y `sha256sum -c` falló con «no properly formatted checksum lines found»: se corrigió antes de dar nada por verificado.
+- `sha256sum -c` en verde en `packages/backend/apk` y en `~/Desktop`; el APK descargado de `GET /api/app/download-apk` devuelve el mismo digest y `latest-release` informa `apkSize 11260812`.
+- Despliegue adelantado al recorrido del emulador: la app 7006 instalada abría el diálogo de actualización obligatoria porque el binario servido seguía siendo la 7005 (mismo `versionName`, tamaño distinto → parche). Se copió el APK nuevo a `packages/backend/apk`, se reconstruyeron `api` y `web` y se levantaron; el diálogo desapareció.
+- Recorrido en `emulator-5554` (Android 14), instalado con `adb install -r` sobre la 7005: inicio limpio; hoy (02/11) con el lote desactivado se ve completo y en solo lectura con el aviso «O lote deste dia está desativado…»; histórico con `Inativo`, icono de reactivar y confirmación «Reativar o carregamento de 28/10/2026?» —cancelada a propósito para no mutar producción—; Relatório con la píldora de Histórico compartida; Massas del día abierto con `Sincronizar ERP`; Massas del 30/10 sin ese botón.
+- No se pudo ejercitar el selector de chapas ni el diálogo de rechazos en el emulador: el único día editable es hoy y su lote está desactivado en producción. Reactivarlo habría cambiado datos reales, así que ambos quedan cubiertos por los tests de T17 y T19 y así se declara.
+- Capturas: `/tmp/r7006-01-home.png` a `/tmp/r7006-12-pastday.png`.
+- Bloqueado por autorización explícita: `gh release upload v0.7.0 trindade-0.7.0.apk trindade-0.7.0.apk.sha256 --clobber` y el push de los commits de documentación y versión.

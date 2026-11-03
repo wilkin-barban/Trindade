@@ -37,7 +37,7 @@ versionCode = major * 1000000 + minor * 1000 + patch
 | `v1.2.3` | `1.2.3` | `1002003` |
 | `v2.0.0` | `2.0.0` | `2000000` |
 
-El tag `v0.7.0` deriva `7000`; la build publicada es `7005`, superior a la anterior, para que Android acepte la actualización.
+El tag `v0.7.0` deriva `7000`; la build publicada es `7006`, superior a la anterior, para que Android acepte la actualización.
 
 Reglas:
 
@@ -73,15 +73,16 @@ Los dos números se calculan una sola vez en `build.gradle.kts` y alimentan tant
 | 0.7.0 | 7002 | Reemplazada | Binario anterior de producción; nunca fue asset de GitHub |
 | 0.7.0 | 7003 | Reemplazada | Asset anterior de GitHub Release `v0.7.0` |
 | 0.7.0 | 7004 | Reemplazada | Acciones y filtros de históricos, Compartilhar App y resumen del inicio |
-| 0.7.0 | 7005 | **Publicada** | Paridad web/Android del ERP: cola drenada con ack reversible, multioperario por asiento, fallos de Aero unificados y errores traducidos; asset actual de GitHub Release `v0.7.0` y binario de producción |
+| 0.7.0 | 7005 | Reemplazada | Paridad web/Android del ERP: cola drenada con ack reversible, multioperario por asiento, fallos de Aero unificados y errores traducidos |
+| 0.7.0 | 7006 | **Publicada** | Histórico de cargamento cerrado en solo lectura, reactivación de lote y reporte, chapas libres sin duplicados, rechazos de tanda en un paso y sync ERP solo del día abierto; asset actual de GitHub Release `v0.7.0` y binario de producción |
 
 Las builds 0.6.x se distribuyeron por `GET /api/app/download-apk`, no por un tag de GitHub. Los hashes y las
 verificaciones completas están en [release-android-historial.md](release-android-historial.md).
 
-> **Estado final del 2026-11-02.** La release `v0.7.0` se republicó con el build **7005**. El asset de GitHub,
+> **Estado final del 2026-11-02.** La release `v0.7.0` se republicó con el build **7006**. El asset de GitHub,
 > su `.sha256`, `packages/backend/apk/trindade-0.7.0.apk`, la copia de escritorio y `GET /api/app/download-apk`
-> son el mismo binario: `versionCode 7005`, `versionName 0.7.0`, 11.220.352 bytes, sha256
-> `87f9a6a36166d0206031a23aa223bc1ea857e749304045ef79ea06877549ba75`. Las builds 7000 a 7004 son
+> son el mismo binario: `versionCode 7006`, `versionName 0.7.0`, 11.260.812 bytes, sha256
+> `f77643b7a5442cf2a74d721f621a3977612ae074d2624c4fe735bb38441f3702`. Las builds 7000 a 7005 son
 > históricas. El tag `v0.7.0` no se movió.
 
 ## 4. Workflow de publicación

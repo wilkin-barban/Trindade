@@ -30,11 +30,17 @@ La guía de firma y publicación está en [release-android.md](release-android.m
 | 0.7.0 | 7002 | 2026-10-31 | Reemplazada | Binario anterior servido por producción; nunca fue asset de GitHub | `bc038f2eeda605fb07bfdd26550c93cfc5a1a8b9c9b06408df0fe505c6ec2f4c` |
 | 0.7.0 | 7003 | 2026-11-01 | Reemplazada | Homogeneización visual de Android; asset de GitHub y binario de producción hasta el build 7004 | `82fce07f17e98206a0ad6916463c80053154a87b5991b3679d47e001747e5810` |
 | 0.7.0 | 7004 | 2026-11-01 | Reemplazada | Acciones y filtros de históricos, Compartilhar App con el APK y resumen único del inicio | `7622756da304157904a1e47eccacff04e65d97d46615ecc804d62d24f0d1674f` |
-| 0.7.0 | 7005 | 2026-11-02 | **Publicada** | Paridad web/Android del ERP: cola drenada con ack reversible, multioperario por asiento y fallos de Aero unificados; asset de GitHub y binario de producción | `87f9a6a36166d0206031a23aa223bc1ea857e749304045ef79ea06877549ba75` |
+| 0.7.0 | 7005 | 2026-11-02 | Reemplazada | Paridad web/Android del ERP: cola drenada con ack reversible, multioperario por asiento y fallos de Aero unificados | `87f9a6a36166d0206031a23aa223bc1ea857e749304045ef79ea06877549ba75` |
+| 0.7.0 | 7006 | 2026-11-02 | **Publicada** | Histórico de cargamento cerrado en solo lectura, reactivación de lote y reporte, selector de chapas libres, rechazos de tanda en un paso y sync ERP limitado al día abierto; asset de GitHub y binario de producción | `f77643b7a5442cf2a74d721f621a3977612ae074d2624c4fe735bb38441f3702` |
 
 Notas:
 
 - **Interna** significa distribuida por `GET /api/app/download-apk`, sin tag ni release de GitHub.
+- **Reemplazo del 2026-11-02 (build 7006):** la build **7006** reemplazó al asset de GitHub y al binario que
+  servía producción. El asset, su `.sha256`, `packages/backend/apk/trindade-0.7.0.apk`, la copia de escritorio
+  y `https://trindademasas.duckdns.org/api/app/download-apk` apuntan al mismo digest
+  `f77643b7a5442cf2a74d721f621a3977612ae074d2624c4fe735bb38441f3702` (11.260.812 bytes). Verificada en
+  `emulator-5554` (Android 14) instalada sobre la 7005.
 - **Reemplazo del 2026-11-01 (build 7004):** la build **7004** reemplazó al asset de GitHub y al binario que
   servía producción. El asset, su `.sha256`, `packages/backend/apk/trindade-0.7.0.apk` y
   `https://trindademasas.duckdns.org/api/app/download-apk` apuntan al mismo digest
