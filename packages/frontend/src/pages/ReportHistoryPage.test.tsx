@@ -12,9 +12,15 @@ import i18n from '../i18n/config';
  * that clearing returns the list to the default without losing the user filter that the phone does not have.
  */
 const get = vi.fn();
+const patch = vi.fn();
+const del = vi.fn();
 
 vi.mock('../api/client', () => ({
-  api: { get: (...args: unknown[]) => get(...args) },
+  api: {
+    get: (...args: unknown[]) => get(...args),
+    patch: (...args: unknown[]) => patch(...args),
+    del: (...args: unknown[]) => del(...args),
+  },
   ApiClientError: class ApiClientError extends Error {},
 }));
 
@@ -34,6 +40,9 @@ function historyUrls(): string[] {
 
 beforeEach(async () => {
   get.mockReset();
+  patch.mockReset();
+  del.mockReset();
+  patch.mockResolvedValue({ success: true });
   get.mockImplementation(async (url: string) => {
     if (url.startsWith('/users/options')) {
       return { users: [{ id: 7, display_name: 'Wilkin' }] };
@@ -81,6 +90,70 @@ describe('ReportHistoryPage', () => {
       expect(last).not.toContain('userId=');
     });
     expect(screen.queryByTestId('history-clear-filters')).not.toBeInTheDocument();
+  });
+
+  it('offers to reopen a retired report and calls the server with its id', async () => {
+    get.mockImplementation(async (url: string) => {
+      if (url.startsWith('/users/options')) return { users: [] };
+      return {
+        items: [
+          {
+            id: 41,
+            turno: 'tarde',
+            report_date: '2026-11-01',
+            notes: null,
+            created_at: '2026-11-01T18:00:00.000Z',
+            isActive: false,
+            isClosedDay: false,
+            readOnly: true,
+            canEdit: false,
+            canDeactivate: false,
+            canActivate: true,
+            canDelete: false,
+            user: { id: 1, display_name: 'Wilkin' },
+          },
+        ],
+        pagination: { page: 1, pageSize: 30, total: 1, totalPages: 1 },
+      };
+    });
+
+    renderPage();
+    const button = await screen.findByTestId('activate-report-41');
+    expect(screen.queryByTestId('delete-report-41')).toBeNull();
+
+    fireEvent.click(button);
+    await waitFor(() => expect(patch).toHaveBeenCalledWith('/reports/41/activate', {}));
+  });
+
+  it('keeps the retire of a past day, which the server still offers', async () => {
+    get.mockImplementation(async (url: string) => {
+      if (url.startsWith('/users/options')) return { users: [] };
+      return {
+        items: [
+          {
+            id: 42,
+            turno: 'noite',
+            report_date: '2026-10-30',
+            notes: null,
+            created_at: '2026-10-30T22:00:00.000Z',
+            isActive: true,
+            isClosedDay: true,
+            readOnly: true,
+            canEdit: false,
+            canDeactivate: true,
+            canActivate: false,
+            canDelete: false,
+            user: { id: 1, display_name: 'Wilkin' },
+          },
+        ],
+        pagination: { page: 1, pageSize: 30, total: 1, totalPages: 1 },
+      };
+    });
+
+    renderPage();
+    // Q4: the day is closed for writing and for erasing, and retiring it is still an action.
+    expect(await screen.findByTestId('deactivate-report-42')).toBeInTheDocument();
+    expect(screen.queryByTestId('delete-report-42')).toBeNull();
   });
 
   it('still filters by user, which is what the web has and the phone does not', async () => {

@@ -32,12 +32,14 @@ export interface HistoryAffordances {
 export function historyAffordances(row: HistoryServerPermissions): HistoryAffordances {
   const closedDay = row.isClosedDay === true;
   return {
-    // A closed day hides every content action even if a stale server said otherwise: a day the plant already
-    // reported is read-only, and the card must not offer a trip that the editor is going to refuse.
+    // Writing is the one thing the calendar closes on this side too: the card must not link to an editor
+    // that is going to refuse. Everything else is the server's answer, drawn as it arrives -- Q4 keeps
+    // retiring and reopening a past day available, so a client rule hiding them would take a real action
+    // away, and the backend already withholds `canDelete` for a day it closed.
     showEdit: row.canEdit === true && !closedDay,
-    showDeactivate: row.canDeactivate === true && !closedDay,
-    showDelete: row.canDelete === true && !closedDay,
-    showReactivate: row.isActive === false && row.canActivate === true,
+    showDeactivate: row.canDeactivate === true,
+    showDelete: row.canDelete === true,
+    showReactivate: row.canActivate === true,
     closedDay,
   };
 }

@@ -10,7 +10,8 @@ const adminOnActiveReport: HistoryServerPermissions = {
   isActive: true, readOnly: true, canEdit: false, canDeactivate: true, canDelete: true,
 };
 const adminOnAClosedDay: HistoryServerPermissions = {
-  isActive: true, isClosedDay: true, readOnly: true, canEdit: true, canDeactivate: true, canDelete: true, canActivate: false,
+  // What the fixed backend sends for a past day: still retirable, no longer erasable.
+  isActive: true, isClosedDay: true, readOnly: true, canEdit: false, canDeactivate: true, canDelete: false, canActivate: false,
 };
 
 test('affordances follow the server projection instead of a client-invented role rule', () => {
@@ -26,12 +27,20 @@ test('affordances follow the server projection instead of a client-invented role
   });
 });
 
-test('a closed day is not editable nor deletable, whatever the rest of the flags say', () => {
-  // The calendar wins over the clock and over the role: a past day the server still reports as editable is
-  // rendered read-only, because rewriting a day the plant already reported is the failure this rule closes.
+test('a closed day is not editable, and keeps the retire the server offered for it', () => {
+  // The calendar closes writing: a past day the server still reports as editable is rendered read-only,
+  // because rewriting a day the plant already reported is the failure this rule closes. Retiring is not
+  // writing content, and Q4 keeps it available on a past day, so the server's flag is drawn as it arrives.
   assert.deepEqual(historyAffordances(adminOnAClosedDay), {
-    showEdit: false, showDeactivate: false, showDelete: false, showReactivate: false, closedDay: true,
+    showEdit: false, showDeactivate: true, showDelete: false, showReactivate: false, closedDay: true,
   });
+});
+
+test('a closed day never shows the erase, because the server withholds it', () => {
+  // The row below is what the backend answers for a past day: canDelete false. The client has no second
+  // rule of its own on top of that -- it draws the flag -- and the erase disappears because the answer did.
+  assert.equal(historyAffordances({ isClosedDay: true, canDelete: false }).showDelete, false);
+  assert.equal(historyAffordances({ isClosedDay: true, canActivate: true }).showReactivate, true);
 });
 
 test('only an inactive row the server offered offers reactivate', () => {
@@ -39,7 +48,9 @@ test('only an inactive row the server offered offers reactivate', () => {
     showEdit: false, showDeactivate: false, showDelete: false, showReactivate: true, closedDay: false,
   });
   assert.equal(historyAffordances({ isActive: false, canActivate: false }).showReactivate, false);
-  assert.equal(historyAffordances({ isActive: true, canActivate: true }).showReactivate, false);
+  // The flag and not the row's own `isActive`: the server sends canActivate only on a retired row, and a
+  // client-side second opinion would be the same rule written twice.
+  assert.equal(historyAffordances({ isActive: true, canActivate: true }).showReactivate, true);
 });
 
 test('a missing or non-boolean flag hides the control rather than guessing', () => {

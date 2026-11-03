@@ -465,6 +465,7 @@
     "allUsers": "Todos os usuários",
     "inactive": "Inativo",
     "reactivateLoading": "Reativar carregamento de {{date}}",
+    "reactivateReport": "Reativar relatório de {{date}}",
     "legacy": "Legado sem criador",
     "pagination": "Página {{page}} de {{totalPages}} — {{total}} registros",
     "previousPage": "Anterior",

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { LucideEye, LucideCalendar, LucideTrash2, LucideBan } from 'lucide-react';
+import { LucideEye, LucideCalendar, LucideTrash2, LucideBan, LucideRotateCcw } from 'lucide-react';
 import { api } from '../api/client';
 import { saoPauloToday } from '../lib/date';
 import { Button } from '../components/ui/button';
@@ -23,6 +23,7 @@ interface ReportListItem {
   readOnly: boolean;
   canEdit: boolean;
   canDeactivate: boolean;
+  canActivate: boolean;
   canDelete: boolean;
   user: { id: number; display_name: string };
 }
@@ -105,6 +106,12 @@ export function ReportHistoryPage() {
     await runAction(id, () => api.patch(`/reports/${id}/deactivate`, {}));
   }
 
+  // Reopening a retired report is the mirror of retiring it, and it stays available on a past day: Q4
+  // closes erasing and writing there, not the state of the report.
+  async function activateReport(id: number) {
+    await runAction(id, () => api.patch(`/reports/${id}/activate`, {}));
+  }
+
   async function deleteReport(id: number) {
     await runAction(id, () => api.del(`/reports/${id}`));
   }
@@ -164,6 +171,7 @@ export function ReportHistoryPage() {
                   <p className="text-xs text-gray-500">{r.user.display_name}{r.notes ? ` — ${r.notes.slice(0, 60)}` : ''}</p>
                 </Link>
                 <Link to={`/reports/${r.id}`} aria-label={t('history.viewReport', { date: formatDate(r.report_date) })}><LucideEye className="h-4 w-4 text-gray-400" /></Link>
+                {affordances.showReactivate && <button onClick={() => activateReport(r.id)} disabled={busyId === r.id} aria-label={t('history.reactivateReport', { date: formatDate(r.report_date) })} className="text-emerald-600 disabled:opacity-50" data-testid={`activate-report-${r.id}`}><LucideRotateCcw className="h-4 w-4" /></button>}
                 {affordances.showDeactivate && <button onClick={() => deactivateReport(r.id)} disabled={busyId === r.id} aria-label={t('history.deactivateReport', { date: formatDate(r.report_date) })} className="text-amber-600 disabled:opacity-50" data-testid={`deactivate-report-${r.id}`}><LucideBan className="h-4 w-4" /></button>}
                 {affordances.showDelete && <button onClick={() => setPendingDelete(r)} disabled={busyId === r.id} aria-label={t('history.deleteReport', { date: formatDate(r.report_date) })} className="text-red-600 disabled:opacity-50" data-testid={`delete-report-${r.id}`}><LucideTrash2 className="h-4 w-4" /></button>}
               </div>
