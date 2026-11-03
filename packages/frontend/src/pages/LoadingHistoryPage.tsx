@@ -176,14 +176,14 @@ export function LoadingHistoryPage() {
             // server is going to refuse. The rest of the card keeps its count and its read-only mark.
             const summary = (
               <>
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex flex-wrap items-center gap-2 mb-1">
                   <span className="text-sm font-semibold">{formatDate(batch.batch_date)}</span>
                   <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100" data-testid={`loading-history-count-${batch.batch_date}`}>
                     {t('loading.historyBatchCount', { count: batch.total_loadings })}
                   </span>
                   {!batch.isActive && <span className="text-xs text-amber-700">{t('history.inactive')}</span>}
                   {affordances.closedDay && (
-                    <span className="text-xs text-gray-500" data-testid={`loading-history-closed-${batch.batch_date}`}>
+                    <span className="basis-full text-xs text-gray-500 sm:basis-auto" data-testid={`loading-history-closed-${batch.batch_date}`}>
                       {t('loading.closedDayReadOnly')}
                     </span>
                   )}
