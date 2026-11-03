@@ -29,3 +29,11 @@ test('AuthContext updates token state and persists refresh token at renewal', ()
     'AuthContext must listen for AUTH_SESSION_REFRESHED_EVENT to update state and storage'
   );
 });
+
+test('AuthContext forgets the ERP password of the session on logout', () => {
+  assert.match(
+    authContextSource,
+    /clearAeroSessionPassword\(\)/,
+    'a logout closes the ERP session too: the tab must not keep the plant password'
+  );
+});

@@ -12,6 +12,7 @@ import {
   clearStoredSession,
   AUTH_SESSION_REFRESHED_EVENT,
 } from '../api/client';
+import { clearAeroSessionPassword } from '../lib/aero-integration';
 
 export interface User {
   id: number;
@@ -132,6 +133,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     clearStoredSession();
+    // The ERP password belongs to the session it was typed in: logging out of Trindade closes it too.
+    clearAeroSessionPassword();
     setToken(null);
     setUser(null);
   }, []);
