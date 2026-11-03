@@ -76,6 +76,42 @@ distintos: el botón de la fila arma una cola con ese producto, sus unidades, su
 dispara `entradasitem` (`launch_sync`); el botón **Sincronizar com ERP** de la cabecera consulta `movimentoitem`
 (`read_history`) y no escribe nada en la empresa.
 
+### 3.1 La lectura que el lanzamiento deja debiendo
+
+Conciliar no es enviar: es leer. Cuando el ERP confirma un lanzamiento, la fila todavía no puede saberse
+conciliada, porque la única prueba de que la empresa lo tiene es el asiento en `/movimentoitem`. Hasta esta
+versión ese segundo viaje lo hacía el operario a mano, con **Sincronizar com ERP**, cuando se acordaba.
+
+Ahora lo dispara el propio lanzamiento, sin pedirle nada:
+
+1. El envío vuelve y la cola del día queda **vacía**: no hay nada más que mandar.
+2. La página muestra el **veredicto** y lo deja leer. Todavía no viaja: la lectura no puede tapar la respuesta
+   que el operario está esperando.
+3. Al cerrar el veredicto — el `onClose` del diálogo o el botón **Fechar**, el mismo cierre — la página gasta
+   la marca del día y dispara el viaje de `movimentos` con el mismo sobre de siempre.
+4. La vuelta guarda el día completo en `POST /api/integration/aero/movements` y la tabla se reconcilia sola: la
+   fila del lote pasa de **pendiente** a **conciliada** por fecha + producto + unidades + operario.
+
+Guardas, todas verificadas en pruebas:
+
+- Sólo el **día abierto** (hoy). Un día pasado no se lee ni se reescribe.
+- Sólo con las **credenciales completas**; sin contraseña la página lo dice en vez de fallar en silencio.
+- Sólo si **algo se envió**: un lote rechazado entero no deja lectura pendiente.
+- Un **lote parcial** no arma la lectura: lo que falló sigue en la cola y su reintento arma su propio veredicto.
+- **Una lectura a la vez.** Si el botón está leyendo, el camino automático no abre otra.
+- Un **viaje que no vuelve** (el operario cancela el atajo) no se reintenta solo; el botón sigue ahí.
+
+Si la lectura falla, el veredicto del envío queda intacto, la fila sigue pendiente y el motivo se ve en el
+aviso. La lectura nunca deshace un lanzamiento.
+
+En la bitácora del servidor cada lectura deja su par `read_history` `requested`/`result` con el mismo
+`attemptId` y la fecha en `note`, igual que el botón. Es la forma de distinguir «el operario leyó» de «la
+lectura automática no llegó».
+
+Lo que el espejo guarda es **todo** lo que el ERP devolvió ese día, insumos incluidos. Masas sólo muestra el
+catálogo de masas; los insumos son de **Recebimento** y **Relatório**. Ocultarlos en una tabla no es filtrarlos
+en la base.
+
 ## 4. Configuración en la web
 
 Dentro de **Lanzamiento de Masas**, debajo de la grilla, hay una tarjeta colapsable. Arranca abierta solo cuando
@@ -103,6 +139,22 @@ Datos que resuelve el sistema:
 Los ajustes viven en el `localStorage` de **ese** iPhone, no en el servidor. Hay que configurar una vez por
 teléfono, y borrar los datos de Safari equivale a borrar la configuración. El botón **Limpiar** hace lo mismo de
 forma explícita, con confirmación.
+
+**La contraseña es la excepción.** No va a `localStorage`, ni a una cookie, ni al servidor: vive en el
+`sessionStorage` de la pestaña que la escribió. Se guarda ahí —y no sólo en memoria— porque cada viaje por el
+atajo vuelve en un documento nuevo, y la lectura del día que sigue a un lanzamiento tiene que salir de ese
+documento. `sessionStorage` es por pestaña y por sesión:
+
+- sobrevive a una recarga y a la vuelta del atajo **en la misma pestaña**, que es el camino normal;
+- muere cuando se cierra la pestaña;
+- se borra al cerrar sesión en Trindade y con **Limpiar**;
+- una pestaña abierta sin relación con la que lanzó arranca sin ella, y entonces la página pide la contraseña
+  otra vez en vez de fallar en silencio.
+
+El riesgo que queda es el de cualquier secreto en el navegador: un script que se ejecute en la página puede
+leerlo mientras la pestaña viva. Por eso no se registra en logs, ni en la bitácora, ni en los avisos, y por eso
+el alcance es la pestaña y no el dispositivo. Un cofre del lado del servidor exigiría el puente on-prem, que
+todavía no existe.
 
 ## 5. Prueba de conexión
 
@@ -293,9 +345,12 @@ En la fábrica:
    empresa respondió y con qué `CODIGO`. Lo que importa es que no quede en «sin veredicto».
 4. Cargar **un** producto, una caja, y confirmar con el interruptor **Sincronizar con ERP** activo.
 5. iOS abre el atajo; al volver, la tarjeta de confirmación debe desaparecer y aparecer el resultado.
-6. Verificar en el ERP que la entrada existe y en el log del servidor las dos líneas (`requested` y `result`).
-7. Repetir con dos productos para comprobar que la cola envía el segundo después del retorno del primero.
-8. Probar el fallo: apagar el Wi-Fi, lanzar y confirmar que el lanzamiento **igual** quedó guardado en Trindade.
+6. Cerrar el veredicto y esperar el segundo viaje: iOS abre el atajo de `movimentos`, la página guarda el día y
+   la fila pasa a **conciliada** sin tocar **Sincronizar com ERP**. En el log quedan dos pares: `launch_sync`
+   del envío y `read_history` de la lectura.
+7. Verificar en el ERP que la entrada existe y en el log del servidor las dos líneas (`requested` y `result`).
+8. Repetir con dos productos para comprobar que la cola envía el segundo después del retorno del primero.
+9. Probar el fallo: apagar el Wi-Fi, lanzar y confirmar que el lanzamiento **igual** quedó guardado en Trindade.
 
 ## 11. Límites conocidos
 
@@ -307,6 +362,9 @@ En la fábrica:
   puente.
 - La respuesta vuelve por la URL del callback: un rango de movimientos muy grande puede superar lo que iOS está
   dispuesto a abrir. Es un motivo más para no pedir historiales largos desde el teléfono.
+- El `sessionStorage` es de la pestaña, no del navegador: si Safari abre la vuelta del atajo en una pestaña
+  distinta de la que lanzó, la contraseña no viaja y la lectura automática no puede salir. La página lo dice y
+  el operario la escribe una vez más; el lanzamiento no se pierde.
 - La integración no escribe en las tablas fiscales del ERP ni reemplaza la operación de la empresa.
 
 ## 12. Estado de las piezas

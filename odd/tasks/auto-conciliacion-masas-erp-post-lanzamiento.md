@@ -98,6 +98,16 @@ Un `200` en `/entradasitem` dice que el ERP recibió la entrada en su buffer. El
   *Por qué:* Safari/Atajos admite un viaje por carga de página; el segundo salto es inevitable y el veredicto no se puede perder.
 - **Q2 — Android: cómo se muestra el fallo de lectura. Aprobada (a).** `noticeMessage = failure.describe()` (la frase compartida de `AeroFailure`), sin pisar el diálogo del lote.
 - **Q4 — Cola: leer antes de liquidar. Aprobada (a).** Con la cola no vacía se lee primero, se liquida contra ese espejo, se envía y se vuelve a leer sólo si se envió algo (2 lecturas en una apertura con pendientes, 0 si no hay). No se reenvía lo que el espejo fresco ya contiene.
+- **Q6 — Web: la contraseña del ERP en la sesión de la pestaña. Aprobada (c).** La contraseña pasa de la
+  memoria del módulo al `sessionStorage` de la pestaña. Sin esto la lectura automática no existe en web: el
+  atajo vuelve abriendo un documento nuevo, y el secreto que sólo vivía en el módulo anterior se perdía justo
+  cuando el segundo viaje tenía que salir. Sigue sin tocar `localStorage`, cookies ni el servidor; no se
+  registra en logs, bitácora ni avisos; se borra al cerrar sesión en Trindade y con **Limpiar**, y muere con
+  la pestaña. Reemplaza la decisión de almacenamiento de `paridad-web-android-erp-7005` (T20: «sólo memoria»)
+  para el alcance de esta feature.
+  *Riesgo aceptado:* un script que se ejecute en la página puede leer el secreto mientras la pestaña viva; el
+  alcance queda limitado a la pestaña y a la sesión. Una pestaña abierta sin relación con la que lanzó arranca
+  vacía y la página vuelve a pedir la contraseña.
 - **Q3 — Release: publicación en GitHub. Pendiente de decisión.** Aprobado implementar, testear, construir el APK 7012 firmado y desplegar producción con `latest-release`. **Prohibido** tocar el release `v0.7.0`, crear tag o release `v0.7.1` y alterar el asset de GitHub: el APK vive en `packages/backend/apk/trindade-0.7.1.apk` hasta que se decida publicarlo.
 - **Q5 — Las siete filas del 03/11. Cerrada sin reparación.** El operador confirmó que no tiene acceso ahora y acepta que queden como están: no se repara el pasado, no se toca `aero_movements` del 03/11 y la prueba de aceptación pasa a ser un día abierto nuevo (AC10).
 
@@ -130,8 +140,8 @@ Un `200` en `/entradasitem` dice que el ERP recibió la entrada en su buffer. El
 - **S7 — Nada se reenvía si el espejo fresco lo tiene.** Después de leer se hace `queue.settle(settledLaunchIds())`; con Q4(a), antes de reintentar se liquida con el espejo recién leído.
 - **S8 — Guardas.** No hay lectura automática si el día en pantalla no es hoy, si las credenciales no están completas (`!settings.ready`), si no hubo envíos (`sent == 0`), ni después de un día cerrado.
 - **S9 — Una lectura en vuelo.** Si el botón está leyendo (`isSyncingAero`), el camino automático no abre otra; si la lectura automática está en vuelo, el botón no dispara una segunda.
-- **S10 — Web: la marca del viaje pendiente.** Con la cola vacía y veredicto exitoso se arma una marca por día en `localStorage`; se consume **una sola vez**, al cerrar el veredicto (el `onClose` del diálogo y el botón «Fechar» pasan por el mismo cierre), y dispara `handleSyncFromErp()`. Sin marca no hay viaje.
-- **S11 — Web: sin bucles ni pérdida.** La marca se consume antes de navegar; un viaje que no vuelve no se reintenta solo; «Reenviar fallas» no dispara la lectura (la cola no está vacía); el callback de `movimentos` no arma otra marca; recargar la página con la marca armada no viaja sin un veredicto cerrado.
+- **S10 — Web: la marca del viaje pendiente.** Con la cola vacía y veredicto exitoso se arma una marca por día en `localStorage`; se consume **una sola vez**, al cerrar el veredicto (el `onClose` del diálogo y el botón «Fechar» pasan por el mismo cierre), y dispara `handleSyncFromErp()`. Sin marca no hay viaje. La contraseña que ese viaje necesita vive en el `sessionStorage` de la pestaña (Q6), así que la lectura puede salir del documento que volvió del atajo: sin ella la página diría el motivo y no habría lectura.
+- **S11 — Web: sin bucles ni pérdida.** La marca se consume antes de navegar; un viaje que no vuelve no se reintenta solo; «Reenviar fallas» no dispara la lectura (la cola no está vacía); un lote parcial no arma la marca; el callback de `movimentos` no arma otra marca; recargar la página con la marca armada no viaja sin un veredicto cerrado.
 - **S12 — Web: reutiliza el atajo existente.** El segundo viaje es `buildAeroBridgeTriggerUrl` con `action: 'movimentos'` y su envelope, sin tocar la receta del atajo.
 - **S13 — Android: un solo camino de lectura.** Un método privado (`readDay(date, mode)`) usado por el botón y por el camino automático; el automático actualiza `aeroSyncedAt` y no muestra spinner; el botón sigue mostrando `massas_aero_sync_done` y su indicador.
 - **S14 — Observabilidad.** Cada lectura deja un par `read_history` `requested`/`result` con el mismo `attemptId`, la fecha en `note`, `buildNumber` del APK instalado y `saved` en la respuesta.
@@ -143,34 +153,34 @@ Un `200` en `/entradasitem` dice que el ERP recibió la entrada en su buffer. El
 
 Fase 1 — Android (T1, T2). Fase 2 — Web (T3, T4). Fase 3 — contrato y conciliación (T5). Fase 4 — documentación y entrega (T6, T7).
 
-- [ ] **T1 — Android: una lectura después del lote.** Specs S1 S2 S3 S5 S9 S13.
+- [x] **T1 — Android: una lectura después del lote.** Specs S1 S2 S3 S5 S9 S13.
   - Archivos: `packages/android/app/src/main/java/com/trindade/app/massas/MassasLaunchViewModel.kt`, `packages/android/app/src/test/java/com/trindade/app/massas/MassasLaunchViewModelTest.kt`, `AeroTestFakes.kt`.
   - Qué: extraer de `syncAeroDay` un camino privado que lea y guarde sin tocar el diálogo; llamarlo al final de `dispatchToErp` cuando `sent > 0` y el día siga siendo hoy; después `refreshMirror` + `repository.day`.
   - Pruebas (RED primero): `elLoteTerminaConUnaSolaLecturaDelDia`, `elVeredictoDelLoteSigueEnElDialogoDespuesDeLeer`, `unLoteSinEnviosNoLee`, `elBotonDuranteLaLecturaAutomaticaNoDisparaOtra`.
   - Aceptación: 1 lectura para 3 productos; `resultDialogMessage` intacto; `aeroSyncedAt` actualizado; `readDates` del fake con la fecha del día.
-  - Commit: `feat(android): re-read the erp day once after a launch batch`.
-- [ ] **T2 — Android: fila suelta, cola y guarda contra el espejo fresco.** Specs S1 S6 S7 S8 S15. Depende de Q2 y Q4.
+  - Commit: `feat(android): re-read the erp day once after a launch batch` → hecho en `15d87b8` (T1 y T2 juntos). Suite Android 1346/1346.
+- [x] **T2 — Android: fila suelta, cola y guarda contra el espejo fresco.** Specs S1 S6 S7 S8 S15. Depende de Q2 y Q4.
   - Archivos: los mismos de T1.
   - Qué: llamar al mismo camino desde `sendPendingLaunch` y al final de `flushPendingQueue`; liquidar la cola con el espejo recién leído; fallo → `noticeMessage`; sin credenciales o día pasado, nada.
   - Pruebas: `elEnvioIndividualTambienDejaElEspejoAlDia`, `laColaNoReenviaLoQueElEspejoFrescoYaTiene`, `unFalloDeLecturaDejaElLanzamientoHechoYElMotivoVisible`, `noLeeSinCredencialesNiUnDiaPasado`.
   - Aceptación: una lectura por fila suelta y una por cola drenada; cero reenvíos de lo que el espejo fresco contiene; fallo de lectura = fila pendiente + motivo + veredicto intacto.
   - Commit: `feat(android): reconcile the pending queue against a fresh erp day`.
-- [ ] **T3 — Web: marca y disparo del segundo viaje.** Specs S1 S2 S6 S10 S11 S12 S17. Depende de Q1.
+- [x] **T3 — Web: marca y disparo del segundo viaje.** Specs S1 S2 S6 S10 S11 S12 S17. Depende de Q1.
   - Archivos: `packages/frontend/src/lib/aero-auto-read.ts` (nuevo), `src/lib/aero-auto-read.test.ts` (nuevo), `src/pages/MassasLaunchPage.tsx`, `src/i18n/locales/es.json`, `src/i18n/locales/pt-BR.json`, `src/pages/massas/aero-result-dialogs.test.ts`.
   - Qué: librería pura `armAeroAutoRead` / `consumeAeroAutoRead` (clave propuesta `trindade.aero.auto-read.v1`, mismo patrón que `aero-queue.ts:67`); armar al cerrar el callback con la cola vacía y `status === 'ok'`; consumir en un `closeResultModal()` único que cubre `:1336` y el botón «Fechar» `:1372`, y llamar `handleSyncFromErp()`; «Reenviar fallas» no consume; texto de `mirrorHint` acorde.
   - Pruebas: `armaLaMarcaSoloConLaColaVacia`, `consumeLaMarcaUnaSolaVez`, `noArmaEnUnDiaPasado`, `elReenvioDeFallasNoConsumeLaMarca`.
   - Aceptación: con la cola vacía queda una marca por día; se consume una sola vez al cerrar el veredicto y dispara un viaje; el reenvío de fallas no la consume; `mirrorHint` ya no pide actualizar a mano.
-  - Commit: `feat(web): read the erp day after the launch queue drains`.
-- [ ] **T4 — Web: e2e del viaje automático.** Specs S10 S11.
+  - Commit: `feat(web): read the erp day after the launch queue drains` → `d6347ea`; la contraseña de la sesión, `8b3ed8c` (Q6).
+- [x] **T4 — Web: e2e del viaje automático.** Specs S10 S11.
   - Archivos: `packages/frontend/src/__e2e__/auto-read-after-launch.spec.ts` (nuevo), sobre el arnés de `aero-batch-launch.spec.ts` (`?aero_action=…&aero_data=…`).
   - Pruebas: `closing the launch verdict reads the day once`, `a second dismissal does not travel again`, `a refused product keeps the retry and does not travel`.
   - Aceptación: tras el lote, la marca queda consumida; con la vuelta `movimentos` simulada, las filas del lote pasan a conciliadas y el insumo no aparece; segundo cierre sin viaje.
-  - Commit: `test(web): cover the automatic movements read after a launch`.
-- [ ] **T5 — Contrato y conciliación post-lectura.** Specs S4 S5.
+  - Commit: `test(web): cover the automatic movements read after a launch` → `7a81603`; el spec vive en `__e2e__/auto-read-after-launch.spec.ts`.
+- [x] **T5 — Contrato y conciliación post-lectura.** Specs S4 S5.
   - Archivos: `packages/frontend/src/lib/massas-unified.test.ts`, `packages/frontend/src/lib/aero-integration.test.ts`, `packages/android/app/src/test/java/com/trindade/app/massas/MassasUnifiedTest.kt`, `packages/backend/src/modules/integration/aero.movements.routes.test.ts` (sólo si falta cobertura).
   - Pruebas: `unaLecturaDelDiaConciliaElLoteYNoMeteInsumos` (web y Android), `elEspejoGuardaInsumosAunqueMasasLosOculte` (verifica el contrato existente `:303-333`).
   - Aceptación: la fila se concilia por fecha + producto + unidades + operador; un asiento de insumo queda guardado e invisible en Masas; el backend no filtra nada.
-  - Commit: `test(aero): pin the post-read reconciliation and the supplies boundary`.
+  - Evidencia: `una lectura del día concilia el lote y no mete insumos` en `massas-unified.test.ts`; Android ya lo fijaba en `MassasUnifiedTest` (`a supply is filtered out of the table but still importable on its own`), y el contrato del backend ya guarda los 11 movimientos (`aero.movements.routes.test.ts:303-333`). No se duplicó.
 - [ ] **T6 — Documentación.** Specs S2 S10 S14 S16.
   - Archivos: `docs/integracion-aero-masas-web.md`, `docs/agents/trindade-development.md` (contrato de pruebas), `docs/release-android-historial.md` (fila 0.7.1 con `buildNumber` y fila 7012), `CHANGELOG.md`.
   - Qué: explicar el segundo viaje, la marca, las guardas y qué mirar en el log; dejar escrito que los insumos del espejo son de Relatório/Recebimento y que Masas sólo los oculta; y corregir `docs/release-android*.md` para que digan que el código de build es **interno** y no se publica en la identidad del release.
@@ -355,3 +365,18 @@ IMPLEMENTACIÓN:
 - Si una decisión no está cubierta o algo contradice el repo, detente y repórtalo en lugar de improvisar.
 ```
 
+- **L6 — La contraseña de la sesión en web (2026-11-03, verbatim de la decisión):**
+
+```text
+El usuario confirma explícitamente la OPCIÓN C para la contraseña del ERP en Web/iPhone: puede persistirse en `sessionStorage` para que el atajo de vuelta y la lectura automática de `/movimentoitem` funcionen.
+
+Condiciones de la opción C:
+- Nunca `localStorage`, cookies ni servidor: solo `sessionStorage` de la pestaña.
+- No registrar la contraseña en logs/auditoría/toasts.
+- Limpiarla al cerrar sesión, al limpiar la configuración y al salir de la sesión de la pestaña. Mantener la migración que purga el valor legado de localStorage.
+- Añadir tests que prueben: se guarda en sessionStorage, no en localStorage, se recupera en una pestaña nueva del mismo navegador/sesión, se borra al limpiar, y no aparece en el payload de settings persistido.
+- Actualizar los documentos/ODD que hoy afirman «solo memoria de la pestaña» para reflejar la decisión aprobada, incluida la nota de seguridad y el alcance de sessionStorage.
+```
+
+*Hallazgo que la motivó:* el e2e del segundo viaje probó que la vuelta del atajo llega en un documento nuevo, y
+con la contraseña sólo en memoria el cierre gastaba la marca y no podía leer. Queda registrado como Q6.
