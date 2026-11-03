@@ -83,10 +83,10 @@ verificaciones completas están en [release-android-historial.md](release-androi
 > **Estado final del 2026-11-03.** La release `v0.7.0` se republicó con la versión **0.7.0**. El asset de
 > GitHub, su `.sha256`, `packages/backend/apk/trindade-0.7.0.apk`, la copia de escritorio y
 > `GET /api/app/download-apk` son el mismo binario: `versionName 0.7.0`, 11.277.888 bytes, sha256
-> `b863bb265af7bb047d25aaac91c9824bb1e50904b4719fe4595b78b0c09ac055`. Esta build incluye el payload de
-> movimientos alineado con el puente web y la vista de solo lectura de días cerrados en el Histórico de
-> Cargamento. El código de build es interno y no se publica. Las builds anteriores son históricas. El tag
-> `v0.7.0` no se movió y no se creó una release nueva.
+> `5dd77e331edb1aace6e2b656e899697819a506068dc375528c8dc6f5a5ade922`. Esta build incluye el payload de
+> movimientos alineado con el puente web, la vista de solo lectura de días cerrados en el Histórico de
+> Cargamento y el orden de Lanzamiento de Masas de la web. El código de build es interno y no se publica. Las
+> builds anteriores son históricas. El tag `v0.7.0` no se movió y no se creó una release nueva.
 
 ## 4. Workflow de publicación
 

@@ -106,7 +106,7 @@ jq -r 'select(.client=="android") | [.appVersion,.buildNumber] | @tsv' \
 ## 7. Verificación del build publicado
 
 - APK final: `versionName 0.7.0`, sha256
-  `b863bb265af7bb047d25aaac91c9824bb1e50904b4719fe4595b78b0c09ac055`, firmado con la huella oficial.
+  `5dd77e331edb1aace6e2b656e899697819a506068dc375528c8dc6f5a5ade922`, firmado con la huella oficial.
 - La lectura de movimientos usa el cuerpo certificado de la web: `_method: PATCH`, `ENTSAI: "E"` y los
   filtros abiertos en `null`. El test de contrato de `AeroErpClientTest` fija ese cuerpo exacto.
 - Para verificar el log sin publicar el build se instaló una variante de prueba `0.7.1`: el detector de

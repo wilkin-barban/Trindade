@@ -21,11 +21,16 @@ hashes y verificaciones está en [docs/release-android-historial.md](docs/releas
   **Ver cronograma** y abre la distribución completa en solo lectura, con las filas inactivas incluidas; no
   ofrece agregar, editar ni eliminar.
 
+### Cambiado
+
+- **Lanzamiento de Masas en Android sigue el orden de la web.** Data de Produção y sincronización, cajas,
+  Produção do dia, lançamentos individuales, resumo colectivo y WhatsApp, en ese orden.
+
 ### Distribución Android
 
 - El asset de GitHub Release `v0.7.0` (`trindade-0.7.0.apk` y su `.sha256`) y el APK de producción son el
   mismo binario: `versionName 0.7.0`, 11.277.888 bytes y sha256
-  `b863bb265af7bb047d25aaac91c9824bb1e50904b4719fe4595b78b0c09ac055`. El código de build es interno.
+  `5dd77e331edb1aace6e2b656e899697819a506068dc375528c8dc6f5a5ade922`. El código de build es interno.
 - El tag `v0.7.0` no se movió y no se creó una release nueva.
 
 ---
