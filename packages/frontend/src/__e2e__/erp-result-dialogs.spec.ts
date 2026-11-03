@@ -111,8 +111,12 @@ test.describe('result dialogs on a phone screen', () => {
 
     const dialog = page.locator('[data-testid="massa-result-modal"]');
     await expect(dialog).toBeVisible();
+    // La lectura del día la hace la página al cerrar: el aviso ya no manda a actualizar nada a mano.
     await expect(page.locator('[data-testid="massa-result-mirror-hint"]')).toContainText(
-      'Atualize a aba «Espelho do ERP»',
+      /lê o dia|lee el día/,
+    );
+    await expect(page.locator('[data-testid="massa-result-mirror-hint"]')).not.toContainText(
+      /Atualize a aba|Actualizá la pestaña/,
     );
   });
 

@@ -78,13 +78,15 @@ test.describe('integration tab in the admin panel', () => {
   });
 
   /**
-   * The password does not survive the tab, and the screen says so before anyone wonders.
+   * The password does not survive the device, and the screen says so before anyone wonders.
    *
-   * It used to sit in `localStorage` in clear. Now the field is emptied by a reload on purpose: the cost of
-   * not keeping the company's secret on the device is typing it again when the session opens, and a person who
-   * is not told reads that as the app losing the configuration.
+   * It used to sit in `localStorage` in clear, next to the IP of the plant: any backup of the profile or the
+   * next launch of the app could read the company's credentials. It now lives in the tab's `sessionStorage`:
+   * out of the device, alive across a reload and across the return trip of the shortcut -- which is what makes
+   * the read that follows a launch possible -- and gone when the tab, the session or the configuration ends.
+   * The cost stays visible: the panel says the secret is not kept on the device.
    */
-  test('saving keeps the password out of the device and a reload asks for it again', async ({ page }) => {
+  test('saving keeps the password out of the device and in this tab session', async ({ page }) => {
     await loginAsAeroOwner(page);
     await page.goto('/admin');
     await page.locator('[data-testid="admin-tab-integration"]').click();
@@ -95,7 +97,7 @@ test.describe('integration tab in the admin panel', () => {
     await expect(page.locator('[data-testid="aero-pass-notice"]')).toContainText(/no se guarda|não é guardada/);
 
     // A fresh profile carries no user either: the save needs the address and the user, and the secret is
-    // what it deliberately does not keep.
+    // what it deliberately does not keep on disk.
     await page.locator('[data-testid="aero-ws-user"]').fill('wilkin');
     await pass.fill('segredo-do-erp');
     await page.locator('[data-testid="aero-save"]').click();
@@ -104,16 +106,25 @@ test.describe('integration tab in the admin panel', () => {
     const stored = await page.evaluate(() => localStorage.getItem('trindade.aero.integration.v1') ?? '');
     expect(stored).not.toContain('segredo-do-erp');
     expect(stored).toContain('192.168.25.250');
+    // The tab keeps it, and only the tab: a reload is the same session.
+    expect(
+      await page.evaluate(() => window.sessionStorage.getItem('trindade.aero.session.v1')),
+    ).toBe('segredo-do-erp');
 
     await page.reload();
     await page.locator('[data-testid="admin-tab-integration"]').click();
 
-    await expect(page.locator('[data-testid="aero-ws-pass"]')).toHaveValue('');
-    // Configured, and waiting for the secret: not «sin configurar», which is what it would say if the reload
-    // had thrown the address away too.
-    await expect(page.locator('[data-testid="aero-state"]')).toContainText(
-      /Falta la contraseña de esta sesión|Falta a senha desta sessão/
-    );
+    await expect(page.locator('[data-testid="aero-ws-pass"]')).toHaveValue('segredo-do-erp');
+    // Configured, not «sin configurar»: the address survived the reload and so did the session secret.
+    await expect(page.locator('[data-testid="aero-state"]')).toContainText(/Configurado/);
     await expect(page.locator('[data-testid="aero-ws-url"]')).toHaveValue('http://192.168.25.250:1453/api');
+
+    // Clearing the configuration closes the session too: the tab keeps no secret once the setup is gone.
+    page.on('dialog', (dialog) => dialog.accept());
+    await page.getByRole('button', { name: /Limpar/ }).click();
+    await expect(page.locator('[data-testid="aero-state"]')).toContainText(/Sin configurar|Não configurado/);
+    expect(
+      await page.evaluate(() => window.sessionStorage.getItem('trindade.aero.session.v1')),
+    ).toBeNull();
   });
 });
