@@ -43,11 +43,11 @@ Cada intento contra el ERP emite dos líneas con el mismo `attemptId`:
 Ejemplo de una consulta:
 
 ```json
-{"event":"read_history","phase":"requested","client":"android","attemptId":"0f6c...","destinationUrl":"http://192.168.25.250:1453/api/movimentoitem","appVersion":"0.7.0","buildNumber":7008,"note":"Android App / ERP · client=android · via=native · date=2026-11-03"}
+{"event":"read_history","phase":"requested","client":"android","attemptId":"0f6c...","destinationUrl":"http://192.168.25.250:1453/api/movimentoitem","appVersion":"0.7.0","note":"Android App / ERP · client=android · via=native · date=2026-11-03"}
 ```
 
 ```json
-{"event":"read_history","phase":"result","client":"android","attemptId":"0f6c...","destinationUrl":"http://192.168.25.250:1453/api/movimentoitem","appVersion":"0.7.0","buildNumber":7008,"httpStatus":200,"durationMs":850,"note":"Android App / ERP · client=android · via=native · date=2026-11-03 · seats=8 · saved=8"}
+{"event":"read_history","phase":"result","client":"android","attemptId":"0f6c...","destinationUrl":"http://192.168.25.250:1453/api/movimentoitem","appVersion":"0.7.0","httpStatus":200,"durationMs":850,"note":"Android App / ERP · client=android · via=native · date=2026-11-03 · seats=8 · saved=8"}
 ```
 
 Un `launch_sync` lleva además `launchId` en ambas líneas. Un `test_connection` lleva el código de fallo de red
@@ -103,18 +103,19 @@ jq -r 'select(.client=="android") | [.appVersion,.buildNumber] | @tsv' \
   logs/aero-integration.log | sort | uniq -c
 ```
 
-## 7. Verificación 7008
+## 7. Verificación del build publicado
 
-- APK final: `versionCode 7008`, `versionName 0.7.0`, sha256
+- APK final: `versionName 0.7.0`, sha256
   `9136b130ce8c29877a87277487f984491b26b4691e726b70fdabf673e2fa3aa7`, firmado con la huella oficial.
-- Para verificar el log sin publicar 7008 se instaló un build de prueba `0.7.1 / 7008`: el detector de
-  actualización lo considera más nuevo que el `v0.7.0` que sirve producción y no bloquea la app.
+- Para verificar el log sin publicar el build se instaló una variante de prueba `0.7.1`: el detector de
+  actualización la considera más nueva que el `v0.7.0` que sirve producción y no bloquea la app.
 - La sincronización ERP generó el par:
-  - `read_history` / `requested` / `client=android` / `appVersion=0.7.1` / `buildNumber=7008`;
+  - `read_history` / `requested` / `client=android` / `appVersion=0.7.1`;
   - `read_history` / `result` / mismo `attemptId` / `httpStatus=null` / `durationMs=2687` /
     `error=AERO_ERP_UNREACHABLE`.
+- El `buildNumber` viaja en la línea para diagnóstico interno; no se documenta ni publica su valor.
 - Verificación: backend **712/712**, Android **1336/1336**, `BUILD SUCCESSFUL`.
-- El APK final `0.7.0 / 7008` queda en `packages/android/app/build/outputs/apk/release/app-release.apk` y en
+- El APK final `0.7.0` queda en `packages/android/app/build/outputs/apk/release/app-release.apk` y en
   Desktop. Producción sirve ese mismo binario en `GET /api/app/download-apk`, y `latest-release` informa
   `apkSize: 11277888`; una instalación del build final ya no recibe el bloqueo de actualización.
 
