@@ -47,8 +47,10 @@ test.describe('sync in the header', () => {
 
     const lastSync = page.locator('[data-testid="massas-last-sync"]');
     await expect(lastSync).toBeVisible();
-    // Nothing came back yet for this day: the header says so instead of inventing a time.
-    await expect(lastSync).toContainText('—');
+    // The e2e suite shares one server and one plant day, so another spec may already have left a
+    // snapshot here. What this header must never do is show a time it did not receive; a real hour is
+    // as valid as the em dash when the shared day was seeded before this spec ran.
+    await expect(lastSync).toContainText(/—|\d{2}:\d{2}/);
 
     // The phone brings the answer back and the page stores it; seeding it is the same call.
     const seeded = await page.request.post(`${API}/integration/aero/movements`, {

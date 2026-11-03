@@ -43,6 +43,8 @@ import kotlinx.serialization.Contextual
  * @param client 
  * @param attemptId 
  * @param durationMs 
+ * @param appVersion 
+ * @param buildNumber 
  */
 @Serializable
 
@@ -82,14 +84,20 @@ data class AeroLogRequest (
     val attemptId: kotlin.String? = null,
 
     @SerialName(value = "durationMs")
-    val durationMs: kotlin.Int? = null
+    val durationMs: kotlin.Int? = null,
+
+    @SerialName(value = "appVersion")
+    val appVersion: kotlin.String? = null,
+
+    @SerialName(value = "buildNumber")
+    val buildNumber: kotlin.Int? = null
 
 ) {
 
     /**
      * 
      *
-     * Values: test_connection,launch_sync,read_history,dispatch,sync,test,`import`
+     * Values: test_connection,launch_sync,read_history,dispatch,sync,test,`import`,queue_rejected
      */
     @Serializable
     enum class Event(val value: kotlin.String) {
@@ -99,7 +107,8 @@ data class AeroLogRequest (
         @SerialName(value = "dispatch") dispatch("dispatch"),
         @SerialName(value = "sync") sync("sync"),
         @SerialName(value = "test") test("test"),
-        @SerialName(value = "import") `import`("import");
+        @SerialName(value = "import") `import`("import"),
+        @SerialName(value = "queue_rejected") queue_rejected("queue_rejected");
     }
     /**
      * 
