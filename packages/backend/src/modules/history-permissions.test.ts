@@ -120,6 +120,39 @@ describe('history permissions', () => {
     assert.strictEqual(projectHistoryPermissions({ sub: 1, role: 'Trabalhador' }, inactive, 'one-hour', now).canActivate, false);
   });
 
+  it('scopes a worker\'s delete to the rows they authored', () => {
+    const own = { user_id: 7, created_at: '2026-08-24T11:30:00.000Z', is_active: 1, day_date: '2026-08-24' };
+    const someoneElse = { ...own, user_id: 8 };
+    const ownPast = { ...own, day_date: '2026-08-23' };
+    const worker = { sub: 7, role: 'Trabalhador' };
+
+    assert.strictEqual(projectHistoryPermissions(worker, own, 'one-hour', now).canDelete, true);
+    assert.strictEqual(
+      projectHistoryPermissions(worker, someoneElse, 'one-hour', now).canDelete,
+      false,
+      'a worker may not erase a row another operator wrote'
+    );
+    assert.strictEqual(
+      projectHistoryPermissions(worker, ownPast, 'one-hour', now).canDelete,
+      false,
+      'authorship does not reopen a day the calendar closed'
+    );
+
+    // The administrator keeps the whole day, and still loses the past one above.
+    assert.strictEqual(projectHistoryPermissions({ sub: 1, role: 'Administrador' }, someoneElse, 'one-hour', now).canDelete, true);
+  });
+
+  it('scopes a worker\'s delete in the reports window the same way', () => {
+    const own = { user_id: 7, created_at: '2026-08-24T07:00:00.000Z', is_active: 1, day_date: '2026-08-24' };
+    const worker = { sub: 7, role: 'Trabalhador' };
+
+    assert.strictEqual(projectHistoryPermissions(worker, own, 'sao-paulo-current-and-previous-day', now).canDelete, true);
+    assert.strictEqual(
+      projectHistoryPermissions(worker, { ...own, user_id: 8 }, 'sao-paulo-current-and-previous-day', now).canDelete,
+      false
+    );
+  });
+
   it('keeps today editable within the window and leaves rows without a day untouched', () => {
     const today = { user_id: 1, created_at: '2026-08-24T11:30:00.000Z', is_active: 1, day_date: '2026-08-24' };
     const permissions = projectHistoryPermissions({ sub: 1, role: 'Trabalhador' }, today, 'one-hour', now);

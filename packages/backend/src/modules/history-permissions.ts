@@ -17,6 +17,16 @@ export interface OwnableHistoryRow {
    * that never opted in.
    */
   day_date?: string | null;
+  /**
+   * The São Paulo date that closes erasing, when it differs from the one that closes the day.
+   *
+   * Reports are the reason this exists and the reason it is separate: a report dated yesterday is
+   * still editable -- its window is the current or the previous day, which is what lets a night shift
+   * finish after midnight -- and it is no longer erasable, because Q4 keeps physical deletion for
+   * today. Folding both into `day_date` would close yesterday for editing too and take that window
+   * away. A row without it anchors erasing on `day_date`, so loading keeps its single calendar.
+   */
+  erase_day_date?: string | null;
 }
 
 /**
@@ -99,7 +109,12 @@ export function projectHistoryPermissions(
   // inside the edit window, and even for the administrator who could otherwise erase it.
   const canEdit = !isClosedDay && active && row.user_id === actor.sub && isWithinEditWindow(window, row.created_at, now);
   const canDeactivate = isAdmin(actor) && active;
-  const canDelete = !isClosedDay && (actor.role === 'Administrador' || actor.role === 'Trabalhador');
+  // Erasing is narrower than retiring: whoever the actor is, a day that is already past cannot lose
+  // content, and an operator erases only what they wrote. A flag that ignored authorship would offer
+  // a thumb a button the route refuses, which reads as a broken screen rather than as a rule.
+  const eraseClosed = Boolean(row.erase_day_date) && row.erase_day_date! < getSaoPauloDateString(now);
+  const canDelete =
+    !isClosedDay && !eraseClosed && (isAdmin(actor) || (actor.role === 'Trabalhador' && row.user_id === actor.sub));
   const canActivate = isAdmin(actor) && !active;
 
   return {

@@ -5,6 +5,7 @@ import type { FastifyInstance } from 'fastify';
 import type Database from 'better-sqlite3';
 
 import { buildTemperatureReadings, buildTestApp } from '../../test-helper.js';
+import { getSaoPauloDateString } from '../../utils/date.js';
 
 /**
  * Helper: login as admin and return the JWT token.
@@ -1059,7 +1060,69 @@ describe('Reports Routes', () => {
     const item = body.items.find((entry: any) => entry.id === 9101);
     assert.strictEqual(item.canEdit, true);
     assert.strictEqual(item.canDeactivate, true);
-    assert.strictEqual(item.canDelete, true);
+    // The row is dated 2026-06-18, which is a past day: its erase is closed even for the administrator
+    // reading this list. The erasable case lives in the spec below, on today's date.
+    assert.strictEqual(item.canDelete, false);
+  });
+
+  it('GET /history closes erase on a report whose day is already past', async () => {
+    const today = getSaoPauloDateString();
+    const yesterday = getSaoPauloDateString(new Date(Date.now() - 24 * 60 * 60 * 1000));
+    db.prepare(
+      `INSERT INTO reports (id, user_id, turno, report_date, notes, created_at) VALUES (9803, 1, 'tarde', ?, 'Old', datetime('now', '-1 day'))`
+    ).run(yesterday);
+
+    const res = await app.inject({ method: 'GET', url: `/api/reports/history?date=${yesterday}`, headers: { authorization: `Bearer ${token}` } });
+    assert.strictEqual(res.statusCode, 200);
+    const item = JSON.parse(res.body).items.find((entry: any) => entry.id === 9803);
+    assert.strictEqual(item.canDelete, false, 'no role erases a day the calendar closed');
+    assert.strictEqual(item.canDeactivate, true, 'retiring stays available on a past day');
+    assert.strictEqual(item.canActivate, false);
+
+    // And the day after it is still erasable, so the rule is the date and not a blanket refusal.
+    db.prepare(
+      `INSERT INTO reports (id, user_id, turno, report_date, notes, created_at) VALUES (9804, 1, 'noite', ?, 'Today', datetime('now'))`
+    ).run(today);
+    const todayRes = await app.inject({ method: 'GET', url: `/api/reports/history?date=${today}`, headers: { authorization: `Bearer ${token}` } });
+    const todayItem = JSON.parse(todayRes.body).items.find((entry: any) => entry.id === 9804);
+    assert.strictEqual(todayItem.canDelete, true);
+  });
+
+  it('DELETE /:id lets a worker erase their own report of today', async () => {
+    const today = getSaoPauloDateString();
+    db.prepare(
+      `INSERT INTO reports (id, user_id, turno, report_date, notes, created_at) VALUES (9811, ?, 'tarde', ?, 'Mine', datetime('now'))`
+    ).run(workerUserId, today);
+
+    const res = await app.inject({ method: 'DELETE', url: '/api/reports/9811', headers: { authorization: `Bearer ${workerToken}` } });
+    assert.strictEqual(res.statusCode, 204, res.body);
+    const gone = db.prepare('SELECT id FROM reports WHERE id = 9811').get();
+    assert.strictEqual(gone, undefined);
+  });
+
+  it('DELETE /:id refuses a report another operator wrote, and one from a past day', async () => {
+    const today = getSaoPauloDateString();
+    const yesterday = getSaoPauloDateString(new Date(Date.now() - 24 * 60 * 60 * 1000));
+    db.prepare(
+      `INSERT INTO reports (id, user_id, turno, report_date, notes, created_at) VALUES (9812, 1, 'tarde', ?, 'Not mine', datetime('now'))`
+    ).run(today);
+    db.prepare(
+      `INSERT INTO reports (id, user_id, turno, report_date, notes, created_at) VALUES (9813, ?, 'noite', ?, 'Mine but old', datetime('now'))`
+    ).run(workerUserId, yesterday);
+
+    const foreign = await app.inject({ method: 'DELETE', url: '/api/reports/9812', headers: { authorization: `Bearer ${workerToken}` } });
+    assert.strictEqual(foreign.statusCode, 403, foreign.body);
+    assert.ok(db.prepare('SELECT id FROM reports WHERE id = 9812').get(), 'a refused erase keeps the report');
+
+    const past = await app.inject({ method: 'DELETE', url: '/api/reports/9813', headers: { authorization: `Bearer ${workerToken}` } });
+    assert.strictEqual(past.statusCode, 403, past.body);
+    assert.ok(db.prepare('SELECT id FROM reports WHERE id = 9813').get(), 'no role erases a past day, not even its author');
+
+    // And the administrator loses the past day too, while keeping today.
+    const adminPast = await app.inject({ method: 'DELETE', url: '/api/reports/9813', headers: { authorization: `Bearer ${token}` } });
+    assert.strictEqual(adminPast.statusCode, 403, adminPast.body);
+    const adminToday = await app.inject({ method: 'DELETE', url: '/api/reports/9812', headers: { authorization: `Bearer ${token}` } });
+    assert.strictEqual(adminToday.statusCode, 204, adminToday.body);
   });
 
   it('GET /history paginates more than 30 reports and combines month/user filters', async () => {
@@ -1105,7 +1168,9 @@ describe('Reports Routes', () => {
   });
 
   it('admin deactivate and delete report history records transactionally', async () => {
-    db.prepare(`INSERT INTO reports (id, user_id, turno, report_date, notes) VALUES (9103, 1, 'tarde', '2026-06-18', 'Delete me')`).run();
+    // Dated today on purpose: the case below pins that a past day is refused, and this one is about the
+    // delete being transactional -- items and photos leave with the row, not before it.
+    db.prepare(`INSERT INTO reports (id, user_id, turno, report_date, notes) VALUES (9103, 1, 'tarde', ?, 'Delete me')`).run(getSaoPauloDateString());
     db.prepare(`INSERT INTO report_items (report_id, task_id, checked) VALUES (9103, 1, 1)`).run();
     db.prepare(`INSERT INTO report_photos (id, report_id, file_path, file_size, mime_type) VALUES (9103, 9103, 'x.jpg', 10, 'image/jpeg')`).run();
 

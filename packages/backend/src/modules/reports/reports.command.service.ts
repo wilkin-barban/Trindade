@@ -123,14 +123,18 @@ export async function updateReport(
 ): Promise<ReportDetail | { error: string; status: number }> {
   // Check report exists
   const report = db
-    .prepare('SELECT id, user_id, created_at, is_active FROM reports WHERE id = ?')
-    .get(reportId) as { id: number; user_id: number; created_at: string; is_active: number } | undefined;
+    .prepare('SELECT id, user_id, created_at, is_active, report_date FROM reports WHERE id = ?')
+    .get(reportId) as { id: number; user_id: number; created_at: string; is_active: number; report_date: string } | undefined;
 
   if (!report) {
     return { error: 'Report not found', status: 404 };
   }
 
-  const permissions = projectHistoryPermissions(actor, report, 'sao-paulo-current-and-previous-day');
+  const permissions = projectHistoryPermissions(
+    actor,
+    { ...report, erase_day_date: report.report_date },
+    'sao-paulo-current-and-previous-day'
+  );
   if (!permissions.canEdit) {
     return { error: 'Registro somente leitura. Apenas o criador pode editar no dia atual ou no dia anterior.', status: 403 };
   }

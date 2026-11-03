@@ -161,10 +161,16 @@ export function deletePhoto(
  */
 export function getReportPermissions(db: Database.Database, reportId: number, actor: HistoryActor) {
   const report = db
-    .prepare('SELECT user_id, created_at, is_active FROM reports WHERE id = ?')
-    .get(reportId) as { user_id: number; created_at: string; is_active: number } | undefined;
+    .prepare('SELECT user_id, created_at, is_active, report_date FROM reports WHERE id = ?')
+    .get(reportId) as { user_id: number; created_at: string; is_active: number; report_date: string } | undefined;
   if (!report) return null;
-  return projectHistoryPermissions(actor, report, 'sao-paulo-current-and-previous-day');
+  // `erase_day_date` and not `day_date`: a report dated yesterday stays editable inside its window and
+  // stops being erasable, which is the rule Q4 keeps apart from the calendar that closes a loading day.
+  return projectHistoryPermissions(
+    actor,
+    { ...report, erase_day_date: report.report_date },
+    'sao-paulo-current-and-previous-day'
+  );
 }
 
 export function isReportReadOnly(db: Database.Database, reportId: number, actor: HistoryActor): boolean {
@@ -258,7 +264,7 @@ export function listReportHistory(db: Database.Database, query: HistoryQuery, ac
     report_date: r.report_date,
     notes: r.notes,
     created_at: r.created_at,
-    ...projectHistoryPermissions(actor, r, 'sao-paulo-current-and-previous-day'),
+    ...projectHistoryPermissions(actor, { ...r, erase_day_date: r.report_date }, 'sao-paulo-current-and-previous-day'),
     user: { id: r.user_id, display_name: r.display_name },
   }));
 

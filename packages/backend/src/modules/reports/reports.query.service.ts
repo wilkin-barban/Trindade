@@ -221,7 +221,9 @@ function enrichReport(db: Database.Database, row: ReportRow, actor?: HistoryActo
     )
     .all(row.id) as ReportTemperatureDetail[];
 
-  const permissions = actor ? projectHistoryPermissions(actor, row, 'sao-paulo-current-and-previous-day') : undefined;
+  const permissions = actor
+    ? projectHistoryPermissions(actor, { ...row, erase_day_date: row.report_date }, 'sao-paulo-current-and-previous-day')
+    : undefined;
 
   return {
     id: row.id,

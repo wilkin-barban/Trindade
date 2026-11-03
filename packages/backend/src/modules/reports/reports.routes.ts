@@ -221,10 +221,17 @@ export async function reportsRoutes(fastify: FastifyInstance, opts: ReportsRoute
     '/:id',
     { preHandler: [fastify.authenticate] },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      if (request.user!.role !== 'Administrador') return reply.status(403).send({ error: 'Insufficient permissions' });
       const { id } = request.params as { id: string };
       const reportId = parseInt(id, 10);
       if (isNaN(reportId)) return reply.status(400).send({ error: 'Invalid report ID' });
+      // Erasing is not a role, it is a row: the administrator erases any report of today, an operator
+      // erases only the one they wrote, and no one erases a day the calendar has closed. The same
+      // projection the card drew from decides the route, so the button and the answer cannot disagree.
+      const permissions = lifecycle.getReportPermissions(fastify.db, reportId, request.user!);
+      if (!permissions) return reply.status(404).send({ error: 'Report not found' });
+      if (!permissions.canDelete) {
+        return reply.status(403).send({ error: 'Insufficient permissions', code: 'REPORT_DELETE_FORBIDDEN' });
+      }
       const photos = lifecycle.deleteReportTransactionally(fastify.db, reportId);
       if (!photos) return reply.status(404).send({ error: 'Report not found' });
       auditLog(fastify.db, { userId: request.user!.sub, action: 'delete', entityType: 'report', entityId: reportId, ipAddress: request.ip });
