@@ -205,7 +205,16 @@ export function LoadingHistoryPage() {
                 ) : (
                   <Link to={`/loading/edit?date=${batch.batch_date}`} className="min-w-0 flex-1">{summary}</Link>
                 )}
-                <div className="flex shrink-0 items-center justify-end gap-1 sm:gap-2">
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-1 sm:gap-2">
+                {affordances.closedDay && (
+                  <Link
+                    to={`/loading/edit?date=${batch.batch_date}&view=1`}
+                    className={`${buttonVariants({ variant: 'outline', size: 'sm' })} max-sm:min-h-12`}
+                    data-testid={`view-loading-batch-${batch.batch_date}`}
+                  >
+                    {t('dashboard.viewSchedule')}
+                  </Link>
+                )}
                 {affordances.showReactivate && <button onClick={() => activateBatch(batch.batch_date)} disabled={busyKey === batch.batch_date} aria-label={t('history.reactivateLoading', { date: formatDate(batch.batch_date) })} className="inline-flex min-h-12 min-w-12 items-center justify-center rounded text-emerald-600 hover:bg-emerald-50 disabled:opacity-50" data-testid={`activate-loading-batch-${batch.batch_date}`}><LucideRotateCcw className="h-4 w-4" /></button>}
                 {/* A button inside a link is invalid markup and a double target for a thumb: the link carries the
                     button's own classes instead. */}

@@ -27,6 +27,7 @@ export function LoadingEditPage() {
   // The grid's pencil points at a row of its own day: the row arrives open instead of the operator having to
   // find it again in a list that grows with every load.
   const editParam = Number(searchParams.get('edit') ?? '');
+  const viewParam = searchParams.get('view') === '1';
 
   const date = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)
     ? dateParam
@@ -47,13 +48,15 @@ export function LoadingEditPage() {
   // A day the plant already closed is history: the screen shows it and stops there. The rule is the same one
   // the backend applies, so the operator learns it before pressing anything, not after a refused save.
   const dayIsClosed = isClosedDay(date, saoPauloToday());
+  const readOnly = dayIsClosed || viewParam;
   const [schedules, setSchedules] = useState<ScheduleRow[]>([]);
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
+  const [dayActive, setDayActive] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  // `?edit=` is a deep link into a row, and a closed day has no row to edit: the parameter is ignored there.
+  // `?edit=` is a deep link into a row, and a closed/read-only day has no row to edit: the parameter is ignored.
   const [editingId, setEditingId] = useState<number | null>(
-    dayIsClosed || !Number.isInteger(editParam) || editParam <= 0 ? null : editParam
+    readOnly || !Number.isInteger(editParam) || editParam <= 0 ? null : editParam
   );
   const [editSlot, setEditSlot] = useState('');
   const [saving, setSaving] = useState(false);
@@ -82,18 +85,22 @@ export function LoadingEditPage() {
     setError('');
     setLoading(true);
     try {
+      const includeInactive = readOnly ? '&includeInactive=1' : '';
       const [schedRes, slotsRes] = await Promise.all([
-        api.get<{ schedules: ScheduleRow[] }>(`/loading/schedules?date=${date}`),
+        api.get<{ schedules: ScheduleRow[]; dayActive?: boolean }>(
+          `/loading/schedules?date=${date}${includeInactive}`
+        ),
         api.get<{ timeSlots: string[] }>('/loading/time-slots'),
       ]);
       setSchedules(schedRes.schedules);
+      setDayActive(schedRes.dayActive ?? true);
       setTimeSlots(slotsRes.timeSlots);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('loading.loadingError'));
     } finally {
       setLoading(false);
     }
-  }, [date, t]);
+  }, [date, readOnly, t]);
 
   useEffect(() => {
     if (error) {
@@ -105,14 +112,15 @@ export function LoadingEditPage() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   useEffect(() => {
-    if (!Number.isFinite(editParam) || editParam <= 0) return;
+    if (readOnly || !Number.isFinite(editParam) || editParam <= 0) return;
     const target = schedules.find((entry) => entry.id === editParam);
     if (!target || editingId === editParam) return;
     setEditingId(target.id);
     setEditSlot(target.time_slot);
-  }, [schedules, editParam, editingId]);
+  }, [schedules, editParam, editingId, readOnly]);
 
   function startEdit(entry: ScheduleRow) {
+    if (readOnly) return;
     setEditingId(entry.id);
     setEditSlot(entry.time_slot);
     setError('');
@@ -186,7 +194,9 @@ export function LoadingEditPage() {
       </div>
 
       <div className="mb-6">
-        <h2 className="text-xl font-bold text-gray-800">{t('loading.editTitle')}</h2>
+        <h2 className="text-xl font-bold text-gray-800">
+          {readOnly ? t('dashboard.viewSchedule') : t('loading.editTitle')}
+        </h2>
         <p className="text-sm text-gray-500">{formatDisplayDate(date)}</p>
       </div>
 
@@ -197,6 +207,16 @@ export function LoadingEditPage() {
           data-testid="loading-edit-readonly-banner"
         >
           {t('loading.closedDayReadOnly')}
+        </div>
+      )}
+
+      {readOnly && !dayIsClosed && !dayActive && (
+        <div
+          className="mb-4 p-3 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md"
+          role="status"
+          data-testid="loading-edit-inactive-banner"
+        >
+          {t('loading.inactiveBatchReadOnly')}
         </div>
       )}
 
@@ -211,7 +231,7 @@ export function LoadingEditPage() {
       ) : (
         <div className="space-y-2" data-testid="edit-schedule-list">
           {schedules.map((entry) => {
-            const isEditing = editingId === entry.id && !dayIsClosed;
+            const isEditing = editingId === entry.id && !readOnly;
             const currentQuota = countInWindow(schedules, entry.time_slot);
 
             return (
@@ -282,7 +302,7 @@ export function LoadingEditPage() {
                       )}
                     </div>
                     <div className="flex items-center gap-1">
-                      {entry.canEdit && !dayIsClosed && (
+                      {entry.canEdit && !readOnly && (
                         <button
                           type="button"
                           onClick={() => startEdit(entry)}
@@ -293,7 +313,7 @@ export function LoadingEditPage() {
                           <LucidePencil className="h-4 w-4" />
                         </button>
                       )}
-                      {entry.canDelete && !dayIsClosed && (
+                      {entry.canDelete && !readOnly && (
                         <button
                           type="button"
                           onClick={() => deleteEntry(entry.id)}
