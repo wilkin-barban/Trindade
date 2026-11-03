@@ -659,8 +659,7 @@ Cada tarea declara objetivo, archivos, tests exactos, aceptación, commit espera
   diseñó. **Defecto encontrado a 390:** en la cabecera de cada tarjeta del histórico de cargamento, la nota
   nueva «Dia encerrado: somente leitura.» cae en una columna de ~90 px y se parte en cinco líneas al lado del
   chip de cantidad. Es una regresión de este ciclo (la nota la introduce T12) y el arreglo es de una clase:
-  la fila de la cabecera necesita `flex-wrap`. No se corrigió dentro de este release: haría falta un build 7007
-  y republicar el asset, decisión del operador. Queda anotado como deuda de T12/T13.
+  la fila de la cabecera necesita `flex-wrap`. Corregido en `6df19bb` (ver L12).
 
 ---
 
@@ -840,3 +839,13 @@ Correcciones que esta verificación introduce sobre el brief: el hallazgo B est�
 - Capturas de producción con la sesión admin de QA (`~/.config/trindade/qa-auth.json`, usuario `wilkin`), inyectando `auth_token`, `auth_user` y `auth_refresh_token` en `localStorage`: 5 pantallas × 2 anchos (390×844 y 1440×900), todas `✓` sin errores de consola. Script temporal `packages/frontend/.ver7006.mjs`, borrado después; salidas en `/tmp/w7006-*`.
 - Hallazgo a 390: la nota «Dia encerrado: somente leitura.» de la cabecera de la tarjeta del histórico de cargamento se comprime a una columna angosta y se parte en cinco líneas (`/tmp/w7006-390-01-loading-history.png`). A 1440 se ve correcta (`/tmp/w7006-1440-01-loading-history.png`). Causa: la fila `flex items-center gap-2` de `LoadingHistoryPage.tsx` no permite envolver. Arreglo propuesto: `flex-wrap`. No aplicado: cambiar la web implica reconstruir `web`, y corregirlo en Android no aplica (allí el aviso ya envuelve), así que se decide con el operador si entra en un 7007 o en el próximo ciclo.
 - Observación sin acción: el cronograma web de hoy permite «Adicionar fletero» aunque el lote esté desactivado (en Android el día inactivo es solo lectura, T8). No se toca: la web nunca recibió la regla del lote inactivo y el backend rechaza la mutación.
+
+**L12 (corrección del hallazgo a 390: la nota del día cerrado pasa a su propia línea)**
+
+- Decisión del operador: corregir ahora, web-only, sin tocar Android ni reemplazar assets de la release.
+- Cambio en `packages/frontend/src/pages/LoadingHistoryPage.tsx`: la fila de la cabecera del histórico pasó a `flex flex-wrap items-center gap-2 mb-1` y la nota de día cerrado a `basis-full text-xs text-gray-500 sm:basis-auto`. En 390 la nota baja a su línea y ocupa el ancho de la tarjeta; desde `sm` vuelve a quedar inline tras las píldoras.
+- Test nuevo `packages/frontend/src/__e2e__/loading-history-closed-note.spec.ts`: responde `GET /api/loading/schedules/history` con un lote cerrado e inactivo (la API rechaza crear filas en un día pasado, así que el estado no se puede sembrar por la puerta del operador) y mide cajas reales. A 390 exige que la nota empiece en la línea siguiente a la fecha, arranque en el mismo `x` y mida casi el ancho de la tarjeta; a 1440 exige que siga a la derecha de la fecha y en la misma línea. RED observado antes del arreglo en el caso 390 (`note.y 531 < 572 esperado`) con el caso 1440 ya verde; GREEN después: 2/2.
+- Verificación: 25/25 e2e de `npx playwright test loading`; `LoadingHistoryPage.test.tsx` 8/8; `tsc --noEmit` sin errores.
+- Despliegue: `docker compose build web` + `up -d web`; `https://trindademasas.duckdns.org/` responde 200 y sirve `assets/index-BgueXj4a.js`. Capturas nuevas en `/tmp/w7006c-*` (5 pantallas × 390/1440, sin errores de consola) y la de 390 muestra la nota en una sola línea bajo la fecha.
+- Observación de datos: los lotes de 22–30/10 aparecen ahora activos en producción (`isActive: true`, `canActivate: false`), así que las capturas nuevas no muestran la píldora `Inativo` ni el botón de reactivar que sí aparecían en las de `/tmp/w7006-*`. No es un efecto del cambio: es el estado vivo del servidor.
+- Fuera de alcance, sigue abierto: el cronograma web de hoy ofrece «Adicionar fletero» con el lote desactivado. Es web-only y de otro ciclo.
