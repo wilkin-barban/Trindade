@@ -159,8 +159,30 @@ La documentación de firma y keystore es [docs/release-android.md](../release-an
 - Verificar `output-metadata.json`, `apksigner verify --print-certs` y `aapt2 dump badging`.
 - Guardar el APK y su `.sha256`; no publicar credenciales ni el keystore.
 
-Para una build local reproducible, usar el mismo contenedor y el archivo de entorno de firma que documenta el
-workflow. El repo no guarda el keystore ni sus contraseñas.
+Para una build local reproducible, usar el mismo contenedor y las variables de firma que documenta el workflow.
+El repo no guarda el keystore ni sus contraseñas:
+
+```bash
+docker run --rm --user "$(id -u):$(id -g)" \
+  --env GRADLE_USER_HOME=/gradle-home --env HOME=/gradle-home \
+  --env TRINDADE_KEYSTORE_PATH=/keys/trindade-release.jks \
+  --env TRINDADE_KEYSTORE_PASSWORD=<store-password> \
+  --env TRINDADE_KEY_ALIAS=trindade \
+  --env TRINDADE_KEY_PASSWORD=<key-password> \
+  --volume "$HOME/.cache/trindade-gradle:/gradle-home" \
+  --volume "$HOME/.cache/trindade-android-sdk:/opt/android-sdk-linux" \
+  --volume "$HOME/.android-keystores:/keys" \
+  --volume "$(git rev-parse --show-toplevel):/work" \
+  --workdir /work/packages/android \
+  ghcr.io/cirruslabs/android-sdk:35@sha256:c724009e305b4607157287624033ab97f319af44c244bfc9f73b6293f3bb01b9 \
+  bash -c './gradlew :app:assembleRelease --no-daemon \
+    -PapiBaseUrl=https://trindademasas.duckdns.org/ \
+    -PversionName=<version> -PversionCode=<build> -PrequireSigned=true'
+```
+
+La tabla completa de propiedades/variables y la explicación de `-PrequireSigned=true` están en
+[docs/release-android.md](../release-android.md). El `versionCode` debe ser mayor al instalado; no usar la
+fórmula del tag como excusa para bajar el código en una rebuild interna.
 
 ### 6.4 Publicación y actualización
 
