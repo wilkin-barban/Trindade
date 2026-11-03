@@ -12,7 +12,25 @@ hashes y verificaciones está en [docs/release-android-historial.md](docs/releas
 
 ## [0.7.1] — 2026-11-03
 
+### Añadido
+
+- **La conciliación de Masas ya no depende de un botón.** Después de cada envío confirmado —lote, fila
+  individual o cola drenada— Trindade lee `/movimentoitem` por su cuenta y guarda el día completo en
+  `/api/integration/aero/movements`: la fila pendiente pasa a conciliada sin que el operario toque
+  **Sincronizar com ERP**. Android lee al terminar el envío, con el veredicto del lote intacto y el fallo de
+  lectura como aviso discreto; la web arma una marca por día y la paga al cerrar el veredicto, para no tapar
+  la respuesta que el operario está leyendo. Una lectura por lote o por cola, una a la vez, sólo el día
+  abierto, sólo con credenciales completas y nunca sobre un lote rechazado entero.
+- **El espejo guarda el día completo.** Los insumos que el ERP devuelve junto a las masas se persisten y
+  siguen alimentando Recebimento y Relatório; la tabla de Masas sólo los oculta. Ocultar una fila no es
+  filtrarla en la base.
+
 ### Cambiado
+
+- **La contraseña del ERP vive en el `sessionStorage` de la pestaña.** Antes sólo en memoria: cada vuelta del
+  atajo abría un documento nuevo y la lectura automática no tenía con qué salir. Sigue sin tocar
+  `localStorage`, cookies ni el servidor, no se registra en logs ni avisos, muere con la pestaña y se borra al
+  cerrar sesión o con **Limpiar**. El aviso del diálogo ya no pide actualizar el espejo a mano.
 
 - **La actualización Android ya no depende del tamaño del APK.** `/api/app/latest-release` expone el
   `buildNumber` interno y el detector lo compara cuando la versión pública es la misma. Una rebuild futura
