@@ -40,6 +40,15 @@ describe('result dialogs wiring', () => {
     assert.ok(page.includes('data-testid="massa-result-mirror-hint"'));
   });
 
+  it('spends the day the launch left owing on the one way out of the verdict', () => {
+    // Las dos salidas del diálogo -- el `onClose` y el botón «Fechar» -- pasan por el mismo cierre, y ese
+    // cierre es el único que gasta la marca: una lectura disparada dos veces sería un segundo viaje.
+    assert.equal(page.match(/onClose=\{closeResultModal\}/g)?.length, 1);
+    assert.ok(page.includes('onClick={closeResultModal}'));
+    assert.ok(page.includes('consumeAeroAutoRead(date)'));
+    assert.ok(page.includes('armAeroAutoRead(date)'));
+  });
+
   it('keeps one thumb-sized close button for every verdict', () => {
     assert.ok(dialog.includes('min-h-[44px]'));
     assert.ok(dialog.includes('data-testid="aero-result-close"'));
