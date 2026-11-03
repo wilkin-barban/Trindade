@@ -235,6 +235,7 @@
     "historyTitle": "Histórico de Carregamento",
     "historyDesc": "Todos os carregamentos, com filtros e ações permitidas pelo servidor.",
     "closedDayReadOnly": "Dia encerrado: somente leitura.",
+    "inactiveBatchReadOnly": "Lote desativado: somente leitura.",
     "sendToFletero": "Enviar direto para o fletero",
     "shareCopied": "Texto copiado para compartilhar.",
     "shareUnavailable": "Este navegador não consegue compartilhar nem copiar.",

@@ -144,11 +144,31 @@ describe('LoadingEditPage', () => {
     renderPage(`/loading/edit?date=${yesterday}&edit=1`);
 
     // The day the plant already reported is history: the screen says so and does not open the row, whatever
-    // the address asked for.
+    // the address asked for. It still shows the distribution and names itself as a view, not an editor.
     await waitFor(() => expect(screen.getByTestId('loading-edit-readonly-banner')).toBeInTheDocument());
     expect(screen.getByTestId('loading-edit-readonly-banner').textContent).toBe('Día cerrado: solo lectura.');
+    expect(screen.getByText('Ver cronograma')).toBeInTheDocument();
+    expect(screen.getByTestId('edit-entry-1')).toHaveTextContent('04:00');
     expect(screen.queryByTestId('slot-select-1')).toBeNull();
     expect(screen.queryByTestId('edit-btn-1')).toBeNull();
+    expect(get).toHaveBeenCalledWith(`/loading/schedules?date=${yesterday}&includeInactive=1`);
+  });
+
+  it('shows an inactive batch in the read-only view with all its rows', async () => {
+    get.mockImplementation(async (url: string) => {
+      if (url.startsWith('/loading/schedules')) {
+        return { schedules: [schedule(1, '04:00', 'A')], dayActive: false };
+      }
+      return { timeSlots: ['04:00'] };
+    });
+    renderPage(`/loading/edit?date=${today}&view=1`);
+
+    await waitFor(() => expect(screen.getByTestId('loading-edit-inactive-banner')).toBeInTheDocument());
+    expect(screen.getByTestId('loading-edit-inactive-banner').textContent).toBe('Lote desactivado: solo lectura.');
+    expect(screen.getByTestId('edit-entry-1')).toHaveTextContent('A');
+    expect(screen.queryByTestId('edit-btn-1')).toBeNull();
+    expect(screen.queryByTestId('delete-edit-entry-1')).toBeNull();
+    expect(get).toHaveBeenCalledWith(`/loading/schedules?date=${today}&includeInactive=1`);
   });
 
   it('keeps today editable, without the banner', async () => {

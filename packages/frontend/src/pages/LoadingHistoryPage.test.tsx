@@ -123,17 +123,20 @@ describe('LoadingHistoryPage', () => {
     expect(screen.getByTestId('loading-history-card-2026-11-04')).toHaveTextContent('1 carga');
   });
 
-  it('does not link a past day to the editor', async () => {
+  it('links a past day to the read-only view, not to the editor', async () => {
     get.mockImplementation(async (url: string) => {
       if (url.startsWith('/users/options')) return { users: [] };
       return { items: [batch('2026-10-30', { isClosedDay: true, readOnly: true })], pagination: { page: 1, pageSize: 30, total: 1, totalPages: 1 } };
     });
     renderPage();
 
-    // The day the plant already closed is history: the card shows it and does not offer the editor, because the
-    // editor would only open a form the server is going to refuse.
+    // The day the plant already closed is history: the card still offers a way to see how it was distributed,
+    // but the URL carries the read-only view and never the editor.
     await waitFor(() => expect(screen.getByTestId('loading-history-closed-2026-10-30')).toBeInTheDocument());
-    expect(screen.queryByTestId('loading-history-card-2026-10-30')?.querySelector('a')).toBeNull();
+    const view = screen.getByTestId('view-loading-batch-2026-10-30');
+    expect(view).toHaveAttribute('href', '/loading/edit?date=2026-10-30&view=1');
+    expect(view).toHaveTextContent('Ver cronograma');
+    expect(screen.queryByRole('link', { name: 'Editar' })).toBeNull();
   });
 
   it('offers reactivate on an inactive day and asks the server for it', async () => {
