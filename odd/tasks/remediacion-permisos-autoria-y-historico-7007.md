@@ -84,7 +84,17 @@ Ciclo de corrección sobre `main` (trunk-based, commits atómicos en inglés). N
 - `HistoryRead<T>` (`Loaded` / `Refused(status)` / `Unreachable`) en `network/HistoryRead.kt`, consumido por ambos repositorios y por los dos view models: 401 → sesión expirada, 403 → solo administrador, 5xx → el servidor no pudo concluir, y solo una lectura sin respuesta dice «Sem conexão».
 - Suite completa: **1329 tests / 0 fallos**.
 
+### Incidencia posterior: el cuerpo de éxito no se decodifica
+
+- En producción, el `PATCH /api/loading/schedules/batch/2026-10-29/activate` respondió **200** varias veces, pero el APK 7006 mostró «Sem conexão». El lote quedó activo en la API.
+- Causa: el backend responde `{"success":true}` y el modelo generado `SuccessResponse.Success` espera el enum serializado como el string `"true"`. Retrofit lanzaba al decodificar el 200; `runCatchingCancellable` lo convertía en `Unreachable`.
+- Fix `afc3435`: las llamadas de ciclo de vida de loading y reportes ahora usan `Response<Unit>` porque solo necesitan el status. Afecta `deactivateSchedule`, `deactivateBatch`, `activateBatch`, `ReportsApi.deactivate`, `ReportsApi.activate` y `deletePhoto`.
+- Regresiones: `LoadingRepositoryTest` y `HistoryRepositoryTest` usan `MockWebServer` y el cuerpo real `{"success":true}`; ambos pasan.
+- Suite Android completa: **1331 tests / 0 fallos** (`BUILD SUCCESSFUL`).
+- Build 7007: `versionCode 7007`, `versionName 0.7.0`, 11.260.812 bytes, sha256 `d6f20bb093d7ce1f4b80f64db35f725d76de3a15649a228062f340f3579970e2`, firmado con la huella oficial; instalado en `emulator-5554`.
+- Verificación en emulador: lote 29/10 desactivado, luego **Reativar** desde el histórico mostró «Lote reativado.», la tarjeta volvió a activa y la API confirmó 8/8 activas. Sin «Sem conexão».
+- API y web 7007 desplegadas y saludables; el día vacío devuelve `dayActive=true` y el lote inactivo `dayActive=false`.
+
 ### Pendiente al cierre
 
-- No se publicó release ni APK: el `versionCode` 7007 queda sin compilar y el tag `v0.7.0` no se tocó.
-- El cambio de permisos se activa en producción al desplegar el backend; hasta entonces la API sigue devolviendo `canDelete=true` en días pasados.
+- No se publicó release ni APK 7007: el APK está en `packages/android/app/build/outputs/apk/release/app-release.apk` y no se subió a GitHub; el tag `v0.7.0` y la release 7006 no se tocaron.
