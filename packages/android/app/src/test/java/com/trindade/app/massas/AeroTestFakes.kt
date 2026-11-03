@@ -103,6 +103,14 @@ class FakeErpPort : AeroErpPort {
     val payloads = mutableListOf<AeroEntryPayload>()
     var readDates = mutableListOf<String>()
 
+    /**
+     * Detiene una lectura hasta que el test la libera.
+     *
+     * Sirve para el único caso que no se puede observar con un fake instantáneo: qué pasa cuando alguien
+     * intenta una segunda lectura mientras la primera sigue en vuelo.
+     */
+    var readGate: kotlinx.coroutines.CompletableDeferred<Unit>? = null
+
     override suspend fun postEntry(settings: AeroSettings, payload: AeroEntryPayload): AeroWriteResult {
         payloads += payload
         return writeResults.removeFirstOrNull() ?: writeResult
@@ -110,6 +118,7 @@ class FakeErpPort : AeroErpPort {
 
     override suspend fun readMovements(settings: AeroSettings, date: String): AeroMovementsResult {
         readDates += date
+        readGate?.await()
         return movementsResult
     }
 }
@@ -122,11 +131,20 @@ class FakeMirrorPort : AeroMirrorPort {
     var failSnapshot = false
     var refusedSnapshot: AeroSnapshotSave.Refused? = null
 
+    /**
+     * Lo que el backend habría guardado, para que el repositorio del test lo devuelva.
+     *
+     * El espejo se relee desde el backend después de guardarlo: sin este enganche el guardado del test queda
+     * sólo en este fake y la relectura ve el día vacío, que es un mundo que la aplicación real no tiene.
+     */
+    var onSave: ((String, List<AeroErpMovement>) -> Unit)? = null
+
     override suspend fun saveMovements(
         date: String,
         movements: List<AeroErpMovement>,
     ): AeroSnapshotSave {
         snapshots += date to movements
+        onSave?.invoke(date, movements)
         return when {
             refusedSnapshot != null -> refusedSnapshot!!
             failSnapshot -> AeroSnapshotSave.Unreachable
