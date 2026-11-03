@@ -136,6 +136,8 @@ describe('LoadingHistoryPage', () => {
     const view = screen.getByTestId('view-loading-batch-2026-10-30');
     expect(view).toHaveAttribute('href', '/loading/edit?date=2026-10-30&view=1');
     expect(view).toHaveTextContent('Ver cronograma');
+    // On a phone it shares the row with the icons instead of floating at the right edge next to a gap.
+    expect(view).toHaveClass('max-sm:flex-1');
     expect(screen.queryByRole('link', { name: 'Editar' })).toBeNull();
   });
 

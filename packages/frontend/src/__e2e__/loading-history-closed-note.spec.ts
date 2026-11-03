@@ -65,6 +65,28 @@ test.describe('Closed day note layout', () => {
     expect(noteBox.height).toBeLessThan(dateBox.height * 2.5);
   });
 
+  test('on a 390 phone the view action fills the row beside the batch icon', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openClosedHistory(page);
+
+    const card = page.getByTestId('loading-history-card-2026-10-28');
+    const view = page.getByTestId('view-loading-batch-2026-10-28');
+    const activate = page.getByTestId('activate-loading-batch-2026-10-28');
+    const viewBox = await view.boundingBox();
+    const activateBox = await activate.boundingBox();
+    const cardBox = await card.boundingBox();
+    expect(viewBox).not.toBeNull();
+    expect(activateBox).not.toBeNull();
+    expect(cardBox).not.toBeNull();
+    if (!viewBox || !activateBox || !cardBox) return;
+
+    // The action used to float at the right edge with a wide empty gap to its left. It now takes the
+    // remaining width of the card and the batch icon sits beside it, on the same optical line.
+    expect(viewBox.width).toBeGreaterThan(cardBox.width * 0.5);
+    expect(activateBox.x).toBeGreaterThanOrEqual(viewBox.x + viewBox.width);
+    expect(Math.abs((viewBox.y + viewBox.height / 2) - (activateBox.y + activateBox.height / 2))).toBeLessThan(2);
+  });
+
   test('on a 1440 desktop the note stays inline after the marks', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await openClosedHistory(page);
