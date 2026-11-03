@@ -75,7 +75,7 @@ Los dos números se calculan una sola vez en `build.gradle.kts` y alimentan tant
 | 0.7.0 | 7004 | Reemplazada | Acciones y filtros de históricos, Compartilhar App y resumen del inicio |
 | 0.7.0 | 7005 | Reemplazada | Paridad web/Android del ERP: cola drenada con ack reversible, multioperario por asiento, fallos de Aero unificados y errores traducidos |
 | 0.7.0 | 7006 | Reemplazada | Histórico de cargamento cerrado en solo lectura, reactivación de lote y reporte, chapas libres sin duplicados, rechazos de tanda en un paso y sync ERP solo del día abierto |
-| 0.7.0 | — | **Publicada** | Auditoría ERP Android: eventos canónicos, pares `requested`/`result`, `launchId`, versión/build internos, status real, clasificación de red/cleartext y outbox persistente; asset actual de GitHub Release `v0.7.0` y binario de producción. El código de build es interno. |
+| 0.7.0 | — | **Publicada** | Auditoría ERP Android, payload de movimientos alineado con el puente web y vista de solo lectura para días cerrados del Histórico de Cargamento; asset actual de GitHub Release `v0.7.0` y binario de producción. El código de build es interno. |
 
 Las builds 0.6.x se distribuyeron por `GET /api/app/download-apk`, no por un tag de GitHub. Los hashes y las
 verificaciones completas están en [release-android-historial.md](release-android-historial.md).
@@ -83,8 +83,10 @@ verificaciones completas están en [release-android-historial.md](release-androi
 > **Estado final del 2026-11-03.** La release `v0.7.0` se republicó con la versión **0.7.0**. El asset de
 > GitHub, su `.sha256`, `packages/backend/apk/trindade-0.7.0.apk`, la copia de escritorio y
 > `GET /api/app/download-apk` son el mismo binario: `versionName 0.7.0`, 11.277.888 bytes, sha256
-> `9136b130ce8c29877a87277487f984491b26b4691e726b70fdabf673e2fa3aa7`. El código de build es interno y no se
-> publica. Las builds 7000 a 7006 son históricas. El tag `v0.7.0` no se movió y no se creó una release nueva.
+> `b863bb265af7bb047d25aaac91c9824bb1e50904b4719fe4595b78b0c09ac055`. Esta build incluye el payload de
+> movimientos alineado con el puente web y la vista de solo lectura de días cerrados en el Histórico de
+> Cargamento. El código de build es interno y no se publica. Las builds anteriores son históricas. El tag
+> `v0.7.0` no se movió y no se creó una release nueva.
 
 ## 4. Workflow de publicación
 

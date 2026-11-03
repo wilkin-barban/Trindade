@@ -10,6 +10,26 @@ hashes y verificaciones está en [docs/release-android-historial.md](docs/releas
 
 ---
 
+## [0.7.0] — 2026-11-03
+
+### Corregido
+
+- **La lectura de movimientos del ERP desde Android usa el mismo cuerpo certificado que la web.** El payload
+  envía `_method: PATCH` dentro del cuerpo y pide solo entradas (`ENTSAI: "E"`); antes omitía ambos y el ERP
+  respondía `HTTP 500` a la sincronización del día.
+- **Un día cerrado del Histórico de Cargamento se puede abrir para consulta.** La tarjeta ofrece
+  **Ver cronograma** y abre la distribución completa en solo lectura, con las filas inactivas incluidas; no
+  ofrece agregar, editar ni eliminar.
+
+### Distribución Android
+
+- El asset de GitHub Release `v0.7.0` (`trindade-0.7.0.apk` y su `.sha256`) y el APK de producción son el
+  mismo binario: `versionName 0.7.0`, 11.277.888 bytes y sha256
+  `b863bb265af7bb047d25aaac91c9824bb1e50904b4719fe4595b78b0c09ac055`. El código de build es interno.
+- El tag `v0.7.0` no se movió y no se creó una release nueva.
+
+---
+
 ## [0.7.0+7006] — 2026-11-02
 
 ### Cambiado
