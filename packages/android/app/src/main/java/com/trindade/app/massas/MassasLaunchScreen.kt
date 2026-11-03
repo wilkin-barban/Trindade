@@ -219,6 +219,7 @@ fun MassasLaunchScreen(
         // La fecha y su única acción: el día de la planta se lee desde el ERP y se guarda en el backend.
         // La cabecera se lleva la acción y la hora del último intento, en el mismo alto que la fila de la
         // fecha: antes había un botón aquí y una tarjeta entera debajo, los dos refrescando lo mismo.
+        // PASO 1: Data de Produção e sincronização com o ERP.
         MassasDayHeader(
             date = state.date,
             syncedAt = state.aeroSyncedAt,
@@ -227,30 +228,8 @@ fun MassasLaunchScreen(
             readOnly = state.isReadOnly,
         )
 
-        // La tabla unificada: lo lanzado aquí, lo que el ERP ya tiene y lo que sólo está en el ERP.
-        MassasUnifiedTable(
-            state = state,
-            onSend = viewModel::sendPendingLaunch,
-            onAcknowledge = viewModel::acknowledgeLaunch,
-            onUndoAcknowledge = viewModel::undoAcknowledgeLaunch,
-            onImport = viewModel::importErpSeat,
-            onCreateOperator = viewModel::createOperatorFromSeat,
-        )
-
-        // Lo que quedó en la cola se puede mandar sin cerrar la app, que es lo que hace el operario cuando
-        // vuelve al Wi-Fi de la planta y ve la fila todavía pendiente.
-        if (state.queuedLaunches > 0 && !state.isReadOnly) {
-            OutlinedButton(
-                onClick = viewModel::retryPendingLaunches,
-                enabled = !state.isSubmitting,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(stringResource(R.string.massas_queue_retry, state.queuedLaunches))
-            }
-        }
-
         if (!state.isReadOnly) {
-            // BLOQUE 1: Lançar Produção do Dia (Cálculo e Inputs)
+            // PASO 2: Lançar Produção por Caixas (cálculo e inputs)
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
                 modifier = Modifier.fillMaxWidth(),
@@ -367,7 +346,29 @@ fun MassasLaunchScreen(
             }
         }
 
-        // BLOQUE 2: Lançamentos Individuais do Dia (filtro por trabalhador no topo)
+        // PASO 3: Produção do Dia (tabela unificada: lançado aqui, no ERP e só no ERP).
+        MassasUnifiedTable(
+            state = state,
+            onSend = viewModel::sendPendingLaunch,
+            onAcknowledge = viewModel::acknowledgeLaunch,
+            onUndoAcknowledge = viewModel::undoAcknowledgeLaunch,
+            onImport = viewModel::importErpSeat,
+            onCreateOperator = viewModel::createOperatorFromSeat,
+        )
+
+        // Lo que quedó en la cola se puede mandar sin cerrar la app, que es lo que hace el operario cuando
+        // vuelve al Wi-Fi de la planta y ve la fila todavía pendiente.
+        if (state.queuedLaunches > 0 && !state.isReadOnly) {
+            OutlinedButton(
+                onClick = viewModel::retryPendingLaunches,
+                enabled = !state.isSubmitting,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.massas_queue_retry, state.queuedLaunches))
+            }
+        }
+
+        // PASO 4: Lançamentos Individuais do Dia (filtro por trabalhador no topo)
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
             modifier = Modifier.fillMaxWidth(),
@@ -539,7 +540,7 @@ fun MassasLaunchScreen(
             }
         }
 
-        // BLOQUE 3: Resumo Coletivo do Dia (segue o filtro de trabalhador e destaca os totais)
+        // PASO 5: Resumo Coletivo do Dia (segue o filtro de trabalhador e destaca os totais)
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
             modifier = Modifier.fillMaxWidth(),
@@ -641,7 +642,7 @@ fun MassasLaunchScreen(
             }
         }
 
-        // BLOQUE 4: Compartilhar no WhatsApp
+        // PASO 6: Compartilhar no WhatsApp
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
             modifier = Modifier.fillMaxWidth(),
