@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { LucideBan, LucideCalendar, LucideRotateCcw, LucideTrash2, LucideTruck } from 'lucide-react';
+import { LucideBan, LucideCalendar, LucideEye, LucideRotateCcw, LucideTrash2, LucideTruck } from 'lucide-react';
 import { api } from '../api/client';
 import { saoPauloToday } from '../lib/date';
 import { Button, buttonVariants } from '../components/ui/button';
@@ -205,29 +205,34 @@ export function LoadingHistoryPage() {
                 ) : (
                   <Link to={`/loading/edit?date=${batch.batch_date}`} className="min-w-0 flex-1">{summary}</Link>
                 )}
-                <div className="flex shrink-0 flex-wrap items-center justify-end gap-1 sm:gap-2">
+                <div className="flex min-w-0 shrink-0 items-center justify-end gap-2">
                 {affordances.closedDay && (
                   <Link
                     to={`/loading/edit?date=${batch.batch_date}&view=1`}
-                    className={`${buttonVariants({ variant: 'outline', size: 'sm' })} max-sm:min-h-12`}
+                    className={`${buttonVariants({ variant: 'outline', size: 'sm' })} max-sm:min-h-12 max-sm:flex-1 sm:w-9 sm:px-0`}
+                    aria-label={t('dashboard.viewSchedule')}
+                    title={t('dashboard.viewSchedule')}
                     data-testid={`view-loading-batch-${batch.batch_date}`}
                   >
-                    {t('dashboard.viewSchedule')}
+                    <LucideEye className="h-4 w-4" />
+                    <span className="sm:sr-only">{t('dashboard.viewSchedule')}</span>
                   </Link>
                 )}
-                {affordances.showReactivate && <button onClick={() => activateBatch(batch.batch_date)} disabled={busyKey === batch.batch_date} aria-label={t('history.reactivateLoading', { date: formatDate(batch.batch_date) })} className="inline-flex min-h-12 min-w-12 items-center justify-center rounded text-emerald-600 hover:bg-emerald-50 disabled:opacity-50" data-testid={`activate-loading-batch-${batch.batch_date}`}><LucideRotateCcw className="h-4 w-4" /></button>}
-                {/* A button inside a link is invalid markup and a double target for a thumb: the link carries the
-                    button's own classes instead. */}
-                {affordances.showEdit && (
-                  <Link
-                    to={`/loading/edit?date=${batch.batch_date}`}
-                    className={buttonVariants({ variant: 'outline', size: 'sm' })}
-                  >
-                    {t('loading.editEntry')}
-                  </Link>
-                )}
-                {affordances.showDeactivate && <button onClick={() => deactivateBatch(batch.batch_date)} disabled={busyKey === batch.batch_date} aria-label={t('history.deactivateLoading', { date: formatDate(batch.batch_date) })} className="inline-flex min-h-12 min-w-12 items-center justify-center rounded text-amber-600 hover:bg-amber-50 disabled:opacity-50" data-testid={`deactivate-loading-batch-${batch.batch_date}`}><LucideBan className="h-4 w-4" /></button>}
-                {affordances.showDelete && <button onClick={() => setPendingDelete(batch)} disabled={busyKey === batch.batch_date} aria-label={t('history.deleteLoading', { date: formatDate(batch.batch_date) })} className="inline-flex min-h-12 min-w-12 items-center justify-center rounded text-red-600 hover:bg-red-50 disabled:opacity-50" data-testid={`delete-loading-batch-${batch.batch_date}`}><LucideTrash2 className="h-4 w-4" /></button>}
+                <div className="flex items-center justify-end gap-1 sm:gap-2">
+                  {affordances.showReactivate && <button onClick={() => activateBatch(batch.batch_date)} disabled={busyKey === batch.batch_date} aria-label={t('history.reactivateLoading', { date: formatDate(batch.batch_date) })} className="inline-flex min-h-12 min-w-12 items-center justify-center rounded text-emerald-600 hover:bg-emerald-50 disabled:opacity-50" data-testid={`activate-loading-batch-${batch.batch_date}`}><LucideRotateCcw className="h-4 w-4" /></button>}
+                  {/* A button inside a link is invalid markup and a double target for a thumb: the link carries the
+                      button's own classes instead. */}
+                  {affordances.showEdit && (
+                    <Link
+                      to={`/loading/edit?date=${batch.batch_date}`}
+                      className={buttonVariants({ variant: 'outline', size: 'sm' })}
+                    >
+                      {t('loading.editEntry')}
+                    </Link>
+                  )}
+                  {affordances.showDeactivate && <button onClick={() => deactivateBatch(batch.batch_date)} disabled={busyKey === batch.batch_date} aria-label={t('history.deactivateLoading', { date: formatDate(batch.batch_date) })} className="inline-flex min-h-12 min-w-12 items-center justify-center rounded text-amber-600 hover:bg-amber-50 disabled:opacity-50" data-testid={`deactivate-loading-batch-${batch.batch_date}`}><LucideBan className="h-4 w-4" /></button>}
+                  {affordances.showDelete && <button onClick={() => setPendingDelete(batch)} disabled={busyKey === batch.batch_date} aria-label={t('history.deleteLoading', { date: formatDate(batch.batch_date) })} className="inline-flex min-h-12 min-w-12 items-center justify-center rounded text-red-600 hover:bg-red-50 disabled:opacity-50" data-testid={`delete-loading-batch-${batch.batch_date}`}><LucideTrash2 className="h-4 w-4" /></button>}
+                </div>
                 </div>
               </div>
             </Card>
