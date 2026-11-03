@@ -333,4 +333,16 @@ describe('loading day lifecycle', () => {
     assert.equal(closed.dayActive, false, 'a fully deactivated day is reported closed');
     assert.equal(closed.schedules.length, 2, 'and still readable in the history');
   });
+
+  it('reports a day with no rows at all as open, so the grid can start it', () => {
+    const db = buildDb();
+    const empty = loading.readDay(db, '2026-08-25', ADMIN);
+    assert.deepEqual(empty.schedules, []);
+    assert.equal(empty.dayActive, true, 'nothing was switched off: there is nothing there yet');
+
+    // The two cases look identical in the list and must not read the same to the client.
+    const driverId = driver(db, 'Sole row');
+    schedule(db, { date: TODAY, driverId, active: 0 });
+    assert.equal(loading.readDay(db, TODAY, ADMIN, { includeInactive: true }).dayActive, false);
+  });
 });

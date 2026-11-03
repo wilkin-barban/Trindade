@@ -86,10 +86,15 @@ export function readDay(
   options: { includeInactive?: boolean } = {}
 ): { schedules: ScheduleRow[]; dayActive: boolean } {
   const schedules = listByDate(db, date, actor, options);
-  const active = db
-    .prepare('SELECT COUNT(*) AS count FROM loading_schedules WHERE schedule_date = ? AND is_active = 1')
-    .get(date) as { count: number };
-  return { schedules, dayActive: active.count > 0 };
+  // One query for both numbers: "switched off" and "never started" used to arrive identically, and a
+  // grid that guessed wrong either forbade a day nobody closed or offered to write into a closed one.
+  const counts = db
+    .prepare(
+      `SELECT COUNT(*) AS total, COALESCE(SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END), 0) AS active
+       FROM loading_schedules WHERE schedule_date = ?`
+    )
+    .get(date) as { total: number; active: number };
+  return { schedules, dayActive: counts.total === 0 || counts.active > 0 };
 }
 
 export function create(
