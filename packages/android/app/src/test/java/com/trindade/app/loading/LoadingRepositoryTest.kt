@@ -60,4 +60,25 @@ class LoadingRepositoryTest {
         assertEquals("ABC-1234", body["license_plate"]?.jsonPrimitive?.content)
         assertEquals("+55 (11) 98888-7777", body["phone"]?.jsonPrimitive?.content)
     }
+
+    @Test
+    fun `reactivates a batch when the server answers with the boolean success body`() = runBlocking {
+        // The server's success body is `{"success":true}`. The generated `SuccessResponse` expects
+        // that boolean as the enum literal `"true"`, so typing this call with it made Retrofit throw
+        // while decoding a 200 and the repository reported an unreachable server. A status-only call
+        // must ignore the body.
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody("""{"success":true}""")
+        )
+
+        val result = repository.activateBatch("2026-09-18")
+
+        assertEquals(ScheduleLifecycleResult.Changed, result)
+        val recorded = server.takeRequest()
+        assertEquals("PATCH", recorded.method)
+        assertEquals("/api/loading/schedules/batch/2026-09-18/activate", recorded.path)
+    }
 }

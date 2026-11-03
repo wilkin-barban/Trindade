@@ -174,6 +174,29 @@ class HistoryRepositoryTest {
         assertEquals(ReportLifecycleResult.Changed, result)
     }
 
+    @Test
+    fun `reactivates a report when the server answers with the boolean success body`() {
+        val server = MockWebServer()
+        server.start()
+        try {
+            server.enqueue(
+                MockResponse()
+                    .setResponseCode(200)
+                    .setHeader("Content-Type", "application/json")
+                    .setBody("""{"success":true}""")
+            )
+
+            val result = runBlocking { ReportsRepository(wireApi(server)).activate(7) }
+
+            assertEquals(ReportLifecycleResult.Changed, result)
+            val recorded = server.takeRequest()
+            assertEquals("PATCH", recorded.method)
+            assertEquals("/api/reports/7/activate", recorded.path)
+        } finally {
+            server.shutdown()
+        }
+    }
+
     private companion object {
         /** A complete answer that says nothing, so the assertions can be about the request alone. */
         const val EMPTY_HISTORY = """{"items":[],"pagination":{"page":1,"pageSize":30,"total":0,"totalPages":0}}"""

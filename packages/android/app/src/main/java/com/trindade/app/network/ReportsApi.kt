@@ -7,7 +7,6 @@ import com.trindade.app.contract.models.PhotosResponse
 import com.trindade.app.contract.models.ProductsResponse
 import com.trindade.app.contract.models.ReportHistoryResponse
 import com.trindade.app.contract.models.ReportResponse
-import com.trindade.app.contract.models.SuccessResponse
 import com.trindade.app.contract.models.TextResponse
 import com.trindade.app.contract.models.TurnoResponse
 import com.trindade.app.contract.models.UpdateReportRequest
@@ -108,11 +107,17 @@ interface ReportsApi {
      * from a role of its own, because it does not have one.
      */
     @PATCH("api/reports/{id}/deactivate")
-    suspend fun deactivate(@Path("id") id: Int): Response<SuccessResponse>
+    suspend fun deactivate(@Path("id") id: Int): Response<Unit>
 
-    /** Brings a deactivated report back. The mirror of [deactivate], with the same refusals. */
+    /**
+     * Brings a deactivated report back. The mirror of [deactivate], with the same refusals.
+     *
+     * The success body is not typed for the same reason as the loading lifecycle calls: the server
+     * writes `{"success":true}`, while the generated enum expects the string `"true"`, and a 200 that
+     * failed to decode was reported as a connection failure.
+     */
     @PATCH("api/reports/{id}/activate")
-    suspend fun activate(@Path("id") id: Int): Response<SuccessResponse>
+    suspend fun activate(@Path("id") id: Int): Response<Unit>
 
     /**
      * Removes a report for good.
@@ -170,5 +175,5 @@ interface ReportsApi {
     suspend fun attachPhoto(@Path("id") id: Int, @Part file: MultipartBody.Part): Response<PhotoResponse>
 
     @DELETE("api/reports/photos/{photoId}")
-    suspend fun deletePhoto(@Path("photoId") photoId: Int): Response<SuccessResponse>
+    suspend fun deletePhoto(@Path("photoId") photoId: Int): Response<Unit>
 }

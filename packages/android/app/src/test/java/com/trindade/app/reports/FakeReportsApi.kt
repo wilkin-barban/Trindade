@@ -16,7 +16,6 @@ import com.trindade.app.contract.models.ReportResponse
 import com.trindade.app.contract.models.ReportResponseReport
 import com.trindade.app.contract.models.ReportsResponseReportsInner
 import com.trindade.app.contract.models.ScheduleHistoryResponsePagination
-import com.trindade.app.contract.models.SuccessResponse
 import com.trindade.app.contract.models.TextResponse
 import com.trindade.app.contract.models.TurnoResponse
 import com.trindade.app.contract.models.UpdateReportRequest
@@ -88,11 +87,9 @@ class FakeReportsApi(
      * What a deactivation answers. 200 with a body in practice; the fake never reads the body either.
      */
     /** A `var` so a retry test can make the first attempt fail and the second one land. */
-    var deactivateResponse: Response<SuccessResponse> =
-        Response.success(SuccessResponse(success = SuccessResponse.Success.entries.first())),
+    var deactivateResponse: Response<Unit> = Response.success(Unit),
     /** What a reactivation answers, the same 200-with-a-body as its pair. */
-    var activateResponse: Response<SuccessResponse> =
-        Response.success(SuccessResponse(success = SuccessResponse.Success.entries.first())),
+    var activateResponse: Response<Unit> = Response.success(Unit),
     /** What a deletion answers, 204 with no body in practice, and the same convention for a refusal. */
     var deleteResponse: Response<Unit> = Response.success(Unit),
 ) : ReportsApi {
@@ -211,12 +208,12 @@ class FakeReportsApi(
         return Response.success(history)
     }
 
-    override suspend fun deactivate(id: Int): Response<SuccessResponse> {
+    override suspend fun deactivate(id: Int): Response<Unit> {
         deactivatedIds += id
         return deactivateResponse
     }
 
-    override suspend fun activate(id: Int): Response<SuccessResponse> {
+    override suspend fun activate(id: Int): Response<Unit> {
         activatedIds += id
         return activateResponse
     }
@@ -269,8 +266,7 @@ class FakeReportsApi(
         return attachResponse
     }
 
-    override suspend fun deletePhoto(photoId: Int): Response<SuccessResponse> =
-        Response.success(SuccessResponse(success = SuccessResponse.Success.entries.first()))
+    override suspend fun deletePhoto(photoId: Int): Response<Unit> = Response.success(Unit)
 
     companion object {
         const val NOT_USED = "this fake does not implement that call; add it when a test needs it"
