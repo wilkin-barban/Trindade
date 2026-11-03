@@ -115,8 +115,8 @@ jq -r 'select(.client=="android") | [.appVersion,.buildNumber] | @tsv' \
     `error=AERO_ERP_UNREACHABLE`.
 - Verificación: backend **712/712**, Android **1336/1336**, `BUILD SUCCESSFUL`.
 - El APK final `0.7.0 / 7008` queda en `packages/android/app/build/outputs/apk/release/app-release.apk` y en
-  Desktop. Producción sigue sirviendo 7006, así que el detector de actualización puede bloquear temporalmente
-  una instalación directa del 7008 hasta que se publique o se actualice `latest-release`.
+  Desktop. Producción sirve ese mismo binario en `GET /api/app/download-apk`, y `latest-release` informa
+  `apkSize: 11277888`; una instalación del build final ya no recibe el bloqueo de actualización.
 
 ## 8. Límites
 
