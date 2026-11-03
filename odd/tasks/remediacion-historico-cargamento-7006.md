@@ -648,6 +648,19 @@ Cada tarea declara objetivo, archivos, tests exactos, aceptación, commit espera
   `v0.7.0` con `gh release upload` y el push de los commits de release. El selector de chapas y el diálogo de
   rechazos no se pudieron recorrer en el emulador porque el único día editable (hoy) tiene el lote desactivado
   en producción; quedan cubiertos por los tests de T17 y T19.
+- **Cierre de publicación.** Con autorización explícita se reemplazaron los assets de `v0.7.0`
+  (`gh release upload … --clobber`), se actualizaron las notas, se descargó el par publicado y
+  `sha256sum -c` dio `OK`; el tag sigue en `4f41400`. El título de la release seguía diciendo «(build 7004)»:
+  se corrigió con `gh release edit v0.7.0 --title «… (build 7006)»`, sin crear release nueva, y se verificó
+  que el cuerpo mencione `7006` y no `7004`. Commits `d1b6599` y `bdd3994` pusheados (`cfb3488..bdd3994`).
+- **Verificación visual web en producción** (`/tmp/w7006-<ancho>-<pantalla>.png`, 390×844 y 1440×900, sesión
+  admin QA): histórico de cargamento, histórico de masas, lanzamiento de masas, relatórios y cronograma. Las
+  diez capturas cargan sin errores de consola ni `pageerror`. A 1440 la tarjeta del histórico se lee como se
+  diseñó. **Defecto encontrado a 390:** en la cabecera de cada tarjeta del histórico de cargamento, la nota
+  nueva «Dia encerrado: somente leitura.» cae en una columna de ~90 px y se parte en cinco líneas al lado del
+  chip de cantidad. Es una regresión de este ciclo (la nota la introduce T12) y el arreglo es de una clase:
+  la fila de la cabecera necesita `flex-wrap`. No se corrigió dentro de este release: haría falta un build 7007
+  y republicar el asset, decisión del operador. Queda anotado como deuda de T12/T13.
 
 ---
 
@@ -820,3 +833,10 @@ Correcciones que esta verificación introduce sobre el brief: el hallazgo B est�
 - No se pudo ejercitar el selector de chapas ni el diálogo de rechazos en el emulador: el único día editable es hoy y su lote está desactivado en producción. Reactivarlo habría cambiado datos reales, así que ambos quedan cubiertos por los tests de T17 y T19 y así se declara.
 - Capturas: `/tmp/r7006-01-home.png` a `/tmp/r7006-12-pastday.png`.
 - Bloqueado por autorización explícita: `gh release upload v0.7.0 trindade-0.7.0.apk trindade-0.7.0.apk.sha256 --clobber` y el push de los commits de documentación y versión.
+
+**L11 (corrección del título de la release y pasada visual web)**
+
+- Título: era «Trindade Android v0.7.0 — Históricos, Compartilhar App y resumen del inicio (build 7004)», herencia del ciclo anterior. Quedó «Trindade Android v0.7.0 — histórico que no se toca, reactivación y tandas que se explican (build 7006)», con `gh release edit v0.7.0 --title`, sin crear release nueva. Verificación: `gh release view v0.7.0 --json name,body` → el nombre contiene `7006`, y el cuerpo tiene `7006` y ninguna mención a `7004`.
+- Capturas de producción con la sesión admin de QA (`~/.config/trindade/qa-auth.json`, usuario `wilkin`), inyectando `auth_token`, `auth_user` y `auth_refresh_token` en `localStorage`: 5 pantallas × 2 anchos (390×844 y 1440×900), todas `✓` sin errores de consola. Script temporal `packages/frontend/.ver7006.mjs`, borrado después; salidas en `/tmp/w7006-*`.
+- Hallazgo a 390: la nota «Dia encerrado: somente leitura.» de la cabecera de la tarjeta del histórico de cargamento se comprime a una columna angosta y se parte en cinco líneas (`/tmp/w7006-390-01-loading-history.png`). A 1440 se ve correcta (`/tmp/w7006-1440-01-loading-history.png`). Causa: la fila `flex items-center gap-2` de `LoadingHistoryPage.tsx` no permite envolver. Arreglo propuesto: `flex-wrap`. No aplicado: cambiar la web implica reconstruir `web`, y corregirlo en Android no aplica (allí el aviso ya envuelve), así que se decide con el operador si entra en un 7007 o en el próximo ciclo.
+- Observación sin acción: el cronograma web de hoy permite «Adicionar fletero» aunque el lote esté desactivado (en Android el día inactivo es solo lectura, T8). No se toca: la web nunca recibió la regla del lote inactivo y el backend rechaza la mutación.
