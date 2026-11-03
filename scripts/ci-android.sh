@@ -113,15 +113,19 @@ if [[ ! -f "$release_config" ]]; then
   printf 'The release network security config is missing at %s.\n' "$release_config" >&2
   exit 1
 fi
-if grep -q '<base-config' "$release_config"; then
+# The file documents the forbidden element by name in a comment. Strip comments before asserting:
+# a gate that cannot tell an explanation from a declaration rejects the very documentation that keeps
+# the policy reviewable, which is what made this lane fail on green source.
+release_config_xml="$(perl -0pe 's/<!--.*?-->//gs' "$release_config")"
+if grep -q '<base-config' <<<"$release_config_xml"; then
   printf 'The release network security config carries a <base-config>, which re-opens cleartext for every destination the app talks to.\n' >&2
   exit 1
 fi
-if grep -q 'includeSubdomains="true"' "$release_config"; then
+if grep -q 'includeSubdomains="true"' <<<"$release_config_xml"; then
   printf 'The release network security config widens the exemption to subdomains; the address that was reviewed is the only one allowed.\n' >&2
   exit 1
 fi
-release_domains="$(grep -oE '<domain[^>]*>[^<]+</domain>' "$release_config" | sed -E 's/<domain[^>]*>([^<]+)<\/domain>/\1/' | tr -d '[:space:]' | sort | tr '\n' ' ')"
+release_domains="$(grep -oE '<domain[^>]*>[^<]+</domain>' <<<"$release_config_xml" | sed -E 's/<domain[^>]*>([^<]+)<\/domain>/\1/' | tr -d '[:space:]' | sort | tr '\n' ' ')"
 if [[ "$release_domains" != '192.168.25.250 ' ]]; then
   printf 'The release network security config exempts [%s] instead of only the plant host 192.168.25.250.\n' "$release_domains" >&2
   exit 1
