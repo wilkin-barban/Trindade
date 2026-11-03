@@ -52,7 +52,7 @@ describe('App Routes - /api/app', () => {
     assert.strictEqual(body.version, FALLBACK_RELEASE.version);
     assert.strictEqual(body.apkUrl, TRINDADE_APK_DOWNLOAD_URL);
     assert.strictEqual(body.apkName, 'trindade.apk');
-    assert.strictEqual(body.buildNumber, 7011);
+    assert.strictEqual(body.buildNumber, 7012);
     assert.strictEqual(body.webUrl, 'https://trindademasas.duckdns.org');
   });
 
@@ -210,7 +210,7 @@ describe('App Routes - /api/app', () => {
       assert.strictEqual(body.version, 'v0.7.1');
       assert.strictEqual(body.apkUrl, TRINDADE_APK_DOWNLOAD_URL);
       assert.strictEqual(body.apkSize, 'PK\x03\x04signed-apk-bytes'.length);
-      assert.strictEqual(body.buildNumber, 7011);
+      assert.strictEqual(body.buildNumber, 7012);
     });
 
     it('serves the local binary as the download', async () => {

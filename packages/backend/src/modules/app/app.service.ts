@@ -26,7 +26,7 @@ export const LOCAL_APK_FILENAME = 'trindade-0.7.1.apk';
  * `versionCode` stays out of the public release notes, but the update endpoint has to expose the
  * identity the installed client needs to make the decision.
  */
-export const LOCAL_APK_BUILD_NUMBER = 7011;
+export const LOCAL_APK_BUILD_NUMBER = 7012;
 
 const LOCAL_APK_PATH = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),

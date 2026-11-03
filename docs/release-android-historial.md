@@ -33,16 +33,21 @@ La guía de firma y publicación está en [release-android.md](release-android.m
 | 0.7.0 | 7005 | 2026-11-02 | Reemplazada | Paridad web/Android del ERP: cola drenada con ack reversible, multioperario por asiento y fallos de Aero unificados | `87f9a6a36166d0206031a23aa223bc1ea857e749304045ef79ea06877549ba75` |
 | 0.7.0 | 7006 | 2026-11-02 | Reemplazada | Histórico de cargamento cerrado en solo lectura, reactivación de lote y reporte, selector de chapas libres, rechazos de tanda en un paso y sync ERP limitado al día abierto | `f77643b7a5442cf2a74d721f621a3977612ae074d2624c4fe735bb38441f3702` |
 | 0.7.0 | — | 2026-11-03 | Reemplazada | Payload de movimientos alineado con el puente web, vista de solo lectura de días cerrados en el Histórico de Cargamento y orden de Lanzamiento de Masas de la web; asset de GitHub | `5dd77e331edb1aace6e2b656e899697819a506068dc375528c8dc6f5a5ade922` |
-| 0.7.1 | — | 2026-11-03 | **Publicada** | Versión pública servida por `latest-release`; el endpoint expone el `buildNumber` interno y el detector lo usa cuando la versión no cambia | `41f87a148e28cc1f40bb2ac25a2e70f31587c598e806f2c65efa37411a46c545` |
+| 0.7.1 | — | 2026-11-03 | Reemplazada | Versión pública servida por `latest-release`; el endpoint expone el `buildNumber` interno y el detector lo usa cuando la versión no cambia | `41f87a148e28cc1f40bb2ac25a2e70f31587c598e806f2c65efa37411a46c545` |
+| 0.7.1 | 7012 | 2026-11-03 | **Publicada** | Conciliación automática de Masas después de cada envío en Android y web, y contraseña del ERP en la sesión de la pestaña | `f325edb6d3c03eba2f058b7aa099961fa99ba12243c6ffbec2d8e44e7683de1f` |
 
 Notas:
 
 - **Interna** significa distribuida por `GET /api/app/download-apk`, sin tag ni release de GitHub.
-- **Publicación del 2026-11-03 (0.7.1):** la instancia de producción sirve
+- **Publicación del 2026-11-03 (0.7.1, build 7012):** la instancia de producción sirve
   `packages/backend/apk/trindade-0.7.1.apk` por `GET /api/app/download-apk` y
   `GET /api/app/latest-release` publica `v0.7.1` con el `buildNumber` interno. Digest
-  `41f87a148e28cc1f40bb2ac25a2e70f31587c598e806f2c65efa37411a46c545` (11.277.888 bytes). El código de build
-  es interno y no se publica. No se instaló en el emulador.
+  `f325edb6d3c03eba2f058b7aa099961fa99ba12243c6ffbec2d8e44e7683de1f` (11.277.888 bytes), firmado con la
+  huella oficial. El código de build es interno y no se publica. No se instaló en el emulador.
+
+  El tamaño coincide con el de la build anterior: por eso el `buildNumber` es lo único que distingue esta
+  actualización, que es exactamente el caso para el que se hizo. Sin tag ni release de GitHub: el binario vive
+  en producción y en `packages/backend/apk/`.
 - **Reemplazo del 2026-11-02 (build 7006):** la build **7006** reemplazó al asset de GitHub y al binario que
   servía producción. El asset, su `.sha256`, `packages/backend/apk/trindade-0.7.0.apk`, la copia de escritorio
   y `https://trindademasas.duckdns.org/api/app/download-apk` apuntaron al mismo digest

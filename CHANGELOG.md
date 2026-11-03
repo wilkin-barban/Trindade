@@ -41,7 +41,7 @@ hashes y verificaciones está en [docs/release-android-historial.md](docs/releas
 ### Distribución Android
 
 - APK de producción: `versionName 0.7.1`, 11.277.888 bytes, sha256
-  `41f87a148e28cc1f40bb2ac25a2e70f31587c598e806f2c65efa37411a46c545`. El código de build es interno.
+  `f325edb6d3c03eba2f058b7aa099961fa99ba12243c6ffbec2d8e44e7683de1f`. El código de build es interno.
 
 ---
 
