@@ -197,7 +197,39 @@ describe('Aero integration routes', () => {
     assert.equal(body.code, 'INVALID_AERO_LOG');
   });
 
-  it('accepts the events Android sends and records identity, attempt and duration', async () => {
+  it('accepts the canonical event Android sends and records identity, attempt, version and duration', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/integration/aero/log',
+      headers: { authorization: `Bearer ${workerToken}` },
+      payload: {
+        event: 'launch_sync',
+        phase: 'result',
+        client: 'android',
+        attemptId: '3d1f6a1e-0d5c-4c31-9a1b-8a6f2f0f9c11',
+        durationMs: 1840,
+        destinationUrl: 'http://192.168.1.50:8000/api/entradasitem',
+        httpStatus: 200,
+        launchId: 42,
+        appVersion: '0.7.0',
+        buildNumber: 7007,
+      },
+    });
+    assert.equal(res.statusCode, 200);
+
+    const lines = readFileSync(join(tempLogDir, AERO_LOG_FILE), 'utf-8').split('\n').filter(Boolean);
+    const lastLine = JSON.parse(lines[lines.length - 1]);
+    assert.equal(lastLine.event, 'launch_sync');
+    assert.equal(lastLine.phase, 'result');
+    assert.equal(lastLine.client, 'android');
+    assert.equal(lastLine.attemptId, '3d1f6a1e-0d5c-4c31-9a1b-8a6f2f0f9c11');
+    assert.equal(lastLine.durationMs, 1840);
+    assert.equal(lastLine.launchId, 42);
+    assert.equal(lastLine.appVersion, '0.7.0');
+    assert.equal(lastLine.buildNumber, 7007);
+  });
+
+  it('keeps accepting the legacy Android event aliases for older APKs', async () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/integration/aero/log',
@@ -206,10 +238,7 @@ describe('Aero integration routes', () => {
         event: 'dispatch',
         phase: 'response',
         client: 'android',
-        attemptId: '3d1f6a1e-0d5c-4c31-9a1b-8a6f2f0f9c11',
-        durationMs: 1840,
         destinationUrl: 'http://192.168.1.50:8000/api/entradasitem',
-        httpStatus: 200,
       },
     });
     assert.equal(res.statusCode, 200);
@@ -218,9 +247,6 @@ describe('Aero integration routes', () => {
     const lastLine = JSON.parse(lines[lines.length - 1]);
     assert.equal(lastLine.event, 'dispatch');
     assert.equal(lastLine.phase, 'response');
-    assert.equal(lastLine.client, 'android');
-    assert.equal(lastLine.attemptId, '3d1f6a1e-0d5c-4c31-9a1b-8a6f2f0f9c11');
-    assert.equal(lastLine.durationMs, 1840);
   });
 
   it('keeps the server strict: an oversized error and an unknown client are refused, not trimmed', async () => {

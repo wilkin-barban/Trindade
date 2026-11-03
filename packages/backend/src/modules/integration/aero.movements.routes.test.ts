@@ -394,7 +394,10 @@ describe('Aero movements routes', () => {
     const res = await app.inject({
       method: 'POST',
       url: url(),
-      headers: { authorization: `Bearer ${wilkinToken}` },
+      headers: {
+        authorization: `Bearer ${wilkinToken}`,
+        'x-trindade-client': 'android',
+      },
       payload: { date: PAST_DAY, movements: [{ ...seat, entry_date: PAST_DAY }] },
     });
 
@@ -407,12 +410,38 @@ describe('Aero movements routes', () => {
 
     const lines = readFileSync(join(tempLogDir, AERO_LOG_FILE), 'utf-8').split('\n').filter(Boolean);
     const refusals = lines
-      .map((line) => JSON.parse(line) as { note?: string; httpStatus?: number; error?: string; payload?: { date?: string } })
+      .map((line) =>
+        JSON.parse(line) as {
+          note?: string;
+          event?: string;
+          client?: string | null;
+          httpStatus?: number;
+          error?: string;
+          payload?: { date?: string };
+        },
+      )
       .filter((entry) => entry.note === 'sync_refused');
     assert.equal(refusals.length, 1);
+    assert.equal(refusals[0].event, 'read_history');
+    assert.equal(refusals[0].client, 'android');
     assert.equal(refusals[0].httpStatus, 409);
     assert.equal(refusals[0].error, 'MASSAS_HISTORY_FROZEN');
     assert.equal(refusals[0].payload?.date, PAST_DAY);
+  });
+
+  it('does not attribute a sync refusal to android without a client header', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: url(),
+      headers: { authorization: `Bearer ${wilkinToken}` },
+      payload: { date: PAST_DAY, movements: [{ ...seat, entry_date: PAST_DAY }] },
+    });
+
+    assert.equal(res.statusCode, 409);
+    const lines = readFileSync(join(tempLogDir, AERO_LOG_FILE), 'utf-8').split('\n').filter(Boolean);
+    const last = JSON.parse(lines[lines.length - 1]) as { note?: string; client?: string | null };
+    assert.equal(last.note, 'sync_refused');
+    assert.equal(last.client, null);
   });
 
   it('answers 503 with a named code when the database has not been migrated', async () => {
