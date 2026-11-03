@@ -13,7 +13,7 @@ Plataforma operativa de **Trindade Massas** para registrar la producción de mas
 
 | Dato | Valor |
 | --- | --- |
-| Última release publicada | `v0.7.0` en GitHub Releases |
+| Última versión publicada | `v0.7.1` en `/api/app/latest-release`; GitHub Release `v0.7.0` |
 | Aplicación Android | APK firmado, `com.trindade.app`, Android 8.0 o superior |
 | Base de datos | SQLite, esquema **revisión 9** (18 tablas) |
 | Producción web | <https://trindademasas.duckdns.org> |
@@ -80,6 +80,8 @@ La guía de contribución y las reglas de trabajo están en [CONTRIBUTING.md](CO
 
 | Documento | Contenido |
 | --- | --- |
+| [AGENTS.md](AGENTS.md) | Punto de entrada para agentes y reglas de trabajo |
+| [docs/agents/trindade-development.md](docs/agents/trindade-development.md) | Guía completa de desarrollo, build Android, actualización y ERP |
 | [docs/README.md](docs/README.md) | Índice, rutas rápidas y convenciones |
 | [docs/arquitectura.md](docs/arquitectura.md) | Monorepo, módulos, datos y flujos |
 | [docs/despliegue.md](docs/despliegue.md) | Despliegue, migraciones y rollback en producción |
@@ -124,7 +126,7 @@ Los workflows de GitHub Actions ejecutan la misma compuerta en cada push y pull 
 
 ## Distribución Android
 
-El APK firmado se publica en [GitHub Releases](https://github.com/wilkinbarban/Trindade/releases/latest). La instancia de producción también lo sirve desde `GET /api/app/download-apk`, y la app consulta `GET /api/app/latest-release` para verificar si hay una versión nueva.
+La instancia de producción sirve el APK firmado en `GET /api/app/download-apk` y publica la versión vigente en `GET /api/app/latest-release`; la app consulta ese endpoint y compara `versionName` y `buildNumber`. La release de GitHub `v0.7.0` conserva su asset histórico; la versión vigente `0.7.1` se publica por la instancia de producción, como se describe en [la guía de agentes](docs/agents/trindade-development.md).
 
 ## Licencia
 
