@@ -224,6 +224,36 @@ describe('massasUnifiedRows', () => {
   });
 });
 
+describe('the day the launch leaves owing', () => {
+  /**
+   * One read of the plant closes the loop the launch opened.
+   *
+   * The snapshot comes back with everything the ERP recorded -- ten massas and, in the same day, whatever
+   * else the plant typed. The row the operator launched has to turn into a reconciled one, and the supply
+   * has to stay out of this table without being thrown away: it is Recebimento's and Relatório's.
+   */
+  it('una lectura del día concilia el lote y no mete insumos', () => {
+    const launches = [launch({ id: 1 }), launch({ id: 2, product_code: '1047', boxes: 1, units: 6 })];
+    const movements = [
+      seat({ entLan: 41001, quantity: 20, operatorName: 'ALICE' }),
+      seat({ entLan: 41002, productCode: '1047', quantity: 6, operatorName: 'ALICE' }),
+      // El insumo que el ERP guardó ese mismo día: existe en el espejo, no es una masa.
+      seat({ entLan: 41003, productCode: '9001', productDesc: 'SACO', quantity: 3, movementType: 'E' }),
+    ];
+
+    const rows = massasUnifiedRows(input({ launches, movements }));
+
+    assert.equal(rows.length, 2, 'el insumo no agrega fila');
+    assert.ok(rows.every((row) => row.productCode !== '9001'), 'y su código no aparece en ninguna');
+    assert.deepEqual(
+      rows.map((row) => row.state),
+      ['reconciled', 'reconciled'],
+      'los dos lanzamientos quedaron conciliados con la lectura',
+    );
+    assert.deepEqual([...reconciledLaunchIds(rows)].sort(), [1, 2], 'la cola puede liquidar lo enviado');
+  });
+});
+
 describe('the owner a row says it belongs to', () => {
   it('carries the seat owner the backend resolved, so a worker keeps their own button', () => {
     const rows = massasUnifiedRows(
