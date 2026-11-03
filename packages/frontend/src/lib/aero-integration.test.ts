@@ -6,6 +6,7 @@ import {
   AERO_DEFAULT_CST,
   AERO_INTEGRATION_USERNAME,
   AERO_PENDING_SYNC_STORAGE_KEY,
+  AERO_SESSION_PASSWORD_KEY,
   AERO_SETTINGS_STORAGE_KEY,
   AERO_SHORTCUT_ICLOUD_URL,
   AERO_ENTRY_SERIES,
@@ -128,38 +129,61 @@ describe('aero-integration: settings persistence', () => {
       lastSyncAt: '2026-10-27T10:00:00Z',
     };
 
-    saveAeroSettings(custom, storage);
-    const loaded = loadAeroSettings(storage);
+    const session = new FakeStorage();
+    saveAeroSettings(custom, storage, session);
+    const loaded = loadAeroSettings(storage, session);
     assert.deepEqual(loaded, custom);
   });
 
   /**
-   * The password is the one thing the browser must not keep.
+   * The password is the one thing the browser must keep out of reach.
    *
    * It sat in `localStorage` in clear, next to the IP of the plant, for as long as the phone was on: any
-   * script on the page, any backup of the profile, any other tab of the same origin could read the company's
-   * credentials. The rest of the settings are not secrets and stay; the password returns to the memory of the
-   * tab and is typed again when the session opens.
+   * backup of the profile, any other tab of the same origin and the next launch of the app could read the
+   * company's credentials. It now lives in `sessionStorage`: this tab, this session, gone when the tab closes.
+   * The rest of the settings are not secrets and stay where they were.
    */
-  it('never writes the password into storage', () => {
+  it('writes the password into session storage and never into local storage', () => {
     const storage = new FakeStorage();
+    const session = new FakeStorage();
 
-    saveAeroSettings({ ...DEFAULT_AERO_SETTINGS, username: 'wilkin', password: 'secreta' }, storage);
+    saveAeroSettings({ ...DEFAULT_AERO_SETTINGS, username: 'wilkin', password: 'secreta' }, storage, session);
 
     const raw = storage.getItem(AERO_SETTINGS_STORAGE_KEY) ?? '';
     assert.ok(!raw.includes('secreta'), 'the password is not on disk');
     assert.equal(JSON.parse(raw).password, undefined, 'and the field is not there empty either');
     assert.equal(JSON.parse(raw).username, 'wilkin', 'the rest of the settings still travel');
+    assert.equal(session.getItem(AERO_SESSION_PASSWORD_KEY), 'secreta', 'the tab that typed it holds it');
   });
 
   it('keeps the password for the tab that typed it', () => {
     const storage = new FakeStorage();
+    const session = new FakeStorage();
 
-    saveAeroSettings({ ...DEFAULT_AERO_SETTINGS, username: 'wilkin', password: 'secreta' }, storage);
+    saveAeroSettings({ ...DEFAULT_AERO_SETTINGS, username: 'wilkin', password: 'secreta' }, storage, session);
 
     // Same session: the envelope can be built without asking again.
-    assert.equal(aeroSessionPassword(), 'secreta');
-    assert.equal(loadAeroSettings(storage).password, 'secreta');
+    assert.equal(aeroSessionPassword(session), 'secreta');
+    assert.equal(loadAeroSettings(storage, session).password, 'secreta');
+  });
+
+  /**
+   * The document the shortcut returns to has no memory of the one that launched.
+   *
+   * Every trip through the shortcut reloads the page, and the read of the plant that follows a launch has to
+   * leave from that returned document -- the whole reason the password moved out of module memory. Same tab,
+   * same `sessionStorage`, so the session survives the round trip without touching the disk.
+   */
+  it('recovers the password in the document the shortcut returns to', () => {
+    const storage = new FakeStorage();
+    const session = new FakeStorage();
+    saveAeroSettings({ ...DEFAULT_AERO_SETTINGS, username: 'wilkin', password: 'secreta' }, storage, session);
+
+    // A new document with the same tab storage: nothing in the module survives, the session does.
+    const returned = loadAeroSettings(storage, session);
+
+    assert.equal(returned.password, 'secreta');
+    assert.equal(aeroSettingsReady(returned), true, 'and the read can leave without asking again');
   });
 
   it('drops the stored password once and does not fill the session with it', () => {
@@ -181,11 +205,13 @@ describe('aero-integration: settings persistence', () => {
 
   it('purges the password and forgets the session value when cleared', () => {
     const storage = new FakeStorage();
-    saveAeroSettings({ ...DEFAULT_AERO_SETTINGS, username: 'wilkin', password: 'secreta' }, storage);
+    const session = new FakeStorage();
+    saveAeroSettings({ ...DEFAULT_AERO_SETTINGS, username: 'wilkin', password: 'secreta' }, storage, session);
 
-    clearAeroSettings(storage);
+    clearAeroSettings(storage, session);
 
-    assert.equal(aeroSessionPassword(), '');
+    assert.equal(aeroSessionPassword(session), '');
+    assert.equal(session.getItem(AERO_SESSION_PASSWORD_KEY), null, 'the tab no longer holds the secret');
     assert.equal(storage.getItem(AERO_SETTINGS_STORAGE_KEY), null);
   });
 

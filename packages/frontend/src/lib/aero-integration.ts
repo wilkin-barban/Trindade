@@ -103,38 +103,60 @@ export const DEFAULT_AERO_SETTINGS: AeroSettings = {
   lastSyncAt: null,
 };
 
-/**
- * The ERP password, in this tab's memory and nowhere else.
- *
- * It used to live in `localStorage` in clear, next to the IP of the plant: any script on the page, any backup
- * of the profile and any other tab of the same origin could read the company's credentials, for as long as the
- * phone was switched on. Keeping it out of the browser's storage is the most this side can do while the ERP
- * stays inside the plant's LAN -- a server-side vault needs the on-prem bridge, which does not exist yet.
- *
- * The cost is deliberate and visible: the password is asked again when the session opens, which is what the
- * panel says out loud. Everything else in the settings is not a secret and stays where it was.
- */
-let sessionPassword = '';
-
-/** The password this tab holds, or an empty string when none was typed since it opened. */
-export function aeroSessionPassword(): string {
-  return sessionPassword;
-}
-
-/** Remembers the password for the rest of the tab. Never reaches storage. */
-export function setAeroSessionPassword(value: string): void {
-  sessionPassword = value;
-}
-
-/** Forgets it: used when the settings are cleared. */
-export function clearAeroSessionPassword(): void {
-  sessionPassword = '';
-}
-
 export interface StorageLike {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
   removeItem(key: string): void;
+}
+
+/**
+ * The ERP password, in this tab's `sessionStorage` and nowhere else.
+ *
+ * It used to live in `localStorage` in clear, next to the IP of the plant: any script on the page, any backup
+ * of the profile and any other tab of the same origin could read the company's credentials, for as long as the
+ * phone was switched on. Keeping it out of `localStorage`, cookies and the server is the most this side can do
+ * while the ERP stays inside the plant's LAN -- a server-side vault needs the on-prem bridge, which does not
+ * exist yet.
+ *
+ * It moved from the ghost memory of the module to `sessionStorage` for one reason: every trip through the
+ * shortcut returns in a fresh document, and the read of `/movimentoitem` that follows a launch has to leave
+ * from that document. A value that died with the page made the automatic read impossible on the web.
+ * `sessionStorage` is per tab and per session: it survives reloads and the return trip in the same tab, dies
+ * when the tab closes, and is removed on logout and when the configuration is cleared. A tab opened without an
+ * opener starts empty, so the landing page can still ask for the secret -- which is what the panel says.
+ */
+export const AERO_SESSION_PASSWORD_KEY = 'trindade.aero.session.v1';
+
+function browserSessionStorage(): StorageLike | null {
+  return typeof sessionStorage === 'undefined' ? null : sessionStorage;
+}
+
+/** The password this tab holds, or an empty string when none was typed in this session. */
+export function aeroSessionPassword(store?: StorageLike | null): string {
+  const target = store ?? browserSessionStorage();
+  if (!target) return '';
+  try {
+    return target.getItem(AERO_SESSION_PASSWORD_KEY) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+/** Remembers the password for the rest of the session. Never reaches `localStorage` nor the server. */
+export function setAeroSessionPassword(value: string, store?: StorageLike | null): void {
+  const target = store ?? browserSessionStorage();
+  if (!target) return;
+  try {
+    if (value) target.setItem(AERO_SESSION_PASSWORD_KEY, value);
+    else target.removeItem(AERO_SESSION_PASSWORD_KEY);
+  } catch {
+    /* a browser that refuses to store it still has the in-page envelope for this call */
+  }
+}
+
+/** Forgets it: used on logout and when the settings are cleared. */
+export function clearAeroSessionPassword(store?: StorageLike | null): void {
+  setAeroSessionPassword('', store);
 }
 
 /**
@@ -165,7 +187,10 @@ function aeroShortcutName(parsed: unknown, legacyDefault: string): string {
 /**
  * Loads company WebService settings from local storage, merging with defaults.
  */
-export function loadAeroSettings(storage?: Pick<Storage, 'getItem'> | StorageLike | null): AeroSettings {
+export function loadAeroSettings(
+  storage?: Pick<Storage, 'getItem'> | StorageLike | null,
+  session?: StorageLike | null,
+): AeroSettings {
   const target = storage ?? (typeof localStorage !== 'undefined' ? localStorage : null);
   if (!target) return { ...DEFAULT_AERO_SETTINGS };
 
@@ -190,7 +215,7 @@ export function loadAeroSettings(storage?: Pick<Storage, 'getItem'> | StorageLik
     return {
       wsUrl: typeof parsed.wsUrl === 'string' ? parsed.wsUrl : DEFAULT_AERO_SETTINGS.wsUrl,
       username: typeof parsed.username === 'string' ? parsed.username : DEFAULT_AERO_SETTINGS.username,
-      password: aeroSessionPassword(),
+      password: aeroSessionPassword(session),
       shortcutName: aeroShortcutName(parsed.shortcutName, AERO_DEFAULT_SHORTCUT_NAME),
       syncEnabled:
         typeof parsed.syncEnabled === 'boolean' ? parsed.syncEnabled : DEFAULT_AERO_SETTINGS.syncEnabled,
@@ -207,10 +232,12 @@ export function loadAeroSettings(storage?: Pick<Storage, 'getItem'> | StorageLik
 export function saveAeroSettings(
   settings: AeroSettings,
   storage?: Pick<Storage, 'setItem'> | StorageLike | null,
+  session?: StorageLike | null,
 ): AeroSettings {
-  // The password stays in the tab: what is written is the settings without it. A save with a typed password
-  // is also what opens the session, so the envelope can be built right after without asking again.
-  if (settings.password) setAeroSessionPassword(settings.password);
+  // The password stays in the session: what is written to `localStorage` is the settings without it. A save
+  // with a typed password is also what opens the session, so the envelope can be built right after without
+  // asking again, and the read that follows the next launch can leave from the returned document.
+  if (settings.password) setAeroSessionPassword(settings.password, session);
   const { password: _secret, ...persisted } = settings;
 
   const target = storage ?? (typeof localStorage !== 'undefined' ? localStorage : null);
@@ -223,8 +250,11 @@ export function saveAeroSettings(
 /**
  * Removes company WebService settings from local storage.
  */
-export function clearAeroSettings(storage?: Pick<Storage, 'removeItem'> | StorageLike | null): void {
-  clearAeroSessionPassword();
+export function clearAeroSettings(
+  storage?: Pick<Storage, 'removeItem'> | StorageLike | null,
+  session?: StorageLike | null,
+): void {
+  clearAeroSessionPassword(session);
   const target = storage ?? (typeof localStorage !== 'undefined' ? localStorage : null);
   if (target) {
     target.removeItem(AERO_SETTINGS_STORAGE_KEY);
