@@ -7,6 +7,7 @@ Este directorio reúne la documentación operativa y técnica del proyecto. La p
 
 | Quiero… | Ir a |
 | --- | --- |
+| Trabajar en el repo como agente | [../AGENTS.md](../AGENTS.md) y [agents/trindade-development.md](agents/trindade-development.md) |
 | Entender cómo está armado el sistema | [arquitectura.md](arquitectura.md) |
 | Desplegar una versión web | [despliegue.md](despliegue.md) |
 | Publicar un APK Android | [release-android.md](release-android.md) |
@@ -23,6 +24,8 @@ Este directorio reúne la documentación operativa y técnica del proyecto. La p
 
 | Documento | Para quién | Qué responde |
 | --- | --- | --- |
+| [../AGENTS.md](../AGENTS.md) | Agentes y desarrollo | Reglas de entrada, mapa y puertas de calidad |
+| [agents/trindade-development.md](agents/trindade-development.md) | Agentes y desarrollo | Guía completa de web, Android, build, actualización y ERP |
 | [arquitectura.md](arquitectura.md) | Desarrollo | Monorepo, módulos, rutas, datos y flujos |
 | [despliegue.md](despliegue.md) | Operaciones | Despliegue, migraciones, verificación y rollback |
 | [release-android.md](release-android.md) | Mobile | Firma, versionado, build y publicación del APK |
