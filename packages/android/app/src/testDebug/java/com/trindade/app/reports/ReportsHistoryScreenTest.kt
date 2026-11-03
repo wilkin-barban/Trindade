@@ -98,6 +98,59 @@ class ReportsHistoryScreenTest {
     }
 
     @Test
+    fun `a retired report the server allows to reopen draws the activate action`() {
+        var activated = 0
+
+        // The row exactly as the backend projects a retired report for an administrator: inactive, open to
+        // activate, closed to deactivate and to erase. The screen has to draw that and nothing else.
+        val state = ReportsHistoryViewModel.UiState(
+            loaded = true,
+            loading = false,
+            items = listOf(
+                FakeReportsApi.historyItem(
+                    id = 7,
+                    isActive = false,
+                    canEdit = false,
+                    canDeactivate = false,
+                    canActivate = true,
+                    canDelete = false,
+                ),
+            ),
+        )
+
+        composeRule.setContent {
+            TrindadeTheme {
+                ReportsHistoryScreen(
+                    state = state,
+                    onBack = {},
+                    onOpenReport = {},
+                    onDateSelected = {},
+                    onMonthSelected = {},
+                    onClearFilters = {},
+                    onPrevious = {},
+                    onNext = {},
+                    onRetry = {},
+                    onDeactivate = {},
+                    onActivate = { activated++ },
+                    onDelete = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription(copy(R.string.history_activate))
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
+
+        // The activation is confirmed in a dialog, so the intent is not a mistap; the callback fires once.
+        composeRule.onAllNodesWithText(copy(R.string.history_activate)).onLast().performClick()
+        assertEquals(1, activated)
+
+        composeRule.onAllNodesWithContentDescription(copy(R.string.history_delete)).assertCountEquals(0)
+        composeRule.onAllNodesWithContentDescription(copy(R.string.history_deactivate)).assertCountEquals(0)
+    }
+
+    @Test
     fun `pagination buttons and item actions meet 48dp touch targets`() {
         var deactivated = 0
         var deleted = 0

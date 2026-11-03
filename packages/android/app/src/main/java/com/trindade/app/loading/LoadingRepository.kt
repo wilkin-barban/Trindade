@@ -8,7 +8,9 @@ import com.trindade.app.contract.models.ScheduleHistoryResponse
 import com.trindade.app.contract.models.SchedulesResponseSchedulesInner
 import com.trindade.app.contract.models.UpdateScheduleRequest
 import com.trindade.app.contract.models.VehiclesResponseVehiclesInner
+import com.trindade.app.network.HistoryRead
 import com.trindade.app.network.LoadingApi
+import com.trindade.app.network.readHistory
 import com.trindade.app.network.runCatchingCancellable
 import kotlinx.serialization.json.Json
 import retrofit2.Response
@@ -68,10 +70,8 @@ class LoadingRepository @Inject constructor(
         month: String?,
         page: Int?,
         pageSize: Int?,
-    ): ScheduleHistoryResponse? =
-        runCatchingCancellable { api.history(date = date, month = month, page = page, pageSize = pageSize) }.getOrNull()
-            ?.takeIf { it.isSuccessful }
-            ?.body()
+    ): HistoryRead<ScheduleHistoryResponse> =
+        readHistory { api.history(date = date, month = month, page = page, pageSize = pageSize) }
 
     suspend fun timeSlots(): List<String>? =
         runCatchingCancellable { api.timeSlots() }.getOrNull()

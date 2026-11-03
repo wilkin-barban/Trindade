@@ -3,6 +3,7 @@ package com.trindade.app.reports
 import com.trindade.app.contract.models.ReportHistoryResponse
 import com.trindade.app.contract.models.ScheduleHistoryResponsePagination
 import com.trindade.app.contract.models.SuccessResponse
+import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -376,7 +377,7 @@ class ReportsHistoryViewModelTest {
 
     @Test
     fun `says the server was not reached rather than showing an empty history`() {
-        val model = viewModel(FakeReportsApi(historyToReturn = null))
+        val model = viewModel(FakeReportsApi(historyFailure = IOException("no route to host")))
 
         // The list is empty and that is the danger: an empty history drawn without a word about the
         // failed read would report a network fault as a fact about the reports.
@@ -418,7 +419,44 @@ class ReportsHistoryViewModelTest {
         model.activate(1)
 
         assertTrue("the action's own sentence survives the failed reload", model.state.value.resultMessage != null)
-        assertEquals(ReportsHistoryViewModel.UNREACHABLE, model.state.value.message)
+        // The reload was answered with a 500, so the sentence names the server and not the network.
+        assertEquals(ReportsHistoryViewModel.SERVER_FAILED, model.state.value.message)
+    }
+
+    @Test
+    fun `names the server failure when the read was answered with a 5xx`() {
+        val api = FakeReportsApi()
+        api.historyFailsFromRead = 1
+        val model = viewModel(api)
+
+        assertEquals(false, model.state.value.loading)
+        assertEquals(false, model.state.value.loaded)
+        assertEquals(ReportsHistoryViewModel.SERVER_FAILED, model.state.value.message)
+        assertNotEquals(ReportsHistoryViewModel.UNREACHABLE, model.state.value.message)
+    }
+
+    @Test
+    fun `names the expired session when the read was refused with a 401`() {
+        // Before the read carried its status, this arrived as "Sem conexão": the operator was told to
+        // check a network that had just carried a signed refusal.
+        val api = FakeReportsApi()
+        api.historyFailStatus = 401
+        api.historyFailsFromRead = 1
+        val model = viewModel(api)
+
+        assertEquals(ReportsHistoryViewModel.SESSION_EXPIRED, model.state.value.message)
+        assertNotEquals(ReportsHistoryViewModel.UNREACHABLE, model.state.value.message)
+    }
+
+    @Test
+    fun `keeps the reports on screen and names the failure when a reload is refused`() {
+        val api = FakeReportsApi(historyToReturn = singleReport(canDeactivate = true, canDelete = true))
+        api.historyFailsFromRead = 2
+        val model = viewModel(api)
+        model.retry()
+
+        assertEquals(1, model.state.value.items.size)
+        assertEquals(ReportsHistoryViewModel.SERVER_FAILED, model.state.value.message)
     }
 
     @Test

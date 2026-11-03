@@ -116,6 +116,9 @@ class FakeReportsApi(
      */
     var historyFailsFromRead: Int? = null
 
+    /** The status a failing read answers with; see [FakeLoadingApi.historyFailStatus] for why. */
+    var historyFailStatus: Int = 500
+
     /** The first read that waits on its own gate, counted from one, for the same reason. */
     var gateHistoryFromRead: Int? = null
 
@@ -187,7 +190,7 @@ class FakeReportsApi(
         historyFailure?.let { throw it }
 
         historyReads += 1
-        historyFailsFromRead?.let { if (historyReads >= it) return Response.error(500, EMPTY_BODY) }
+        historyFailsFromRead?.let { if (historyReads >= it) return Response.error(historyFailStatus, EMPTY_BODY) }
 
         val query = ReportsHistoryQuery(date = date, month = month, page = page, pageSize = pageSize)
         lastHistoryQuery = query
@@ -345,6 +348,10 @@ class FakeReportsApi(
             reportDate: String = "2026-09-18",
             isActive: Boolean = true,
             canEdit: Boolean = true,
+            canDeactivate: Boolean = true,
+            canActivate: Boolean = false,
+            canDelete: Boolean = true,
+            isClosedDay: Boolean = false,
         ) = ReportsResponseReportsInner(
             id = id,
             turno = ReportsResponseReportsInner.Turno.entries.first { it.value == DEFAULT_TURNO },
@@ -355,9 +362,10 @@ class FakeReportsApi(
             isActive = isActive,
             readOnly = !canEdit,
             canEdit = canEdit,
-            canDeactivate = true,
-            canActivate = false,
-            canDelete = true,
+            isClosedDay = isClosedDay,
+            canDeactivate = canDeactivate,
+            canActivate = canActivate,
+            canDelete = canDelete,
         )
 
         fun createdReport(id: Int = 42) = ReportResponseReport(

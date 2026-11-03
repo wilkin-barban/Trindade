@@ -7,7 +7,9 @@ import com.trindade.app.contract.models.ProductsResponse
 import com.trindade.app.contract.models.ReportHistoryResponse
 import com.trindade.app.contract.models.ReportResponseReport
 import com.trindade.app.contract.models.UpdateReportRequest
+import com.trindade.app.network.HistoryRead
 import com.trindade.app.network.ReportsApi
+import com.trindade.app.network.readHistory
 import com.trindade.app.network.runCatchingCancellable
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -93,10 +95,8 @@ class ReportsRepository @Inject constructor(
         month: String?,
         page: Int?,
         pageSize: Int?,
-    ): ReportHistoryResponse? =
-        runCatchingCancellable { api.history(date = date, month = month, page = page, pageSize = pageSize) }.getOrNull()
-            ?.takeIf { it.isSuccessful }
-            ?.body()
+    ): HistoryRead<ReportHistoryResponse> =
+        readHistory { api.history(date = date, month = month, page = page, pageSize = pageSize) }
 
     /**
      * Retires a report, or says why the server would not.

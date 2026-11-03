@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trindade.app.contract.models.ScheduleHistoryResponseItemsInner
 import com.trindade.app.ui.UiText
+import com.trindade.app.network.HistoryRead
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -212,29 +213,38 @@ class LoadingHistoryViewModel @Inject constructor(
         // then describe different requests.
         if (load != newestLoad) return false
 
-        if (history == null) {
-            // Null is "the server did not answer", not "there are no batches". An empty list drawn
-            // over a failed read would report a network fault as a fact about the history.
+        // Three answers, three sentences. A refusal is the server talking -- an expired session, a
+        // caller this route does not accept, a server that could not finish -- and answering it with
+        // "check the network" sends the operator to fix something that works. Only a read that got no
+        // answer at all is a connection problem.
+        if (history is HistoryRead.Refused) {
+            _state.update { it.copy(loading = false, message = refusalMessage(history.statusCode)) }
+            return false
+        }
+        if (history is HistoryRead.Unreachable) {
+            // No answer is not "there are no batches". An empty list drawn over a failed read would
+            // report a network fault as a fact about the history.
             _state.update { it.copy(loading = false, message = UNREACHABLE) }
             return false
         }
+        val loaded = (history as HistoryRead.Loaded).value
 
         // A page past the end answers an empty list with a well-formed pagination instead of an
         // error, and above the first page that means the page just lost its last row -- which is what
         // deleting a batch does. Stepping back one page is what keeps the operator off a blank screen
         // still labelled "Página 2 de 2"; one page at a time is enough, because that is as far as the
         // single deletion that caused it could have moved the end.
-        if (history.items.isEmpty() && page > FIRST_PAGE) {
+        if (loaded.items.isEmpty() && page > FIRST_PAGE) {
             return readPage(filters, page - 1, load)
         }
 
         _state.update {
             it.copy(
                 loading = false,
-                items = history.items,
-                page = history.pagination.page,
-                totalPages = history.pagination.totalPages,
-                total = history.pagination.total,
+                items = loaded.items,
+                page = loaded.pagination.page,
+                totalPages = loaded.pagination.totalPages,
+                total = loaded.pagination.total,
                 loaded = true,
             )
         }

@@ -4,6 +4,7 @@ import com.trindade.app.contract.models.ScheduleHistoryResponse
 import com.trindade.app.contract.models.ScheduleHistoryResponseItemsInner
 import com.trindade.app.contract.models.ScheduleHistoryResponsePagination
 import com.trindade.app.contract.models.SuccessResponse
+import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -413,13 +414,51 @@ class LoadingHistoryViewModelTest {
 
     @Test
     fun `says the server was not reached rather than showing an empty history`() {
-        val model = viewModel(FakeLoadingApi(historyToReturn = null))
+        val model = viewModel(FakeLoadingApi(historyFailure = IOException("no route to host")))
 
         // The list is empty and that is the danger: an empty history drawn without a word about the
         // failed read would report a network fault as a fact about the batches.
         assertEquals(true, model.state.value.items.isEmpty())
         assertEquals(false, model.state.value.loading)
         assertEquals(LoadingHistoryViewModel.UNREACHABLE, model.state.value.message)
+    }
+
+    @Test
+    fun `names the server failure when the read was answered with a 5xx`() {
+        // A 500 is the server talking, and the answer is not on the wire because it could not finish.
+        // The sentence says so instead of sending the operator to check a network that just worked.
+        val api = FakeLoadingApi()
+        api.historyFailsFromRead = 1
+        val model = viewModel(api)
+
+        assertEquals(false, model.state.value.loading)
+        assertEquals(false, model.state.value.loaded)
+        assertEquals(LoadingHistoryViewModel.SERVER_FAILED, model.state.value.message)
+        assertNotEquals(LoadingHistoryViewModel.UNREACHABLE, model.state.value.message)
+    }
+
+    @Test
+    fun `names the expired session when the read was refused with a 401`() {
+        val api = FakeLoadingApi()
+        api.historyFailStatus = 401
+        api.historyFailsFromRead = 1
+        val model = viewModel(api)
+
+        assertEquals(LoadingHistoryViewModel.SESSION_EXPIRED, model.state.value.message)
+        assertNotEquals(LoadingHistoryViewModel.UNREACHABLE, model.state.value.message)
+    }
+
+    @Test
+    fun `keeps the rows on screen and names the failure when a reload is refused`() {
+        // The rows are already read and they are still true; a failed refresh does not unsay them. What
+        // must not happen is the connection sentence drawn over a list that arrived a moment ago.
+        val api = FakeLoadingApi(historyToReturn = oneRow(ACTIVATABLE_ROW))
+        api.historyFailsFromRead = 2
+        val model = viewModel(api)
+        model.retry()
+
+        assertEquals(1, model.state.value.items.size)
+        assertEquals(LoadingHistoryViewModel.SERVER_FAILED, model.state.value.message)
     }
 
     // ---- A refused action says which refusal it was ----
@@ -478,7 +517,8 @@ class LoadingHistoryViewModelTest {
         model.activateBatch("2026-09-18")
 
         assertTrue("the action's own sentence survives the failed reload", model.state.value.resultMessage != null)
-        assertEquals(LoadingHistoryViewModel.UNREACHABLE, model.state.value.message)
+        // The reload was answered with a 500, so the sentence names the server and not the network.
+        assertEquals(LoadingHistoryViewModel.SERVER_FAILED, model.state.value.message)
     }
 
     @Test

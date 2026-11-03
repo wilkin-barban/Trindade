@@ -2,6 +2,7 @@ package com.trindade.app.loading
 
 import com.trindade.app.contract.models.ScheduleHistoryResponse
 import com.trindade.app.contract.models.ScheduleHistoryResponsePagination
+import com.trindade.app.network.HistoryRead
 import kotlinx.coroutines.test.runTest
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.ResponseBody.Companion.toResponseBody
@@ -94,13 +95,13 @@ class LoadingHistoryRepositoryTest {
     }
 
     @Test
-    fun `answers null when the server refuses the read`() = runTest {
-        // Null rather than an empty envelope: a screen that could not tell "no batches that month"
+    fun `answers the refusal with its status when the server says no`() = runTest {
+        // The status and not an empty envelope: a screen that could not tell "no batches that month"
         // from "the server refused" would render an empty history over a 500 and call it a fact.
         val answer = repository(FakeLoadingApi(historyToReturn = null))
             .history(date = null, month = null, page = null, pageSize = null)
 
-        assertNull(answer)
+        assertEquals(HistoryRead.Refused(500), answer)
     }
 
     @Test
@@ -115,10 +116,11 @@ class LoadingHistoryRepositoryTest {
 
         // The pagination is the half of the answer a bare list could not carry: the batches group by
         // date, so without `totalPages` the screen cannot tell a full page from the last one.
-        assertEquals(62, answer?.pagination?.total)
-        assertEquals(3, answer?.pagination?.totalPages)
-        assertEquals(4, answer?.items?.single()?.totalLoadings)
-        assertEquals(false, answer?.items?.single()?.isActive)
+        val loaded = (answer as HistoryRead.Loaded).value
+        assertEquals(62, loaded.pagination.total)
+        assertEquals(3, loaded.pagination.totalPages)
+        assertEquals(4, loaded.items.single().totalLoadings)
+        assertEquals(false, loaded.items.single().isActive)
     }
 
     @Test
@@ -138,10 +140,11 @@ class LoadingHistoryRepositoryTest {
         val answer = repository(FakeLoadingApi(historyToReturn = page))
             .history(date = null, month = null, page = null, pageSize = null)
 
-        assertEquals("2026-06-26", answer?.items?.first()?.batchDate)
-        assertEquals("2026-06-26", answer?.items?.first()?.loadingDate)
-        assertEquals("2026-06-27", answer?.items?.last()?.batchDate)
-        assertEquals("2026-06-28", answer?.items?.last()?.loadingDate)
+        val loaded = (answer as HistoryRead.Loaded).value
+        assertEquals("2026-06-26", loaded.items.first().batchDate)
+        assertEquals("2026-06-26", loaded.items.first().loadingDate)
+        assertEquals("2026-06-27", loaded.items.last().batchDate)
+        assertEquals("2026-06-28", loaded.items.last().loadingDate)
     }
 }
 

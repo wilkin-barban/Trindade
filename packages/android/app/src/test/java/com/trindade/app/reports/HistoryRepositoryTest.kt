@@ -2,6 +2,7 @@ package com.trindade.app.reports
 
 import com.trindade.app.contract.models.ReportHistoryResponse
 import com.trindade.app.contract.models.ScheduleHistoryResponsePagination
+import com.trindade.app.network.HistoryRead
 import com.trindade.app.network.ReportsApi
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
@@ -80,14 +81,13 @@ class HistoryRepositoryTest {
     }
 
     @Test
-    fun `answers null when the server refuses the read`() = runTest {
-        // Null rather than an empty envelope, which is what this layer's failure convention is for: a
-        // screen that could not tell "no reports that month" from "the server refused" would render an
-        // empty history over a 400 and call it a fact.
+    fun `answers the refusal with its status when the server says no`() = runTest {
+        // The status and not an empty envelope: a screen that could not tell "no reports that month"
+        // from "the server refused" would render an empty history over a 400 and call it a fact.
         val answer = repository(FakeReportsApi(historyToReturn = null))
             .history(date = null, month = null, page = null, pageSize = null)
 
-        assertNull(answer)
+        assertEquals(HistoryRead.Refused(500), answer)
     }
 
     @Test
@@ -103,10 +103,11 @@ class HistoryRepositoryTest {
         // The pagination is the half of the answer a bare list could not carry: `totalPages = 4` is
         // the only thing that tells the screen there is a page 3 worth offering, and `total` is the
         // only thing that can label it.
-        assertEquals(95, answer?.pagination?.total)
-        assertEquals(4, answer?.pagination?.totalPages)
-        assertEquals(7, answer?.items?.single()?.id)
-        assertEquals(false, answer?.items?.single()?.isActive)
+        val loaded = (answer as HistoryRead.Loaded).value
+        assertEquals(95, loaded.pagination.total)
+        assertEquals(4, loaded.pagination.totalPages)
+        assertEquals(7, loaded.items.single().id)
+        assertEquals(false, loaded.items.single().isActive)
     }
 
     @Test
@@ -124,8 +125,9 @@ class HistoryRepositoryTest {
         val answer = repository(FakeReportsApi(historyToReturn = page))
             .history(date = null, month = null, page = null, pageSize = null)
 
-        assertNull(answer?.items?.single()?.canEdit)
-        assertNull(answer?.items?.single()?.readOnly)
+        val loaded = (answer as HistoryRead.Loaded).value
+        assertNull(loaded.items.single().canEdit)
+        assertNull(loaded.items.single().readOnly)
     }
 
     @Test

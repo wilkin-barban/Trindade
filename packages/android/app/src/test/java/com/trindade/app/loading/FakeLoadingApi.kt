@@ -265,6 +265,13 @@ class FakeLoadingApi(
      */
     var historyFailsFromRead: Int? = null
 
+    /**
+     * The status a failing read answers with, once [historyFailsFromRead] or [historyToReturn] makes it
+     * fail. A refusal is the server talking and an unreachable read is not, so the tests have to be able
+     * to choose between 401, 403, 500 and a connection that never answered.
+     */
+    var historyFailStatus: Int = 500
+
     /** The first read that waits on its own gate, counted from one, for the same reason. */
     var gateHistoryFromRead: Int? = null
 
@@ -280,7 +287,7 @@ class FakeLoadingApi(
     ): Response<ScheduleHistoryResponse> {
         historyFailure?.let { throw it }
         historyReads += 1
-        historyFailsFromRead?.let { if (historyReads >= it) return Response.error(500, EMPTY_BODY) }
+        historyFailsFromRead?.let { if (historyReads >= it) return Response.error(historyFailStatus, EMPTY_BODY) }
 
         val query = LoadingHistoryQuery(date = date, month = month, page = page, pageSize = pageSize)
         lastHistoryQuery = query
