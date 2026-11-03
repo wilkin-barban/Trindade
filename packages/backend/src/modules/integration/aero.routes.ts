@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { apiError } from '../../utils/api-error.js';
-import { AERO_ERROR_CODES, AeroLogBodySchema } from './aero.schema.js';
+import { AERO_ERROR_CODES, AeroLogBodySchema, AeroLogClientSchema } from './aero.schema.js';
 import { appendAeroLog } from './aero.log.service.js';
 import { AERO_MOVEMENTS_ERROR_CODES, AeroMovementsBodySchema } from './aero.movements.schema.js';
 import {
@@ -62,6 +62,8 @@ export async function aeroIntegrationRoutes(fastify: FastifyInstance) {
         client: body.client ?? null,
         attemptId: body.attemptId ?? null,
         durationMs: body.durationMs ?? null,
+        appVersion: body.appVersion,
+        buildNumber: body.buildNumber,
       });
 
       return reply.status(200).send({ ok: true });
@@ -139,10 +141,16 @@ export async function aeroIntegrationRoutes(fastify: FastifyInstance) {
       if (typeof saved !== 'number') {
         // A past day is frozen by the calendar, not by the clock. The refusal is audited with the date so
         // an operator reading the log sees which night a phone kept trying to rewrite.
+        //
+        // The client is the caller's declaration, not an assumption. This route used to write `android`
+        // unconditionally, which turned any other caller into a false Android line.
+        const rawClient = request.headers['x-trindade-client'];
+        const parsedClient =
+          typeof rawClient === 'string' ? AeroLogClientSchema.safeParse(rawClient) : null;
         appendAeroLog({
           ts: new Date().toISOString(),
-          event: 'sync',
-          phase: 'response',
+          event: 'read_history',
+          phase: 'result',
           user: request.user!.username,
           role: request.user!.role,
           destinationUrl: '/api/integration/aero/movements',
@@ -152,7 +160,7 @@ export async function aeroIntegrationRoutes(fastify: FastifyInstance) {
           error: saved.code,
           launchId: null,
           note: 'sync_refused',
-          client: 'android',
+          client: parsedClient?.success ? parsedClient.data : null,
           attemptId: null,
           durationMs: null,
         });

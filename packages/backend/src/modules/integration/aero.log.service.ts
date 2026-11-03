@@ -26,6 +26,8 @@ export interface AeroLogEntry {
   client: string | null;
   attemptId: string | null;
   durationMs: number | null;
+  appVersion?: string | null;
+  buildNumber?: number | null;
 }
 
 /**
@@ -137,6 +139,8 @@ export function appendAeroLog(entry: AeroLogEntry, dir?: string): string {
     client: entry.client ?? null,
     attemptId: entry.attemptId ?? null,
     durationMs: entry.durationMs ?? null,
+    ...(entry.appVersion != null ? { appVersion: entry.appVersion } : {}),
+    ...(entry.buildNumber != null ? { buildNumber: entry.buildNumber } : {}),
   };
 
   const line = JSON.stringify(record) + '\n';

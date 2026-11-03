@@ -13,11 +13,9 @@ export type AeroErrorCode = (typeof AERO_ERROR_CODES)[keyof typeof AERO_ERROR_CO
 /**
  * Valid event types for the company Aero WebService integration audit trail.
  *
- * The two vocabularies are not a mistake. The web and the iOS shortcut speak of `launch_sync`,
- * `read_history` and `test_connection`; the phone says `dispatch`, `sync` and `test`. They grew
- * apart because each client was written against its own screen, and the server used to accept only
- * the web's words, so every Android line was refused with a 400. Both are accepted now and the
- * `client` field says who spoke, which is what the operator reads when a line looks odd.
+ * The canonical names are `launch_sync`, `read_history` and `test_connection`; both the web and the
+ * current Android client write them. The older `dispatch`, `sync` and `test` aliases remain accepted
+ * only so an APK already in the field keeps writing. New clients must use the canonical spelling.
  */
 export const AeroLogEventSchema = z.enum([
   'test_connection',
@@ -27,11 +25,12 @@ export const AeroLogEventSchema = z.enum([
   'sync',
   'test',
   'import',
+  'queue_rejected',
 ]);
 
 /**
- * Operation phase: requested before sending, result upon server response or network outcome.
- * Android reports `response` for the same moment the web calls `result`.
+ * Operation phase: `requested` before sending and `result` upon server response or network outcome.
+ * `response` is retained only for older clients; the Android client now writes `result`.
  */
 export const AeroLogPhaseSchema = z.enum(['requested', 'result', 'response']);
 
@@ -59,6 +58,8 @@ export const AeroLogBodySchema = z
     client: AeroLogClientSchema.optional(),
     attemptId: z.string().min(1).max(64).optional(),
     durationMs: z.number().int().min(0).max(600_000).optional(),
+    appVersion: z.string().min(1).max(32).optional(),
+    buildNumber: z.number().int().min(0).max(2_000_000_000).optional(),
   })
   .strict();
 
