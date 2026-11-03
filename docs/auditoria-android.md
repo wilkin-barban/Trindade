@@ -106,7 +106,11 @@ jq -r 'select(.client=="android") | [.appVersion,.buildNumber] | @tsv' \
 ## 7. Verificación del build publicado
 
 - APK final: `versionName 0.7.1`, sha256
-  `41f87a148e28cc1f40bb2ac25a2e70f31587c598e806f2c65efa37411a46c545`, firmado con la huella oficial.
+  `f325edb6d3c03eba2f058b7aa099961fa99ba12243c6ffbec2d8e44e7683de1f`, firmado con la huella oficial.
+- La conciliación posterior al lanzamiento deja su propio par en el log: `read_history` automático después
+  de un lote, una fila suelta o una cola drenada, con la fecha en `note` y el mismo `attemptId` en
+  `requested`/`result`. Masas concilia con ese snapshot; Recebimento y Relatório siguen viendo los insumos
+  que el espejo guardó completos.
 - `/api/app/latest-release` expone el `buildNumber` interno; el detector lo usa antes que el tamaño cuando
   la versión pública no cambia.
 - La lectura de movimientos usa el cuerpo certificado de la web: `_method: PATCH`, `ENTSAI: "E"` y los

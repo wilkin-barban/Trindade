@@ -186,9 +186,14 @@ Fase 1 — Android (T1, T2). Fase 2 — Web (T3, T4). Fase 3 — contrato y conc
   - Qué: explicar el segundo viaje, la marca, las guardas y qué mirar en el log; dejar escrito que los insumos del espejo son de Relatório/Recebimento y que Masas sólo los oculta; y corregir `docs/release-android*.md` para que digan que el código de build es **interno** y no se publica en la identidad del release.
   - Aceptación: un lector nuevo entiende el flujo (lanzar → veredicto → lectura → conciliación) sin leer código; las docs de release explican que el código es interno y no exponen `versionCode`/`buildNumber` como valor público.
   - Commit: `docs(aero): document the automatic post-launch reconciliation`.
-- [ ] **T7 — Release 7012.** Spec S16. Depende de Q3 y de T1–T5 en verde. Riesgo alto (entrega).
+- [x] **T7 — Release 7012.** Spec S16. Depende de Q3 y de T1–T5 en verde. Riesgo alto (entrega).
   - Pasos: `./gradlew clean :app:assembleRelease` con `LOCAL_APK_BUILD_NUMBER=7012` (receta de `docs/agents/trindade-development.md` §6.5 y `docs/release-android.md`); verificar firma (huella `EE:0E:40:…`), `versionName 0.7.1` y `versionCode 7012`; copiar a `packages/backend/apk/trindade-0.7.1.apk`; recalcular `.sha256`; `docker compose build api web && docker compose up -d api web`; comprobar `GET /api/app/latest-release`, la descarga y el sha256 servido.
   - Aceptación: AC8–AC9. No instalar en el emulador ni por `adb`; la tablet la actualiza el operador y AC10 se prueba en un día abierto. Sin tocar el release `v0.7.0`, sin tag/release `v0.7.1` y sin publicar en GitHub (Q3).
+  - Evidencia: APK firmado (`versionName 0.7.1`, `versionCode 7012`, huella `EE:0E:40:…`) de 11.277.888 bytes,
+    sha256 `f325edb6d3c03eba2f058b7aa099961fa99ba12243c6ffbec2d8e44e7683de1f`; copiado a
+    `packages/backend/apk/trindade-0.7.1.apk` con su `.sha256`; `LOCAL_APK_BUILD_NUMBER = 7012`; `api` y `web`
+    reconstruidos y sanos; `latest-release` público responde `buildNumber 7012`, `apkSize 11277888` y la
+    descarga coincide con el sha256. Sin tag ni release de GitHub.
   - Commit: `chore(release): ship Android 7012 with the post-launch reconciliation`.
 
 ## 7. Criterios de aceptación
