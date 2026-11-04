@@ -35,16 +35,16 @@ S13. La verificación contra el ERP físico (`192.168.25.250:1453`) sigue pendie
 
 ## Tasks
 
-- [ ] T1 — Documento ODD con specs, riesgos, RED/GREEN y criterios de aceptación. `S1-S13`. Commit: docs(odd).
-- [ ] T2 — Backend RED: tests de 182/15, 3/10, dos líneas parciales del mismo operador-producto, producto y día. `S1-S3, S10`. Commit: fix(massas).
-- [ ] T3 — Backend GREEN: `boxesForUnits` + `openBoxUnits`, acumulación por unidades y redondeo por producto. `S1-S3, S10`. Commit: fix(massas).
-- [ ] T4 — Web RED: cálculo, anotación de caja abierta, resumen desde filas unificadas, filtro ERP-only, parcial no importable y entero importable. `S1-S8`. Commit: fix(web).
-- [ ] T5 — Web GREEN: `massas-unified.ts`, `massas.ts`, `MassasCollectiveTable.tsx`, `MassasUnifiedTable.tsx`, páginas de lanzamiento/histórico e i18n. `S1-S9`. Commit: fix(web).
-- [ ] T6 — Android RED: cálculo, anotación, secciones unificadas, filtro ERP-only, parcial no importable y entero importable. `S1-S9`. Commit: fix(android).
-- [ ] T7 — Android GREEN: `MassasUnified.kt`, `MassasLogic.kt`, `MassasLaunchScreen.kt`, `MassasUnifiedTable.kt`, strings ES/PT. `S1-S9`. Commit: fix(android).
-- [ ] T8 — Suites completas, typecheck, contratos y e2e móvil/escritorio. `S1-S10`. Commit: test(massas).
-- [ ] T9 — Entrega 0.7.3/7014: `app.service.ts`, APK firmado y sidecar, docs, CHANGELOG y runbook. `S11-S13`. Commit: chore(release).
-- [ ] T10 — Imágenes API y web, despliegue, salud y verificación de `/api/app/latest-release`, descarga y sha256. `S11`. Evidencia en el Log.
+- [x] T1 — Documento ODD con specs, riesgos, RED/GREEN y criterios de aceptación. `S1-S13`. Commit: `acf4442c`.
+- [x] T2 — Backend RED: tests de 182/15, 3/10, dos líneas parciales del mismo operador-producto, producto y día. `S1-S3, S10`. Commit: `6ef28bd9`.
+- [x] T3 — Backend GREEN: `boxesForUnits` + `openBoxUnits`, acumulación por unidades y redondeo por producto. `S1-S3, S10`. Commit: `6ef28bd9` (T2+T3 en un solo commit, 17/17 verdes).
+- [x] T4 — Web RED: cálculo, anotación de caja abierta, resumen desde filas unificadas, filtro ERP-only, parcial no importable y entero importable. `S1-S8`. Commit: `6af38715` (T4+T5 en un solo commit; lib 26/26, massas 18/18, componente 6/6, vitest 125/125, node 565/565).
+- [x] T5 — Web GREEN: `massas-unified.ts`, `massas.ts`, `MassasCollectiveTable.tsx`, `MassasUnifiedTable.tsx`, páginas de lanzamiento/histórico e i18n. `S1-S9`. Commit: `6af38715`.
+- [x] T6 — Android RED: cálculo, anotación, secciones unificadas, filtro ERP-only, parcial no importable y entero importable. `S1-S9`. Commit: `db0d3fc6` (T6+T7 en un solo commit; 29/29 unified, 109/109 massas).
+- [x] T7 — Android GREEN: `MassasUnified.kt`, `MassasLogic.kt`, `MassasLaunchScreen.kt`, `MassasUnifiedTable.kt`, strings ES/PT. `S1-S9`. Commit: `db0d3fc6`.
+- [x] T8 — Suites completas, typecheck, contratos y e2e móvil/escritorio. `S1-S10`. Commit: `8a0ec4d7`. Backend 731/731 (dos corridas); web 565 node + 125 vitest; Android 1365/1365; e2e 5/5. El artefacto `packages/contracts/openapi.json` estaba desactualizado y se regeneró.
+- [x] T9 — Entrega 0.7.3/7014: `app.service.ts`, APK firmado y sidecar, docs, CHANGELOG y runbook. `S11-S13`. Commit: `b0b8e90a`. APK 11.295.876 bytes, sha256 `593ffc646efc01c4b0e7cedddfe728e9acb45544ec81a3bf4a6a1ba85576aa21`, versionCode 7014.
+- [x] T10 — Imágenes API y web, despliegue, salud y verificación de `/api/app/latest-release`, descarga y sha256. `S11`. Evidencia en el Log: `v0.7.3`/`7014`, `apkSize 11295876`, descarga sha256 `593ffc64…aa21`, web 200 con ambas traducciones en el bundle.
 - [ ] T11 — Push a `main`, CI verde, tag anotado `v0.7.3` y release con los assets verificados. `S12`. Evidencia en el Log.
 - [ ] T12 — Reporte final: commits, tests, CI, hashes, release, pendiente de ERP y confirmación de no instalación. `S13`.
 
@@ -97,3 +97,14 @@ L1 — Pedido del usuario (verbatim):
 L2 — Convención de cálculo decidida en la implementación: `boxesForUnits(units, upb) = upb > 0 ? Math.ceil(units / upb) : 0` y `openBoxUnits = upb > 0 && units % upb > 0 ? units % upb : 0`. El total de un operador o del día suma las cajas ya calculadas por producto, porque no existe un `unitsPerBox` único para unidades mezcladas (S2).
 
 L3 — Investigación previa (read-only, sin cambios): `aero_movements` de producción confirma 182 un de MASSA QUADRADA (`001192`, upb 15) en `ent_lan 35983`, operario VINICIUS R, el 2026-11-04, y 8 de 40 asientos de masas del espejo no son divisibles por su `unitsPerBox` (3/10, 4/15, 172/10, 456/20, 182/15). La web imprimía `12.133333333333333 cx` y Android truncaba a `12` (y a `0` por debajo de una caja). Las secciones individual y colectiva se derivaban sólo de `launches` y `extractOperators` exigía `user_id`.
+
+- **L7 — 2026-11-04, hallazgo de verificación (T8).** `scripts/verify-openapi-artifact.sh` falló: el artefacto
+  commiteado `packages/contracts/openapi.json` no describía `openBoxUnits`, que el backend ya emitía desde T2.
+  Se regeneró con `contracts:generate` y los tipos Kotlin con `generate-android-contract.sh`; ambos checks verdes
+  en `8a0ec4d7`. Sin este paso un lector del contrato no habría visto el campo nuevo.
+- **L8 — 2026-11-04, corridas de backend.** `npm test` de la corrida 1 dio 1 fallo no reproducido (el `tail` no
+  conservó el nombre); las corridas 2 y 3 dieron 731/731 con 0 fallos. Se registra el hecho sin declarar el fallo
+  como resuelto: no se reprodujo en dos corridas completas.
+- **L9 — 2026-11-04, build y despliegue.** APK firmado con el certificado del proyecto (mismo SHA-256 de firma que
+  0.7.2): `versionCode 7014`, `versionName 0.7.3`, 11.295.876 bytes. Ímagenes api/web reconstruidas; la descarga
+  servida coincide byte a byte con el archivo commiteado (sha256 `593ffc64…aa21`).
