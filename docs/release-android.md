@@ -104,18 +104,20 @@ Los dos números se calculan una sola vez en `build.gradle.kts` y alimentan tant
 | 0.7.0 | 7006 | Reemplazada | Histórico de cargamento cerrado en solo lectura, reactivación de lote y reporte, chapas libres sin duplicados, rechazos de tanda en un paso y sync ERP solo del día abierto |
 | 0.7.0 | — | Reemplazada | Auditoría ERP Android, payload de movimientos alineado con el puente web, vista de solo lectura para días cerrados del Histórico de Cargamento y orden de Lanzamiento de Masas; asset de GitHub Release `v0.7.0`. El código de build es interno. |
 | 0.7.1 | — | **Publicada** | Actualización por `buildNumber` en `/latest-release`, versión pública servida por producción y asset de GitHub Release `v0.7.1`. El código de build es interno. |
-| 0.7.2 | 7013 | 2026-11-04 · **En entrega** | Remediación de los hallazgos de auditoría 7006/7007/0.7.1: espejo distinto de backend inalcanzable, sesión que olvida la contraseña del ERP, despacho serializado, cola con traza, borrado de lote sólo Administrador, intento correlacionado y histórico táctil. |
+| 0.7.2 | 7013 | 2026-11-04 | **Publicada** | Remediación de los hallazgos de auditoría 7006/7007/0.7.1: espejo distinto de backend inalcanzable, sesión que olvida la contraseña del ERP, despacho serializado, cola con traza, borrado de lote sólo Administrador, intento correlacionado y histórico táctil. |
 
 Las builds 0.6.x se distribuyeron por `GET /api/app/download-apk`, no por un tag de GitHub. Los hashes y las
 verificaciones completas están en [release-android-historial.md](release-android-historial.md).
 
-> **Estado final del 2026-11-03.** La instancia de producción publica la versión **0.7.1** en
-> `GET /api/app/latest-release`, sirve el APK `packages/backend/apk/trindade-0.7.1.apk` en
-> `GET /api/app/download-apk` y la GitHub Release `v0.7.1` publica ese mismo binario: `versionName 0.7.1`,
-> 11.277.888 bytes, sha256 `f325edb6d3c03eba2f058b7aa099961fa99ba12243c6ffbec2d8e44e7683de1f`. La respuesta
+> **Estado final del 2026-11-04.** La instancia de producción publica la versión **0.7.2** en
+> `GET /api/app/latest-release`, sirve el APK `packages/backend/apk/trindade-0.7.2.apk` en
+> `GET /api/app/download-apk` y la GitHub Release `v0.7.2` publica ese mismo binario: `versionName 0.7.2`,
+> 11.278.564 bytes, sha256 `0f7c2eef842510fbcce94bc82866fda4b91b9106bd10d2a70f14e9f2ed1c2cb3`. La respuesta
 > incluye el `buildNumber` interno para que una rebuild futura sea detectable aunque conserve la versión y el
-> tamaño. El código de build no se publica en las notas. La release de GitHub `v0.7.0` no se movió: conserva su
-> asset histórico.
+> tamaño. El código de build no se publica en las notas. Las releases `v0.7.0` y `v0.7.1` no se movieron:
+> conservan su asset histórico. El primer run del workflow sobre el tag falló antes de subir nada —un paso
+> leía una variable que sólo declaraba su vecino—; el asset se subió verificado y el defecto quedó corregido
+> en `main`, con una prueba que rechaza cualquier paso que lea una variable que nadie declara.
 
 ## 4. Workflow de publicación
 

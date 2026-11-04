@@ -35,7 +35,7 @@ La guía de firma y publicación está en [release-android.md](release-android.m
 | 0.7.0 | — | 2026-11-03 | Reemplazada | Payload de movimientos alineado con el puente web, vista de solo lectura de días cerrados en el Histórico de Cargamento y orden de Lanzamiento de Masas de la web; asset de GitHub | `5dd77e331edb1aace6e2b656e899697819a506068dc375528c8dc6f5a5ade922` |
 | 0.7.1 | — | 2026-11-03 | Reemplazada | Versión pública servida por `latest-release`; el endpoint expone el `buildNumber` interno y el detector lo usa cuando la versión no cambia | `41f87a148e28cc1f40bb2ac25a2e70f31587c598e806f2c65efa37411a46c545` |
 | 0.7.1 | 7012 | 2026-11-03 | **Publicada** | Conciliación automática de Masas después de cada envío en Android y web, y contraseña del ERP en la sesión de la pestaña; asset de GitHub Release `v0.7.1` y binario de producción | `f325edb6d3c03eba2f058b7aa099961fa99ba12243c6ffbec2d8e44e7683de1f` |
-| 0.7.2 | 7013 | 2026-11-04 | **En entrega** | Remediación de los hallazgos de auditoría 7006/7007/0.7.1: espejo que distingue backend inalcanzable de rechazo, sesión que olvida la contraseña del ERP y la lectura pendiente, despacho serializado, cola con traza, borrado de lote sólo Administrador, intento correlacionado, histórico de Relatórios táctil y release atada al binario de producción | `0f7c2eef842510fbcce94bc82866fda4b91b9106bd10d2a70f14e9f2ed1c2cb3` |
+| 0.7.2 | 7013 | 2026-11-04 | **Publicada** | Remediación de los hallazgos de auditoría 7006/7007/0.7.1: espejo que distingue backend inalcanzable de rechazo, sesión que olvida la contraseña del ERP y la lectura pendiente, despacho serializado, cola con traza, borrado de lote sólo Administrador, intento correlacionado, histórico de Relatórios táctil y release atada al binario de producción | `0f7c2eef842510fbcce94bc82866fda4b91b9106bd10d2a70f14e9f2ed1c2cb3` |
 
 Notas:
 
@@ -62,6 +62,14 @@ Notas:
   huella oficial `ee0e404b211052b311ae0e0730606e9c7d5554315463d02f9ef33c9573c431f6`. El workflow
   `Android release` publica ese mismo archivo como asset de la release `v0.7.2` y valida el sidecar, el
   `versionCode` y el certificado antes de subirlo. No se instaló en el emulador.
+
+- **Publicación del 2026-11-04 (tag `v0.7.2`):** el tag anotado se creó sobre `8340215c` con CI verde. El
+  primer run del workflow falló en el paso que prefiere el binario de producción, porque la huella esperada
+  se declaraba en un sólo step y `set -u` abortó antes de subir el asset; el asset se subió después con
+  `gh release upload`, verificado contra el binario que sirve producción: sha256
+  `0f7c2eef842510fbcce94bc82866fda4b91b9106bd10d2a70f14e9f2ed1c2cb3`, publicado con su `.sha256`. El
+  defecto quedó corregido en `main` (`4b398146`) y la suite de contrato del workflow rechaza ahora cualquier
+  paso que lea una variable que nada declara. El tag no se movió; `v0.7.0` y `v0.7.1` conservan su asset.
 
 - **Reemplazo del 2026-11-02 (build 7006):** la build **7006** reemplazó al asset de GitHub y al binario que
   servía producción. El asset, su `.sha256`, `packages/backend/apk/trindade-0.7.0.apk`, la copia de escritorio

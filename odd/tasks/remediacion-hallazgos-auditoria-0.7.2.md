@@ -204,7 +204,7 @@ refactor con la suite enfocada. Los commits son atómicos y llevan tests y docum
   - Aceptación: AC14 (documento revisable; ejecución real pendiente).
   - Riesgo: 6. Rollback: borrar el documento.
 
-- [ ] **T15 — Entrega 0.7.2 (7013).** Specs S16, S17.
+- [x] **T15 — Entrega 0.7.2 (7013).** Specs S16, S17.
   - Pasos: `app.service.ts` (`LOCAL_APK_FILENAME`, `LOCAL_APK_BUILD_NUMBER=7013`, `FALLBACK_RELEASE.version`), APK firmado con 7013, sidecar, `packages/backend/apk/`, `docker compose build api web`, verificación de `/latest-release`, descarga y sha256; CHANGELOG, release docs, historial, README; CI verde; tag anotado `v0.7.2`; release con el binario de producción y sidecar; verificación final de tag, assets, hash y producción.
   - Aceptación: AC15–AC17.
   - Riesgo: 5 (entrega). Rollback: no se mueve ningún tag; un asset equivocado se reemplaza con `--clobber` sin crear release nueva.
@@ -256,6 +256,29 @@ Cada unidad de trabajo quedó en `main` con sus pruebas y su documentación:
 | T8–T10, B4 | `bd71717` | cierre de sesión sin contraseña ni marca de lectura, fecha del intento, `X-Trindade-Client`, y el test de `AuthContext` ejercitando el proveedor |
 | T10 | `43d5c79` | histórico de Relatórios con objetivos de 48 px y chip de solo lectura |
 | T12, B2, T14 | `c522426` | guías y KDoc sin `localStorage` ni autoría en lote, y el runbook de tablet |
+
+## 6.2 Resultado de la entrega
+
+La entrega quedó publicada el 2026-11-04:
+
+| Qué | Valor |
+| --- | --- |
+| Commit de la entrega | `8340215c` (`main`), CI `verify` y `android` en verde |
+| Tag | `v0.7.2` anotado, sobre `8340215c`; `v0.7.0` y `v0.7.1` sin mover |
+| `/api/app/latest-release` | `version v0.7.2`, `buildNumber 7013`, `apkSize 11278564` |
+| APK servido por producción | `trindade-0.7.2.apk`, sha256 `0f7c2eef842510fbcce94bc82866fda4b91b9106bd10d2a70f14e9f2ed1c2cb3` |
+| Asset de la release | el mismo binario y su `.sha256`, descargados y verificados con `sha256sum -c` |
+| Firma | huella oficial `ee0e404b211052b311ae0e0730606e9c7d5554315463d02f9ef33c9573c431f6`, `versionCode 7013`, `versionName 0.7.2` |
+| Suites | backend 726, web 558 node + 120 vitest + 112 e2e, Android 1357, typecheck limpio |
+
+El primer run del workflow sobre el tag falló antes de subir el asset: el paso que prefiere el binario de
+producción leía `EXPECTED_CERT_SHA256`, que sólo declaraba el step vecino, y `set -u` lo abortó. El asset se
+subió verificado a mano contra el binario de producción y el defecto se corrigió en `main` (`4b398146`),
+donde la suite de contrato del workflow rechaza cualquier paso que lea una variable que nada declara. El tag
+no se movió.
+
+Queda pendiente únicamente la verificación real con el ERP de la planta descrita en
+`docs/verificacion-erp-tablet.md`: desde esta máquina `192.168.25.250:1453` no es alcanzable.
 
 ## 7. Log
 
