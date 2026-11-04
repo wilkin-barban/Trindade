@@ -217,4 +217,92 @@ describe('massas report — the day the company recorded', () => {
     assert.equal(caseira.totalBoxes, 7);
     assert.equal(caseira.totalUnits, 70);
   });
+
+  /*
+   * The boxes are a presentation of the units, not a measurement of their own: the company counted 182 units
+   * of a 15-unit box, so the day occupies 13 boxes -- twelve closed and one open with the last two units.
+   * Rounding the division to one decimal, or truncating it, would show the plant a number no box ever had.
+   */
+  it('rounds the boxes up from the exact units, never from the decimal division', () => {
+    insertSeat({ entLan: 35983, code: '001192', quantity: 182, operator: 'VINICIUS R' });
+
+    const view = massasReportDayView(db, date);
+
+    const quadrada = view.products.find((product) => product.code === '1192');
+    assert.ok(quadrada);
+    assert.equal(quadrada.totalUnits, 182, 'the exact units are kept untouched');
+    assert.equal(quadrada.totalBoxes, 13);
+    assert.equal(quadrada.openBoxUnits, 2, 'the open box carries the two remaining units');
+    assert.equal(view.totalBoxes, 13);
+    assert.equal(view.totalUnits, 182);
+
+    const vinicius = view.operators[0];
+    assert.equal(vinicius.name, 'VINICIUS R');
+    assert.equal(vinicius.units, 182);
+    assert.equal(vinicius.boxes, 13);
+    assert.equal(vinicius.openBoxUnits, 2);
+    assert.equal(vinicius.products[0].boxes, 13);
+    assert.equal(vinicius.products[0].units, 182);
+    assert.equal(vinicius.products[0].openBoxUnits, 2);
+  });
+
+  it('counts one open box when the seat does not reach a full box', () => {
+    // Three units of a ten-unit box still occupy a box on the floor: showing 0,3 -- or zero, as the phone did
+    // -- tells the operator a box that left the plant never existed.
+    insertSeat({ entLan: 35949, code: '5000', quantity: 3, operator: 'JOAO H' });
+
+    const view = massasReportDayView(db, date);
+
+    const rolo = view.products.find((product) => product.code === '5000');
+    assert.ok(rolo);
+    assert.equal(rolo.totalUnits, 3);
+    assert.equal(rolo.totalBoxes, 1);
+    assert.equal(rolo.openBoxUnits, 3);
+    assert.equal(view.operators[0].boxes, 1);
+  });
+
+  it('adds the units of two partial lines before rounding, never their boxes', () => {
+    // Two seats of three units in the same ten-unit box are one open box, not two: rounding each line first
+    // would have the operator report a box the plant never packed.
+    insertSeat({ entLan: 9101, code: '5000', quantity: 3, operator: 'JOAO H' });
+    insertSeat({ entLan: 9102, code: '5000', quantity: 3, operator: 'JOAO H' });
+
+    const view = massasReportDayView(db, date);
+
+    const joao = view.operators[0];
+    assert.equal(joao.products.length, 1);
+    assert.equal(joao.products[0].units, 6);
+    assert.equal(joao.products[0].boxes, 1);
+    assert.equal(joao.products[0].openBoxUnits, 6);
+    assert.equal(joao.boxes, 1);
+  });
+
+  it('rounds the product of the day from every operator units', () => {
+    // The product total is the one the collective summary reads: six units in total occupy one box, whatever
+    // each operator's own rounding says.
+    insertSeat({ entLan: 9201, code: '5000', quantity: 3, operator: 'JOAO H' });
+    insertSeat({ entLan: 9202, code: '5000', quantity: 3, operator: 'VIVIANE' });
+
+    const view = massasReportDayView(db, date);
+
+    const rolo = view.products.find((product) => product.code === '5000');
+    assert.ok(rolo);
+    assert.equal(rolo.totalUnits, 6);
+    assert.equal(rolo.totalBoxes, 1);
+    assert.equal(view.totalBoxes, 1);
+    assert.equal(view.operators.find((operator) => operator.name === 'JOAO H')?.boxes, 1);
+    assert.equal(view.operators.find((operator) => operator.name === 'VIVIANE')?.boxes, 1);
+  });
+
+  it('leaves a whole-box seat without an open box to explain', () => {
+    insertSeat({ entLan: 9301, code: '84', quantity: 940, operator: 'JAIME' });
+
+    const view = massasReportDayView(db, date);
+
+    const disco = view.products.find((product) => product.code === '84');
+    assert.ok(disco);
+    assert.equal(disco.totalBoxes, 47);
+    assert.equal(disco.openBoxUnits, 0);
+    assert.equal(view.operators[0].openBoxUnits, 0);
+  });
 });

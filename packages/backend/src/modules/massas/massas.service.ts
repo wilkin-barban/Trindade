@@ -11,6 +11,8 @@ export interface MassaProductTotal {
   unitsPerBox: number;
   totalBoxes: number;
   totalUnits: number;
+  /** Units left in the box the total leaves open; zero when every box closed. */
+  openBoxUnits: number;
 }
 
 export interface MassaIndividualLaunch {
@@ -124,6 +126,8 @@ export function massasLaunchDayView(db: Database.Database, date: string): Massas
       unitsPerBox: massa.unitsPerBox,
       totalBoxes: productBoxes,
       totalUnits: productUnits,
+      // A launch stores whole boxes, so the launch-side view never has an open box to explain.
+      openBoxUnits: 0,
     };
   });
 

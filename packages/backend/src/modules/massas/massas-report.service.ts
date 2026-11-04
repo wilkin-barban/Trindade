@@ -27,6 +27,8 @@ export interface MassasReportOperatorProduct {
   name: string;
   boxes: number;
   units: number;
+  /** Units left in the open box of this product's total, or zero when the last box closed. */
+  openBoxUnits: number;
 }
 
 /**
@@ -47,6 +49,8 @@ export interface MassasReportOperator {
   username: string | null;
   boxes: number;
   units: number;
+  /** Units the operator left in open boxes, added product by product; zero when every box closed. */
+  openBoxUnits: number;
   products: MassasReportOperatorProduct[];
   /** True when the operator only exists in the ERP, so the screen can say so. */
   erpOnly: boolean;
@@ -126,23 +130,46 @@ function emptyProductTotals(): MassaProductTotal[] {
     unitsPerBox: product.unitsPerBox,
     totalBoxes: 0,
     totalUnits: 0,
+    openBoxUnits: 0,
   }));
+}
+
+/**
+ * How many boxes the units occupy: the division rounded up, never left with decimals.
+ *
+ * The company counts units and the plant packs boxes; 182 units of a 15-unit box are 12 closed boxes and one
+ * open with two units, so the day occupies 13. Keeping `12.13` -- or truncating it to 12 -- shows a number no
+ * box ever had and hides that the last box was not full.
+ */
+export function boxesForUnits(units: number, unitsPerBox: number): number {
+  if (!Number.isFinite(units) || units <= 0) return 0;
+  if (!Number.isFinite(unitsPerBox) || unitsPerBox <= 0) return 0;
+  return Math.ceil(units / unitsPerBox);
+}
+
+/** The units left in the open box, or zero when the last box is full. */
+export function openBoxUnits(units: number, unitsPerBox: number): number {
+  if (!Number.isFinite(units) || units <= 0) return 0;
+  if (!Number.isFinite(unitsPerBox) || unitsPerBox <= 0) return 0;
+  const remainder = units % unitsPerBox;
+  // The ERP can send a fractional quantity for a supply; a massa seat is whole units. Three decimals keep
+  // floating noise out of the note without rounding away a real remainder.
+  return remainder > 0 ? Number(remainder.toFixed(3)) : 0;
 }
 
 function addProduct(
   products: Map<string, MassasReportOperatorProduct>,
   code: string,
   name: string,
-  boxes: number,
   units: number,
 ): void {
   const existing = products.get(code);
   if (existing) {
-    existing.boxes += boxes;
+    // The units are the measurement; the boxes are derived once the total is known.
     existing.units += units;
     return;
   }
-  products.set(code, { code, name, boxes, units });
+  products.set(code, { code, name, boxes: 0, units, openBoxUnits: 0 });
 }
 
 /**
@@ -191,16 +218,32 @@ export function massasReportDayView(db: Database.Database, date: string): Massas
       operators.set(key, bucket);
     }
 
-    const boxes = product.unitsPerBox > 0 ? seat.quantity / product.unitsPerBox : 0;
     if (!bucket.entLans.includes(seat.ent_lan)) bucket.entLans.push(seat.ent_lan);
-    addProduct(bucket.products, product.code, product.name, boxes, seat.quantity);
-    product.totalBoxes += boxes;
+    addProduct(bucket.products, product.code, product.name, seat.quantity);
     product.totalUnits += seat.quantity;
+  }
+
+  // One rounding per product, from every unit the day counted for it. The product total is what the
+  // collective summary reads, so it cannot inherit a rounding already applied to an operator.
+  const unitsPerBoxByCode = new Map(MASSAS.map((product) => [product.code, product.unitsPerBox]));
+  for (const product of products) {
+    product.totalBoxes = boxesForUnits(product.totalUnits, product.unitsPerBox);
+    product.openBoxUnits = openBoxUnits(product.totalUnits, product.unitsPerBox);
   }
 
   const operatorList: MassasReportOperator[] = [...operators.values()]
     .map((operator) => {
-      const items = [...operator.products.values()];
+      // Each product in the operator's breakdown is rounded once from its own units. The operator total adds
+      // those boxes because the products can have different box sizes; there is no single units-per-box to
+      // divide the mixed units by.
+      const items = [...operator.products.values()].map((item) => {
+        const unitsPerBox = unitsPerBoxByCode.get(item.code) ?? 0;
+        return {
+          ...item,
+          boxes: boxesForUnits(item.units, unitsPerBox),
+          openBoxUnits: openBoxUnits(item.units, unitsPerBox),
+        };
+      });
       return {
         operatorKey: operatorKey(operator.name),
         name: operator.name,
@@ -208,6 +251,7 @@ export function massasReportDayView(db: Database.Database, date: string): Massas
         username: operator.username,
         boxes: items.reduce((sum, item) => sum + item.boxes, 0),
         units: items.reduce((sum, item) => sum + item.units, 0),
+        openBoxUnits: items.reduce((sum, item) => sum + item.openBoxUnits, 0),
         products: items,
         erpOnly: operator.erpOnly,
         onlyErp: operator.erpOnly,
