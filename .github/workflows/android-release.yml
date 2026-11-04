@@ -17,6 +17,14 @@ on:
 permissions:
   contents: read
 
+# The public fingerprint of the release certificate. A fingerprint is not a secret -- it is what anyone
+# installing the APK can compare against -- and it lives here, once, because two steps verify the same
+# key: the one that checks the APK this job built and the one that checks the binary the tag carries.
+# Declaring it only on one of them is how a release failed halfway: the other step read an empty
+# variable under `set -u` and aborted after the tag already existed.
+env:
+  EXPECTED_CERT_SHA256: 'EE:0E:40:4B:21:10:52:B3:11:AE:0E:07:30:60:6E:9C:7D:55:54:31:54:63:D0:2F:9E:F3:3C:95:73:C4:31:F6'
+
 jobs:
   # The build runs inside the same SDK container CI and the local lane use (`make ci-android`), which is
   # what makes a third-party setup-android action unnecessary: the toolchain is the one this project
@@ -239,11 +247,6 @@ jobs:
         # is not enough, it has to be signed by *this* project's release key, because Android refuses to
         # install an APK over an existing install when the signing key differs -- so an APK signed by the
         # wrong key is not a bad release, it is no release at all, discovered on the crew's phones.
-        env:
-          # The public fingerprint of the release certificate. A fingerprint is not a secret: it is what
-          # anyone installing the APK can compare against, and pinning it here is what turns "the APK is
-          # signed" into "the APK is signed by the key whose fingerprint we published".
-          EXPECTED_CERT_SHA256: 'EE:0E:40:4B:21:10:52:B3:11:AE:0E:07:30:60:6E:9C:7D:55:54:31:54:63:D0:2F:9E:F3:3C:95:73:C4:31:F6'
         run: |
           set -euo pipefail
           unsigned="packages/android/app/build/outputs/apk/release/app-release-unsigned.apk"

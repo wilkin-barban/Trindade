@@ -643,6 +643,12 @@ class TestProductionBinaryPreference(unittest.TestCase):
     def setUp(self) -> None:
         self.content = load_workflow_text()
         self.script = extract_step_script(self.content, self.STEP)
+        # The fingerprint comes from the workflow, not from this file: the step reads it at run time, and a
+        # copy here would keep these tests green while the release job died on an unbound variable.
+        import yaml  # type: ignore
+
+        self.declared_cert = (yaml.safe_load(self.content).get("env") or {}).get("EXPECTED_CERT_SHA256")
+        self.assertEqual(self.CERT, self.declared_cert, "the workflow must declare the release fingerprint once")
 
     def _workspace(self, *, version_code: str = "7013", cert: str | None = None) -> tempfile.TemporaryDirectory:
         tmp = tempfile.TemporaryDirectory()
@@ -685,7 +691,7 @@ class TestProductionBinaryPreference(unittest.TestCase):
             "VERSION_CODE": version_code,
             "APK_NAME": "trindade-0.7.2.apk",
             "BUILD_TOOLS": str(tools),
-            "EXPECTED_CERT_SHA256": self.CERT,
+            "EXPECTED_CERT_SHA256": self.declared_cert,
             "FAKE_VERSION_CODE": version_code,
             "FAKE_VERSION_NAME": "0.7.2",
             "FAKE_CERT": cert,
@@ -743,6 +749,80 @@ class TestProductionBinaryPreference(unittest.TestCase):
 
         self.assertIn("PRODUCTION_ASSET_SHA256", staging)
         self.assertIn("release-assets", staging)
+
+
+class TestEveryStepVariableIsDeclared(unittest.TestCase):
+    """A step that reads a variable nobody declared fails in the release, not in review.
+
+    This is what happened to the step that prefers the production binary: it compared the signer digest
+    against `EXPECTED_CERT_SHA256`, declared `env:` on a sibling step only, and `set -u` aborted the
+    publish after the tag existed. The unit tests around that step injected the variable themselves, so
+    they stayed green while the workflow could not run. A step's `run:` block may only read what the
+    workflow, its job, or the step itself declares -- or what the step assigns before reading.
+    """
+
+    SCRIPT = "android-release.yml"
+
+    #: Variables the runner provides, plus the shell's own. None of them is ours to declare.
+    BUILTIN = {
+        "HOME", "PATH", "PWD", "OLDPWD", "SHELL", "IFS", "LANG", "LC_ALL", "TMPDIR", "USER", "LOGNAME",
+        "HOSTNAME", "SHLVL", "BASH", "BASH_SOURCE", "BASH_VERSION", "RANDOM", "SECONDS", "GITHUB_ENV",
+        "GITHUB_OUTPUT", "GITHUB_PATH", "GITHUB_STEP_SUMMARY", "GITHUB_ACTIONS", "RUNNER_OS",
+        "BASH_REMATCH",
+    }
+
+    def _workflow(self) -> dict:
+        import yaml  # type: ignore
+
+        return yaml.safe_load(load_workflow_text())
+
+    def test_no_step_reads_an_undeclared_variable(self) -> None:
+        workflow = self._workflow()
+        workflow_env = set(workflow.get("env") or {})
+        failures: list[str] = []
+
+        for job_id, job in (workflow.get("jobs") or {}).items():
+            job_env = workflow_env | set(job.get("env") or {})
+            # What earlier steps of this job handed to the next one, through $GITHUB_ENV.
+            exported: set[str] = set()
+            for step in job.get("steps") or []:
+                script = step.get("run")
+                if not script:
+                    continue
+                declared = job_env | set(step.get("env") or {}) | exported
+                # `NAME=value`, `export NAME=value` and the `printf 'NAME=%s\n' >> "$GITHUB_ENV"` idiom.
+                assigned = set(re.findall(r"(?m)^\s*(?:export\s+)?([A-Z][A-Z0-9_]+)=", script))
+                assigned |= set(re.findall(r"printf\s+'([A-Z][A-Z0-9_]+)=", script))
+                # A read with a default (`${NAME:-x}`, `${NAME-d}`) cannot abort under `set -u`, so it needs
+                # no declaration; a bare read does, and that is the one that stops a release halfway.
+                reads_with_default = set(re.findall(r"\$\{([A-Z][A-Z0-9_]+):?-", script))
+                used = set(re.findall(r"\$\{?([A-Z][A-Z0-9_]{2,})\}?", script))
+                missing = {
+                    name
+                    for name in used - declared - assigned - reads_with_default - self.BUILTIN
+                    if not name.startswith(("GITHUB_", "RUNNER_", "INPUT_"))
+                }
+                if missing:
+                    failures.append(f"{job_id} / {step.get('name')}: {sorted(missing)}")
+                exported |= assigned
+
+        self.assertEqual([], failures, "steps read variables no env declares: " + "; ".join(failures))
+
+    def test_the_production_binary_step_runs_with_the_workflow_environment(self) -> None:
+        """The step is executed with what the YAML declares, not with a convenient hand-made env."""
+        workflow = self._workflow()
+        job = workflow["jobs"]["build"]
+        declared = set(workflow.get("env") or {}) | set(job.get("env") or {})
+        steps = job["steps"]
+        index = next(i for i, s in enumerate(steps) if s.get("name") == TestProductionBinaryPreference.STEP)
+        step = steps[index]
+        declared |= set(step.get("env") or {})
+        # The variables the earlier steps wrote to $GITHUB_ENV are the workflow's environment too.
+        for earlier in steps[:index]:
+            declared |= set(re.findall(r"printf\s+'([A-Z][A-Z0-9_]+)=", earlier.get("run") or ""))
+
+        needed = {"VERSION_NAME", "VERSION_CODE", "APK_NAME", "BUILD_TOOLS", "EXPECTED_CERT_SHA256"}
+        self.assertTrue(needed <= declared, f"the workflow declares {sorted(declared)}, missing {sorted(needed - declared)}")
 
 
 if __name__ == "__main__":
