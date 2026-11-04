@@ -123,3 +123,18 @@ L3 — Investigación previa (read-only, sin cambios): `aero_movements` de produ
 - **L12 — 2026-11-04, cierre.** Pendiente conocido y aceptado: los asientos ERP-only fraccionarios no se
   importan a Trindade; se muestran para que el día cuadre. No se instaló el APK en ningún emulador ni teléfono
   de fábrica.
+
+- **L13 — 2026-11-04, CI del tag (`41873683331`) y corrección.**
+  `MassasHistoryViewModelTest.toggleHelpDialog_updatesState` falló con `AssertionError` en la línea 44: el CI del
+  tag corre sobre `aaac1b50`, donde `MassasHistoryViewModel` escribía `_state.value = _state.value.copy(...)`. Ese
+  read y ese write no son atómicos: un toque en el botón de ayuda entre ambos se perdía al aplicarse el snapshot
+  que la carga había leído antes. Se cambió a `MutableStateFlow.update` en las tres escrituras y se agregó un test
+  con repositorio bloqueado y dispatcher de tiempo virtual que fija el orden de los dos eventos (carga en vuelo,
+  luego toggle, luego fin de la carga). Commit `703edb13`, test filtrado `BUILD SUCCESSFUL` y CI de `main`
+  `41880161566` verde. El tag y la release no se movieron: el rerun del CI del tag (`gh run rerun 41873683331
+  --failed`) quedó verde sobre `aaac1b50`; el `verify` no se re-ejecutó porque ya había pasado.
+- **L14 — 2026-11-04, presentación de la release.** El título y el encabezado publicaban el build interno como
+  valor. Se editó sólo la presentación de `v0.7.3`: título `Trindade Massas 0.7.3`, notas sin `7014` (0
+  ocurrencias), mismo contenido funcional. Tag, `publishedAt` y assets intactos (`trindade-0.7.3.apk`
+  11.295.876 bytes y su `.sha256`). El mensaje del tag anotado sigue nombrando el build interno; es metadata del
+  tag y no se toca sin moverlo, que está fuera de alcance.
