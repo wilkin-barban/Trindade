@@ -34,7 +34,7 @@ La guía de firma y publicación está en [release-android.md](release-android.m
 | 0.7.0 | 7006 | 2026-11-02 | Reemplazada | Histórico de cargamento cerrado en solo lectura, reactivación de lote y reporte, selector de chapas libres, rechazos de tanda en un paso y sync ERP limitado al día abierto | `f77643b7a5442cf2a74d721f621a3977612ae074d2624c4fe735bb38441f3702` |
 | 0.7.0 | — | 2026-11-03 | Reemplazada | Payload de movimientos alineado con el puente web, vista de solo lectura de días cerrados en el Histórico de Cargamento y orden de Lanzamiento de Masas de la web; asset de GitHub | `5dd77e331edb1aace6e2b656e899697819a506068dc375528c8dc6f5a5ade922` |
 | 0.7.1 | — | 2026-11-03 | Reemplazada | Versión pública servida por `latest-release`; el endpoint expone el `buildNumber` interno y el detector lo usa cuando la versión no cambia | `41f87a148e28cc1f40bb2ac25a2e70f31587c598e806f2c65efa37411a46c545` |
-| 0.7.1 | 7012 | 2026-11-03 | **Publicada** | Conciliación automática de Masas después de cada envío en Android y web, y contraseña del ERP en la sesión de la pestaña | `f325edb6d3c03eba2f058b7aa099961fa99ba12243c6ffbec2d8e44e7683de1f` |
+| 0.7.1 | 7012 | 2026-11-03 | **Publicada** | Conciliación automática de Masas después de cada envío en Android y web, y contraseña del ERP en la sesión de la pestaña; asset de GitHub Release `v0.7.1` y binario de producción | `f325edb6d3c03eba2f058b7aa099961fa99ba12243c6ffbec2d8e44e7683de1f` |
 
 Notas:
 
@@ -46,8 +46,15 @@ Notas:
   huella oficial. El código de build es interno y no se publica. No se instaló en el emulador.
 
   El tamaño coincide con el de la build anterior: por eso el `buildNumber` es lo único que distingue esta
-  actualización, que es exactamente el caso para el que se hizo. Sin tag ni release de GitHub: el binario vive
-  en producción y en `packages/backend/apk/`.
+  actualización, que es exactamente el caso para el que se hizo.
+
+- **Publicación del 2026-11-04 (tag `v0.7.1`):** el tag anotado se creó sobre el commit de `main` con CI verde y
+  el workflow `Android release` firmó, verificó la huella oficial y publicó la GitHub Release `v0.7.1`. El
+  workflow adoptó como código de build el interno que producción servía en lugar del derivado del tag, que
+  habría sido un downgrade. El asset que quedó es el binario de producción: mismo digest
+  `f325edb6…`, publicado con su `.sha256`; el APK que compiló el propio workflow tenía la misma versión y la
+  misma firma pero un digest distinto, así que se reemplazó para que release y producción coincidieran. Una
+  sola release, sin assets heredados de `v0.7.0`, que no se movió.
 - **Reemplazo del 2026-11-02 (build 7006):** la build **7006** reemplazó al asset de GitHub y al binario que
   servía producción. El asset, su `.sha256`, `packages/backend/apk/trindade-0.7.0.apk`, la copia de escritorio
   y `https://trindademasas.duckdns.org/api/app/download-apk` apuntaron al mismo digest
@@ -86,7 +93,7 @@ aapt2 dump badging trindade-0.7.1.apk | head -1
 Resultado esperado para el APK actual de producción:
 
 - `sha256sum -c` imprime `OK` y el digest es
-  `41f87a148e28cc1f40bb2ac25a2e70f31587c598e806f2c65efa37411a46c545`.
+  `f325edb6d3c03eba2f058b7aa099961fa99ba12243c6ffbec2d8e44e7683de1f`.
 - `apksigner` reporta `Verifies` con APK Signature Scheme v2 y un solo firmante.
 - El certificado SHA-256 es
   `ee0e404b211052b311ae0e0730606e9c7d5554315463d02f9ef33c9573c431f6`.
@@ -95,9 +102,9 @@ Resultado esperado para el APK actual de producción:
 - El tamaño es de `11.277.888` bytes.
 
 El APK servido por producción (`GET /api/app/download-apk`) es el **mismo build actual**: su `.sha256`,
-`packages/backend/apk/trindade-0.7.1.apk` y la descarga de producción comparten el digest
-`41f87a148e28cc1f40bb2ac25a2e70f31587c598e806f2c65efa37411a46c545`. Verificar siempre con `aapt2`, no solo con
-el nombre del archivo.
+`packages/backend/apk/trindade-0.7.1.apk`, la descarga de producción y el asset de la GitHub Release `v0.7.1`
+comparten el digest `f325edb6d3c03eba2f058b7aa099961fa99ba12243c6ffbec2d8e44e7683de1f`. Verificar siempre con
+`aapt2`, no solo con el nombre del archivo.
 
 ## 3. Verificar la instalación en un dispositivo
 

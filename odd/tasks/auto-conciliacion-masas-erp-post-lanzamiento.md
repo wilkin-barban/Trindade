@@ -78,6 +78,10 @@ Un `200` en `/entradasitem` dice que el ERP recibió la entrada en su buffer. El
 - La 0.7.1 publicada ya corrige `_method` en cuerpo/query y `ENTSAI: "E"` (L1) y su APK contiene la cadena `_method` en el `dex`; el 7011 se registró después de ese fix (`bbeafc9`, 14:01 local; registro 17:14). La tablet corre **7008 / 0.7.0**, anterior al fix: eso explica los cuatro 500 y significa que **la lectura sólo puede verificarse de punta a punta desde la tablet actualizada**.
 - `http://192.168.25.250:1453` no es alcanzable desde este equipo (`curl` 000): el ERP de la planta sólo se ve desde su red.
 
+*Actualizado el 2026-11-04:* esta sección describe el estado del 2026-11-03 al abrir el ODD. Después de T7 y T8 la
+instancia sirve el build 7012 con digest `f325edb6…`, y el tag `v0.7.1` y su release existen; ver L7 y la
+evidencia de T8.
+
 ## 3. Invariantes y decisiones
 
 ### 3.1 Cerradas
@@ -196,11 +200,22 @@ Fase 1 — Android (T1, T2). Fase 2 — Web (T3, T4). Fase 3 — contrato y conc
     reconstruidos y sanos; `latest-release` público responde `buildNumber 7012`, `apkSize 11277888` y la
     descarga coincide con el sha256. Sin tag ni release de GitHub en esta fase.
   - Commit: `chore(release): ship Android 7012 with the post-launch reconciliation`.
-- [ ] **T8 — Publicación 0.7.1.** Spec S18. Depende de T7 y de CI verde en el commit etiquetado. Riesgo alto (entrega).
+- [x] **T8 — Publicación 0.7.1.** Spec S18. Depende de T7 y de CI verde en el commit etiquetado. Riesgo alto (entrega).
   - Pasos: documentar 0.7.1, el build interno y `sessionStorage`; cambiar el workflow de release para que el `versionCode` del tag sea el mayor entre el derivado y `LOCAL_APK_BUILD_NUMBER`, con tests; commit, push y CI verde; crear y subir el tag anotado `v0.7.1` sobre ese commit; ejecutar y vigilar el workflow `Android release`; ajustar título y notas de la release sin publicar el `versionCode`; verificar `gh release view`, la descarga, el sha256, `/api/app/latest-release` y que el tag no se movió.
   - Aceptación: S18 y AC9. No instalar en emulador ni teléfonos; no mover `v0.7.0`; no crear una segunda release.
   - Checks: `python3 scripts/test_android_release_workflow.py`, CI del commit etiquetado, run del workflow del tag, `gh release view v0.7.1`, `sha256sum` del asset descargado contra `f325edb6…`, `curl /api/app/latest-release`, `git rev-parse v0.7.1`.
   - Commit: `ci(release): derive the tag build from the internal build production serves` (workflow, tests, documentación); la publicación en sí no lleva commit.
+  - Evidencia: CI del commit `3a6a1f0` en verde (`verify` y `android`; el test del workflow corrió 19 casos en CI).
+    Tag anotado `v0.7.1` = objeto `bfffd74…`, commit `3a6a1f0`; `v0.7.0` sigue en `4f41400`. El workflow
+    `Android release` 41747341971 leyó el build interno, adoptó ese número sobre el del tag (7001) y el APK
+    empaquetado declaró `versionName 0.7.1` con la huella oficial `EE0E404B…`. Release
+    <https://github.com/wilkinbarban/Trindade/releases/tag/v0.7.1> publicada (no borrador), con
+    `trindade-0.7.1.apk` y su `.sha256`; el asset se reemplazó por el binario de producción para que el digest
+    coincidiera (el del workflow era idéntico en versión y firma, distinto en bytes) y la descarga verificada da
+    `f325edb6…`. `/api/app/latest-release` responde `v0.7.1`, `buildNumber 7012`, `apkSize 11277888`; la
+    descarga pública coincide; `api` y `web` sanos; ninguna release duplicada.
+  - Commit: `ci(release): derive the tag build from the internal build production serves` (workflow, tests,
+    documentación) y `docs(release): record the published 0.7.1 release`; la publicación en sí no lleva commit.
 
 ## 7. Criterios de aceptación
 

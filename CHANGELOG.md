@@ -5,8 +5,8 @@ Todos los cambios relevantes del proyecto se documentan en este archivo. El form
 [SemVer](https://semver.org/lang/es/).
 
 Las versiones **0.6.x** se distribuyeron por `GET /api/app/download-apk` y no tienen tag propio en GitHub.
-La release **v0.7.0** es la primera de la línea 0.7.x publicada en GitHub Releases. El detalle de builds,
-hashes y verificaciones está en [docs/release-android-historial.md](docs/release-android-historial.md).
+Las releases **v0.7.0** y **v0.7.1** se publicaron en GitHub Releases. El detalle de builds, hashes y
+verificaciones está en [docs/release-android-historial.md](docs/release-android-historial.md).
 
 ---
 
@@ -42,6 +42,8 @@ hashes y verificaciones está en [docs/release-android-historial.md](docs/releas
 
 - APK de producción: `versionName 0.7.1`, 11.277.888 bytes, sha256
   `f325edb6d3c03eba2f058b7aa099961fa99ba12243c6ffbec2d8e44e7683de1f`. El código de build es interno.
+- GitHub Release `v0.7.1` con ese mismo binario y su `.sha256`. El tag se creó cuando el commit ya estaba en
+  verde y no se movió; `v0.7.0` conserva su asset histórico.
 
 ---
 
