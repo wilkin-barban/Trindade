@@ -33,8 +33,10 @@ La regla se aplica en el servidor: un día cerrado no admite altas, ediciones ni
 ### ERP
 
 El reporte del día se alimenta del espejo de movimientos de Aero32 (`aero_movements`), no de
-`massa_launches`. Los diez códigos del catálogo de masas se clasifican como producción; el resto de los asientos
-del día se clasifica como **Recepción de Insumos**. El detalle está en
+`massa_launches`. El catálogo de masas son **diez códigos** (`1045, 39, 60, 84, 91, 1192, 5000, 1047, 22,
+1616`): ésos son producción y cualquier otro código del día es **Insumo**, incluidos los productos terceirizados
+que la planta revende. La regla vive en `isMassa(code)` y no mira la descripción, así que un asiento descrito
+«MASSA P PIZZA KIT» con un código ajeno sigue siendo insumo. El detalle está en
 [integracion-aero-masas-web.md](integracion-aero-masas-web.md).
 
 ## 2. Calculadora de Assaí

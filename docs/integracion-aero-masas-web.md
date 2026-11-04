@@ -108,9 +108,21 @@ En la bitácora del servidor cada lectura deja su par `read_history` `requested`
 `attemptId` y la fecha en `note`, igual que el botón. Es la forma de distinguir «el operario leyó» de «la
 lectura automática no llegó».
 
-Lo que el espejo guarda es **todo** lo que el ERP devolvió ese día, insumos incluidos. Masas sólo muestra el
-catálogo de masas; los insumos son de **Recebimento** y **Relatório**. Ocultarlos en una tabla no es filtrarlos
-en la base.
+Lo que el espejo guarda es **todo** lo que el ERP devolvió ese día, insumos incluidos. La clasificación es una
+sola regla por código, `isMassa(code)` en `packages/backend/src/modules/stock/stock.catalog.ts`: **los diez
+códigos de masa** (`1045, 39, 60, 84, 91, 1192, 5000, 1047, 22, 1616`) son producción; **cualquier otro código es
+insumo**, aunque su descripción empiece con «MASSA P PIZZA». La descripción no decide nunca. Masas muestra esos
+diez; los insumos son de **Insumos** (Recebimento) y **Relatório**. Ocultarlos en una tabla no es filtrarlos en la
+base: el espejo se guarda completo y se clasifica al leer.
+
+## 3.1 El mensaje de WhatsApp del día
+
+El botón **Compartilhar** de Lançamento de Massas arma el mensaje desde las **filas unificadas**, no desde
+`launches`: los lanzamientos locales y los asientos del espejo, deduplicados por asiento (`ent_lan`) y por
+lanzamiento. Por eso un trabajador que sólo existe en el ERP —la tableta lo registró y Trindade no lo lanzó—
+aparece en el mensaje con su nombre marcado «(só ERP)», sus productos y sus cajas. La lista se filtra por los diez
+códigos del catálogo, así que un insumo nunca entra aunque su descripción diga «MASSA». Web y Android generan el
+mismo texto para el mismo día.
 
 ## 4. Configuración en la web
 

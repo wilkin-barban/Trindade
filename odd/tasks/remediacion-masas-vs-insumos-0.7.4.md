@@ -44,6 +44,25 @@ cambia el catálogo ni la base: unifica el predicado, lo prueba como invariante 
   mueve un tag: se corrige, se sube el asset verificado y se documenta. El host ERP de fábrica sigue inalcanzable y
   no se inventan pruebas reales contra él.
 
+- **S10 — WhatsApp con los trabajadores Só ERP, en web y Android.** El mensaje de Compartilhar por WhatsApp de
+  Lançamento de Massas se construye desde las filas unificadas (lanzamientos locales + espejo del ERP), no desde
+  `launches` solo. Debe incluir a los operarios que existen únicamente en el ERP y sus masas, con su nombre marcado
+  «Só ERP», sus productos y sus unidades y cajas. Dos clientes, un mismo texto.
+- **S11 — Sin duplicados y sin insumos en el mensaje.** Un lanzamiento local ya conciliado con su asiento del ERP
+  aparece una sola vez: la deduplicación es la de las filas unificadas (por `entLan`/lanzamiento), no una segunda
+  regla. Sólo entran los 10 códigos de masa: un asiento de insumo del espejo nunca aparece en el mensaje, aunque su
+  descripción diga «MASSA».
+- **S12 — Android: la caja abierta es un dato, no una explicación.** Bajo el operario o el producto del resumen,
+  cuando `openBoxUnits > 0`, se muestra únicamente un dato compacto —«1 caixa aberta · 2 un» / «1 caja abierta ·
+  2 un»—; se elimina la frase larga «inclui 1 caixa aberta», la explicación tipo `massas_import_hint_whole_boxes`
+  («no cierran cajas enteras…») y no quedan dos notas repitiendo lo mismo. El significado y la clasificación no
+  cambian: sigue diciendo que hay una caja abierta y cuántas unidades tiene.
+- **S13 — Pruebas RED/GREEN de los dos requisitos.** Web: un operario Só ERP aparece en el mensaje con sus masas y
+  sin insumos; un lanzamiento local conciliado no se duplica. Android: el mensaje es idéntico en contenido al de la
+  web para el mismo día, y la fila del resumen ya no muestra la explicación larga y sí el dato compacto cuando hay
+  caja abierta.
+- **S14 — Los textos existen en ES y PT** en los dos clientes, y la paridad de claves de Android sigue verde.
+
 ## Tasks
 
 | ID | Specs | Ruta | Commit |
@@ -58,6 +77,11 @@ cambia el catálogo ni la base: unifica el predicado, lo prueba como invariante 
 | T8 | S9 | Suites completas, typecheck y APK firmado 0.7.4 / 7015 | — |
 | T9 | S9 | Imágenes, despliegue y verificación de `/api/app/latest-release` | — |
 | T10 | S9 | CI de main, tag anotado `v0.7.4` y release con APK y sidecar verificados | — |
+| T11 | S10-S11, S13 | Web: mensaje de WhatsApp desde filas unificadas, con Só ERP y sin insumos | — |
+| T12 | S10-S11, S13 | Android: mismo mensaje desde filas unificadas, paridad de contenido con la web | — |
+| T13 | S12-S13 | Android: dato compacto de caja abierta y fuera la explicación larga | — |
+| T14 | S14 | i18n ES/PT de la nota compacta y los textos nuevos en ambos clientes | — |
+| T15 | S10-S14 | Docs, CHANGELOG y notas de release con los dos requisitos nuevos | — |
 
 ## Log
 
@@ -114,3 +138,46 @@ cambia el catálogo ni la base: unifica el predicado, lo prueba como invariante 
   >   host ERP de fábrica sigue inalcanzable; no inventes pruebas reales.
   > - Todo a main, sin ramas. Reporta commits, tests, CI, hashes, release y pendientes. Trabaja en ciclos de 5 minutos
   >   y no te desvíes a features ajenas.
+
+- **L2 — 2026-11-04, segundo pedido del usuario (verbatim).**
+
+  > Añade dos requisitos aprobados al alcance actual 0.7.4/7015, sin cambiar el catálogo de 10 ni la clasificación
+  > de insumos:
+  >
+  > 1) WhatsApp (web y Android): el mensaje de Compartilhar por WhatsApp del módulo Lançamento de Massas debe
+  > incluir a los trabajadores que solo existen en el ERP (Só ERP) y sus masas, además de los lanzamientos locales.
+  > Debe construirse desde las filas unificadas (launches + espejo; deduplicadas por ent_lan/lanzamiento), no solo
+  > desde /. Incluye su nombre con la marca  cuando corresponda, sus productos y unidades/cajas. Excluye insumos:
+  > solo los 10 códigos de masa. Paridad exacta web/Android.
+  >
+  > 2) Android, sección de lanzamientos/resumen: elimina la explicación redundante que aparece debajo del operario
+  > cuando hay cajas abiertas o unidades sueltas (la frase tipo  / explicación de que no cierra cajas enteras). Deja
+  > únicamente un dato compacto, por ejemplo  / , solo cuando . No muestres la explicación larga ni dos notas
+  > repitiendo lo mismo. No cambies el significado ni la clasificación.
+  >
+  > Tests RED/GREEN en ambos clientes: un operario Só ERP aparece en el WhatsApp con sus masas y no aparecen
+  > insumos; un lanzamiento local no se duplica si está conciliado; Android no muestra la explicación larga debajo
+  > del operario y sí el dato compacto de caja abierta. Actualiza ODD, i18n, CHANGELOG y release notes. Mantén
+  > 0.7.4/7015, tag/release, CI e imagen según la directiva vigente.
+
+- **L3 — 2026-11-04, precisión del usuario sobre L2 (verbatim).**
+
+  > Añade dos requisitos aprobados al alcance actual 0.7.4/7015, sin cambiar el catálogo de 10 ni la clasificación
+  > de insumos:
+  >
+  > 1) WhatsApp (web y Android): el mensaje de Compartilhar por WhatsApp del módulo Lançamento de Massas debe
+  > incluir a los trabajadores que solo existen en el ERP (Só ERP) y sus masas, además de los lanzamientos locales.
+  > Debe construirse desde las filas unificadas (launches + espejo; deduplicadas por ent_lan/lanzamiento), no solo
+  > desde massa_launches/view.launches. Incluye su nombre con la marca "(só ERP)" cuando corresponda, sus productos
+  > y unidades/cajas. Excluye insumos: solo los 10 códigos de masa. Paridad exacta web/Android.
+  >
+  > 2) Android, sección de lanzamientos/resumen: elimina la explicación redundante que aparece debajo del operario
+  > cuando hay cajas abiertas o unidades sueltas (la frase tipo massas_import_hint_whole_boxes / explicación de que
+  > no cierra cajas enteras). Deja únicamente un dato compacto, por ejemplo "1 caixa aberta · 2 un" / "1 caja
+  > abierta · 2 un", solo cuando openBoxUnits sea mayor que 0. No muestres la explicación larga ni dos notas
+  > repitiendo lo mismo. No cambies el significado ni la clasificación.
+  >
+  > Tests RED/GREEN en ambos clientes: un operario Só ERP aparece en el WhatsApp con sus masas y no aparecen
+  > insumos; un lanzamiento local no se duplica si está conciliado; Android no muestra la explicación larga debajo
+  > del operario y sí el dato compacto de caja abierta. Actualiza ODD, i18n, CHANGELOG y release notes. Mantén
+  > 0.7.4/7015, tag/release, CI e imagen según la directiva vigente.
