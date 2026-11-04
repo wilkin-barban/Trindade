@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
 import { aeroMovementsTableExists, listAeroMovements, type AeroMovement } from '../integration/aero.movements.service.js';
-import { MASSAS } from '../stock/stock.catalog.js';
+import { erpCodeKey, isMassa } from '../stock/stock.catalog.js';
 
 /**
  * The report's Recebimento section, derived from the ERP snapshot the mirror already keeps.
@@ -52,16 +52,9 @@ export interface DayReceipts {
   receipts: ReceiptLine[];
 }
 
-/**
- * The ERP pads product codes to six digits (`000084`), the catalogue writes them without padding (`84`).
- * The zeros are padding, not identity, so both sides are compared stripped -- the same rule
- * `importCodeKey` applies in the SPA.
- */
-export function erpCodeKey(code: string): string {
-  return code.trim().replace(/^0+/, '') || '0';
-}
-
-const PRODUCED_CODES: ReadonlySet<string> = new Set(MASSAS.map((product) => erpCodeKey(product.code)));
+// The padding rule lives with the catalogue now: one source of truth for the ten codes and for the key the
+// ERP writes them with.
+export { erpCodeKey };
 
 /**
  * The one rule both lenses share: an incoming entry is a supply when it is not a massa the plant produces.
@@ -70,7 +63,7 @@ const PRODUCED_CODES: ReadonlySet<string> = new Set(MASSAS.map((product) => erpC
  * inflate the count of a day that only received.
  */
 function isSupplyReceipt(movement: Pick<AeroMovement, 'movement_type' | 'product_code'>): boolean {
-  return movement.movement_type === 'E' && !PRODUCED_CODES.has(erpCodeKey(movement.product_code));
+  return movement.movement_type === 'E' && !isMassa(movement.product_code);
 }
 
 /** A day's seats split by the lens each screen counts: the plant's massas, and everything it received. */
