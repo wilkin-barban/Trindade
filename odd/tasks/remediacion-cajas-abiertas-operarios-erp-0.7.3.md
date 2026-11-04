@@ -45,8 +45,8 @@ S13. La verificación contra el ERP físico (`192.168.25.250:1453`) sigue pendie
 - [x] T8 — Suites completas, typecheck, contratos y e2e móvil/escritorio. `S1-S10`. Commit: `8a0ec4d7`. Backend 731/731 (dos corridas); web 565 node + 125 vitest; Android 1365/1365; e2e 5/5. El artefacto `packages/contracts/openapi.json` estaba desactualizado y se regeneró.
 - [x] T9 — Entrega 0.7.3/7014: `app.service.ts`, APK firmado y sidecar, docs, CHANGELOG y runbook. `S11-S13`. Commit: `b0b8e90a`. APK 11.295.876 bytes, sha256 `593ffc646efc01c4b0e7cedddfe728e9acb45544ec81a3bf4a6a1ba85576aa21`, versionCode 7014.
 - [x] T10 — Imágenes API y web, despliegue, salud y verificación de `/api/app/latest-release`, descarga y sha256. `S11`. Evidencia en el Log: `v0.7.3`/`7014`, `apkSize 11295876`, descarga sha256 `593ffc64…aa21`, web 200 con ambas traducciones en el bundle.
-- [ ] T11 — Push a `main`, CI verde, tag anotado `v0.7.3` y release con los assets verificados. `S12`. Evidencia en el Log.
-- [ ] T12 — Reporte final: commits, tests, CI, hashes, release, pendiente de ERP y confirmación de no instalación. `S13`.
+- [x] T11 — Push a `main`, CI verde, tag anotado `v0.7.3` y release con los assets verificados. `S12`. Evidencia en el Log: CI `41871841960` verde sobre `aaac1b50`; tag sobre ese commit; workflow `41873683202` verde; release `v0.7.3` con APK y sidecar, sha256 idéntico.
+- [x] T12 — Reporte final: commits, tests, CI, hashes, release, pendiente de ERP y confirmación de no instalación. `S13`. Entregado en la sesión; ninguna instalación en emuladores ni teléfonos.
 
 ## Riesgos
 
@@ -108,3 +108,18 @@ L3 — Investigación previa (read-only, sin cambios): `aero_movements` de produ
 - **L9 — 2026-11-04, build y despliegue.** APK firmado con el certificado del proyecto (mismo SHA-256 de firma que
   0.7.2): `versionCode 7014`, `versionName 0.7.3`, 11.295.876 bytes. Ímagenes api/web reconstruidas; la descarga
   servida coincide byte a byte con el archivo commiteado (sha256 `593ffc64…aa21`).
+
+- **L10 — 2026-11-04, CI rojo del primer push (`41866020540`).** El job `android` falló con un solo test:
+  `ReportDayContractTest` levantó `MissingFieldException`. La causa fue propia y no del producto: los tipos
+  Kotlin se regeneraron con `openBoxUnits` como campo requerido (T8) y el fixture del test seguía sin él. Se
+  corrigió el fixture con los valores reales —producto entero en 0 y parcial en 6 (18 un de caja de 12)— y se
+  verificó local: `BUILD SUCCESSFUL` del test filtrado. Commit `aaac1b50`.
+- **L11 — 2026-11-04, CI verde y release.** Run `41871841960` en `aaac1b50`: `android` y `verify` en success. Tag
+  anotado `v0.7.3` sobre `aaac1b50`; workflow `Android release` (`41873683202`) construyó, firmó y verificó el
+  APK contra el sidecar commiteado, y publicó la release con `trindade-0.7.3.apk` (11.295.876 bytes) y su
+  `.sha256`. El asset descargado de GitHub coincide con el binario que sirve producción:
+  `593ffc646efc01c4b0e7cedddfe728e9acb45544ec81a3bf4a6a1ba85576aa21`. La release `v0.7.2` sigue con su asset
+  de 11.278.564 bytes.
+- **L12 — 2026-11-04, cierre.** Pendiente conocido y aceptado: los asientos ERP-only fraccionarios no se
+  importan a Trindade; se muestran para que el día cuadre. No se instaló el APK en ningún emulador ni teléfono
+  de fábrica.
