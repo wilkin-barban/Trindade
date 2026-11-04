@@ -38,6 +38,7 @@ import kotlinx.serialization.Contextual
  * @param username 
  * @param boxes 
  * @param units 
+ * @param openBoxUnits 
  * @param products 
  * @param erpOnly 
  * @param onlyErp 
@@ -64,6 +65,9 @@ data class MassasReportDayViewOperatorsInner (
 
     @Contextual @SerialName(value = "units")
     val units: java.math.BigDecimal,
+
+    @Contextual @SerialName(value = "openBoxUnits")
+    val openBoxUnits: java.math.BigDecimal,
 
     @SerialName(value = "products")
     val products: kotlin.collections.List<MassasReportDayViewOperatorsInnerProductsInner>,

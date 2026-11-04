@@ -35,6 +35,7 @@ import kotlinx.serialization.Contextual
  * @param name 
  * @param boxes 
  * @param units 
+ * @param openBoxUnits 
  */
 @Serializable
 
@@ -50,7 +51,10 @@ data class MassasReportDayViewOperatorsInnerProductsInner (
     val boxes: java.math.BigDecimal,
 
     @Contextual @SerialName(value = "units")
-    val units: java.math.BigDecimal
+    val units: java.math.BigDecimal,
+
+    @Contextual @SerialName(value = "openBoxUnits")
+    val openBoxUnits: java.math.BigDecimal
 
 ) {
 
