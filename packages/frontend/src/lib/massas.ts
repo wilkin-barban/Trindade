@@ -4,6 +4,32 @@ export interface MassaProductTotal {
   unitsPerBox: number;
   totalBoxes: number;
   totalUnits: number;
+  /**
+   * Units left in the box the total leaves open; zero when every box closed.
+   *
+   * Optional because an older backend never sends it: a missing note is the same as a closed box.
+   */
+  openBoxUnits?: number;
+}
+
+/**
+ * How many boxes the units occupy: the division rounded up, never left with decimals.
+ *
+ * The company counts units and the plant packs boxes. 182 units of a 15-unit box are twelve closed boxes and
+ * one open with two units, so the day occupies 13 -- `12.13` or `12` are numbers no box ever had.
+ */
+export function boxesForUnits(units: number, unitsPerBox: number): number {
+  if (!Number.isFinite(units) || units <= 0) return 0;
+  if (!Number.isFinite(unitsPerBox) || unitsPerBox <= 0) return 0;
+  return Math.ceil(units / unitsPerBox);
+}
+
+/** The units left in the open box, or zero when the last box is full. */
+export function openBoxUnits(units: number, unitsPerBox: number): number {
+  if (!Number.isFinite(units) || units <= 0) return 0;
+  if (!Number.isFinite(unitsPerBox) || unitsPerBox <= 0) return 0;
+  const remainder = units % unitsPerBox;
+  return remainder > 0 ? Number(remainder.toFixed(3)) : 0;
 }
 
 export interface MassaIndividualLaunch {
@@ -157,9 +183,13 @@ export function groupProductsFromLaunches(
         meta?.unitsPerBox ?? (launch.boxes > 0 ? Math.round(launch.units / launch.boxes) : 0),
       totalBoxes: 0,
       totalUnits: 0,
+      openBoxUnits: 0,
     };
-    entry.totalBoxes += launch.boxes;
+    // The units are the measurement; the boxes are derived once the product's total is known, so two partial
+    // lines are one open box and not two.
     entry.totalUnits += launch.units;
+    entry.totalBoxes = boxesForUnits(entry.totalUnits, entry.unitsPerBox);
+    entry.openBoxUnits = openBoxUnits(entry.totalUnits, entry.unitsPerBox);
     byCode.set(launch.product_code, entry);
   }
 

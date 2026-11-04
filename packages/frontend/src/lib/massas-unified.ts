@@ -1,6 +1,6 @@
 import { aeroImportPlan, aeroMirrorSeats, type AeroImportProduct } from './aero-mirror';
 import { reconcileAeroMovements, type AeroErpMovementItem, type SeatOwnerStatus } from './aero-integration';
-import type { MassaIndividualLaunch } from './massas';
+import { compareWorkerNames, boxesForUnits, openBoxUnits, type MassaIndividualLaunch } from './massas';
 
 /** The three things a row can be, and the only three. */
 export type MassasRowState = 'reconciled' | 'pendingErp' | 'erpOnly';
@@ -15,8 +15,13 @@ export interface MassasUnifiedRow {
   operatorKey: string;
   productCode: string;
   productName: string;
+  /** The boxes the units occupy, rounded up; never a decimal and never a truncated zero. */
   boxes: number;
   units: number;
+  /** Units per box of the catalogue entry, so every screen derives the same number. */
+  unitsPerBox: number;
+  /** Units left in the open box of this line, or zero when the line closes every box. */
+  openBoxUnits: number;
   launchIds: number[];
   entLans: number[];
   /** True only for `erpOnly` seats that fit whole boxes; the import action exists for these. */
@@ -149,6 +154,18 @@ function operatorNames(launch: MassaIndividualLaunch): string[] {
     .filter(Boolean);
 }
 
+/** The box size of a line: the catalogue's, or what the launch itself implies when the catalogue lacks it. */
+function unitsPerBoxFor(
+  products: readonly AeroImportProduct[],
+  code: string,
+  boxes: number,
+  units: number,
+): number {
+  const product = productFor(products, code);
+  if (product && product.unitsPerBox > 0) return product.unitsPerBox;
+  return boxes > 0 && units > 0 ? Math.round(units / boxes) : 0;
+}
+
 /** The catalogue entry for a code, tolerating the padding both sides use differently. */
 function productFor(products: readonly AeroImportProduct[], code: string): AeroImportProduct | null {
   const digits = String(code).trim().replace(/^0+/, '') || '0';
@@ -197,6 +214,8 @@ export function massasUnifiedRows(
     // The filter is universal: it looks at every name the operator uses, on both sides of the day.
     if (filter && !names.some((name) => name.includes(filter))) continue;
     const reconciled = matchedLaunchIds.has(launch.id);
+    // A launch stores whole boxes, but it still reads through the same rule: the units are the measurement.
+    const unitsPerBox = unitsPerBoxFor(products, launch.product_code, launch.boxes, launch.units);
     rows.push({
       key: `launch-${launch.id}`,
       state: reconciled ? 'reconciled' : 'pendingErp',
@@ -204,8 +223,10 @@ export function massasUnifiedRows(
       operatorKey: (launch.display_name || launch.username || 'operador').trim().toLowerCase(),
       productCode: launch.product_code,
       productName: launch.product_name,
-      boxes: launch.boxes,
+      boxes: boxesForUnits(launch.units, unitsPerBox),
       units: launch.units,
+      unitsPerBox,
+      openBoxUnits: openBoxUnits(launch.units, unitsPerBox),
       launchIds: [launch.id],
       // The reconciliation matches counts, not pairs: two identical seats are interchangeable, so naming one
       // as this launch's seat would be a guess. The row says it is paired and leaves the id to the ERP side.
@@ -231,8 +252,10 @@ export function massasUnifiedRows(
       operatorKey: operator.toLowerCase(),
       productCode: product.code,
       productName: product.name,
-      boxes: product.unitsPerBox > 0 ? seat.quantity / product.unitsPerBox : 0,
+      boxes: boxesForUnits(seat.quantity, product.unitsPerBox),
       units: seat.quantity,
+      unitsPerBox: product.unitsPerBox,
+      openBoxUnits: openBoxUnits(seat.quantity, product.unitsPerBox),
       launchIds: [],
       entLans: [seat.entLan],
       importable: plan !== null,
@@ -306,4 +329,139 @@ export function toggleAckedLaunchId(date: string, launchId: number): number[] {
     // A phone with storage disabled still gets the answer for this render; only the memory is lost.
   }
   return next;
+}
+
+/** One worker of the unified day, as the filter and the subtotal need them. */
+export interface MassasUnifiedOperator {
+  /** Stable across both sides of the day: the normalised name, never a user id. */
+  key: string;
+  name: string;
+  /** Units the worker's rows occupy, added product by product. */
+  boxes: number;
+  units: number;
+}
+
+/**
+ * Every worker the unified day names, including the ones who exist only in the ERP.
+ *
+ * The old filter was built from `user_id`, which a mirrored seat does not have: a worker who only typed on
+ * the company tablet was absent from the chips and their boxes were invisible in the lower sections. The key
+ * is the normalised name so a launch and a seat of the same person land on one chip.
+ */
+export function massasUnifiedOperators(rows: readonly MassasUnifiedRow[]): MassasUnifiedOperator[] {
+  const byKey = new Map<string, { name: string; units: Map<string, number>; unitsPerBox: Map<string, number> }>();
+  for (const row of rows) {
+    const entry = byKey.get(row.operatorKey) ?? { name: row.operatorName, units: new Map(), unitsPerBox: new Map() };
+    entry.units.set(row.productCode, (entry.units.get(row.productCode) ?? 0) + row.units);
+    entry.unitsPerBox.set(row.productCode, row.unitsPerBox);
+    byKey.set(row.operatorKey, entry);
+  }
+
+  return Array.from(byKey.entries())
+    .map(([key, entry]) => ({
+      key,
+      name: entry.name,
+      // Each product has its own box size, so the worker's boxes are the sum of the products' boxes.
+      boxes: Array.from(entry.units.entries()).reduce(
+        (sum, [code, units]) => sum + boxesForUnits(units, entry.unitsPerBox.get(code) ?? 0),
+        0,
+      ),
+      units: Array.from(entry.units.values()).reduce((sum, units) => sum + units, 0),
+    }))
+    .sort((left, right) => compareWorkerNames(left.name, right.name));
+}
+
+export interface MassasUnifiedSummaryProduct {
+  code: string;
+  name: string;
+  unitsPerBox: number;
+  totalBoxes: number;
+  totalUnits: number;
+  openBoxUnits: number;
+}
+
+export interface MassasUnifiedSummaryWorker {
+  key: string;
+  name: string;
+  boxes: number;
+  units: number;
+  /** Units the worker left in open boxes, added product by product. */
+  openBoxUnits: number;
+}
+
+export interface MassasUnifiedSummary {
+  /** One entry per product, rounded up once from every unit the day counted for it. */
+  products: MassasUnifiedSummaryProduct[];
+  workers: MassasUnifiedSummaryWorker[];
+  /** The workers who touched each product, for the collective table's name line. */
+  workerNamesByProduct: Map<string, string[]>;
+}
+
+/**
+ * The collective summary of the rows the section is showing.
+ *
+ * The rule is one rounding per product, from the exact units: two rows of three units in a ten-unit box are
+ * one open box, not two. A worker's total adds the boxes of their products because the products have
+ * different box sizes; dividing mixed units by one box size would answer a question nobody asked.
+ */
+export function massasUnifiedSummary(rows: readonly MassasUnifiedRow[]): MassasUnifiedSummary {
+  const products = new Map<string, { name: string; unitsPerBox: number; totalUnits: number }>();
+  const workers = new Map<
+    string,
+    { name: string; units: Map<string, number>; unitsPerBox: Map<string, number> }
+  >();
+  const namesByProduct = new Map<string, Set<string>>();
+
+  for (const row of rows) {
+    const product = products.get(row.productCode) ?? {
+      name: row.productName,
+      unitsPerBox: row.unitsPerBox,
+      totalUnits: 0,
+    };
+    product.totalUnits += row.units;
+    if (product.unitsPerBox <= 0 && row.unitsPerBox > 0) product.unitsPerBox = row.unitsPerBox;
+    products.set(row.productCode, product);
+
+    const worker = workers.get(row.operatorKey) ?? { name: row.operatorName, units: new Map(), unitsPerBox: new Map() };
+    worker.units.set(row.productCode, (worker.units.get(row.productCode) ?? 0) + row.units);
+    worker.unitsPerBox.set(row.productCode, row.unitsPerBox);
+    workers.set(row.operatorKey, worker);
+
+    const names = namesByProduct.get(row.productCode) ?? new Set<string>();
+    names.add(row.operatorName);
+    namesByProduct.set(row.productCode, names);
+  }
+
+  return {
+    products: Array.from(products.entries()).map(([code, product]) => {
+      const totalUnits = product.totalUnits;
+      return {
+        code,
+        name: product.name,
+        unitsPerBox: product.unitsPerBox,
+        totalBoxes: boxesForUnits(totalUnits, product.unitsPerBox),
+        totalUnits,
+        openBoxUnits: openBoxUnits(totalUnits, product.unitsPerBox),
+      };
+    }),
+    workers: Array.from(workers.entries()).map(([key, worker]) => ({
+      key,
+      name: worker.name,
+      boxes: Array.from(worker.units.entries()).reduce(
+        (sum, [code, units]) => sum + boxesForUnits(units, worker.unitsPerBox.get(code) ?? 0),
+        0,
+      ),
+      units: Array.from(worker.units.values()).reduce((sum, units) => sum + units, 0),
+      openBoxUnits: Array.from(worker.units.entries()).reduce(
+        (sum, [code, units]) => sum + openBoxUnits(units, worker.unitsPerBox.get(code) ?? 0),
+        0,
+      ),
+    })),
+    workerNamesByProduct: new Map(
+      Array.from(namesByProduct.entries()).map(([code, names]) => [
+        code,
+        Array.from(names).sort(compareWorkerNames),
+      ]),
+    ),
+  };
 }

@@ -6,19 +6,13 @@ import { Input } from '../../components/ui/input';
 import { Edit2, Trash2, Check, X, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { MassasUnifiedTable } from './MassasUnifiedTable';
 import {
-  reconciledLaunchIds,
+  massasUnifiedOperators,
+  massasUnifiedRows,
+  massasUnifiedSummary,
   type AeroImportRequest,
   type MassasUnifiedRow,
 } from '../../lib/massas-unified';
-import {
-  extractOperators,
-  filterLaunchesByOperator,
-  calculateOperatorSubtotal,
-  groupProductsFromLaunches,
-  productWorkerNames,
-  type MassaProductTotal,
-  type MassaIndividualLaunch,
-} from '../../lib/massas';
+import type { MassaProductTotal, MassaIndividualLaunch } from '../../lib/massas';
 
 interface MassasCollectiveTableProps {
   products: MassaProductTotal[];
@@ -41,8 +35,8 @@ interface MassasCollectiveTableProps {
   deletingId?: number | null;
   readOnly?: boolean;
   /**
-   * The plant's day already reconciled, one row per box. Only the launch screen has both halves; the history
-   * screen reads past days and its {@link launches} list is the whole answer there.
+   * The plant's day already reconciled, one row per box. Both lower sections read it, so a seat that only
+   * exists in the ERP has a worker, boxes and a place in the collective summary.
    */
   unifiedRows?: MassasUnifiedRow[];
   unifiedDate?: string;
@@ -84,51 +78,65 @@ export function MassasCollectiveTable({
   onToggleAck,
 }: MassasCollectiveTableProps) {
   const { t } = useTranslation();
-  const [selectedOperatorId, setSelectedOperatorId] = useState<number | 'all'>('all');
-
-  const operators = useMemo(() => extractOperators(launches), [launches]);
-
-  useEffect(() => {
-    if (selectedOperatorId !== 'all' && !operators.some((o) => o.id === selectedOperatorId)) {
-      setSelectedOperatorId('all');
-    }
-  }, [operators, selectedOperatorId]);
-
-  const displayedLaunches = useMemo(() => {
-    return filterLaunchesByOperator(launches, selectedOperatorId);
-  }, [launches, selectedOperatorId]);
-
-  const workerSubtotal = useMemo(() => {
-    return calculateOperatorSubtotal(launches, selectedOperatorId);
-  }, [launches, selectedOperatorId]);
-
-  const selectedOperatorName = useMemo(() => {
-    if (selectedOperatorId === 'all') return '';
-    return operators.find((o) => o.id === selectedOperatorId)?.name || '';
-  }, [operators, selectedOperatorId]);
-
-  // El resumen colectivo sigue al filtro de trabajador: se consolidan los lanzamientos
-  // visibles, usando el catálogo sólo como fuente de nombres, unidades por caja y orden.
-  const activeProducts = useMemo(() => {
-    return groupProductsFromLaunches(displayedLaunches, products);
-  }, [displayedLaunches, products]);
+  const [selectedOperatorKey, setSelectedOperatorKey] = useState('all');
 
   /**
-   * Los lanzamientos que Delphi ya asentó.
+   * The day both sections read.
    *
-   * Un lanzamiento conciliado está cerrado: su caja ya existe en el ERP, así que editar la cantidad o
-   * borrarlo acá dejaría el día de la planta y el libro de la empresa diciendo cosas distintas, sin ninguna
-   * pantalla capaz de decir cuál es la buena. La regla se dibuja en la fila, no se le confía al operario.
+   * The launch screen already reconciles the mirror and passes the rows; the history screen may have only the
+   * past launches, so the same projection runs over them with an empty ERP side. One shape for both.
    */
-  const reconciledIds = useMemo(() => reconciledLaunchIds(unifiedRows), [unifiedRows]);
+  const rows = useMemo<MassasUnifiedRow[]>(() => {
+    if (unifiedRows) return unifiedRows;
+    return massasUnifiedRows({ launches, movements: [], products });
+  }, [unifiedRows, launches, products]);
 
-  const workersByProduct = useMemo(() => {
-    const map = new Map<string, string[]>();
-    for (const product of activeProducts) {
-      map.set(product.code, productWorkerNames(displayedLaunches, product.code));
+  // The filter is the normalised name, not `user_id`: a worker who only typed on the company tablet has no
+  // account here, and their boxes still belong in both sections.
+  const operators = useMemo(() => massasUnifiedOperators(rows), [rows]);
+
+  useEffect(() => {
+    if (selectedOperatorKey !== 'all' && !operators.some((operator) => operator.key === selectedOperatorKey)) {
+      setSelectedOperatorKey('all');
     }
-    return map;
-  }, [activeProducts, displayedLaunches]);
+  }, [operators, selectedOperatorKey]);
+
+  const displayedRows = useMemo(() => {
+    return selectedOperatorKey === 'all'
+      ? rows
+      : rows.filter((row) => row.operatorKey === selectedOperatorKey);
+  }, [rows, selectedOperatorKey]);
+
+  /**
+   * The collective summary of what is on screen.
+   *
+   * One rounding per product, from the exact units of every row: two partial lines of the same product are one
+   * open box, never two. The worker subtotal adds the products' boxes because each product has its own box.
+   */
+  const summary = useMemo(() => massasUnifiedSummary(displayedRows), [displayedRows]);
+
+  const workerSubtotal = useMemo(() => {
+    if (selectedOperatorKey === 'all') return null;
+    return summary.workers.find((worker) => worker.key === selectedOperatorKey) ?? null;
+  }, [summary, selectedOperatorKey]);
+
+  const selectedOperatorName = useMemo(() => {
+    if (selectedOperatorKey === 'all') return '';
+    return operators.find((operator) => operator.key === selectedOperatorKey)?.name || '';
+  }, [operators, selectedOperatorKey]);
+
+  const activeProducts = useMemo<MassaProductTotal[]>(() => {
+    return summary.products.map((product) => ({
+      code: product.code,
+      name: product.name,
+      unitsPerBox: product.unitsPerBox,
+      totalBoxes: product.totalBoxes,
+      totalUnits: product.totalUnits,
+      openBoxUnits: product.openBoxUnits,
+    }));
+  }, [summary]);
+
+  const workersByProduct = summary.workerNamesByProduct;
 
   return (
     <div className="space-y-6">
@@ -168,9 +176,9 @@ export function MassasCollectiveTable({
               <div className="flex flex-wrap items-center gap-1.5" data-testid="massas-worker-chips">
                 <button
                   type="button"
-                  onClick={() => setSelectedOperatorId('all')}
+                  onClick={() => setSelectedOperatorKey('all')}
                   className={`min-h-[44px] px-3.5 py-1 text-xs rounded-full border transition-all sm:min-h-0 ${
-                    selectedOperatorId === 'all'
+                    selectedOperatorKey === 'all'
                       ? 'bg-amber-600 text-white border-amber-600 font-semibold shadow-xs'
                       : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
                   }`}
@@ -180,15 +188,15 @@ export function MassasCollectiveTable({
                 </button>
                 {operators.map((op) => (
                   <button
-                    key={op.id}
+                    key={op.key}
                     type="button"
-                    onClick={() => setSelectedOperatorId(op.id)}
+                    onClick={() => setSelectedOperatorKey(op.key)}
                     className={`min-h-[44px] px-3.5 py-1 text-xs rounded-full border transition-all sm:min-h-0 ${
-                      selectedOperatorId === op.id
+                      selectedOperatorKey === op.key
                         ? 'bg-amber-600 text-white border-amber-600 font-semibold shadow-xs'
                         : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
                     }`}
-                    data-testid={`filter-operator-${op.id}`}
+                    data-testid={`filter-operator-${op.key}`}
                   >
                     👤 {op.name}
                   </button>
@@ -212,29 +220,75 @@ export function MassasCollectiveTable({
             </div>
           )}
 
-          {displayedLaunches.length === 0 ? (
+          {displayedRows.length === 0 ? (
             <div className="py-8 text-center text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-200 text-sm">
               {t('massas.noLaunches')}
             </div>
           ) : (
-            <div className="space-y-2.5">
-              {displayedLaunches.map((launch) => {
+            <div className="space-y-2.5" data-testid="massas-individual-launches">
+              {displayedRows.map((row) => {
+                const launch =
+                  row.launchIds.length > 0
+                    ? launches.find((candidate) => row.launchIds.includes(candidate.id))
+                    : undefined;
+                const reconciled = row.state === 'reconciled';
+
+                // A seat nobody launched here is the ERP's record: it reads, it does not get edited or
+                // imported from this section. The unified card above owns the actions that belong to the seat.
+                if (!launch) {
+                  return (
+                    <div
+                      key={row.key}
+                      data-testid={`massas-individual-row-${row.key}`}
+                      className="p-3.5 rounded-lg border border-sky-200 bg-sky-50/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-gray-900 text-sm break-words min-w-0">
+                            {row.productName}
+                          </span>
+                          <span className="shrink-0 rounded bg-sky-100 px-1.5 py-0.5 text-[11px] font-semibold text-sky-800">
+                            {t('massas.unified.stateErpOnly')}
+                          </span>
+                          <span className="text-[11px] text-gray-500">{t('massas.erpOnlyReadOnly')}</span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mt-1">
+                          <span>
+                            {t('massas.user')}: <strong className="text-gray-700">{row.operatorName}</strong>
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="text-left sm:text-right shrink-0">
+                        <span className="text-sm font-bold text-gray-900">{row.boxes} cx</span>
+                        <span className="text-xs text-gray-400 mx-1">·</span>
+                        <span className="text-sm font-bold text-amber-800">{row.units} un</span>
+                        {row.openBoxUnits > 0 && (
+                          <p className="text-[11px] text-amber-700" data-testid={`massas-open-box-${row.key}`}>
+                            {t('massas.unified.openBox')}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+
                 const isOwner = currentUserId === launch.user_id;
-                const reconciled = reconciledIds.has(launch.id);
                 // Conciliado manda sobre el rol: ni el administrador edita lo que el ERP ya asentó.
                 const canManage = (isOwner || isAdmin) && !reconciled;
                 const isEditing = editingLaunchId === launch.id;
 
                 return (
                   <div
-                    key={launch.id}
+                    key={row.key}
+                    data-testid={`massas-individual-row-${row.key}`}
                     className={`p-3.5 rounded-lg border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                       canManage ? 'bg-amber-50/40 border-amber-200' : 'bg-gray-50/60 border-gray-200'
                     }`}
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold text-gray-900 text-sm break-words min-w-0">{launch.product_name}</span>
+                        <span className="font-semibold text-gray-900 text-sm break-words min-w-0">{row.productName}</span>
                         <span className="text-[11px] text-gray-500 shrink-0">#{launch.id}</span>
                       </div>
                       <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mt-1">
@@ -285,12 +339,17 @@ export function MassasCollectiveTable({
                         <>
                           <div className="text-left sm:text-right">
                             <span className="text-sm font-bold text-gray-900">
-                              {launch.boxes} cx
+                              {row.boxes} cx
                             </span>
                             <span className="text-xs text-gray-400 mx-1">·</span>
                             <span className="text-sm font-bold text-amber-800">
-                              {launch.units} un
+                              {row.units} un
                             </span>
+                            {row.openBoxUnits > 0 && (
+                              <p className="text-[11px] text-amber-700" data-testid={`massas-open-box-${row.key}`}>
+                                {t('massas.unified.openBox')}
+                              </p>
+                            )}
                           </div>
 
                           {!readOnly && (
@@ -350,7 +409,7 @@ export function MassasCollectiveTable({
       </Card>
 
       {/* Resumen Colectivo de Productos con Lançamentos */}
-      <Card className="border-gray-200 shadow-sm">
+      <Card className="border-gray-200 shadow-sm" data-testid="massas-collective-summary">
         <CardContent className="pt-6">
           <div className="mb-4">
             <h2 className="text-lg font-semibold text-gray-900">{t('massas.collectiveTitle')}</h2>
@@ -392,6 +451,11 @@ export function MassasCollectiveTable({
                             <span className="inline-flex items-center rounded-md bg-gray-900/5 px-2 py-0.5 text-xs font-bold text-gray-900 tabular-nums">
                               {p.totalBoxes} cx
                             </span>
+                            {(p.openBoxUnits ?? 0) > 0 && (
+                              <div className="text-[11px] text-amber-700 mt-0.5">
+                                {t('massas.unified.openBox')}
+                              </div>
+                            )}
                           </td>
                           <td className="py-2.5 px-4 text-right">
                             <span className="inline-flex items-center rounded-md bg-amber-600 px-2 py-0.5 text-xs font-extrabold text-white tabular-nums">
@@ -428,6 +492,9 @@ export function MassasCollectiveTable({
                           </span>
                         </div>
                       </div>
+                      {(p.openBoxUnits ?? 0) > 0 && (
+                        <p className="text-[11px] text-amber-700 mt-1">{t('massas.unified.openBox')}</p>
+                      )}
                       {workers.length > 0 && (
                         <p className="text-[11px] text-amber-800 mt-1.5">👤 {workers.join(', ')}</p>
                       )}
