@@ -156,6 +156,81 @@ describe('ReportHistoryPage', () => {
     expect(screen.queryByTestId('delete-report-42')).toBeNull();
   });
 
+  it('gives every action of the card a 48 px target, like the loading history', async () => {
+    // A 16 px icon inside a bare button is a 16 px target: on a phone in the plant the thumb misses it and
+    // the operator learns to press twice, which on this screen means deleting the wrong report. `min-h-12`
+    // and `min-w-12` are Tailwind's 3rem, the same pair the loading history uses.
+    get.mockImplementation(async (url: string) => {
+      if (url.startsWith('/users/options')) return { users: [] };
+      return {
+        items: [
+          {
+            id: 43,
+            turno: 'tarde',
+            report_date: '2026-11-01',
+            notes: null,
+            created_at: '2026-11-01T18:00:00.000Z',
+            isActive: true,
+            isClosedDay: false,
+            readOnly: false,
+            canEdit: true,
+            canDeactivate: true,
+            canActivate: false,
+            canDelete: true,
+            user: { id: 1, display_name: 'Wilkin' },
+          },
+        ],
+        pagination: { page: 1, pageSize: 30, total: 1, totalPages: 1 },
+      };
+    });
+
+    renderPage();
+    const actions = [
+      await screen.findByTestId('view-report-43'),
+      await screen.findByTestId('deactivate-report-43'),
+      await screen.findByTestId('delete-report-43'),
+    ];
+
+    for (const action of actions) {
+      expect(action.className).toContain('min-h-12');
+      expect(action.className).toContain('min-w-12');
+    }
+  });
+
+  it('marks a closed day as read only, with the same chip as the loading history', async () => {
+    get.mockImplementation(async (url: string) => {
+      if (url.startsWith('/users/options')) return { users: [] };
+      return {
+        items: [
+          {
+            id: 44,
+            turno: 'noite',
+            report_date: '2026-10-30',
+            notes: null,
+            created_at: '2026-10-30T22:00:00.000Z',
+            isActive: true,
+            isClosedDay: true,
+            readOnly: true,
+            canEdit: false,
+            canDeactivate: true,
+            canActivate: false,
+            canDelete: false,
+            user: { id: 1, display_name: 'Wilkin' },
+          },
+        ],
+        pagination: { page: 1, pageSize: 30, total: 1, totalPages: 1 },
+      };
+    });
+
+    renderPage();
+
+    // The chip says why the report cannot be edited; without it the card only looks like one whose role
+    // happens to have no edit, and the operator goes looking for the editor.
+    expect(await screen.findByTestId('report-history-closed-44')).toHaveTextContent('Solo lectura');
+    const card = screen.getByTestId('report-card-44');
+    expect(card.querySelector('[data-testid="report-history-closed-44"]')).not.toBeNull();
+  });
+
   it('still filters by user, which is what the web has and the phone does not', async () => {
     renderPage();
     await waitFor(() => expect(screen.getByTestId('history-user-filter')).toBeInTheDocument());

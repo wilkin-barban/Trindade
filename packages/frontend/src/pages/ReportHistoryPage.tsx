@@ -164,12 +164,30 @@ export function ReportHistoryPage() {
               <div className="flex items-center justify-between gap-3">
                 <Link to={`/reports/${r.id}`} className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-1"><span className="text-sm font-semibold">{formatDate(r.report_date)}</span><span className="text-xs px-2 py-0.5 rounded-full bg-gray-100">{r.turno === 'tarde' ? `🌅 ${t('reports.turnoTarde')}` : `🌙 ${t('reports.turnoNoite')}`}</span>{!r.isActive && <span className="text-xs text-amber-700">{t('history.inactive')}</span>}</div>
-                  <p className="text-xs text-gray-500">{r.user.display_name}{r.notes ? ` — ${r.notes.slice(0, 60)}` : ''}</p>
+                  <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
+                    {affordances.closedDay && (
+                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-600" data-testid={`report-history-closed-${r.id}`}>
+                        {t('history.readOnly')}
+                      </span>
+                    )}
+                    <span>{r.user.display_name}{r.notes ? ` — ${r.notes.slice(0, 60)}` : ''}</span>
+                  </p>
                 </Link>
-                <Link to={`/reports/${r.id}`} aria-label={t('history.viewReport', { date: formatDate(r.report_date) })}><LucideEye className="h-4 w-4 text-gray-400" /></Link>
-                {affordances.showReactivate && <button onClick={() => activateReport(r.id)} disabled={busyId === r.id} aria-label={t('history.reactivateReport', { date: formatDate(r.report_date) })} className="text-emerald-600 disabled:opacity-50" data-testid={`activate-report-${r.id}`}><LucideRotateCcw className="h-4 w-4" /></button>}
-                {affordances.showDeactivate && <button onClick={() => deactivateReport(r.id)} disabled={busyId === r.id} aria-label={t('history.deactivateReport', { date: formatDate(r.report_date) })} className="text-amber-600 disabled:opacity-50" data-testid={`deactivate-report-${r.id}`}><LucideBan className="h-4 w-4" /></button>}
-                {affordances.showDelete && <button onClick={() => setPendingDelete(r)} disabled={busyId === r.id} aria-label={t('history.deleteReport', { date: formatDate(r.report_date) })} className="text-red-600 disabled:opacity-50" data-testid={`delete-report-${r.id}`}><LucideTrash2 className="h-4 w-4" /></button>}
+                {/* Every action is a 48 px target, like the loading history: a 16 px icon in a bare
+                    button is what a thumb misses in the plant, and a missed press here deletes nothing
+                    until it is pressed again. */}
+                <Link
+                  to={`/reports/${r.id}`}
+                  aria-label={t('history.viewReport', { date: formatDate(r.report_date) })}
+                  title={t('history.viewReport', { date: formatDate(r.report_date) })}
+                  className="inline-flex min-h-12 min-w-12 items-center justify-center rounded text-gray-500 hover:bg-gray-50"
+                  data-testid={`view-report-${r.id}`}
+                >
+                  <LucideEye className="h-4 w-4" />
+                </Link>
+                {affordances.showReactivate && <button onClick={() => activateReport(r.id)} disabled={busyId === r.id} aria-label={t('history.reactivateReport', { date: formatDate(r.report_date) })} className="inline-flex min-h-12 min-w-12 items-center justify-center rounded text-emerald-600 hover:bg-emerald-50 disabled:opacity-50" data-testid={`activate-report-${r.id}`}><LucideRotateCcw className="h-4 w-4" /></button>}
+                {affordances.showDeactivate && <button onClick={() => deactivateReport(r.id)} disabled={busyId === r.id} aria-label={t('history.deactivateReport', { date: formatDate(r.report_date) })} className="inline-flex min-h-12 min-w-12 items-center justify-center rounded text-amber-600 hover:bg-amber-50 disabled:opacity-50" data-testid={`deactivate-report-${r.id}`}><LucideBan className="h-4 w-4" /></button>}
+                {affordances.showDelete && <button onClick={() => setPendingDelete(r)} disabled={busyId === r.id} aria-label={t('history.deleteReport', { date: formatDate(r.report_date) })} className="inline-flex min-h-12 min-w-12 items-center justify-center rounded text-red-600 hover:bg-red-50 disabled:opacity-50" data-testid={`delete-report-${r.id}`}><LucideTrash2 className="h-4 w-4" /></button>}
               </div>
             </Card>
             );
