@@ -190,11 +190,11 @@ La app consulta `GET /api/app/latest-release`. La respuesta incluye:
 
 ```json
 {
-  "version": "v0.7.1",
+  "version": "v0.7.2",
   "apkUrl": "https://trindademasas.duckdns.org/api/app/download-apk",
   "apkName": "trindade.apk",
-  "apkSize": 11277888,
-  "buildNumber": 7012,
+  "apkSize": <tamaño del APK de 0.7.2>,
+  "buildNumber": 7013,
   "publishedAt": "2026-11-03T20:11:58.000Z",
   "webUrl": "https://trindademasas.duckdns.org"
 }

@@ -104,6 +104,7 @@ Los dos números se calculan una sola vez en `build.gradle.kts` y alimentan tant
 | 0.7.0 | 7006 | Reemplazada | Histórico de cargamento cerrado en solo lectura, reactivación de lote y reporte, chapas libres sin duplicados, rechazos de tanda en un paso y sync ERP solo del día abierto |
 | 0.7.0 | — | Reemplazada | Auditoría ERP Android, payload de movimientos alineado con el puente web, vista de solo lectura para días cerrados del Histórico de Cargamento y orden de Lanzamiento de Masas; asset de GitHub Release `v0.7.0`. El código de build es interno. |
 | 0.7.1 | — | **Publicada** | Actualización por `buildNumber` en `/latest-release`, versión pública servida por producción y asset de GitHub Release `v0.7.1`. El código de build es interno. |
+| 0.7.2 | 7013 | 2026-11-04 · **En entrega** | Remediación de los hallazgos de auditoría 7006/7007/0.7.1: espejo distinto de backend inalcanzable, sesión que olvida la contraseña del ERP, despacho serializado, cola con traza, borrado de lote sólo Administrador, intento correlacionado y histórico táctil. |
 
 Las builds 0.6.x se distribuyeron por `GET /api/app/download-apk`, no por un tag de GitHub. Los hashes y las
 verificaciones completas están en [release-android-historial.md](release-android-historial.md).

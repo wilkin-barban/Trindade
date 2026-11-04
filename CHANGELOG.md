@@ -5,10 +5,68 @@ Todos los cambios relevantes del proyecto se documentan en este archivo. El form
 [SemVer](https://semver.org/lang/es/).
 
 Las versiones **0.6.x** se distribuyeron por `GET /api/app/download-apk` y no tienen tag propio en GitHub.
-Las releases **v0.7.0** y **v0.7.1** se publicaron en GitHub Releases. El detalle de builds, hashes y
+Las releases **v0.7.0** y **v0.7.1** se publicaron en GitHub Releases; **v0.7.2** se publica con esta entrega. El detalle de builds, hashes y
 verificaciones está en [docs/release-android-historial.md](docs/release-android-historial.md).
 
 ---
+
+## [0.7.2] — 2026-11-04
+
+Remediación de los hallazgos de auditoría de los ciclos 7006, 7007 y 0.7.1. Nada de lo reportado llegó a
+producir datos incorrectos que hubiera que reparar: lo que se corrige es el camino por el que un operario
+podía perderse, duplicar un envío o creer que había fallado la fábrica cuando fallaba Trindade.
+
+### Corregido
+
+- **El espejo distingue «el ERP contestó y no se guardó» de «no se llegó al backend».** Antes los dos casos
+  mostraban el mismo aviso y mandaban a mirar la planta; ahora el primero se reporta con su propio código
+  (`AERO_SNAPSHOT_BACKEND_UNREACHABLE`) y el segundo conserva el de red. Las frases existen en español y
+  portugués.
+- **Cerrar sesión, y que la sesión expire, olvida la contraseña del ERP y la lectura pendiente.** La
+  contraseña vive en el `sessionStorage` de la pestaña y la marca de auto-lectura en el navegador: ninguna de
+  las dos sobrevive al cierre ni al `401`, así que la próxima persona que abra el teléfono no hereda una
+  lectura que ya no pidió.
+- **Un lote, una fila suelta y el drenaje de la cola no pueden enviarse dos veces a la vez.** El despacho al
+  ERP se serializa y el envío conserva su estado «enviando» hasta que la lectura termina; un reintento ya no
+  duplica cajas.
+- **La cola que expira deja rastro.** Un lote pendiente que vencía se borraba sin decir nada; ahora escribe
+  una línea de auditoría con `AERO_QUEUE_EXPIRED` o `AERO_QUEUE_MALFORMED` y el motivo.
+- **El histórico de cargamento sólo ofrece borrar el día al Administrador.** El flag venía de la autoría del
+  asiento y la ruta que borra un día es exclusiva del Administrador: al operario se le ofrecía un control que
+  terminaba en 403.
+- **La lectura del ERP posterior a un envío queda atribuida a su intento.** La web manda su intento en la
+  cabecera, el servidor lo registra en la misma línea `sync_refused` y cada llamada declara si viene de la
+  web o de Android, para que un rechazo no se confunda con el de otro cliente.
+- **El callback de movimientos guarda el día que pidió.** La fecha viaja dentro del intento pendiente y no se
+  relee del reloj, así que un turno que cruza la medianoche no escribe el espejo bajo el día equivocado.
+- **El histórico de Relatórios usa los mismos objetivos táctiles que Cargamento.** Las acciones pasan a 48 px
+  y un día cerrado muestra su chip de solo lectura en vez de acciones ausentes sin explicación.
+- **`logout` y `changePassword` aceptan su respuesta real.** Ambos contestan `200` con un cuerpo que el
+  cliente no podía deserializar y reportaba como fallo; ahora se declaran como respuesta sin cuerpo.
+- **El borrado de un reporte ajeno o de un día pasado se nombra.** El test fija el código
+  `REPORT_DELETE_FORBIDDEN` que la web y el teléfono traducen.
+
+### Cambiado
+
+- **El log del ERP se contrasta con los cuerpos que cada cliente envía de verdad.** El contrato cubre los
+  eventos canónicos y los alias que un APK ya instalado sigue escribiendo, y las líneas de importación usan
+  la fase `result`, igual que la web.
+- **El lote importado se registra como resultado, no como respuesta intermedia.** Una sola línea por
+  importación, con su asiento y sus cajas.
+- **Release Android: el asset no puede divergir de lo que sirve producción.** El workflow prefiere el APK
+  firmado que acompaña al tag, valida su digest y su certificado con `aapt2` y `apksigner`, y sólo compila si
+  ese archivo no existe.
+- **Versión pública 0.7.2, build interno 7013.** Sin downgrade: el `versionCode` sale del mayor entre el que
+  deriva el tag y el que anuncia `/api/app/latest-release`.
+
+### Documentación
+
+- Guías y KDoc dejan de describir la contraseña del ERP en `localStorage` y el borrado de un lote como
+  derivado de la autoría.
+- Nuevo runbook [`docs/verificacion-erp-tablet.md`](docs/verificacion-erp-tablet.md): cómo comprobar en la
+  planta, en un día abierto, que un lote termina con su lectura, el espejo completo y las filas conciliadas, y
+  qué no tocar si falla. Su ejecución real sigue pendiente: desde fuera de la LAN de la fábrica el ERP no es
+  alcanzable.
 
 ## [0.7.1] — 2026-11-03
 
