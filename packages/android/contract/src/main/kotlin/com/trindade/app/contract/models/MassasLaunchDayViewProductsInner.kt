@@ -36,6 +36,7 @@ import kotlinx.serialization.Contextual
  * @param unitsPerBox 
  * @param totalBoxes 
  * @param totalUnits 
+ * @param openBoxUnits 
  */
 @Serializable
 
@@ -54,7 +55,10 @@ data class MassasLaunchDayViewProductsInner (
     val totalBoxes: kotlin.Int,
 
     @SerialName(value = "totalUnits")
-    val totalUnits: kotlin.Int
+    val totalUnits: kotlin.Int,
+
+    @Contextual @SerialName(value = "openBoxUnits")
+    val openBoxUnits: java.math.BigDecimal
 
 ) {
 
