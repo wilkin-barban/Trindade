@@ -44,8 +44,9 @@ class ReportDayContractTest {
               "username": "alice",
               "boxes": 4,
               "units": 40,
+              "openBoxUnits": 0,
               "products": [
-                { "code": "1045", "name": "CASEIRA 500G", "boxes": 4, "units": 40 }
+                { "code": "1045", "name": "CASEIRA 500G", "boxes": 4, "units": 40, "openBoxUnits": 0 }
               ],
               "erpOnly": false,
               "onlyErp": false,
@@ -56,10 +57,11 @@ class ReportDayContractTest {
               "name": "TIAGO",
               "displayName": "TIAGO",
               "username": null,
-              "boxes": 3,
+              "boxes": 2,
               "units": 18,
+              "openBoxUnits": 6,
               "products": [
-                { "code": "1047", "name": "DOCE DE LEITE", "boxes": 3, "units": 18 }
+                { "code": "1047", "name": "DOCE DE LEITE", "boxes": 2, "units": 18, "openBoxUnits": 6 }
               ],
               "erpOnly": true,
               "onlyErp": true,
@@ -67,12 +69,13 @@ class ReportDayContractTest {
             }
           ],
           "products": [
-            { "code": "1045", "name": "CASEIRA 500G", "unitsPerBox": 10, "totalBoxes": 4, "totalUnits": 40 }
+            { "code": "1045", "name": "CASEIRA 500G", "unitsPerBox": 10, "totalBoxes": 4, "totalUnits": 40, "openBoxUnits": 0 },
+            { "code": "1047", "name": "DOCE DE LEITE", "unitsPerBox": 12, "totalBoxes": 2, "totalUnits": 18, "openBoxUnits": 6 }
           ],
-          "totalBoxes": 7,
+          "totalBoxes": 6,
           "totalUnits": 58,
           "balance": {
-            "producedBoxes": 7,
+            "producedBoxes": 6,
             "producedUnits": 58,
             "registeredBoxes": 7,
             "registeredUnits": 58,
@@ -98,15 +101,23 @@ class ReportDayContractTest {
         assertFalse(alice.onlyErp)
         assertEquals(listOf(BigDecimal(9001)), alice.entLans)
         assertEquals(0, BigDecimal(40).compareTo(alice.units))
+        // A product whose units fill whole boxes says so instead of leaving the field out: the operator
+        // and its product carry the same open-box units the screen annotates.
+        assertEquals(0, BigDecimal.ZERO.compareTo(alice.openBoxUnits))
+        assertEquals(0, BigDecimal.ZERO.compareTo(alice.products.first().openBoxUnits))
 
         val tiago = day.operators.first { it.displayName == "TIAGO" }
         assertTrue(tiago.onlyErp)
         assertNull(tiago.username)
         assertEquals(listOf(BigDecimal(9002)), tiago.entLans)
+        // 18 units of a 12-unit box occupy two boxes and leave six units in the open one.
+        assertEquals(0, BigDecimal(6).compareTo(tiago.openBoxUnits))
+        assertEquals(0, BigDecimal(6).compareTo(tiago.products.first().openBoxUnits))
 
         assertEquals(0, BigDecimal(58).compareTo(day.balance.producedUnits))
         assertEquals(0, BigDecimal(58).compareTo(day.balance.registeredUnits))
         assertEquals(0, BigDecimal.ZERO.compareTo(day.balance.differenceUnits))
+        assertEquals(0, BigDecimal(6).compareTo(day.products.first { it.code == "1047" }.openBoxUnits))
         assertEquals(0, BigDecimal.ONE.compareTo(day.balance.reconciledSeats))
         assertEquals(0, BigDecimal.ONE.compareTo(day.balance.pendingSeats))
     }
