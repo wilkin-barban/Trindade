@@ -220,7 +220,6 @@ export function ReceiptsSection({
           </div>
         </div>
       )}
-      <p className="mb-3 text-xs text-gray-500">{t('reports.receiptsSubtitle')}</p>
       {!readOnly && !canSync && (
         <p className="mb-3 text-[11px] text-amber-800" data-testid="receipts-sync-hint">
           {t('reports.receiptsSyncNotConfigured')}

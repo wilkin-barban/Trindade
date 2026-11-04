@@ -63,4 +63,12 @@ describe('ERP movements: massas and insumos are separate blocks', () => {
     assert.equal(/\b(1045|1192|1616)\b/.test(massasSection), false, 'no hardcoded massa code in the massas section');
     assert.equal(/\b(1045|1192|1616)\b/.test(receiptsSection), false, 'no hardcoded massa code in the receipts');
   });
+  it('states the insumos subtitle once per layout, never twice in the same one', () => {
+    // The heading variant carries the subtitle inside its header; a second copy placed after the header is
+    // what a reader sees as the same sentence repeated, which is exactly the noise this block removes.
+    const occurrences = receiptsSection.split("t('reports.receiptsSubtitle')").length - 1;
+    assert.equal(occurrences, 2, 'one subtitle for the card header and one for the embedded header');
+    const headers = receiptsSection.split('data-testid="receipts-subtitle"').length - 1;
+    assert.equal(headers, 2, 'each subtitle belongs to a header variant');
+  });
 });
