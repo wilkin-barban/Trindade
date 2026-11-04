@@ -79,6 +79,18 @@ export function newAeroAttempt(now: number = Date.now()): { attemptId: string; s
   return { attemptId: newAeroAttemptId(), startedAt: now };
 }
 
+/**
+ * The request headers that pair a call with the attempt that produced it.
+ *
+ * The snapshot POST is audited by the server itself when it refuses, and the line it writes has to name
+ * the same attempt the page's `read_history` result line names. The transport cannot derive it: it is the
+ * page that knows which attempt came back from the shortcut. No attempt, no header -- the server must not
+ * receive an identifier for a request that never began.
+ */
+export function aeroAttemptHeaders(attempt?: { attemptId: string } | null): Record<string, string> {
+  return attempt ? { 'X-Trindade-Attempt': attempt.attemptId } : {};
+}
+
 /** A random identifier, with a fallback for browsers that predate `randomUUID`. */
 export function newAeroAttemptId(): string {
   const cryptoApi = globalThis.crypto;

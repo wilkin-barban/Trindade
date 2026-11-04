@@ -33,6 +33,7 @@ globalThis.window = {
 } as any;
 
 const {
+  aeroAttemptHeaders,
   aeroErrorCode,
   aeroImportAuditEvent,
   aeroReceiptsAuditEvent,
@@ -206,6 +207,17 @@ describe('postAeroAuditEvent', () => {
       console.error = original;
       stub.restore();
     }
+  });
+});
+
+describe('aeroAttemptHeaders', () => {
+  test('carries the attempt that produced the snapshot and nothing when there is none', () => {
+    // The snapshot POST is the call whose refusal is audited as `sync_refused`: without this header the
+    // line on disk belongs to no request, and the operator reading the log cannot pair it with the
+    // shortcut the phone took.
+    assert.deepEqual(aeroAttemptHeaders({ attemptId: 'attempt-9' }), { 'X-Trindade-Attempt': 'attempt-9' });
+    assert.deepEqual(aeroAttemptHeaders(null), {});
+    assert.deepEqual(aeroAttemptHeaders(undefined), {});
   });
 });
 

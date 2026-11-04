@@ -53,8 +53,9 @@ import {
   saveAeroSettings,
   type AeroSettings,
 } from '../lib/aero-integration';
-import { aeroImportAuditEvent, newAeroAttempt, postAeroAuditEvent } from '../lib/aero-audit';
+import { aeroAttemptHeaders, aeroImportAuditEvent, newAeroAttempt, postAeroAuditEvent } from '../lib/aero-audit';
 import {
+  aeroAttemptDate,
   clearAeroPendingAttempt,
   loadAeroPendingAttempt,
   type AeroPendingAction,
@@ -434,7 +435,7 @@ export function MassasLaunchPage() {
       // brings back has to be written down before leaving. A batch and a single entry are different trips.
       const action: AeroPendingAction = payloads.length === 1 ? 'entrada' : 'entrada_lote';
       const attempt = newAeroAttempt();
-      saveAeroPendingAttempt({ action, ...attempt });
+      saveAeroPendingAttempt({ action, ...attempt, date });
 
       void postAeroAuditEvent({
         event: 'launch_sync',
@@ -524,7 +525,9 @@ export function MassasLaunchPage() {
     });
 
     const attempt = newAeroAttempt();
-    saveAeroPendingAttempt({ action: 'movimentos', ...attempt });
+    // The date travels with the attempt: the page returns in a fresh document and today's clock there is
+    // not necessarily the day this envelope asked for.
+    saveAeroPendingAttempt({ action: 'movimentos', ...attempt, date });
 
     void postAeroAuditEvent({
       event: 'read_history',
@@ -551,6 +554,9 @@ export function MassasLaunchPage() {
       // The page returned from the shortcut: the request line is already on disk with this identifier.
       const attempt = loadAeroPendingAttempt('movimentos');
       clearAeroPendingAttempt();
+      // The answer belongs to the day the trip asked for, not to the one the calendar says on return: a
+      // read launched at 23:55 and answered at 00:01 would otherwise store yesterday's plant under today.
+      const answeredDate = aeroAttemptDate(attempt, date);
       const pairing = attempt
         ? { attemptId: attempt.attemptId, startedAt: attempt.startedAt, client: 'web' as const }
         : { client: 'web' as const };
@@ -589,9 +595,12 @@ export function MassasLaunchPage() {
         // of the catalogue: the boxes are not this screen's business and must never appear in its dialog.
         const stored = await api.post<{ massas?: number }>(
           '/integration/aero/movements',
-          buildAeroMovementsSnapshot(date, read.movements),
+          buildAeroMovementsSnapshot(answeredDate, read.movements),
+          // The refusal this call may get is audited by the server, and that line has to name the same
+          // attempt as the page's result line: no attempt in memory means no header, never an invented one.
+          { headers: aeroAttemptHeaders(attempt) },
         );
-        await loadMirror(date);
+        await loadMirror(answeredDate);
         setSyncResult({
           feedback: movementsSyncFeedback({ status: 'ok', count: stored?.massas ?? 0 }),
           detail: null,

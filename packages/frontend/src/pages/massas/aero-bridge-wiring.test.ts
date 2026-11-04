@@ -44,8 +44,20 @@ describe('aero bridge wiring: the panel asks for three things and dispatches the
     // holds two lines about one action and no way to tell they belong together.
     assert.match(
       launch,
-      /saveAeroPendingAttempt\(\{ action: 'movimentos', \.\.\.attempt \}\)/,
-      'the movements read must remember its attempt before leaving the page',
+      /saveAeroPendingAttempt\(\{ action: 'movimentos', \.\.\.attempt, date \}\)/,
+      'the movements read must remember its attempt and the day it asked for before leaving the page',
+    );
+    // The page returns in a fresh document: the answer is stored under the day the trip asked for, never
+    // under whatever the clock says on return.
+    assert.match(
+      launch,
+      /const answeredDate = aeroAttemptDate\(attempt, date\);/,
+      'the movements answer must be filed under the day the read was armed for',
+    );
+    assert.match(
+      launch,
+      /buildAeroMovementsSnapshot\(answeredDate, read\.movements\)/,
+      'the snapshot must carry the day the bridge asked for',
     );
     assert.match(
       launch,
