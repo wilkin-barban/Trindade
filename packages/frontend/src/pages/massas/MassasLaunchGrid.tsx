@@ -73,6 +73,7 @@ export function MassasLaunchGrid({
             return (
               <div
                 key={product.code}
+                data-testid={`massas-product-${product.code}`}
                 className={`p-3 rounded-lg border transition-all ${
                   numBoxes > 0 ? 'bg-amber-50/50 border-amber-300 shadow-xs' : 'bg-gray-50/50 border-gray-200'
                 }`}

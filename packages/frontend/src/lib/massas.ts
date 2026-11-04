@@ -1,3 +1,5 @@
+import type { MassasUnifiedRow } from './massas-unified';
+
 export interface MassaProductTotal {
   code: string;
   name: string;
@@ -80,9 +82,19 @@ export function brazilianDate(date: string): string {
 /**
  * Formats WhatsApp message for massas launches: the collective summary of the day
  * plus a per-worker breakdown, with the redundant "MASSA" prefix removed from names.
+ *
+ * With unified rows the message covers the whole day: the launches recorded here and the seats the plant
+ * recorded on its tablet, already deduplicated by `massasUnifiedRows`. A worker who only exists in the ERP
+ * is part of the day and travels in the message marked "Só ERP"; without rows it falls back to the local
+ * launches, which is what the screen had before the mirror existed.
  */
-export function massasMessage(view: MassasLaunchDayView): string {
+export function massasMessage(view: MassasLaunchDayView, rows?: readonly MassasUnifiedRow[]): string {
   const lines: string[] = [`🍝 *Lançamento de Massas — ${brazilianDate(view.date)}*`, ''];
+
+  if (rows && rows.length > 0) {
+    const message = unifiedMessageLines(view, rows);
+    if (message) return [lines[0], '', ...message].join('\n');
+  }
 
   const launchedProducts = view.products.filter((p) => p.totalUnits > 0);
 
@@ -120,6 +132,85 @@ export function massasMessage(view: MassasLaunchDayView): string {
  * Removes the leading "MASSA" (or "MASSA DE") prefix from a product name,
  * so the message reads "CASEIRA" instead of "MASSA CASEIRA".
  */
+/**
+ * The body of the message when the unified rows are available: the whole day, insumos excluded by the
+ * day's own catalogue and each worker's boxes rounded per product exactly like the table does.
+ *
+ * Returns `null` when the rows carry nothing to say, so the caller keeps its "nothing yet" answer.
+ */
+function unifiedMessageLines(
+  view: MassasLaunchDayView,
+  rows: readonly MassasUnifiedRow[]
+): string[] | null {
+  // The catalogue is the ten massas: a supply the mirror returned is not part of this message, and the
+  // description never gets a vote.
+  const catalog = new Set(view.products.map((product) => product.code));
+  const massas = rows.filter((row) => row.productCode && (catalog.size === 0 || catalog.has(row.productCode)));
+  if (massas.length === 0) return null;
+
+  const products = new Map<string, { name: string; units: number; unitsPerBox: number }>();
+  const workers = new Map<
+    string,
+    { name: string; erpOnly: boolean; units: Map<string, { name: string; units: number; unitsPerBox: number }> }
+  >();
+
+  for (const row of massas) {
+    const product = products.get(row.productCode) ?? { name: row.productName, units: 0, unitsPerBox: row.unitsPerBox };
+    product.units += row.units;
+    if (product.unitsPerBox <= 0 && row.unitsPerBox > 0) product.unitsPerBox = row.unitsPerBox;
+    products.set(row.productCode, product);
+
+    const worker = workers.get(row.operatorKey) ?? {
+      name: row.operatorName,
+      erpOnly: true,
+      units: new Map<string, { name: string; units: number; unitsPerBox: number }>(),
+    };
+    if (row.state !== 'erpOnly') worker.erpOnly = false;
+    const line = worker.units.get(row.productCode) ?? {
+      name: row.productName,
+      units: 0,
+      unitsPerBox: row.unitsPerBox,
+    };
+    line.units += row.units;
+    worker.units.set(row.productCode, line);
+    workers.set(row.operatorKey, worker);
+  }
+
+  const catalogOrder = view.products.map((product) => product.code);
+  const byCatalog = (a: string, b: string) => {
+    const left = catalogOrder.indexOf(a);
+    const right = catalogOrder.indexOf(b);
+    return (left < 0 ? Number.MAX_SAFE_INTEGER : left) - (right < 0 ? Number.MAX_SAFE_INTEGER : right);
+  };
+
+  const lines: string[] = ['*Resumo Coletivo:*'];
+  for (const code of Array.from(products.keys()).sort(byCatalog)) {
+    const product = products.get(code)!;
+    lines.push(
+      `• ${stripMassasPrefix(product.name)}: ${product.units} un (${boxesForUnits(product.units, product.unitsPerBox)} cx)`
+    );
+  }
+
+  const people = Array.from(workers.values()).sort((a, b) => compareWorkerNames(a.name, b.name));
+  if (people.length > 0) {
+    lines.push('');
+    lines.push('*Por Trabalhador:*');
+    people.forEach((worker, index) => {
+      if (index > 0) lines.push('');
+      // The mark says the worker has no account here: the plant recorded him and Trindade only mirrors it.
+      lines.push(`👤 *${worker.name}${worker.erpOnly ? ' (só ERP)' : ''}:*`);
+      for (const code of Array.from(worker.units.keys()).sort(byCatalog)) {
+        const line = worker.units.get(code)!;
+        lines.push(
+          `• ${stripMassasPrefix(line.name)}: ${line.units} un (${boxesForUnits(line.units, line.unitsPerBox)} cx)`
+        );
+      }
+    });
+  }
+
+  return lines;
+}
+
 export function stripMassasPrefix(name: string): string {
   return name
     .trim()

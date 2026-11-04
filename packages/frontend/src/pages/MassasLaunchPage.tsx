@@ -782,11 +782,6 @@ export function MassasLaunchPage() {
     }
   };
 
-  const previewMessage = useMemo(() => {
-    if (!dayView) return '';
-    return massasMessage(dayView);
-  }, [dayView]);
-
   const handleCopyReport = async () => {
     if (!previewMessage) return;
     setCopyNote('');
@@ -1051,6 +1046,13 @@ export function MassasLaunchPage() {
       }),
     [dayView, mirror.snapshot, ackedLaunchIds],
   );
+
+  // The message covers the whole day, so it reads the same rows the table draws: a worker who only exists in
+  // the ERP travels in the WhatsApp summary too, and an already reconciled launch is not counted twice.
+  const previewMessage = useMemo(() => {
+    if (!dayView) return '';
+    return massasMessage(dayView, unifiedRows);
+  }, [dayView, unifiedRows]);
 
   if (loading) {
     return (
