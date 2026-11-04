@@ -242,8 +242,9 @@ sealed interface ScheduleWriteResult {
  * operator, and "it failed" would leave both without anything to do.
  *
  * A 403 on the single-entry route means a Trabalhador tried to delete an entry that is not their own;
- * on the batch routes it means the administrator-only check, and `canDelete` overstates a Trabalhador
- * there, so the history draws an action whose answer is this 403. 404 is a batch that is already gone.
+ * on the batch routes it means the administrator-only check, which the batch projection now mirrors, so
+ * this answer is the backstop for an older server rather than the expected path. 404 is a batch that is
+ * already gone.
  */
 sealed interface ScheduleLifecycleResult {
     data object Changed : ScheduleLifecycleResult

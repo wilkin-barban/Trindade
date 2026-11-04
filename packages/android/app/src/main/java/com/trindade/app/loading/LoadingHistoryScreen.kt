@@ -277,8 +277,8 @@ private fun BatchCard(
                 // Each action is drawn only where the server said it would be accepted, which is the
                 // `== true` inside those two predicates rather than a role decided here: this client does
                 // not know the caller's role, and the flag is the server's own answer to that question.
-                // `canDelete` is known to overstate a Trabalhador on this route, which is why the refusal
-                // has a sentence of its own rather than being folded into "it failed".
+                // The batch flag mirrors the administrator-only route, and the refusal keeps a sentence
+                // of its own for a server that still overstates it or a role that changed mid-flight.
                 if (offersDeactivate(batch)) {
                     HistoryIconAction(
                         iconRes = R.drawable.ic_deactivate,

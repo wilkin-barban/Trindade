@@ -310,10 +310,10 @@ class ReportsHistoryViewModel @Inject constructor(
     private fun refusalMessage(statusCode: Int, code: String? = null): String = when (statusCode) {
         // The session is gone, not the network. The app's own sign-in is the way back.
         401 -> SESSION_EXPIRED
-        // Both routes check for Administrador, and this is the pair where the server's own flag
-        // overstates the caller: the history drew a delete action for a Trabalhador because `canDelete`
-        // said so, and the route answers 403. Naming the role the server checks is the honest thing to
-        // say -- the client cannot know the caller's role, only that it was refused here.
+        // Deactivate is administrator-only and delete follows authorship, both decided by the same
+        // projection the card drew from. A 403 here is a role that changed mid-flight or a server that
+        // has not adopted that projection; naming the role is still the honest thing to say, because
+        // the client cannot know the caller's role, only that it was refused here.
         403 -> ADMIN_ONLY
         404 -> GONE
         // A report that moved out from under the operator: the day was closed, or someone else closed it.

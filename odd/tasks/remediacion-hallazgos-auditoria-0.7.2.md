@@ -117,31 +117,31 @@ Evidencia por hallazgo (archivo y síntoma observado en la auditoría):
 Cada tarea es TDD: primero el test que falla (RED) por la regla que cubre, después el cambio mínimo (GREEN) y el
 refactor con la suite enfocada. Los commits son atómicos y llevan tests y documentación con el comportamiento.
 
-- [ ] **T1 — A1: separar snapshot rechazado de backend inalcanzable.** Specs S1, S2.
+- [x] **T1 — A1: separar snapshot rechazado de backend inalcanzable.** Specs S1, S2.
   - Archivos: `aero/AeroFailure.kt`, `aero/AeroDispatcher.kt`, `res/values/strings.xml`, `res/values-pt-r2/strings.xml` (o el locale que exista), `aero/AeroDispatcherTest.kt`, `aero/AeroFailureTest.kt`, `massas/MassasLaunchViewModelTest.kt`.
   - Regla: `AeroSnapshotSave.Unreachable` produce `AeroFailureCode.SNAPSHOT_BACKEND_UNREACHABLE` con `auditCode` propio (`AERO_SNAPSHOT_BACKEND_UNREACHABLE`), retryable, y una frase distinta de «el backend rechazó el snapshot».
   - Aceptación: AC1. Test RED: `AeroDispatcherTest` con un mirror que responde `Unreachable` afirma el código nuevo y la auditoría; el mismo test con `Refused` afirma `SNAPSHOT_REFUSED`.
   - Riesgo: 3 (contrato del log: códigos nuevos consumidos por diagnósticos). Rollback: revertir el enum y su `when` exhaustivo falla en compilación, no en producción.
 
-- [ ] **T2 — A2: `logout` y `changePassword` sin cuerpo tipado.** Specs S3.
+- [x] **T2 — A2: `logout` y `changePassword` sin cuerpo tipado.** Specs S3.
   - Archivos: `network/AuthApi.kt`, `auth/AuthRepository.kt`, `auth/*Test.kt` (MockWebServer), `network/AuthApiTest.kt`.
   - Regla: ambos declaran `Response<Unit>`; un 200 real con `{"success":true}` se lee como éxito y no como fallo de red.
   - Aceptación: AC2. Test RED: con MockWebServer devolviendo `200 {"success":true}`, `logout()` y `changePassword()` resuelven éxito.
   - Riesgo: 2 (seguridad: cerrar sesión es la barrera de sesión). Rollback: una línea por método.
 
-- [ ] **T3 — A3: serializar lote, fila y cola.** Specs S4.
+- [x] **T3 — A3: serializar lote, fila y cola.** Specs S4.
   - Archivos: `massas/MassasLaunchViewModel.kt`, `massas/MassasLaunchViewModelTest.kt`.
   - Regla: un único mutex cubre toda salida al ERP (lote, fila suelta, drenaje de cola); un `launchId` en vuelo no se vuelve a despachar; dos toques concurrentes producen un solo envío.
   - Aceptación: AC3. Test RED: dos `sendPendingLaunch` concurrentes sobre la misma fila → el dispatcher fake registra una llamada; `flushPendingQueue` mientras un envío está en vuelo no reenvía el mismo `launchId`.
   - Riesgo: 4 (concurrencia). Rollback: quitar el mutex devuelve el comportamiento anterior, y el test lo detecta.
 
-- [ ] **T4 — A4: el TTL de la cola deja traza.** Specs S5.
+- [x] **T4 — A4: el TTL de la cola deja traza.** Specs S5.
   - Archivos: `aero/AeroQueue.kt`, `aero/AeroQueueStore.kt`, `aero/AeroQueueTest.kt`, `massas/MassasLaunchViewModel.kt`, `massas/MassasLaunchViewModelTest.kt`.
   - Regla: `readAeroQueueResult` distingue `Pending`, `Empty` y `Rejected(EXPIRED|MALFORMED)`; el view model registra `queue_rejected` con `code=AERO_QUEUE_EXPIRED` (o `AERO_QUEUE_MALFORMED`) y la cantidad de ítems antes de descartarla. Nunca se pierde trabajo sin línea.
   - Aceptación: AC4. Test RED: cola con `createdAt` de hace 9 h → `Rejected(EXPIRED)` con los ítems; el view model llama `logQueueRejected` con la fecha y el código.
   - Riesgo: 1 (descarte de datos locales). Rollback: el store sigue borrando el blob; solo cambia lo que se informa.
 
-- [ ] **T5 — A6: el asset de la release no puede divergir de producción.** Specs S6.
+- [x] **T5 — A6: el asset de la release no puede divergir de producción.** Specs S6.
   - Archivos: `.github/workflows/android-release.yml`, `scripts/test_android_release_workflow.py`.
   - Regla: si el checkout del tag trae `packages/backend/apk/trindade-<versión>.apk` con su `.sha256` válido, el
   asset publicado es **ese** archivo, verificado con `aapt2`/`apksigner` y su digest; si falta, se publica el
@@ -150,49 +150,49 @@ refactor con la suite enfocada. Los commits son atómicos y llevan tests y docum
   (c) archivo de otra versión → falla; (d) sin archivo → publica el compilado; (e) re-run converge al mismo digest.
   - Riesgo: 5 (entrega). Rollback: quitar el paso devuelve el comportamiento anterior, sin tocar tags ya publicados.
 
-- [ ] **T6 — M1: `canDelete` día-level alineado con la ruta.** Specs S7.
+- [x] **T6 — M1: `canDelete` día-level alineado con la ruta.** Specs S7.
   - Archivos: `packages/backend/src/modules/history-permissions.ts`, `loading/loading.service.ts`, `massas/massas.service.ts`, `reports/*`, tests de permisos, `LoadingHistoryPage.tsx`, `ReportHistoryPage.tsx`, `HistoryCardActions.kt`, tests.
   - Regla: el flag que habilita borrar un **lote/día** es verdadero solo si la ruta que lo ejecuta lo aceptaría (admin para lote); el de una **fila** sigue la regla de autoría.
   - Aceptación: AC6. Tests: Trabajador con filas propias ve borrar fila, no lote; Administrador ve ambos; la ruta rechaza con 403 lo que el flag ya no ofrece.
   - Riesgo: 2 (permisos). Rollback: revertir la proyección del flag.
 
-- [ ] **T7 — M2: `sync_refused` correlacionado y atribuido.** Specs S8.
+- [x] **T7 — M2: `sync_refused` correlacionado y atribuido.** Specs S8.
   - Archivos: `packages/backend/src/modules/integration/aero.movements.*`, `aero.log.contract.test.ts`, `packages/frontend/src/lib/aero-mirror.ts` (o el emisor), `packages/android/.../AeroAudit.kt` si aplica.
   - Regla: el rechazo del snapshot lleva el `attemptId` del intento y el `client` real (`web`/`android`); la web manda `X-Trindade-Client` en todas sus llamadas a `/integration/aero/*`.
   - Aceptación: AC7. Test RED: POST de snapshot rechazado → la fila de auditoría tiene `attemptId` y `client=web`; sin header, el backend no inventa `android`.
   - Riesgo: 3 (contrato del log). Rollback: el header es aditivo.
 
-- [ ] **T8 — M3+M4: cerrar sesión olvida todo secreto y toda marca.** Specs S9.
+- [x] **T8 — M3+M4: cerrar sesión olvida todo secreto y toda marca.** Specs S9.
   - Archivos: `api/client.ts`, `contexts/AuthContext.tsx`, `lib/aero-integration.ts`, `lib/aero-auto-read.ts`, tests de los tres.
   - Regla: `handleUnauthorizedRedirect`, logout y `clearAeroSettings` borran el JWT, la contraseña ERP de la sesión y la marca de auto-lectura; ninguna marca huérfana dispara una lectura tras un cierre de sesión.
   - Aceptación: AC8. Tests: con marca y contraseña presentes, `handleUnauthorizedRedirect()` deja ambos vacíos; `clearAeroSettings()` borra la marca; logout limpia las tres cosas.
   - Riesgo: 2 (seguridad). Rollback: las llamadas son aditivas.
 
-- [ ] **T9 — M5: la fecha pedida viaja con el intento.** Specs S10.
+- [x] **T9 — M5: la fecha pedida viaja con el intento.** Specs S10.
   - Archivos: `lib/aero-pending-attempt.ts`, `pages/MassasLaunchPage.tsx`, `lib/aero-pending-attempt.test.ts`, `pages/massas/*.test.tsx`.
   - Regla: el intento de `movimentos` guarda la fecha pedida; el callback guarda el snapshot y recarga el espejo con esa fecha, no con la del reloj al volver.
   - Aceptación: AC9. Test RED: intento con `date=2026-11-03` y callback después de medianoche → `buildAeroMovementsSnapshot` recibe `2026-11-03`.
   - Riesgo: 1 (snapshot guardado bajo el día equivocado). Rollback: usar la fecha del closure otra vez.
 
-- [ ] **T10 — M6: histórico de Relatórios como Cargamento.** Specs S11.
+- [x] **T10 — M6: histórico de Relatórios como Cargamento.** Specs S11.
   - Archivos: `pages/ReportHistoryPage.tsx`, `components/ui/HistoryCardActions.tsx`, `components/ui/*`, tests de la página y de accesibilidad.
   - Regla: toda acción del histórico tiene target táctil ≥ 48 px y el día cerrado muestra chip de solo lectura con el mismo componente que Cargamento.
   - Aceptación: AC10. Tests a 390 px: las acciones conservan ≥ 48 px y el chip aparece con `isClosedDay`.
   - Riesgo: 6 (sin test de regresión visual nativo; se cubre con clases y DOM). Rollback: revertir el componente.
 
-- [ ] **T11 — M7: contrato del log con cuerpos reales.** Specs S12.
+- [x] **T11 — M7: contrato del log con cuerpos reales.** Specs S12.
   - Archivos: `aero.log.contract.test.ts`, fixtures nuevas bajo `packages/backend/src/modules/integration/__fixtures__/` o inline, `aero.log.service.ts`.
   - Regla: cada evento canónico (`launch_sync`, `read_history`, `test_connection`, `import`, `queue_rejected`) tiene al menos un caso con el cuerpo que el emisor real produce, incluidos los alias aceptados.
   - Aceptación: AC11. Test RED: un fixture con la forma real de `queue_rejected` (note con `aero_queue_rejected · date=… · launchIds=… · code=…`) se acepta y se expone con sus campos.
   - Riesgo: 3 (contrato del log). Rollback: los fixtures son datos de test.
 
-- [ ] **T12 — M8+B2: documentación y KDoc coherentes.** Specs S13.
+- [x] **T12 — M8+B2: documentación y KDoc coherentes.** Specs S13.
   - Archivos: `odd/tasks/auto-conciliacion-masas-erp-post-lanzamiento.md` (T6), `docs/auditoria-android.md`, `docs/integracion-aero-masas-web.md`, `docs/agents/trindade-development.md`, `README.md`, KDoc de `canDelete`.
   - Regla: no queda `localStorage` para la contraseña ERP, no queda 7012/7013 como valor en documentación pública, los conteos de tests que se citan coinciden con la suite y el ODD anterior cierra T6.
   - Aceptación: AC12. Verificación: `grep` dirigido y revisión de las frases citadas.
   - Riesgo: 6 (documentación). Rollback: `git revert` del commit de docs.
 
-- [ ] **T13 — B1/B3/B4: deuda menor.** Specs S14.
+- [x] **T13 — B1/B3/B4: deuda menor.** Specs S14.
   - Archivos: emisor de `logImport`, tests de reportes, tests que leen fuente con `readFileSync`.
   - Regla: `logImport` usa `phase:"result"`; el test de borrado de reporte afirma `REPORT_DELETE_FORBIDDEN`; donde un test lee el fuente para afirmar comportamiento, se sustituye por un test de comportamiento sin perder la cobertura.
   - Aceptación: AC13.

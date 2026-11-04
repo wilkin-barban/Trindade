@@ -126,11 +126,10 @@ interface ReportsApi {
      * here whose success carries nothing to read, and a caller that reached for a body would find
      * null. It can refuse with 403 and 404 the way the deactivate does.
      *
-     * The ability is the item's `canDelete`, and that flag overstates what this route accepts: the
-     * server's own projection grants `canDelete` to a `Trabalhador` while the route checks for
-     * `Administrador` and answers 403, so the client follows the flag it is given and gives that
-     * refusal its own sentence instead of hardcoding a role. Anything else would be this client
-     * inventing a permission rule, and a second one to keep in agreement with the server's.
+     * The ability is the item's `canDelete`, and the route decides with that same projection: an
+     * administrator erases any report of an open day, an operator only the one they wrote. The client
+     * follows the flag it is given and still gives a 403 its own sentence instead of hardcoding a
+     * role, because a role can change between the card and the call.
      */
     @DELETE("api/reports/{id}")
     suspend fun delete(@Path("id") id: Int): Response<Unit>
