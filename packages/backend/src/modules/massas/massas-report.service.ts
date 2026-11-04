@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3';
-import { MASSAS } from '../stock/stock.catalog.js';
+import { MASSAS, isMassa } from '../stock/stock.catalog.js';
 import {
   aeroMovementsTableExists,
   listAeroMovements,
@@ -119,8 +119,7 @@ function loadUserNames(db: Database.Database): Map<string, UserName> {
 /** The massas seats of the day, or none when the mirror was never migrated. */
 function massasSeats(db: Database.Database, date: string): AeroMovement[] {
   if (!aeroMovementsTableExists(db)) return [];
-  const codes = new Set(MASSAS.map((product) => codeKey(product.code)));
-  return listAeroMovements(db, date).filter((movement) => codes.has(codeKey(movement.product_code)));
+  return listAeroMovements(db, date).filter((movement) => isMassa(movement.product_code));
 }
 
 function emptyProductTotals(): MassaProductTotal[] {

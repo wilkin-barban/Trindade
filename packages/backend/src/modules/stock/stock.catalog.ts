@@ -49,6 +49,27 @@ export const STOCK_CATALOG: readonly StockProduct[] = [...TERCEIRIZADOS, ...MASS
 
 const BY_CODE = new Map(STOCK_CATALOG.map((product) => [product.code, product]));
 
+/**
+ * The ERP pads product codes to six digits (`000084`); the catalogue writes them without padding (`84`).
+ * The zeros are padding, not identity, so both sides are compared stripped.
+ */
+export function erpCodeKey(code: string): string {
+  return code.trim().replace(/^0+/, '') || '0';
+}
+
+const MASSA_CODES: ReadonlySet<string> = new Set(MASSAS.map((product) => erpCodeKey(product.code)));
+
+/**
+ * Whether a product code is one of the ten the plant produces.
+ *
+ * This is the only classification rule the app has: the ten codes in `MASSAS` are massas, every other code is
+ * a supply -- flour, boxes, film, or a third-party product the plant resells. The description never decides;
+ * an ERP seat whose label starts with "MASSA P PIZZA" is a supply when its code is not one of the ten.
+ */
+export function isMassa(code: string): boolean {
+  return MASSA_CODES.has(erpCodeKey(code));
+}
+
 export function findStockProduct(code: string): StockProduct | undefined {
   return BY_CODE.get(code);
 }
