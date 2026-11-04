@@ -4,6 +4,7 @@ import {
   AERO_AUTO_READ_KEY,
   AERO_AUTO_READ_TTL_MS,
   armAeroAutoRead,
+  clearAeroAutoRead,
   consumeAeroAutoRead,
 } from './aero-auto-read';
 
@@ -66,6 +67,18 @@ describe('aero auto read', () => {
 
     assert.equal(consumeAeroAutoRead('2026-11-03', storage, NOW), false);
     assert.equal(storage.data.has(AERO_AUTO_READ_KEY), false);
+  });
+
+  it('forgets the mark on demand, so a closed session cannot fire the read later', () => {
+    // Logging out leaves the tab's storage behind; a mark that survived would read the plant the next
+    // time this person signed in, for a launch nobody remembers making.
+    const storage = memoryStorage();
+    armAeroAutoRead('2026-11-03', storage, NOW);
+
+    clearAeroAutoRead(storage);
+
+    assert.equal(storage.data.has(AERO_AUTO_READ_KEY), false);
+    assert.equal(consumeAeroAutoRead('2026-11-03', storage, NOW), false);
   });
 
   it('survives a phone whose storage refuses to write', () => {

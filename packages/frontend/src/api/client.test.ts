@@ -37,7 +37,7 @@ globalThis.window = {
 } as any;
 
 // Dynamic import of client after globals are configured
-const { api, consumeSessionExpiredNotice } = await import('./client');
+const { api, consumeSessionExpiredNotice, handleUnauthorizedRedirect } = await import('./client');
 
 interface RecordedRequest {
   url: string;
@@ -57,6 +57,57 @@ function resetEnvironment() {
   globalThis.window.location.href = '/dashboard';
   globalThis.fetch = originalFetch;
 }
+
+test('an expired session closes the ERP session it belonged to', () => {
+  // The JWT expiring is a logout the operator did not ask for, and it has to close the same things: the
+  // token, the plant password this tab held and the auto-read mark. A mark left behind fires a read for a
+  // launch of a session that is gone.
+  resetEnvironment();
+  mockLocalStorage.setItem('auth_token', 'expired-access-token');
+  mockLocalStorage.setItem('auth_user', JSON.stringify({ id: 1, username: 'test' }));
+  mockLocalStorage.setItem('trindade.aero.auto-read.v1', JSON.stringify({ date: '2026-11-03', at: Date.now() }));
+  mockSessionStorage.setItem('trindade.aero.session.v1', 'secret');
+
+  handleUnauthorizedRedirect();
+
+  assert.equal(mockLocalStorage.getItem('auth_token'), null);
+  assert.equal(mockLocalStorage.getItem('auth_user'), null);
+  assert.equal(mockSessionStorage.getItem('trindade.aero.session.v1'), null);
+  assert.equal(mockLocalStorage.getItem('trindade.aero.auto-read.v1'), null);
+});
+
+test('the web client declares itself on every call', async (t) => {
+  await t.test('sends X-Trindade-Client: web, and a per-request attempt when asked', async () => {
+    resetEnvironment();
+    mockLocalStorage.setItem('auth_token', 'valid-access-token');
+
+    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      recordedRequests.push({
+        url: String(input),
+        method: init?.method || 'GET',
+        headers: (init?.headers as Record<string, string>) || {},
+        body: null,
+      });
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    };
+
+    await api.get('/integration/aero/movements?date=2026-11-03');
+    await api.post(
+      '/integration/aero/movements',
+      { date: '2026-11-03', movements: [] },
+      { headers: { 'X-Trindade-Attempt': 'attempt-9' } },
+    );
+
+    assert.equal(recordedRequests[0].headers['X-Trindade-Client'], 'web');
+    assert.equal(recordedRequests[1].headers['X-Trindade-Client'], 'web');
+    assert.equal(recordedRequests[1].headers['X-Trindade-Attempt'], 'attempt-9');
+    // The attempt is the caller's, not something the transport invents for every request.
+    assert.equal(recordedRequests[0].headers['X-Trindade-Attempt'], undefined);
+  });
+});
 
 test('session rotation and refresh token handling', async (t) => {
   await t.test('expired access token -> silent renewal -> original request retried once with new token', async () => {

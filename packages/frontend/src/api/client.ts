@@ -1,4 +1,6 @@
 import i18n from '../i18n/config';
+import { clearAeroAutoRead } from '../lib/aero-auto-read';
+import { clearAeroSessionPassword } from '../lib/aero-integration';
 import { GUEST_READONLY_MESSAGE, isGuestMutationRefusal } from '../lib/guest-readonly';
 import { resolveApiErrorKey, isNetworkError } from '../lib/api-error-normalizer';
 
@@ -75,6 +77,10 @@ export function clearStoredSession(): void {
 
 export function handleUnauthorizedRedirect(): void {
   clearStoredSession();
+  // An expired JWT is a logout nobody asked for, and the ERP session belongs to the Trindade session it
+  // was typed in. The mark goes too: a pending read armed before the expiry would fire in the next one.
+  clearAeroSessionPassword();
+  clearAeroAutoRead();
   markSessionExpiredNotice();
   if (typeof window !== 'undefined' && window.location && window.location.pathname !== appUrl('/login')) {
     window.location.href = appUrl('/login');
@@ -191,6 +197,10 @@ async function request<T>(
 
   const headers: Record<string, string> = {
     'Accept-Language': lang,
+    // Which app is speaking. The backend used to assume Android on the routes that write their own audit
+    // line, which turned every web call into a false phone line; declaring it here covers every call the
+    // browser makes, including the ones that never reach the log route.
+    'X-Trindade-Client': 'web',
   };
 
   if (options.body) {
@@ -292,8 +302,9 @@ export const api = {
     return request<T>(path);
   },
 
-  post<T>(path: string, body: unknown): Promise<T> {
+  post<T>(path: string, body: unknown, init: RequestInit = {}): Promise<T> {
     return request<T>(path, {
+      ...init,
       method: 'POST',
       body: JSON.stringify(body),
     });

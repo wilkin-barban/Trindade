@@ -12,6 +12,7 @@ import {
   clearStoredSession,
   AUTH_SESSION_REFRESHED_EVENT,
 } from '../api/client';
+import { clearAeroAutoRead } from '../lib/aero-auto-read';
 import { clearAeroSessionPassword } from '../lib/aero-integration';
 
 export interface User {
@@ -135,6 +136,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearStoredSession();
     // The ERP password belongs to the session it was typed in: logging out of Trindade closes it too.
     clearAeroSessionPassword();
+    // A mark left behind would fire a plant read in the next session, for a launch this one made.
+    clearAeroAutoRead();
     setToken(null);
     setUser(null);
   }, []);

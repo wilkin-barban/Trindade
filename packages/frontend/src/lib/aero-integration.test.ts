@@ -71,6 +71,24 @@ class FakeStorage implements StorageLike {
   }
 }
 
+describe('aero-integration: clearing the configuration', () => {
+  it('forgets the session password and the auto-read mark, which belong to the same session', () => {
+    // `clearAeroSettings` is the panel's «borrar configuración»: it closes the ERP session, so a mark
+    // left behind would read the plant as if a launch had just been confirmed.
+    const storage = new FakeStorage();
+    const session = new FakeStorage();
+    storage.setItem(AERO_SETTINGS_STORAGE_KEY, '{"wsUrl":"http://192.168.25.250:1453","username":"wilkin"}');
+    session.setItem(AERO_SESSION_PASSWORD_KEY, 'secret');
+    storage.setItem('trindade.aero.auto-read.v1', JSON.stringify({ date: '2026-11-03', at: Date.now() }));
+
+    clearAeroSettings(storage, session);
+
+    assert.equal(storage.getItem(AERO_SETTINGS_STORAGE_KEY), null);
+    assert.equal(session.getItem(AERO_SESSION_PASSWORD_KEY), null);
+    assert.equal(storage.getItem('trindade.aero.auto-read.v1'), null);
+  });
+});
+
 describe('aero-integration: constants & types', () => {
   it('defines expected storage keys, usernames, defaults and timeouts', () => {
     assert.equal(AERO_SETTINGS_STORAGE_KEY, 'trindade.aero.integration.v1');

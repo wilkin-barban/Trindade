@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   AERO_PENDING_ATTEMPT_STORAGE_KEY,
+  aeroAttemptDate,
   clearAeroPendingAttempt,
   loadAeroPendingAttempt,
   saveAeroPendingAttempt,
@@ -28,6 +29,37 @@ describe('the attempt the bridge carries away', () => {
       attemptId: 'attempt-7',
       startedAt: 1_700_000_000_000,
     });
+  });
+
+  it('comes back with the day it was armed for, even after midnight', () => {
+    // The page leaves for the shortcut with one day in hand and returns in a fresh document. Reading
+    // today's clock there would store the plant's answer under the next day, and the mirror would show
+    // a date whose boxes are still pending.
+    const storage = memoryStorage();
+    saveAeroPendingAttempt(
+      { action: 'movimentos', attemptId: 'attempt-7', startedAt: 1_700_000_000_000, date: '2026-11-03' },
+      storage,
+    );
+
+    const attempt = loadAeroPendingAttempt('movimentos', storage);
+    assert.equal(attempt?.date, '2026-11-03');
+    assert.equal(aeroAttemptDate(attempt, '2026-11-04'), '2026-11-03');
+    assert.equal(aeroAttemptDate(null, '2026-11-04'), '2026-11-04');
+  });
+
+  it('keeps reading an attempt stored before dates were carried', () => {
+    // A tab that left with the previous build has a record without a date. It is still the attempt of
+    // that trip, so the identifier pairs; only the day falls back to the page's own.
+    const storage = memoryStorage();
+    storage.setItem(
+      AERO_PENDING_ATTEMPT_STORAGE_KEY,
+      JSON.stringify({ action: 'movimentos', attemptId: 'attempt-6', startedAt: 1_700_000_000_000 }),
+    );
+
+    const attempt = loadAeroPendingAttempt('movimentos', storage);
+    assert.equal(attempt?.attemptId, 'attempt-6');
+    assert.equal(attempt?.date, undefined);
+    assert.equal(aeroAttemptDate(attempt, '2026-11-04'), '2026-11-04');
   });
 
   it('is not borrowed by a callback of another trip', () => {

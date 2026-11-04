@@ -5,6 +5,7 @@
  * separate from React and UI layers.
  */
 
+import { clearAeroAutoRead } from './aero-auto-read';
 import { aeroTestVerdictFromToken, type AeroTestVerdict } from './aero-test';
 
 export const AERO_SETTINGS_STORAGE_KEY = 'trindade.aero.integration.v1';
@@ -259,6 +260,9 @@ export function clearAeroSettings(
   if (target) {
     target.removeItem(AERO_SETTINGS_STORAGE_KEY);
   }
+  // Clearing the integration closes the session it configured, so the mark a launch left behind goes
+  // with it: a read armed for this setup must not fire under the next one.
+  clearAeroAutoRead(target);
 }
 
 /**

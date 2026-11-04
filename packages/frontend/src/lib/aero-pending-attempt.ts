@@ -20,6 +20,28 @@ export interface AeroPendingAttempt {
   action: AeroPendingAction;
   attemptId: string;
   startedAt: number;
+  /**
+   * The day the trip was armed for.
+   *
+   * The page leaves with one day in hand and returns in a fresh document, which is why the date cannot
+   * be read from the clock on return: a trip that comes back after midnight would store the plant's
+   * answer under the next day and leave today's mirror empty. Optional because an attempt written by an
+   * older build has no date, and that record is still the attempt of its trip.
+   */
+  date?: string;
+}
+
+/**
+ * The day a returned attempt belongs to.
+ *
+ * The attempt's own date wins over whatever the page was showing when the answer arrived; the page's
+ * day is the fallback for an attempt stored before dates were carried, or for a callback with none.
+ */
+export function aeroAttemptDate(
+  attempt: Pick<AeroPendingAttempt, 'date'> | null | undefined,
+  pageDate: string,
+): string {
+  return attempt?.date ?? pageDate;
 }
 
 function storageOf(storage?: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null) {
@@ -56,14 +78,15 @@ export function loadAeroPendingAttempt(
   try {
     const parsed = JSON.parse(raw) as Record<string, unknown> | null;
     if (!parsed || typeof parsed !== 'object') return null;
-    const { action: storedAction, attemptId, startedAt } = parsed;
+    const { action: storedAction, attemptId, startedAt, date } = parsed;
     if (storedAction !== 'movimentos' && storedAction !== 'entrada' && storedAction !== 'entrada_lote') {
       return null;
     }
     if (typeof attemptId !== 'string' || attemptId.length === 0) return null;
     if (typeof startedAt !== 'number' || !Number.isFinite(startedAt)) return null;
     if (action !== undefined && storedAction !== action) return null;
-    return { action: storedAction, attemptId, startedAt };
+    if (date !== undefined && typeof date !== 'string') return null;
+    return { action: storedAction, attemptId, startedAt, ...(date ? { date } : {}) };
   } catch {
     return null;
   }

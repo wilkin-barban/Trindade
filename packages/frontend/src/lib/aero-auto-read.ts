@@ -63,6 +63,17 @@ function read(storage: StorageLike | null): AutoReadMark | null {
 }
 
 /**
+ * Forgets the mark: a session that closes takes its pending read with it.
+ *
+ * Called on logout, on an expired JWT and when the integration is cleared. A mark that survived would
+ * fire a read for a launch of a session that no longer exists, and the operator would see the plant's
+ * day change for a reason nothing on screen explains.
+ */
+export function clearAeroAutoRead(storage: Pick<StorageLike, 'removeItem'> | null = safeStorage()): void {
+  forget(storage as StorageLike | null);
+}
+
+/**
  * Records that the day owes one read, replacing whatever a previous launch marked.
  *
  * Writing is best effort: a phone in private mode cannot keep the mark, and that costs the automatic
