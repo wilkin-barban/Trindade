@@ -429,6 +429,48 @@ describe('Aero movements routes', () => {
     assert.equal(refusals[0].payload?.date, PAST_DAY);
   });
 
+  it('correlates a sync refusal with the attempt that produced it', async () => {
+    // A refusal is the line an operator reads when a phone kept trying to rewrite a frozen night. Without
+    // the attempt it belongs to no request, and without the declared client it is attributed to a phone
+    // that may not have been involved.
+    const res = await app.inject({
+      method: 'POST',
+      url: url(),
+      headers: {
+        authorization: `Bearer ${wilkinToken}`,
+        'x-trindade-client': 'web',
+        'x-trindade-attempt': 'attempt-9',
+      },
+      payload: { date: PAST_DAY, movements: [{ ...seat, entry_date: PAST_DAY }] },
+    });
+
+    assert.equal(res.statusCode, 409);
+    const lines = readFileSync(join(tempLogDir, AERO_LOG_FILE), 'utf-8').split('\n').filter(Boolean);
+    const last = JSON.parse(lines[lines.length - 1]) as {
+      note?: string;
+      client?: string | null;
+      attemptId?: string | null;
+    };
+    assert.equal(last.note, 'sync_refused');
+    assert.equal(last.client, 'web');
+    assert.equal(last.attemptId, 'attempt-9');
+  });
+
+  it('does not invent an attempt identifier the caller did not declare', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: url(),
+      headers: { authorization: `Bearer ${wilkinToken}`, 'x-trindade-client': 'android' },
+      payload: { date: PAST_DAY, movements: [{ ...seat, entry_date: PAST_DAY }] },
+    });
+
+    assert.equal(res.statusCode, 409);
+    const lines = readFileSync(join(tempLogDir, AERO_LOG_FILE), 'utf-8').split('\n').filter(Boolean);
+    const last = JSON.parse(lines[lines.length - 1]) as { note?: string; attemptId?: string | null };
+    assert.equal(last.note, 'sync_refused');
+    assert.equal(last.attemptId, null);
+  });
+
   it('does not attribute a sync refusal to android without a client header', async () => {
     const res = await app.inject({
       method: 'POST',

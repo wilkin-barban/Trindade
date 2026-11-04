@@ -1112,6 +1112,9 @@ describe('Reports Routes', () => {
 
     const foreign = await app.inject({ method: 'DELETE', url: '/api/reports/9812', headers: { authorization: `Bearer ${workerToken}` } });
     assert.strictEqual(foreign.statusCode, 403, foreign.body);
+    // The code is the contract the client reads: the phone and the web translate `REPORT_DELETE_FORBIDDEN`
+    // into the sentence that says why nothing was erased, so a 403 without it is a refusal nobody can name.
+    assert.strictEqual(foreign.json().code, 'REPORT_DELETE_FORBIDDEN', foreign.body);
     assert.ok(db.prepare('SELECT id FROM reports WHERE id = 9812').get(), 'a refused erase keeps the report');
 
     const past = await app.inject({ method: 'DELETE', url: '/api/reports/9813', headers: { authorization: `Bearer ${workerToken}` } });

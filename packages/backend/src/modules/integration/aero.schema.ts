@@ -41,6 +41,14 @@ export const AeroLogPhaseSchema = z.enum(['requested', 'result', 'response']);
 export const AeroLogClientSchema = z.enum(['android', 'web', 'shortcut', 'bridge']);
 
 /**
+ * The identifier that pairs the lines of one attempt.
+ *
+ * Declared once because two transports carry it -- the audit body and the `X-Trindade-Attempt` header on
+ * the routes that write their own refusal line -- and a second copy would drift.
+ */
+export const AeroLogAttemptSchema = z.string().min(1).max(64);
+
+/**
  * Request body for appending an audit log event.
  * Marked strict to reject smuggled fields such as inline credentials or authorization headers.
  */
@@ -56,7 +64,7 @@ export const AeroLogBodySchema = z
     launchId: z.number().int().positive().nullable().optional(),
     note: z.string().max(256).nullable().optional(),
     client: AeroLogClientSchema.optional(),
-    attemptId: z.string().min(1).max(64).optional(),
+    attemptId: AeroLogAttemptSchema.optional(),
     durationMs: z.number().int().min(0).max(600_000).optional(),
     appVersion: z.string().min(1).max(32).optional(),
     buildNumber: z.number().int().min(0).max(2_000_000_000).optional(),
