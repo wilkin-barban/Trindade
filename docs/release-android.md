@@ -104,12 +104,17 @@ Los dos números se calculan una sola vez en `build.gradle.kts` y alimentan tant
 | 0.7.0 | 7006 | Reemplazada | Histórico de cargamento cerrado en solo lectura, reactivación de lote y reporte, chapas libres sin duplicados, rechazos de tanda en un paso y sync ERP solo del día abierto |
 | 0.7.0 | — | Reemplazada | Auditoría ERP Android, payload de movimientos alineado con el puente web, vista de solo lectura para días cerrados del Histórico de Cargamento y orden de Lanzamiento de Masas; asset de GitHub Release `v0.7.0`. El código de build es interno. |
 | 0.7.1 | — | **Publicada** | Actualización por `buildNumber` en `/latest-release`, versión pública servida por producción y asset de GitHub Release `v0.7.1`. El código de build es interno. |
+| 0.7.3 | 7014 | 2026-11-04 | **Publicada** | Las cajas del día se calculan con el total del producto (redondeo único), la caja abierta se anota en palabras y las dos secciones inferiores se alimentan de las filas unificadas, de modo que un operario que sólo existe en el ERP aparece, se filtra y suma su subtotal. |
 | 0.7.2 | 7013 | 2026-11-04 | **Publicada** | Remediación de los hallazgos de auditoría 7006/7007/0.7.1: espejo distinto de backend inalcanzable, sesión que olvida la contraseña del ERP, despacho serializado, cola con traza, borrado de lote sólo Administrador, intento correlacionado y histórico táctil. |
 
 Las builds 0.6.x se distribuyeron por `GET /api/app/download-apk`, no por un tag de GitHub. Los hashes y las
 verificaciones completas están en [release-android-historial.md](release-android-historial.md).
 
-> **Estado final del 2026-11-04.** La instancia de producción publica la versión **0.7.2** en
+> **Estado final del 2026-11-04.** La versión **0.7.3** (build 7014) es la publicada: `packages/backend/apk/trindade-0.7.3.apk`
+> son 11.295.876 bytes, sha256 `593ffc646efc01c4b0e7cedddfe728e9acb45544ec81a3bf4a6a1ba85576aa21`, firmada con el mismo
+> certificado del proyecto. La release anterior (0.7.2, build 7013) sigue intacta como asset de `v0.7.2`.
+>
+> **Estado anterior, 2026-11-04.** La instancia de producción publicó la versión **0.7.2** en
 > `GET /api/app/latest-release`, sirve el APK `packages/backend/apk/trindade-0.7.2.apk` en
 > `GET /api/app/download-apk` y la GitHub Release `v0.7.2` publica ese mismo binario: `versionName 0.7.2`,
 > 11.278.564 bytes, sha256 `0f7c2eef842510fbcce94bc82866fda4b91b9106bd10d2a70f14e9f2ed1c2cb3`. La respuesta
