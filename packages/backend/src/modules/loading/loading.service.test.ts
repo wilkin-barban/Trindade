@@ -158,6 +158,22 @@ describe('loading service direct persistence contract', () => {
     assert.equal(loading.listScheduleHistory(db, { userId: 2, page: 1, pageSize: 30 }, { sub: 2, role: 'Administrador' }).pagination.total, 2);
   });
 
+  it('does not offer a worker the batch delete the route would refuse', () => {
+    // The history's own flag used to say yes for the worker who created the rows, and the batch route
+    // answered 403: the screen drew a control whose only outcome was a refusal. The row keeps its
+    // authorship rule; the day is the administrator's.
+    const db = buildDb();
+    const own = driver(db, 'Own');
+    schedule(db, { driverId: own, userId: 1, createdAt: new Date().toISOString() });
+
+    const worker = loading.listScheduleHistory(db, { page: 1, pageSize: 30 }, { sub: 1, role: 'Trabalhador' });
+    assert.equal(worker.items[0]?.canDelete, false, 'a worker never gets the batch delete');
+    assert.equal(worker.items[0]?.canDeactivate, false, 'nor the batch deactivate');
+
+    const admin = loading.listScheduleHistory(db, { page: 1, pageSize: 30 }, { sub: 1, role: 'Administrador' });
+    assert.equal(admin.items[0]?.canDelete, true, 'the administrator keeps the day');
+  });
+
   it('projects list-by-date ownership and future timestamps fail-closed', () => {
     const db = buildDb();
     const own = driver(db, 'Own');

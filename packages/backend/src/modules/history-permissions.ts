@@ -97,6 +97,31 @@ export function isWithinEditWindow(
     : isWithinReportsEditWindow(createdAt, now);
 }
 
+/** The two ways a row's calendar closes erasing, computed once for every projection that asks. */
+function closedForErasing(row: OwnableHistoryRow, now: Date): { isClosedDay: boolean; eraseClosed: boolean } {
+  return {
+    isClosedDay: Boolean(row.day_date) && row.day_date! < getSaoPauloDateString(now),
+    eraseClosed: Boolean(row.erase_day_date) && row.erase_day_date! < getSaoPauloDateString(now),
+  };
+}
+
+/**
+ * Whether the actor may erase a whole batch or day.
+ *
+ * Separate from [projectHistoryPermissions] because the route that takes a day is administrator-only:
+ * deriving it from authorship would offer a Trabalhador a control whose only answer is 403, which
+ * reads as a broken screen rather than as a rule. The calendar still wins: a past day loses erasing
+ * even for the administrator.
+ */
+export function projectBatchDeletePermission(
+  actor: HistoryActor,
+  row: OwnableHistoryRow,
+  now: Date = new Date(),
+): boolean {
+  const { isClosedDay, eraseClosed } = closedForErasing(row, now);
+  return !isClosedDay && !eraseClosed && isAdmin(actor);
+}
+
 export function projectHistoryPermissions(
   actor: HistoryActor,
   row: OwnableHistoryRow,
@@ -104,15 +129,15 @@ export function projectHistoryPermissions(
   now: Date = new Date(),
 ) {
   const active = row.is_active === undefined || row.is_active === null ? true : Boolean(row.is_active);
-  const isClosedDay = Boolean(row.day_date) && row.day_date! < getSaoPauloDateString(now);
+  const { isClosedDay, eraseClosed } = closedForErasing(row, now);
   // The calendar wins over the clock: a row dated before today is read-only even for its creator
   // inside the edit window, and even for the administrator who could otherwise erase it.
   const canEdit = !isClosedDay && active && row.user_id === actor.sub && isWithinEditWindow(window, row.created_at, now);
   const canDeactivate = isAdmin(actor) && active;
-  // Erasing is narrower than retiring: whoever the actor is, a day that is already past cannot lose
-  // content, and an operator erases only what they wrote. A flag that ignored authorship would offer
-  // a thumb a button the route refuses, which reads as a broken screen rather than as a rule.
-  const eraseClosed = Boolean(row.erase_day_date) && row.erase_day_date! < getSaoPauloDateString(now);
+  // Erasing a row is narrower than retiring it: whoever the actor is, a day that is already past
+  // cannot lose content, and an operator erases only what they wrote. A flag that ignored authorship
+  // would offer a thumb a button the route refuses, which reads as a broken screen rather than as a
+  // rule. A whole day is not this flag's question: see [projectBatchDeletePermission].
   const canDelete =
     !isClosedDay && !eraseClosed && (isAdmin(actor) || (actor.role === 'Trabalhador' && row.user_id === actor.sub));
   const canActivate = isAdmin(actor) && !active;
