@@ -5,7 +5,7 @@ Todos los cambios relevantes del proyecto se documentan en este archivo. El form
 [SemVer](https://semver.org/lang/es/).
 
 Las versiones **0.6.x** se distribuyeron por `GET /api/app/download-apk` y no tienen tag propio en GitHub.
-Las releases **v0.7.0** y **v0.7.1** se publicaron en GitHub Releases; **v0.7.2** se publica con esta entrega. El detalle de builds, hashes y
+Las releases **v0.7.0**, **v0.7.1** y **v0.7.2** se publicaron en GitHub Releases. El detalle de builds, hashes y
 verificaciones está en [docs/release-android-historial.md](docs/release-android-historial.md).
 
 ---
