@@ -328,7 +328,7 @@ Contexto confirmado (léelo y verifícalo en el repo):
 - Las apps muestran pendientes porque la tabla de Lanzamiento de Masas combina lanzamientos locales + espejo guardado; el espejo no existe.
 - Android: `MassasLaunchViewModel.dispatchToErp` (lote) recarga `repository.day` pero no ejecuta `syncAeroDay`; `sendPendingLaunch` llama `refreshMirror`, pero este solo lee el espejo ya guardado en backend, no consulta `/movimentoitem`. `flushPendingQueue` tiene el mismo límite.
 - Web: el callback de `entrada`/`entrada_lote` limpia la cola y muestra resultado, pero no dispara la lectura de `/movimentoitem`; solo el botón Sincronizar com ERP hace esa lectura.
-- La sincronización actual ya consulta todos los usuarios (`NOMUSU:null`), todos los productos (`CODPRO:null`) y `ENTSAI:"E"`. El filtro de los 8 productos de masas es de presentación (`aeroMirrorSeats` + `massasUnifiedRows`); NO filtrar el almacenamiento del espejo a 8, porque Relatório/Recebimento usa los insumos.
+- La sincronización actual ya consulta todos los usuarios (`NOMUSU:null`), todos los productos (`CODPRO:null`) y `ENTSAI:"E"`. El filtro de los **10** productos de masas es de presentación (`aeroMirrorSeats` + `massasUnifiedRows`); NO filtrar el almacenamiento del espejo a 10, porque Relatório/insumos usa el resto. *(Nota posterior, 0.7.4: este párrafo decía «8»; el catálogo siempre tuvo y tiene diez códigos —`1045, 39, 60, 84, 91, 1192, 5000, 1047, 22, 1616`— y todo código fuera de ellos es insumo.)*
 - La versión 0.7.1 actual ya corrige `_method` en cuerpo/query y `ENTSAI:"E"`; publica `buildNumber` 7011 en `/latest-release`, pero no tiene lectura automática posterior al lanzamiento.
 
 Contenido obligatorio del ODD:
