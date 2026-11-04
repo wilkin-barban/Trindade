@@ -10,6 +10,8 @@ export const MassaProductTotalSchema = z
     unitsPerBox: z.number().int(),
     totalBoxes: z.number().int(),
     totalUnits: z.number().int(),
+    /** Units left in the open box when the total does not close every box. */
+    openBoxUnits: z.number(),
   })
   .strict();
 
@@ -138,6 +140,7 @@ export const MassasReportOperatorProductSchema = z.object({
   name: z.string(),
   boxes: z.number(),
   units: z.number(),
+  openBoxUnits: z.number(),
 });
 
 /**
@@ -153,6 +156,7 @@ export const MassasReportOperatorSchema = z.object({
   username: z.string().nullable(),
   boxes: z.number(),
   units: z.number(),
+  openBoxUnits: z.number(),
   products: z.array(MassasReportOperatorProductSchema),
   erpOnly: z.boolean(),
   onlyErp: z.boolean(),
