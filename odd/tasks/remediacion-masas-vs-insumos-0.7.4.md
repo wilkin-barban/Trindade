@@ -74,9 +74,9 @@ cambia el catálogo ni la base: unifica el predicado, lo prueba como invariante 
 | T5 | S6, S7 | Android: bloques, strings ES/PT y tests del contrato | `e0a6f0d5` |
 | T6 | S7 | e2e web y fixture de los 10 códigos; Lançamento sigue con 10 productos | `5fa2882b` |
 | T7 | S8 | Docs, CHANGELOG y aclaración de las referencias históricas a 8 masas | `c5fafed4` |
-| T8 | S9 | Suites completas, typecheck y APK firmado 0.7.4 / 7015 | — |
-| T9 | S9 | Imágenes, despliegue y verificación de `/api/app/latest-release` | — |
-| T10 | S9 | CI de main, tag anotado `v0.7.4` y release con APK y sidecar verificados | — |
+| T8 | S9 | Suites completas, typecheck y APK firmado 0.7.4 / 7015 | `54a69444` |
+| T9 | S9 | Imágenes, despliegue y verificación de `/api/app/latest-release` | `4aef9141` |
+| T10 | S9 | CI de main, tag anotado `v0.7.4` y release con APK y sidecar verificados | `4aef9141` (tag `v0.7.4`) |
 | T11 | S10-S11, S13 | Web: mensaje de WhatsApp desde filas unificadas, con Só ERP y sin insumos | `5fa2882b` |
 | T12 | S10-S11, S13 | Android: mismo mensaje desde filas unificadas, paridad de contenido con la web | `e0a6f0d5` |
 | T13 | S12-S13 | Android: dato compacto de caja abierta y fuera la explicación larga | `e0a6f0d5` |

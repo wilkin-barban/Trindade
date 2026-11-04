@@ -113,7 +113,9 @@ verificaciones completas están en [release-android-historial.md](release-androi
 
 > **Estado final del 2026-11-04.** La versión **0.7.4** (build 7015) es la publicada: `packages/backend/apk/trindade-0.7.4.apk`
 > son 11.295.724 bytes, sha256 `cfde493af39b8a8ef749e4162b84f7a4a8a157c13d0ef14b76f04b1318175342`, firmada con el mismo
-> certificado del proyecto. La release anterior (0.7.3, build 7014) sigue intacta como asset de `v0.7.3`.
+> certificado del proyecto, y la GitHub Release `v0.7.4` publica ese mismo binario con su `.sha256`
+> (`https://github.com/wilkinbarban/Trindade/releases/tag/v0.7.4`). La release anterior (0.7.3, build 7014)
+> sigue intacta como asset de `v0.7.3`.
 >
 > **Estado anterior, 2026-11-04.** La versión **0.7.3** (build 7014) es la publicada: `packages/backend/apk/trindade-0.7.3.apk`
 > son 11.295.876 bytes, sha256 `593ffc646efc01c4b0e7cedddfe728e9acb45544ec81a3bf4a6a1ba85576aa21`, firmada con el mismo
