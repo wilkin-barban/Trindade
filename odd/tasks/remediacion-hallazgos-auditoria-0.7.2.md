@@ -3,9 +3,10 @@
 Auditoría read-only de los ciclos 7006, 7007 y 0.7.1/7012 sobre `main`. Esta entrega no agrega features: cierra
 los defectos encontrados, con TDD estricto, y publica 0.7.2 con el mismo binario en producción y en GitHub.
 
-**Alcance:** Android (A1–A4, A6), web/backend (M1–M7), documentación (M8, B2), deuda menor (B1, B3, B4), runbook
-A5 y la entrega 0.7.2. **Fuera de alcance:** cualquier feature nueva, `/saidasitem` (deuda documentada, B6) y la
-instalación del APK en emulador o teléfonos, que hace el usuario.
+**Alcance:** Android (A1–A4, A6), web/backend (M1–M7), documentación (M8, B2), deuda menor (B1, B3, B4), decisión
+documentada sobre cobertura instrumentada (B5), runbook A5 y la entrega 0.7.2. **Fuera de alcance:** cualquier
+feature nueva, `/saidasitem` (deuda documentada, B6) y la instalación o ejecución del APK en emulador o teléfonos,
+que hace el usuario. B5 no se excluye: se evalúa y se cierra con una decisión explícita en la sección 6.3.
 
 ## 1. Contexto y evidencia
 
@@ -35,6 +36,7 @@ Evidencia por hallazgo (archivo y síntoma observado en la auditoría):
 | B2 | KDoc de históricos | describen un `canDelete` que ya no existe |
 | B3 | tests de reportes | no afirman el código `REPORT_DELETE_FORBIDDEN` |
 | B4 | tests web/Android | leen el fuente con `readFileSync` en vez de ejercitar comportamiento |
+| B5 | `packages/android/app/src/androidTest` (8 casos, 4 clases) vs. `test/`+`testDebug/` | la cobertura instrumentada existe pero no se ejecuta en esta entrega: exige emulador o dispositivo |
 | B6 | `/saidasitem` | sin consumidor de producción: se documenta como deuda, no se implementa |
 
 ## 2. Prioridades
@@ -43,7 +45,8 @@ Evidencia por hallazgo (archivo y síntoma observado en la auditoría):
   verificación de punta a punta imprescindible. Bloquean la release.
 - **MEDIA (M1–M8):** permisos sobredeclarados, secretos que sobreviven al cierre de sesión, correlación del log,
   fecha del snapshot y accesibilidad del histórico. Bloquean la release.
-- **BAJA (B1–B4, B6):** consistencia de nombres y cobertura; se cierran en la misma entrega salvo B5.
+- **BAJA (B1–B5, B6):** consistencia de nombres y cobertura. B1, B3 y B4 se corrigen; B5 se cierra como
+  decisión documentada (sección 6.3) y B6 como deuda fuera de alcance.
 
 ## 3. Invariantes
 
@@ -209,6 +212,12 @@ refactor con la suite enfocada. Los commits son atómicos y llevan tests y docum
   - Aceptación: AC15–AC17.
   - Riesgo: 5 (entrega). Rollback: no se mueve ningún tag; un asset equivocado se reemplaza con `--clobber` sin crear release nueva.
 
+- [x] **T16 — B5: decisión sobre cobertura instrumentada.** Sin código.
+  - Qué: evaluar si esta entrega añade tests instrumentados o Compose nuevos.
+  - Decisión: no se añaden; se documenta la limitación y se mantiene la cobertura JVM + Compose + e2e.
+    Razonamiento completo en la sección 6.3.
+  - Riesgo: 6 (documentación). Rollback: `git revert` del commit de docs.
+
 ## 5. Criterios de aceptación
 
 - **AC1** Un fallo del backend al guardar el snapshot se reporta como `SNAPSHOT_BACKEND_UNREACHABLE` (auditoría `AERO_SNAPSHOT_BACKEND_UNREACHABLE`, retryable) y un rechazo HTTP como `SNAPSHOT_REFUSED`; la UI muestra frases distintas en español y portugués.
@@ -228,6 +237,7 @@ refactor con la suite enfocada. Los commits son atómicos y llevan tests y docum
 - **AC15** El APK 0.7.2 está firmado con la clave oficial y declara `versionName 0.7.2` con el build interno 7013; `/latest-release` responde `v0.7.2`, `buildNumber 7013` y el tamaño del archivo.
 - **AC16** La descarga pública y el asset de la GitHub Release `v0.7.2` comparten el sha256 de `packages/backend/apk/trindade-0.7.2.apk`; `v0.7.0` y `v0.7.1` no se movieron y no hay una segunda release.
 - **AC17** CI en verde en el commit etiquetado y en el de documentación; `api` y `web` sanos.
+- **AC18** La decisión sobre B5 está registrada: qué se evaluó, por qué no se añaden tests instrumentados en esta entrega y bajo qué condición se retoma como deuda.
 
 ## 6. Verificación real pendiente (ERP inalcanzable desde esta máquina)
 
@@ -256,6 +266,7 @@ Cada unidad de trabajo quedó en `main` con sus pruebas y su documentación:
 | T8–T10, B4 | `bd71717` | cierre de sesión sin contraseña ni marca de lectura, fecha del intento, `X-Trindade-Client`, y el test de `AuthContext` ejercitando el proveedor |
 | T10 | `43d5c79` | histórico de Relatórios con objetivos de 48 px y chip de solo lectura |
 | T12, B2, T14 | `c522426` | guías y KDoc sin `localStorage` ni autoría en lote, y el runbook de tablet |
+| T16, B5 | commit de cierre documental | la decisión sobre cobertura instrumentada, registrada en la sección 6.3 (sin código, sin tag, sin release) |
 
 ## 6.2 Resultado de la entrega
 
@@ -280,7 +291,49 @@ no se movió.
 Queda pendiente únicamente la verificación real con el ERP de la planta descrita en
 `docs/verificacion-erp-tablet.md`: desde esta máquina `192.168.25.250:1453` no es alcanzable.
 
+## 6.3 B5 — Cobertura instrumentada/Compose: decisión cerrada
+
+**Qué se evaluó.** Si esta entrega añadía tests instrumentados (`src/androidTest`, emulador o dispositivo) para
+los flujos que tocó: despacho serializado al ERP (A3), cola que expira con traza (A4), cierre de sesión que
+olvida la contraseña y la marca de lectura (M3/M4), fecha del intento en `movimentos` (M5), histórico táctil
+(M6) y el diálogo de resultado del snapshot.
+
+**Qué se decidió.** No se añaden tests instrumentados en 0.7.2. La decisión es explícita, no una omisión.
+
+**Por qué.**
+
+1. **Ejecutarlos exige emulador o dispositivo, y esta entrega no los usa.** El usuario prohibió instalar el APK
+   en emuladores y teléfonos; un `src/androidTest` que no se ejecuta no es cobertura, es código sin verificar. Un
+   test instrumentado que nunca corre da la misma falsa confianza que la auditoría encontró en los tests que
+   leían el fuente con `readFileSync` (B4).
+2. **La cobertura que sí corre ya cubre estas reglas en su nivel observable.** Los 1357 tests de Android son JVM
+   con Robolectric y Compose (`src/test/`, `src/testDebug/`, 38 clases con `createComposeRule`): ejercitan los
+   `ViewModel`, los adaptadores del espejo, la cola, la serialización del despacho y las pantallas de histórico y
+   Masas. La web suma 558 tests de nodo, 120 de componente y 112 de Playwright contra la app real. Ninguno de los
+   seis hallazgos tocados tenía su causa en una API del framework que sólo un emulador exponga: eran lógica de
+   concurrencia, permisos, ciclo de vida de la sesión y layout, y todos tienen RED y GREEN en esa capa.
+3. **La deuda ya existe y está acotada.** `src/androidTest` tiene hoy 8 casos en 4 clases (`PdfShareNativeGateTest`,
+   `PdfExternalRecipientNativeGateTest`, `PdfRecipientIdentityNativeGateTest`, `ReportDetailNativeGateTest`) que
+   verifican contratos de plataforma del PDF y del `Intent`. No se tocaron ni se ejecutaron en esta entrega.
+
+**Deuda declarada.** Queda para una entrega que pueda ejecutar emulador o dispositivo:
+
+- correr los 8 casos existentes de `src/androidTest` y registrar el resultado;
+- añadir instrumentados para el flujo de punta a punta del ERP cuando la tablet esté disponible: lanzar lote,
+  leer `/movimentoitem`, ver la cola drenarse y el espejo conciliarse en el día pedido;
+- cubrir con un instrumentado el almacenamiento cifrado de la contraseña ERP en Android (`AeroSettingsStore`
+  sobre `KeystoreCipher`), que hoy se prueba con Robolectric y es la frontera de plataforma más sensible.
+
+**Disparador para retomarla.** La entrega que habilite emulador o dispositivo, o la que cambie una API de
+plataforma en esos flujos (permisos del `Intent`, `WebView`, Keystore o almacenamiento de sesión).
+
 ## 7. Log
+
+- **L2 — Pedido del usuario (verbatim, 2026-11-04):**
+
+```text
+Cierre documental de B5, sin tocar código, tag ni release. En odd/tasks/remediacion-hallazgos-auditoria-0.7.2.md falta la decisión explícita de B5: cobertura instrumentada/Compose. Añade una sección breve que diga qué se evaluó, por qué no se añaden tests instrumentados en esta entrega (el emulador no se instala por restricción del usuario; la cobertura existente es JVM + Compose + e2e) y que queda como deuda para una entrega que pueda ejecutar emulador/dispositivo. Ajusta también la lista de alcance para que B5 no parezca excluido sin justificación, y marca la decisión como cerrada en la tabla/checklist. No cambies la release v0.7.2, no muevas el tag y no modifiques código. Commitea solo docs y pushea a main; avísame del commit y del CI.
+```
 
 - **L1 — Pedido del usuario (verbatim):** ver la sección final de este documento.
 
