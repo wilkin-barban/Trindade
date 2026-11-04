@@ -103,17 +103,18 @@ Los dos números se calculan una sola vez en `build.gradle.kts` y alimentan tant
 | 0.7.0 | 7005 | Reemplazada | Paridad web/Android del ERP: cola drenada con ack reversible, multioperario por asiento, fallos de Aero unificados y errores traducidos |
 | 0.7.0 | 7006 | Reemplazada | Histórico de cargamento cerrado en solo lectura, reactivación de lote y reporte, chapas libres sin duplicados, rechazos de tanda en un paso y sync ERP solo del día abierto |
 | 0.7.0 | — | Reemplazada | Auditoría ERP Android, payload de movimientos alineado con el puente web, vista de solo lectura para días cerrados del Histórico de Cargamento y orden de Lanzamiento de Masas; asset de GitHub Release `v0.7.0`. El código de build es interno. |
-| 0.7.1 | — | **Publicada** | Actualización por `buildNumber` en `/latest-release` y versión pública servida por producción. El código de build es interno. |
+| 0.7.1 | — | **Publicada** | Actualización por `buildNumber` en `/latest-release`, versión pública servida por producción y asset de GitHub Release `v0.7.1`. El código de build es interno. |
 
 Las builds 0.6.x se distribuyeron por `GET /api/app/download-apk`, no por un tag de GitHub. Los hashes y las
 verificaciones completas están en [release-android-historial.md](release-android-historial.md).
 
 > **Estado final del 2026-11-03.** La instancia de producción publica la versión **0.7.1** en
-> `GET /api/app/latest-release` y sirve el APK `packages/backend/apk/trindade-0.7.1.apk` en
-> `GET /api/app/download-apk`: `versionName 0.7.1`, 11.277.888 bytes, sha256
-> `41f87a148e28cc1f40bb2ac25a2e70f31587c598e806f2c65efa37411a46c545`. La respuesta incluye el
-> `buildNumber` interno para que una rebuild futura sea detectable aunque conserve la versión y el tamaño.
-> El código de build no se publica en las notas. La release de GitHub `v0.7.0` no se movió.
+> `GET /api/app/latest-release`, sirve el APK `packages/backend/apk/trindade-0.7.1.apk` en
+> `GET /api/app/download-apk` y la GitHub Release `v0.7.1` publica ese mismo binario: `versionName 0.7.1`,
+> 11.277.888 bytes, sha256 `f325edb6d3c03eba2f058b7aa099961fa99ba12243c6ffbec2d8e44e7683de1f`. La respuesta
+> incluye el `buildNumber` interno para que una rebuild futura sea detectable aunque conserve la versión y el
+> tamaño. El código de build no se publica en las notas. La release de GitHub `v0.7.0` no se movió: conserva su
+> asset histórico.
 
 ## 4. Workflow de publicación
 
