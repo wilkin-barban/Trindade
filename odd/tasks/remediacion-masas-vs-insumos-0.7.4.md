@@ -67,21 +67,21 @@ cambia el catálogo ni la base: unifica el predicado, lo prueba como invariante 
 
 | ID | Specs | Ruta | Commit |
 |----|-------|------|--------|
-| T1 | S8 | Escribir este ODD antes de tocar código | — |
-| T2 | S1-S3 | Backend: `isMassa` en el catálogo y los tres consumidores usándolo | — |
-| T3 | S4 | Backend: tests de invariante del catálogo y de las dos lentes | — |
-| T4 | S5, S7 | Web: bloques Masas/Insumos, textos ES/PT y tests de la separación | — |
-| T5 | S6, S7 | Android: bloques, strings ES/PT y tests del contrato | — |
-| T6 | S7 | e2e web y fixture de los 10 códigos; Lançamento sigue con 10 productos | — |
-| T7 | S8 | Docs, CHANGELOG y aclaración de las referencias históricas a 8 masas | — |
+| T1 | S8 | Escribir este ODD antes de tocar código | — (docs) |
+| T2 | S1-S3 | Backend: `isMassa` en el catálogo y los tres consumidores usándolo | `a926c737` |
+| T3 | S4 | Backend: tests de invariante del catálogo y de las dos lentes | `a926c737` |
+| T4 | S5, S7 | Web: bloques Masas/Insumos, textos ES/PT y tests de la separación | `5fa2882b` |
+| T5 | S6, S7 | Android: bloques, strings ES/PT y tests del contrato | `e0a6f0d5` |
+| T6 | S7 | e2e web y fixture de los 10 códigos; Lançamento sigue con 10 productos | `5fa2882b` |
+| T7 | S8 | Docs, CHANGELOG y aclaración de las referencias históricas a 8 masas | `c5fafed4` |
 | T8 | S9 | Suites completas, typecheck y APK firmado 0.7.4 / 7015 | — |
 | T9 | S9 | Imágenes, despliegue y verificación de `/api/app/latest-release` | — |
 | T10 | S9 | CI de main, tag anotado `v0.7.4` y release con APK y sidecar verificados | — |
-| T11 | S10-S11, S13 | Web: mensaje de WhatsApp desde filas unificadas, con Só ERP y sin insumos | — |
-| T12 | S10-S11, S13 | Android: mismo mensaje desde filas unificadas, paridad de contenido con la web | — |
-| T13 | S12-S13 | Android: dato compacto de caja abierta y fuera la explicación larga | — |
-| T14 | S14 | i18n ES/PT de la nota compacta y los textos nuevos en ambos clientes | — |
-| T15 | S10-S14 | Docs, CHANGELOG y notas de release con los dos requisitos nuevos | — |
+| T11 | S10-S11, S13 | Web: mensaje de WhatsApp desde filas unificadas, con Só ERP y sin insumos | `5fa2882b` |
+| T12 | S10-S11, S13 | Android: mismo mensaje desde filas unificadas, paridad de contenido con la web | `e0a6f0d5` |
+| T13 | S12-S13 | Android: dato compacto de caja abierta y fuera la explicación larga | `e0a6f0d5` |
+| T14 | S14 | i18n ES/PT de la nota compacta y los textos nuevos en ambos clientes | `e0a6f0d5`, `5fa2882b` |
+| T15 | S10-S14 | Docs, CHANGELOG y notas de release con los dos requisitos nuevos | `c5fafed4`, `0f506ed8` |
 
 ## Log
 
