@@ -70,6 +70,15 @@ enum class AeroFailureCode {
     SNAPSHOT_REFUSED,
 
     /**
+     * The backend could not be reached to store what the ERP answered.
+     *
+     * The read happened and the plant said yes; what failed is Trindade's own server. Reporting it as
+     * [SNAPSHOT_REFUSED] sent the operator to look at the plant or at the day, when the only thing to fix is
+     * the connection between the phone and the server -- and the log lost the difference too.
+     */
+    SNAPSHOT_BACKEND_UNREACHABLE,
+
+    /**
      * The backend closed the day the phone tried to write.
      *
      * It is the mirror image of [SNAPSHOT_REFUSED]: there the server could not keep the read, here it refuses
@@ -104,6 +113,7 @@ data class AeroFailure(
         AeroFailureCode.REFUSED_CONNECTION -> UiText.of(R.string.aero_failure_refused_connection)
         AeroFailureCode.NO_ANSWER -> UiText.of(R.string.aero_failure_no_answer)
         AeroFailureCode.SNAPSHOT_REFUSED -> UiText.of(R.string.aero_failure_snapshot_refused)
+        AeroFailureCode.SNAPSHOT_BACKEND_UNREACHABLE -> UiText.of(R.string.aero_failure_snapshot_backend_unreachable)
         AeroFailureCode.BACKEND_DAY_CLOSED -> UiText.of(R.string.aero_failure_day_closed)
         // The plant's own sentence is the whole message; without one, the generic refusal is all that is left.
         AeroFailureCode.ERP_REFUSED -> detail?.trim()?.takeIf { it.isNotEmpty() }
@@ -121,6 +131,7 @@ data class AeroFailure(
             AeroFailureCode.REFUSED_CONNECTION,
             AeroFailureCode.NO_ANSWER,
             AeroFailureCode.SNAPSHOT_REFUSED,
+            AeroFailureCode.SNAPSHOT_BACKEND_UNREACHABLE,
             -> true
             AeroFailureCode.NOT_CONFIGURED,
             AeroFailureCode.CLEARTEXT_BLOCKED,
@@ -155,6 +166,7 @@ val AeroFailureCode.auditCode: String
         AeroFailureCode.NO_ANSWER -> "AERO_ERP_UNREACHABLE"
         AeroFailureCode.ERP_REFUSED -> "AERO_ERP_REFUSED"
         AeroFailureCode.SNAPSHOT_REFUSED -> "AERO_SNAPSHOT_REFUSED"
+        AeroFailureCode.SNAPSHOT_BACKEND_UNREACHABLE -> "AERO_SNAPSHOT_BACKEND_UNREACHABLE"
         AeroFailureCode.BACKEND_DAY_CLOSED -> "AERO_BACKEND_DAY_CLOSED"
     }
 

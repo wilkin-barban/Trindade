@@ -100,26 +100,72 @@ private val queueJson = Json { ignoreUnknownKeys = true; explicitNulls = false; 
 /** The stored form of the queue, or null when the caller has nothing to store yet. */
 fun encodeAeroQueue(queue: AeroQueue): String = queueJson.encodeToString(AeroQueue.serializer(), queue)
 
+/** Why a stored queue was dropped instead of sent. */
+enum class AeroQueueRejection {
+    /** Older than [AERO_QUEUE_TTL_MS]: it belongs to a shift nobody is standing in. */
+    EXPIRED,
+
+    /** A blob this build cannot read, or one whose every entry was unusable. */
+    MALFORMED,
+}
+
+/** The stable audit codes for both rejections, so the log can be filtered without prose. */
+const val AERO_QUEUE_EXPIRED_CODE: String = "AERO_QUEUE_EXPIRED"
+const val AERO_QUEUE_MALFORMED_CODE: String = "AERO_QUEUE_MALFORMED"
+
 /**
- * Reads a stored queue, discarding anything that is not a fresh, well-formed one.
+ * What a stored queue turned out to be.
+ *
+ * [Rejected] is not [Empty] on purpose: a queue that was dropped carried work the plant never saw, and the
+ * caller has to be able to say so in the audit trail instead of reading a silent null as "nothing pending".
+ */
+sealed interface AeroQueueRead {
+    data class Pending(val queue: AeroQueue) : AeroQueueRead
+
+    data object Empty : AeroQueueRead
+
+    data class Rejected(
+        val reason: AeroQueueRejection,
+        /** The day the dropped queue said it belonged to, when the blob was readable enough to carry it. */
+        val date: String?,
+        /** The launches that will never be sent, quoted so the trail names the boxes and not just a count. */
+        val items: List<AeroQueueItem>,
+    ) : AeroQueueRead
+}
+
+/**
+ * Reads a stored queue and says what happened to it.
  *
  * A half-written queue is worse than none: it would send a product with the wrong quantity, or a launch of a
- * shift nobody is standing in any more. Anything unexpected clears itself instead of being repaired, and the
- * caller treats null as "there is nothing pending", which is the truth a broken blob can offer.
+ * shift nobody is standing in any more. Anything unexpected is dropped instead of repaired -- and reported,
+ * because dropping it used to be the same silent answer as having no work at all.
  */
-fun readAeroQueue(raw: String?, now: Long = System.currentTimeMillis()): AeroQueue? {
-    if (raw.isNullOrBlank()) return null
+fun readAeroQueueResult(raw: String?, now: Long = System.currentTimeMillis()): AeroQueueRead {
+    if (raw.isNullOrBlank()) return AeroQueueRead.Empty
 
     val parsed = runCatching { queueJson.decodeFromString(AeroQueue.serializer(), raw) }.getOrNull()
-        ?: return null
+        ?: return AeroQueueRead.Rejected(AeroQueueRejection.MALFORMED, date = null, items = emptyList())
 
     val age = now - parsed.createdAt
-    if (age < 0 || age > AERO_QUEUE_TTL_MS) return null
+    if (age < 0 || age > AERO_QUEUE_TTL_MS) {
+        return AeroQueueRead.Rejected(AeroQueueRejection.EXPIRED, parsed.date, parsed.items)
+    }
 
     val items = parsed.items.filter(::isAeroQueueItem)
-    if (items.isEmpty()) return null
-    return parsed.copy(items = items)
+    if (items.isEmpty()) {
+        return AeroQueueRead.Rejected(AeroQueueRejection.MALFORMED, parsed.date, parsed.items)
+    }
+    return AeroQueueRead.Pending(parsed.copy(items = items))
 }
+
+/**
+ * Reads a stored queue, answering only the queue that is worth sending.
+ *
+ * Kept for the callers that only need the pending work; a caller that must leave a trail reads
+ * [readAeroQueueResult] instead, because this one cannot tell "nothing pending" from "dropped".
+ */
+fun readAeroQueue(raw: String?, now: Long = System.currentTimeMillis()): AeroQueue? =
+    (readAeroQueueResult(raw, now) as? AeroQueueRead.Pending)?.queue
 
 /**
  * Whether one entry is worth sending.

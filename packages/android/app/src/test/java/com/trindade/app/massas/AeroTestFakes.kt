@@ -8,12 +8,15 @@ import com.trindade.app.aero.AeroMirrorPort
 import com.trindade.app.aero.AeroMovementsResult
 import com.trindade.app.aero.AeroQueue
 import com.trindade.app.aero.AeroQueuePort
+import com.trindade.app.aero.AeroQueueRead
 import com.trindade.app.aero.AeroReachabilityPort
 import com.trindade.app.aero.AeroSettings
 import com.trindade.app.aero.AeroSettingsPort
 import com.trindade.app.aero.AeroSnapshotSave
 import com.trindade.app.aero.AeroWriteResult
 import com.trindade.app.aero.TabletAckPort
+import com.trindade.app.aero.encodeAeroQueue
+import com.trindade.app.aero.readAeroQueueResult
 import com.trindade.app.network.AeroAuditLogRequest
 import com.trindade.app.network.AeroMovementsSaved
 
@@ -52,20 +55,25 @@ class FakeSettingsPort(
  * pendiente de ayer y comprobar que la apertura lo reintenta sin que nadie toque un botón.
  */
 class FakeQueuePort(seed: AeroQueue? = null) : AeroQueuePort {
-    var stored: AeroQueue? = seed
+    /** Lo guardado, en la misma forma que el archivo real: así el TTL y el descarte se ejercen de verdad. */
+    private var raw: String? = seed?.let(::encodeAeroQueue)
     var writes = 0
     var clears = 0
 
-    override fun read(now: Long): AeroQueue? = stored
+    val stored: AeroQueue? get() = (readAeroQueueResult(raw) as? AeroQueueRead.Pending)?.queue
+
+    override fun read(now: Long): AeroQueue? = (readAeroQueueResult(raw, now) as? AeroQueueRead.Pending)?.queue
+
+    override fun readResult(now: Long): AeroQueueRead = readAeroQueueResult(raw, now)
 
     override fun write(queue: AeroQueue) {
         writes++
-        stored = if (queue.isEmpty) null else queue
+        raw = if (queue.isEmpty) null else encodeAeroQueue(queue)
     }
 
     override fun clear() {
         clears++
-        stored = null
+        raw = null
     }
 }
 
@@ -111,8 +119,20 @@ class FakeErpPort : AeroErpPort {
      */
     var readGate: kotlinx.coroutines.CompletableDeferred<Unit>? = null
 
+    /**
+     * Detiene una escritura hasta que el test la libera.
+     *
+     * Es el único modo de mirar la pantalla mientras el viaje al ERP sigue en vuelo: con un fake instantáneo
+     * no hay ventana en la que el operario pueda tocar de nuevo.
+     */
+    var entryGate: kotlinx.coroutines.CompletableDeferred<Unit>? = null
+
+    /** Cuántas escrituras llegaron al ERP, incluidas las que el gate tiene detenidas. */
+    val entryCalls: Int get() = payloads.size
+
     override suspend fun postEntry(settings: AeroSettings, payload: AeroEntryPayload): AeroWriteResult {
         payloads += payload
+        entryGate?.await()
         return writeResults.removeFirstOrNull() ?: writeResult
     }
 

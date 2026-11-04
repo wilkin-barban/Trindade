@@ -248,7 +248,8 @@ class AeroDispatcher(
                         // The ERP answered but the backend would not store the snapshot: the day is read and
                         // lost, which is a different failure from an unreachable plant.
                         error = (save as? AeroSnapshotSave.Refused)?.code
-                            ?: AeroFailureCode.SNAPSHOT_REFUSED.auditCode.takeIf { save !is AeroSnapshotSave.Saved },
+                            ?: AeroFailureCode.SNAPSHOT_BACKEND_UNREACHABLE.auditCode
+                                .takeIf { save is AeroSnapshotSave.Unreachable },
                     ),
                 )
                 when (save) {
@@ -267,7 +268,10 @@ class AeroDispatcher(
                             serverCode = save.code,
                         ),
                     )
-                    AeroSnapshotSave.Unreachable -> AeroSyncOutcome.Failed(AeroFailure(AeroFailureCode.SNAPSHOT_REFUSED))
+                    // Nothing was answered: the plant said yes and the server was not there to keep it.
+                    AeroSnapshotSave.Unreachable -> AeroSyncOutcome.Failed(
+                        AeroFailure(AeroFailureCode.SNAPSHOT_BACKEND_UNREACHABLE),
+                    )
                 }
             }
 
@@ -327,7 +331,9 @@ class AeroDispatcher(
             AeroAudit.request(
                 event = AeroAudit.Event.IMPORT,
                 destinationUrl = IMPORT_DESTINATION,
-                phase = "response",
+                // One line, written after the backend answered: `result`, the same phase the web uses for
+                // this event. `response` is the alias kept for APKs already in the field.
+                phase = "result",
                 detail = "date=$date · ent_lan=$entLan · product=$productCode · boxes=$boxes",
                 error = error,
             ),

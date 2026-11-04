@@ -20,6 +20,15 @@ interface AeroQueuePort {
     /** The fresh, well-formed queue, or null when there is nothing to send. */
     fun read(now: Long = System.currentTimeMillis()): AeroQueue?
 
+    /**
+     * The same read, saying whether the queue was dropped and why.
+     *
+     * Defaults to [read] for the fakes and for any port that only stores a live queue; the device store
+     * overrides it because it is the one that deletes the blob.
+     */
+    fun readResult(now: Long = System.currentTimeMillis()): AeroQueueRead =
+        read(now)?.let { AeroQueueRead.Pending(it) } ?: AeroQueueRead.Empty
+
     fun write(queue: AeroQueue)
 
     fun clear()
@@ -38,11 +47,20 @@ class AeroQueueStore @Inject constructor(
      * A blob this build cannot read is removed instead of kept: it will never become readable, and leaving it
      * there would make every future read pay for the same failure.
      */
-    override fun read(now: Long): AeroQueue? {
-        val raw = prefs.getString(AERO_QUEUE_KEY, null) ?: return null
-        val queue = readAeroQueue(raw, now)
-        if (queue == null) prefs.edit().remove(AERO_QUEUE_KEY).apply()
-        return queue
+    override fun read(now: Long): AeroQueue? =
+        (readResult(now) as? AeroQueueRead.Pending)?.queue
+
+    /**
+     * The queue, or what was dropped instead of it.
+     *
+     * A blob this build cannot read is removed here, once, and the answer says what it carried so the view
+     * model can write the rejection down: deleting it in silence was the same answer as having nothing to send.
+     */
+    override fun readResult(now: Long): AeroQueueRead {
+        val raw = prefs.getString(AERO_QUEUE_KEY, null) ?: return AeroQueueRead.Empty
+        val result = readAeroQueueResult(raw, now)
+        if (result !is AeroQueueRead.Pending) prefs.edit().remove(AERO_QUEUE_KEY).apply()
+        return result
     }
 
     override fun write(queue: AeroQueue) {

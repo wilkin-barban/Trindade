@@ -1116,6 +1116,83 @@ class MassasLaunchViewModelTest {
     }
 
     /**
+     * El lote sigue ocupando la pantalla mientras el ERP responde.
+     *
+     * `confirmLaunch` liberaba `isSubmitting` antes de salir al ERP, así que la pantalla volvía a aceptar un
+     * toque con el lote todavía viajando: el segundo toque reenviaba las mismas cajas. El estado tiene que
+     * durar hasta que el viaje termina, no hasta que la escritura local termina.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun confirmLaunch_keepsTheScreenBusyUntilTheBatchReachesThePlant() = runTest {
+        // El repositorio del día responde en memoria: el viaje al ERP es lo único que este test detiene, y
+        // una recarga que dependiera de la red dejaría la corrutina viva después del gate.
+        val repo = DayRepository(massasApi, dayWith(launch(7, boxes = 3, units = 30)))
+        repo.created = listOf(MassaIndividualLaunch(id = 7, productCode = "1045", boxes = 3, units = 30, userId = 1))
+        val gate = CompletableDeferred<Unit>()
+        erpPort.entryGate = gate
+        val testVm = newViewModel(repo)
+
+        testVm.onQuantityChange("1045", "3")
+        testVm.requestLaunchConfirmation()
+        testVm.confirmLaunch()
+        testScheduler.runCurrent()
+
+        assertEquals("el lote está en vuelo", 1, erpPort.entryCalls)
+        assertTrue("la pantalla no puede aceptar otro toque mientras el lote viaja", testVm.state.value.isSubmitting)
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        assertFalse("el viaje terminó", testVm.state.value.isSubmitting)
+    }
+
+    /**
+     * Dos envíos de la misma fila no son dos cajas.
+     *
+     * La fila pendiente se puede tocar dos veces, y el segundo toque salía antes de que el primero hubiera
+     * liquidado la cola: el mismo `launchId` viajaba dos veces. Con la salida al ERP serializada, el segundo
+     * espera y encuentra el asiento ya enviado.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun sendPendingLaunch_twice_in_flight_sendsOneSeat() = runTest {
+        val repo = DayRepository(massasApi, dayWith(launch(89, boxes = 280, units = 2800)))
+        val gate = CompletableDeferred<Unit>()
+        erpPort.entryGate = gate
+        val testVm = newViewModel(repo)
+        testScheduler.runCurrent()
+
+        testVm.loadDay(MassasLaunchViewModel.saopauloToday())
+        testScheduler.runCurrent()
+
+        val row = MassasUnifiedRow(
+            key = "launch-89",
+            state = MassasRowState.PENDING_ERP,
+            operatorName = "Jaime",
+            operatorKey = "jaime",
+            productCode = "1045",
+            productName = "MASSA CASEIRA",
+            boxes = 280,
+            units = 2800,
+            launchIds = listOf(89),
+            entLans = emptyList(),
+            importable = false,
+            tabletAcked = false,
+            ownerUserId = 2,
+        )
+        testVm.sendPendingLaunch(row)
+        testScheduler.runCurrent()
+        testVm.sendPendingLaunch(row)
+        testScheduler.runCurrent()
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals("una sola caja viajó al ERP", 1, erpPort.entryCalls)
+    }
+
+    /**
      * A batch is several people's work sent by one press.
      *
      * The seat the plant receives is the only record of who typed the boxes, so every item of the batch is
@@ -1707,6 +1784,43 @@ class MassasLaunchViewModelTest {
         assertEquals(0, erpPort.payloads.size)
         assertNull(queuePort.stored)
         assertEquals(listOf(today), erpPort.readDates)
+        assertEquals(0, testVm.state.value.queuedLaunches)
+    }
+
+    /**
+     * Una cola vencida deja su línea, no desaparece.
+     *
+     * El store borraba el blob y devolvía null: el teléfono leía "no hay nada pendiente" y la caja que la
+     * planta nunca vio se perdía sin registro. Lo que el operario ve sigue siendo el día limpio, pero el log
+     * tiene que decir qué se descartó y por qué.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `una cola vencida deja una linea de rechazo en vez de desaparecer`() = runTest {
+        val yesterday = AeroQueue(
+            createdAt = System.currentTimeMillis() - com.trindade.app.aero.AERO_QUEUE_TTL_MS - 60_000,
+            date = "2026-11-03",
+            items = listOf(
+                AeroQueueItem(
+                    productCode = "001045",
+                    productName = "MASSA CASEIRA",
+                    quantity = 30.0,
+                    operatorName = "JAIME",
+                    launchIds = listOf(3010),
+                    date = "2026-11-03",
+                ),
+            ),
+        )
+        queuePort = FakeQueuePort(yesterday)
+        val repo = DayRepository(massasApi, dayWith())
+        val testVm = newViewModel(repo)
+        advanceUntilIdle()
+
+        val line = mirrorPort.logs.single { it.event == "queue_rejected" }
+        assertEquals("AERO_QUEUE_EXPIRED", line.error)
+        assertTrue("la línea nombra el día y los asientos", line.note.orEmpty().contains("date=2026-11-03"))
+        assertTrue("la línea nombra los asientos", line.note.orEmpty().contains("launchIds=3010"))
+        assertNull("la cola descartada no se reenvía", queuePort.stored)
         assertEquals(0, testVm.state.value.queuedLaunches)
     }
 
