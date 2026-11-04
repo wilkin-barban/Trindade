@@ -242,6 +242,21 @@ puede ejecutar** aquí la prueba de punta a punta contra el ERP de la fábrica. 
   no «snapshot rechazado», y la cola debe conservar el pendiente con su línea de auditoría si expira.
 - **P4** Confirmar que las siete filas del 03/11 siguen intactas (no se reparan en esta entrega).
 
+## 6.1 Evidencia de commits
+
+Cada unidad de trabajo quedó en `main` con sus pruebas y su documentación:
+
+| Tareas | Commit | Qué contiene |
+| --- | --- | --- |
+| T1–T4 | `a44a4e2` | `SNAPSHOT_BACKEND_UNREACHABLE`, cola que expira con traza y despacho serializado del ERP |
+| T2 | `4b149bc` | `logout` y `changePassword` como `Response<Unit>` y los fakes con la firma nueva |
+| T5 | `5862381` | el workflow prefiere el binario commiteado y lo valida con `aapt2` y `apksigner` |
+| T6 | `d2f966a` | `projectBatchDeletePermission` para el borrado de un lote completo |
+| T7, T11, B3 | `269bfaa` | intento correlacionado, cliente en la cabecera, contrato del log con cuerpos reales y código `REPORT_DELETE_FORBIDDEN` |
+| T8–T10, B4 | `bd71717` | cierre de sesión sin contraseña ni marca de lectura, fecha del intento, `X-Trindade-Client`, y el test de `AuthContext` ejercitando el proveedor |
+| T10 | `43d5c79` | histórico de Relatórios con objetivos de 48 px y chip de solo lectura |
+| T12, B2, T14 | `c522426` | guías y KDoc sin `localStorage` ni autoría en lote, y el runbook de tablet |
+
 ## 7. Log
 
 - **L1 — Pedido del usuario (verbatim):** ver la sección final de este documento.
