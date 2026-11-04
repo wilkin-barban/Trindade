@@ -934,9 +934,10 @@
     <string name="report_massas_day_operators">Operadores: %1$d</string>
     <string name="report_massas_day_balance">Balanço: %1$s</string>
     <!-- Reports: unified ERP movements card (massas and receipts). -->
-    <string name="report_erp_movements_title">Movimentações do ERP (Massas e Recebimento)</string>
+    <string name="report_erp_movements_title">Movimentações do ERP</string>
     <string name="report_erp_sync">Sincronizar com ERP</string>
-    <string name="report_receipts_title">Recebimento de Insumos</string>
+    <string name="report_receipts_title">Insumos</string>
+    <string name="report_receipts_subtitle">Produtos que não são massa, incluindo os terceirizados.</string>
     <string name="report_receipts_empty">Nenhum insumo recebido no dia.</string>
     <string name="report_receipts_units">%1$s un</string>
     <string name="report_erp_sync_success">Movimentações do ERP sincronizadas.</string>
@@ -948,12 +949,11 @@
     <string name="massas_state_reconciled">Conciliado</string>
     <string name="massas_state_pending">Pendente</string>
     <string name="massas_state_erp_only">Só ERP</string>
-    <string name="massas_open_box_note">inclui 1 caixa aberta</string>
+    <string name="massas_open_box_compact">1 caixa aberta · %1$d un</string>
     <string name="massas_erp_only_read_only">Somente leitura (ERP)</string>
     <string name="massas_action_send">Enviar</string>
     <string name="massas_action_on_tablet">Já na tablet</string>
     <string name="massas_action_undo_on_tablet">Desfazer</string>
-    <string name="massas_import_hint_whole_boxes">%1$d un não fecham caixas inteiras de %2$d un: importe pela web ou ajuste o lançamento.</string>
     <string name="massas_import_hint_unknown_product">O produto deste assento não está no catálogo da fábrica.</string>
     <string name="massas_import_hint_not_an_entry">Este movimento é uma saída de estoque, não produção.</string>
     <string name="massas_queue_retry">Reenviar pendentes (%1$d)</string>

@@ -932,9 +932,10 @@
     <string name="report_massas_day_operators">Operarios: %1$d</string>
     <string name="report_massas_day_balance">Balance: %1$s</string>
     <!-- Reportes: tarjeta unificada de movimientos del ERP (masas y recepción). -->
-    <string name="report_erp_movements_title">Movimientos del ERP (Masas y Recepción)</string>
+    <string name="report_erp_movements_title">Movimientos del ERP</string>
     <string name="report_erp_sync">Sincronizar con ERP</string>
-    <string name="report_receipts_title">Recepción de Insumos</string>
+    <string name="report_receipts_title">Insumos</string>
+    <string name="report_receipts_subtitle">Productos que no son masa, incluidos los terceirizados.</string>
     <string name="report_receipts_empty">Ningún insumo recibido en el día.</string>
     <string name="report_receipts_units">%1$s un</string>
     <string name="report_erp_sync_success">Movimientos del ERP sincronizados.</string>
@@ -946,12 +947,11 @@
     <string name="massas_state_reconciled">Conciliado</string>
     <string name="massas_state_pending">Pendiente</string>
     <string name="massas_state_erp_only">Sólo ERP</string>
-    <string name="massas_open_box_note">incluye 1 caja abierta</string>
+    <string name="massas_open_box_compact">1 caja abierta · %1$d un</string>
     <string name="massas_erp_only_read_only">Solo lectura (ERP)</string>
     <string name="massas_action_send">Enviar</string>
     <string name="massas_action_on_tablet">Ya en la tablet</string>
     <string name="massas_action_undo_on_tablet">Deshacer</string>
-    <string name="massas_import_hint_whole_boxes">%1$d un no cierran cajas enteras de %2$d un: importá desde la web o ajustá el lanzamiento.</string>
     <string name="massas_import_hint_unknown_product">El producto de este asiento no está en el catálogo de la fábrica.</string>
     <string name="massas_import_hint_not_an_entry">Este movimiento es una salida de stock, no producción.</string>
     <string name="massas_queue_retry">Reenviar pendientes (%1$d)</string>

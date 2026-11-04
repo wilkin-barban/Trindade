@@ -51,8 +51,12 @@ class MassasDaySectionsTest {
             screen.contains("val displayedRows = remember(rows, selectedKey)"),
         )
         assertTrue(
-            "A row with an open box must say so",
-            screen.contains("R.string.massas_open_box_note"),
+            "A row with an open box says it in one compact datum, not a sentence",
+            screen.contains("R.string.massas_open_box_compact"),
+        )
+        assertTrue(
+            "The long note is gone: the number and the open box are the whole message",
+            !screen.contains("R.string.massas_open_box_note"),
         )
         assertTrue(
             "A seat nobody launched here is read-only in this section",
@@ -71,8 +75,8 @@ class MassasDaySectionsTest {
     }
 
     @Test
-    fun `the open box note exists in both locales`() {
-        assertTrue(strings("values/strings.xml").contains("inclui 1 caixa aberta"))
-        assertTrue(strings("values-es/strings.xml").contains("incluye 1 caja abierta"))
+    fun `the open box datum exists in both locales`() {
+        assertTrue(strings("values/strings.xml").contains("1 caixa aberta · %1\$d un"))
+        assertTrue(strings("values-es/strings.xml").contains("1 caja abierta · %1\$d un"))
     }
 }

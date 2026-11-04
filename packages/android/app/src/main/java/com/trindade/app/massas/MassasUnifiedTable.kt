@@ -190,11 +190,11 @@ private fun UnifiedRow(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                // The number alone could read as closed boxes; the note says the last one is open, and only
-                // when there is a remainder to explain.
+                // The number alone could read as closed boxes; the compact datum says one box is open, and only
+                // when there is a remainder to say.
                 if (row.openBoxUnits > 0) {
                     Text(
-                        text = stringResource(R.string.massas_open_box_note),
+                        text = stringResource(R.string.massas_open_box_compact, row.openBoxUnits),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.tertiary,
                     )
@@ -248,7 +248,7 @@ private fun UnifiedRow(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    else -> ImportHint(importHint, row)
+                    else -> ImportHint(importHint)
                 }
             }
         }
@@ -322,16 +322,17 @@ private fun StateBadge(state: MassasRowState) {
 /**
  * Why this line offers no import action.
  *
- * The seat is real -- the plant recorded it -- so hiding it would be worse than explaining it. Each reason has
- * its own sentence because they ask the operator for different things: nothing for a stock exit, and a word with
- * the office for a quantity that does not fill whole boxes.
+ * The seat is real -- the plant recorded it -- so hiding it would be worse than explaining it. A stock exit and an
+ * unknown product get their own sentence because they ask the operator for different things; a quantity that does
+ * not fill whole boxes needs none, because the row already states the open box and its units once.
  */
 @Composable
-private fun ImportHint(hint: MassasImportHint?, row: MassasUnifiedRow) {
+private fun ImportHint(hint: MassasImportHint?) {
     if (hint == null) return
     val text = when (hint) {
-        MassasImportHint.NOT_WHOLE_BOXES ->
-            stringResource(R.string.massas_import_hint_whole_boxes, row.units, row.unitsPerBox)
+        // The row already says "1 caixa aberta · N un" above this hint: one datum, not two notes repeating the
+        // same numbers. The remainder is the reason, and it is stated once.
+        MassasImportHint.NOT_WHOLE_BOXES -> return
         MassasImportHint.UNKNOWN_PRODUCT -> stringResource(R.string.massas_import_hint_unknown_product)
         MassasImportHint.NOT_AN_ENTRY -> stringResource(R.string.massas_import_hint_not_an_entry)
     }

@@ -487,10 +487,10 @@ fun MassasLaunchScreen(
                                     )
                                 }
 
-                                // A caixa aberta só se explica quando existe uma: a nota sem resto mentiria.
+                                // A caixa aberta é um dado, não uma frase: o resto em unidades basta.
                                 if (row.openBoxUnits > 0) {
                                     Text(
-                                        text = stringResource(R.string.massas_open_box_note),
+                                        text = stringResource(R.string.massas_open_box_compact, row.openBoxUnits),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.tertiary,
                                     )
@@ -653,7 +653,7 @@ fun MassasLaunchScreen(
 
                                 if (product.openBoxUnits > 0) {
                                     Text(
-                                        text = stringResource(R.string.massas_open_box_note),
+                                        text = stringResource(R.string.massas_open_box_compact, product.openBoxUnits),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.tertiary,
                                     )

@@ -16,6 +16,9 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.platform.testTag
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Text
 import androidx.compose.foundation.layout.Spacer
@@ -124,85 +127,121 @@ fun ErpMovementsCard(
 
             HorizontalDivider()
 
-            // Block 1: Massas do dia
-            Text(
-                text = stringResource(R.string.report_massas_day_title),
-                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.primary,
-            )
+            // Two blocks, two lists. Sharing one card is a matter of one sync action, not of one list:
+            // the massas block reads `massasDay` and the insumos block reads `receipts`, and neither one
+            // renders the other's rows.
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("report-massas-block")
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.report_massas_day_title),
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.primary,
+                    )
 
-            if (massasDay == null || massasDay.operators.isEmpty()) {
-                Text(
-                    text = stringResource(R.string.report_massas_day_empty),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                Text(
-                    text = stringResource(R.string.report_massas_day_operators, massasDay.operators.size),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-
-                massasDay.operators.forEach { operator ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
+                    if (massasDay == null || massasDay.operators.isEmpty()) {
                         Text(
-                            text = operator.displayName,
+                            text = stringResource(R.string.report_massas_day_empty),
                             style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.weight(1f),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    } else {
                         Text(
-                            text = "${operator.boxes.stripZeros()} cx · ${operator.units.stripZeros()} un",
+                            text = stringResource(R.string.report_massas_day_operators, massasDay.operators.size),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+
+                        massasDay.operators.forEach { operator ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = operator.displayName,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Text(
+                                    text = "${operator.boxes.stripZeros()} cx · ${operator.units.stripZeros()} un",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
                     }
                 }
             }
 
             HorizontalDivider()
 
-            // Block 2: Recebimento de Insumos
-            Text(
-                text = stringResource(R.string.report_receipts_title),
-                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.primary,
-            )
+            // Block 2: Insumos. The subtitle says what the block holds in words, so the operator does not
+            // read a third-party product as production: everything that is not one of the ten massa codes.
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.18f),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("report-receipts-block")
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.report_receipts_title),
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Text(
+                        text = stringResource(R.string.report_receipts_subtitle),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
 
-            val receiptList = receipts?.receipts.orEmpty()
-            if (receiptList.isEmpty()) {
-                Text(
-                    text = stringResource(R.string.report_receipts_empty),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                receiptList.forEach { receipt ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = receipt.productDesc.ifBlank { receipt.productCode },
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                            if (receipt.operatorName.isNotBlank()) {
+                    val receiptList = receipts?.receipts.orEmpty()
+                    if (receiptList.isEmpty()) {
+                        Text(
+                            text = stringResource(R.string.report_receipts_empty),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        receiptList.forEach { receipt ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = receipt.productDesc.ifBlank { receipt.productCode },
+                                        style = MaterialTheme.typography.bodyMedium,
+                                    )
+                                    if (receipt.operatorName.isNotBlank()) {
+                                        Text(
+                                            text = receipt.operatorName,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
                                 Text(
-                                    text = receipt.operatorName,
-                                    style = MaterialTheme.typography.bodySmall,
+                                    text = stringResource(R.string.report_receipts_units, receipt.quantity.stripZeros()),
+                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                         }
-                        Text(
-                            text = stringResource(R.string.report_receipts_units, receipt.quantity.stripZeros()),
-                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
                     }
                 }
             }
