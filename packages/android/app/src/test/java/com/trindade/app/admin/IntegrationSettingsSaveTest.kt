@@ -18,7 +18,6 @@ import com.trindade.app.contract.models.RefreshResponse
 import com.trindade.app.contract.models.RegisterRequest
 import com.trindade.app.contract.models.RegisterResponse
 import com.trindade.app.contract.models.SetupStatusResponse
-import com.trindade.app.contract.models.SuccessResponse
 import com.trindade.app.contract.models.UpdateProfileRequest
 import com.trindade.app.massas.FakeMirrorPort
 import com.trindade.app.network.AuthApi
@@ -182,11 +181,11 @@ class IntegrationSettingsSaveTest {
 private class NoAuthApi : AuthApi {
     override suspend fun login(body: LoginRequest): Response<LoginResponse> = error("no se usa")
     override suspend fun refresh(body: RefreshRequest): Response<RefreshResponse> = error("no se usa")
-    override suspend fun logout(body: LogoutRequest): Response<SuccessResponse> = error("no se usa")
+    override suspend fun logout(body: LogoutRequest): Response<Unit> = error("no se usa")
     override suspend fun me(): Response<ProfileResponse> = error("no se usa")
     override suspend fun profile(): Response<ProfileResponse> = error("no se usa")
     override suspend fun updateProfile(body: UpdateProfileRequest): Response<ProfileResponse> = error("no se usa")
-    override suspend fun changePassword(body: ChangePasswordRequest): Response<SuccessResponse> = error("no se usa")
+    override suspend fun changePassword(body: ChangePasswordRequest): Response<Unit> = error("no se usa")
     override suspend fun setupStatus(): Response<SetupStatusResponse> = error("no se usa")
     override suspend fun register(body: RegisterRequest): Response<RegisterResponse> = error("no se usa")
 }

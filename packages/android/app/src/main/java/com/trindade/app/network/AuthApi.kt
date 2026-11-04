@@ -10,7 +10,6 @@ import com.trindade.app.contract.models.RefreshResponse
 import com.trindade.app.contract.models.RegisterRequest
 import com.trindade.app.contract.models.RegisterResponse
 import com.trindade.app.contract.models.SetupStatusResponse
-import com.trindade.app.contract.models.SuccessResponse
 import com.trindade.app.contract.models.UpdateProfileRequest
 import retrofit2.Response
 import retrofit2.http.Body
@@ -47,9 +46,13 @@ interface AuthApi {
     /**
      * End the session. Idempotent by contract: an unknown or already-ended token still succeeds, so a
      * client can clear local state without treating a failure as unfinished business.
+     *
+     * Status only: the server answers `{"success":true}` with a JSON boolean, and the generated
+     * `SuccessResponse` types that field as an enum literal. Declaring the body made Retrofit throw while
+     * decoding a 200, which the caller could only read as a server it never reached.
      */
     @POST("api/auth/logout")
-    suspend fun logout(@Body body: LogoutRequest): Response<SuccessResponse>
+    suspend fun logout(@Body body: LogoutRequest): Response<Unit>
 
     /** The authenticated user, as the server sees them. */
     @GET("api/auth/me")
@@ -65,9 +68,11 @@ interface AuthApi {
     /**
      * Change the password. The server ends every session as part of this, including the one making
      * the call, so a success here means the client must sign in again rather than carry on.
+     *
+     * Status only, for the same reason as [logout]: the body is a boolean the client never reads.
      */
     @POST("api/auth/change-password")
-    suspend fun changePassword(@Body body: ChangePasswordRequest): Response<SuccessResponse>
+    suspend fun changePassword(@Body body: ChangePasswordRequest): Response<Unit>
 
     /**
      * Whether setup is still required, which is only true while no user exists at all.

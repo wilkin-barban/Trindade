@@ -13,7 +13,6 @@ import com.trindade.app.contract.models.RefreshResponse
 import com.trindade.app.contract.models.RegisterRequest
 import com.trindade.app.contract.models.RegisterResponse
 import com.trindade.app.contract.models.SetupStatusResponse
-import com.trindade.app.contract.models.SuccessResponse
 import com.trindade.app.contract.models.UpdateProfileRequest
 import com.trindade.app.network.AuthApi
 import com.trindade.app.update.Clock
@@ -985,7 +984,6 @@ private fun profileUser(username: String = "ana", displayName: String = "Ana Sou
     role = "Trabalhador",
 )
 
-private fun successBody() = SuccessResponse(success = SuccessResponse.Success.`true`)
 
 /** The same Json the app builds, so a test does not pass against a lenient parser the app lacks. */
 private fun json() = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
@@ -1022,7 +1020,7 @@ private class StubAuthApi(
         Response.success(ProfileResponse(user = profileUser())),
     private val updateResponse: Response<ProfileResponse> =
         Response.success(ProfileResponse(user = profileUser())),
-    private val changePasswordResponse: Response<SuccessResponse> = Response.success(successBody()),
+    private val changePasswordResponse: Response<Unit> = Response.success(Unit),
     /**
      * What a login answers. Implemented because a test needs it -- the session counter's two rules are
      * measured through this repository -- and not because this screen signs anybody in: it does not.
@@ -1084,16 +1082,16 @@ private class StubAuthApi(
         return updateResponse
     }
 
-    override suspend fun changePassword(body: ChangePasswordRequest): Response<SuccessResponse> {
+    override suspend fun changePassword(body: ChangePasswordRequest): Response<Unit> {
         changePasswordBodies += body
         if (failChangePasswordWithTransport) throw java.io.IOException("network down")
         return changePasswordResponse
     }
 
-    override suspend fun logout(body: LogoutRequest): Response<SuccessResponse> {
+    override suspend fun logout(body: LogoutRequest): Response<Unit> {
         logoutBodies += body
         onLogout()
-        return Response.success(successBody())
+        return Response.success(Unit)
     }
 
     /**

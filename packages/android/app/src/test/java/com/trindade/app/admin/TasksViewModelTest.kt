@@ -503,10 +503,10 @@ private class ProfileApi(role: String) : AuthApi {
     override suspend fun profile() = Response.success(profile)
     override suspend fun login(body: LoginRequest): Response<LoginResponse> = error("not expected")
     override suspend fun refresh(body: RefreshRequest): Response<RefreshResponse> = error("not expected")
-    override suspend fun logout(body: LogoutRequest): Response<SuccessResponse> = error("not expected")
+    override suspend fun logout(body: LogoutRequest): Response<Unit> = error("not expected")
     override suspend fun me(): Response<ProfileResponse> = Response.success(profile)
     override suspend fun updateProfile(body: UpdateProfileRequest): Response<ProfileResponse> = error("not expected")
-    override suspend fun changePassword(body: ChangePasswordRequest): Response<SuccessResponse> = error("not expected")
+    override suspend fun changePassword(body: ChangePasswordRequest): Response<Unit> = error("not expected")
     override suspend fun setupStatus(): Response<SetupStatusResponse> = error("not expected")
     override suspend fun register(body: RegisterRequest): Response<RegisterResponse> = error("not expected")
 }

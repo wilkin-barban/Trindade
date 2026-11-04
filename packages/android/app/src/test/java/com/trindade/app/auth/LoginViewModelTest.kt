@@ -14,7 +14,6 @@ import com.trindade.app.contract.models.RefreshResponse
 import com.trindade.app.contract.models.RegisterRequest
 import com.trindade.app.contract.models.RegisterResponse
 import com.trindade.app.contract.models.SetupStatusResponse
-import com.trindade.app.contract.models.SuccessResponse
 import com.trindade.app.contract.models.UpdateProfileRequest
 import com.trindade.app.logging.AppLogger
 import com.trindade.app.network.AuthApi
@@ -450,11 +449,11 @@ private class FakeAuthApi(
     }
 
     override suspend fun refresh(body: RefreshRequest): Response<RefreshResponse> = error(NOT_USED)
-    override suspend fun logout(body: LogoutRequest): Response<SuccessResponse> = error(NOT_USED)
+    override suspend fun logout(body: LogoutRequest): Response<Unit> = error(NOT_USED)
     override suspend fun me(): Response<ProfileResponse> = error(NOT_USED)
     override suspend fun profile(): Response<ProfileResponse> = error(NOT_USED)
     override suspend fun updateProfile(body: UpdateProfileRequest): Response<ProfileResponse> = error(NOT_USED)
-    override suspend fun changePassword(body: ChangePasswordRequest): Response<SuccessResponse> = error(NOT_USED)
+    override suspend fun changePassword(body: ChangePasswordRequest): Response<Unit> = error(NOT_USED)
     override suspend fun setupStatus(): Response<SetupStatusResponse> = error(NOT_USED)
     override suspend fun register(body: RegisterRequest): Response<RegisterResponse> = error(NOT_USED)
 

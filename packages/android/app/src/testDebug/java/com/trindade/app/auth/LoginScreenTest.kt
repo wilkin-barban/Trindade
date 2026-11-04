@@ -42,7 +42,6 @@ import com.trindade.app.contract.models.RefreshResponse
 import com.trindade.app.contract.models.RegisterRequest
 import com.trindade.app.contract.models.RegisterResponse
 import com.trindade.app.contract.models.SetupStatusResponse
-import com.trindade.app.contract.models.SuccessResponse
 import com.trindade.app.contract.models.UpdateProfileRequest
 import com.trindade.app.network.AuthApi
 import com.trindade.app.ui.theme.TrindadeTheme
@@ -630,11 +629,11 @@ class LoginScreenTest {
             )
         )
         override suspend fun refresh(body: RefreshRequest) = Response.error<RefreshResponse>(500, "".toResponseBody())
-        override suspend fun logout(body: LogoutRequest) = Response.success(SuccessResponse(SuccessResponse.Success.`true`))
+        override suspend fun logout(body: LogoutRequest) = Response.success(Unit)
         override suspend fun me() = Response.error<ProfileResponse>(500, "".toResponseBody())
         override suspend fun profile() = Response.error<ProfileResponse>(500, "".toResponseBody())
         override suspend fun updateProfile(body: UpdateProfileRequest) = Response.error<ProfileResponse>(500, "".toResponseBody())
-        override suspend fun changePassword(body: ChangePasswordRequest) = Response.success(SuccessResponse(SuccessResponse.Success.`true`))
+        override suspend fun changePassword(body: ChangePasswordRequest) = Response.success(Unit)
         override suspend fun setupStatus() = Response.error<SetupStatusResponse>(500, "".toResponseBody())
         override suspend fun register(body: RegisterRequest) = Response.error<RegisterResponse>(500, "".toResponseBody())
     }

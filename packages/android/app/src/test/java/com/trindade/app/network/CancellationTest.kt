@@ -12,7 +12,6 @@ import com.trindade.app.contract.models.RefreshResponse
 import com.trindade.app.contract.models.RegisterRequest
 import com.trindade.app.contract.models.RegisterResponse
 import com.trindade.app.contract.models.SetupStatusResponse
-import com.trindade.app.contract.models.SuccessResponse
 import com.trindade.app.contract.models.UpdateProfileRequest
 import com.trindade.app.loading.FakeLoadingApi
 import com.trindade.app.loading.LoadingRepository
@@ -161,11 +160,11 @@ private class CancellingAuthApi(private val cancellation: CancellationException)
     override suspend fun login(body: LoginRequest): Response<LoginResponse> = throw cancellation
 
     override suspend fun refresh(body: RefreshRequest): Response<RefreshResponse> = error(NOT_USED)
-    override suspend fun logout(body: LogoutRequest): Response<SuccessResponse> = throw cancellation
+    override suspend fun logout(body: LogoutRequest): Response<Unit> = throw cancellation
     override suspend fun me(): Response<ProfileResponse> = error(NOT_USED)
     override suspend fun profile(): Response<ProfileResponse> = error(NOT_USED)
     override suspend fun updateProfile(body: UpdateProfileRequest): Response<ProfileResponse> = error(NOT_USED)
-    override suspend fun changePassword(body: ChangePasswordRequest): Response<SuccessResponse> = error(NOT_USED)
+    override suspend fun changePassword(body: ChangePasswordRequest): Response<Unit> = error(NOT_USED)
     override suspend fun setupStatus(): Response<SetupStatusResponse> = error(NOT_USED)
     override suspend fun register(body: RegisterRequest): Response<RegisterResponse> = error(NOT_USED)
 }
