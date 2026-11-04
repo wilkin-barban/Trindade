@@ -304,11 +304,75 @@ jobs:
           esac
           printf 'The packaged version matches the release: %s (versionCode %s).\n' "$VERSION_NAME" "$VERSION_CODE"
 
+      - name: Prefer the production binary committed with the tag
+        # A publish re-run rebuilds the APK, and a signed APK is not byte-stable: the signature carries a
+        # timestamp, so the same commit produces a different file. Clobbering the release with it replaces
+        # the binary production serves -- the one /api/app/latest-release announces and every install
+        # compares its sha256 against -- with a valid, correctly numbered, different APK. When the tag
+        # carries that binary and its sidecar, they are the asset, and this step verifies both before
+        # staging them. The rebuilt APK is only the fallback for a tag that carries no binary yet.
+        #
+        # It fails closed on a sidecar that does not match, a version the manifest does not carry, or a
+        # signature from another key: a binary that fails any of the three is not the one production serves,
+        # and publishing it is the very divergence this step exists to stop.
+        run: |
+          set -euo pipefail
+          committed="packages/backend/apk/$APK_NAME"
+          sidecar="$committed.sha256"
+          if [[ ! -f "$committed" ]]; then
+            printf 'The tag carries no production binary at %s, so the release publishes the APK this run built.\n' "$committed"
+            exit 0
+          fi
+          if [[ ! -f "$sidecar" ]]; then
+            printf '%s is committed without %s. A published binary without its digest is one nobody can compare against the endpoint.\n' "$committed" "$sidecar" >&2
+            exit 1
+          fi
+          ( cd "$(dirname "$committed")" && sha256sum -c "$(basename "$sidecar")" )
+          badging="$("$BUILD_TOOLS/aapt2" dump badging "$committed")"
+          package_line="${badging%%$'\n'*}"
+          printf '%s\n' "$package_line"
+          case "$package_line" in
+            *"versionCode='$VERSION_CODE'"*) ;;
+            *)
+              printf 'The committed binary does not carry versionCode %s, so it is not the build production serves.\n' "$VERSION_CODE" >&2
+              exit 1
+              ;;
+          esac
+          case "$package_line" in
+            *"versionName='$VERSION_NAME'"*) ;;
+            *)
+              printf 'The committed binary does not carry versionName %s, so it is not this release.\n' "$VERSION_NAME" >&2
+              exit 1
+              ;;
+          esac
+          digest="$("$BUILD_TOOLS/apksigner" verify --print-certs "$committed" | awk -F': ' '/certificate SHA-256 digest/ { print $2; exit }')"
+          if [[ -z "$digest" ]]; then
+            printf 'apksigner reported no signer certificate SHA-256 digest for %s.\n' "$committed" >&2
+            exit 1
+          fi
+          got="$(printf '%s' "$digest" | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+          want="$(printf '%s' "$EXPECTED_CERT_SHA256" | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+          if [[ "$got" != "$want" ]]; then
+            printf 'The committed binary is not signed by this project release key.\n  expected: %s\n  got:      %s\n' "$want" "$got" >&2
+            exit 1
+          fi
+          mkdir -p release-assets
+          cp "$committed" "release-assets/$APK_NAME"
+          staged_digest="$(sha256sum "release-assets/$APK_NAME" | awk '{print $1}')"
+          printf 'PRODUCTION_ASSET_SHA256=%s\n' "$staged_digest" >> "$GITHUB_ENV"
+          printf 'The release publishes the production binary at sha256 %s.\n' "$staged_digest"
+
       - name: Stage the release asset
+        # The preference step stages the committed binary when the tag carries one; otherwise the APK this
+        # run built is what gets published, and the two names cannot both end up in the asset directory.
         run: |
           set -euo pipefail
           mkdir -p release-assets
-          cp packages/android/app/build/outputs/apk/release/app-release.apk "release-assets/$APK_NAME"
+          if [[ -n "${PRODUCTION_ASSET_SHA256:-}" ]]; then
+            printf 'Publishing the production binary committed with the tag (sha256 %s).\n' "$PRODUCTION_ASSET_SHA256"
+          else
+            cp packages/android/app/build/outputs/apk/release/app-release.apk "release-assets/$APK_NAME"
+          fi
           ls -l "release-assets/$APK_NAME"
 
       - name: Upload the verified APK

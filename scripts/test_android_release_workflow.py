@@ -88,7 +88,8 @@ def validate_publish_job_condition(condition: str) -> None:
         )
 
 
-def extract_version_derivation_script(workflow_content: str) -> str:
+def extract_step_script(workflow_content: str, step_name: str) -> str:
+    """Extracts the `run: |` body of the step whose name starts with `step_name`."""
     lines = workflow_content.splitlines()
     in_step = False
     in_run = False
@@ -97,7 +98,7 @@ def extract_version_derivation_script(workflow_content: str) -> str:
     script_indent: int | None = None
 
     for line in lines:
-        if "- name: Derive the version" in line:
+        if not in_step and "- name: " + step_name in line:
             in_step = True
             continue
         if in_step:
@@ -116,8 +117,24 @@ def extract_version_derivation_script(workflow_content: str) -> str:
                 run_indent = len(line) - len(line.lstrip())
 
     if not run_lines:
-        raise ValueError("Could not extract version derivation script from workflow")
+        raise ValueError(f"Could not extract the {step_name!r} step script from the workflow")
     return "\n".join(run_lines).strip()
+
+
+def extract_version_derivation_script(workflow_content: str) -> str:
+    return extract_step_script(workflow_content, "Derive the version")
+
+
+def run_step_script(script: str, cwd: Path, env_vars: dict[str, str]) -> tuple[int, str, str]:
+    """Runs an extracted step in `cwd`, with a throwaway GITHUB_ENV the caller can read back."""
+    env = {
+        "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+        "HOME": str(cwd),
+        "GITHUB_ENV": str(cwd / "github-env"),
+    }
+    env.update(env_vars)
+    proc = subprocess.run(["bash", "-c", script], cwd=cwd, env=env, capture_output=True, text=True)
+    return proc.returncode, proc.stdout, proc.stderr
 
 
 def run_derivation_script(
@@ -610,6 +627,122 @@ class TestProductionBuildSource(unittest.TestCase):
             "app.service.ts must declare LOCAL_APK_BUILD_NUMBER in the form the workflow greps",
         )
         self.assertGreater(int(match.group(1)), 0)
+
+
+class TestProductionBinaryPreference(unittest.TestCase):
+    """The release publishes the binary production serves, not a fresh rebuild of it.
+
+    An APK is signed with timestamps, so rebuilding the same commit produces different bytes: a re-run of
+    the publish job used to clobber the asset with a file whose sha256 nobody had announced. The tag carries
+    the binary and its sidecar; the built APK is only the fallback for a tag that carries neither.
+    """
+
+    STEP = "Prefer the production binary committed with the tag"
+    CERT = "EE:0E:40:4B:21:10:52:B3:11:AE:0E:07:30:60:6E:9C:7D:55:54:31:54:63:D0:2F:9E:F3:3C:95:73:C4:31:F6"
+
+    def setUp(self) -> None:
+        self.content = load_workflow_text()
+        self.script = extract_step_script(self.content, self.STEP)
+
+    def _workspace(self, *, version_code: str = "7013", cert: str | None = None) -> tempfile.TemporaryDirectory:
+        tmp = tempfile.TemporaryDirectory()
+        root = Path(tmp.name)
+        tools = root / "build-tools"
+        tools.mkdir()
+        cert = cert or self.CERT.replace(":", "")
+        (tools / "aapt2").write_text(
+            "#!/usr/bin/env bash\n"
+            "printf \"package: name='com.trindade.app' versionCode='%s' versionName='%s'\\n\" "
+            "\"$FAKE_VERSION_CODE\" \"$FAKE_VERSION_NAME\"\n",
+            encoding="utf-8",
+        )
+        (tools / "apksigner").write_text(
+            "#!/usr/bin/env bash\nprintf 'certificate SHA-256 digest: %s\\n' \"$FAKE_CERT\"\n",
+            encoding="utf-8",
+        )
+        for tool in ("aapt2", "apksigner"):
+            (tools / tool).chmod(0o755)
+
+        committed_dir = root / "packages" / "backend" / "apk"
+        committed_dir.mkdir(parents=True)
+        committed = committed_dir / "trindade-0.7.2.apk"
+        committed.write_bytes(b"PRODUCTION-BINARY")
+        digest = subprocess.run(
+            ["sha256sum", committed.name],
+            cwd=committed_dir,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        (committed_dir / "trindade-0.7.2.apk.sha256").write_text(digest, encoding="utf-8")
+
+        built = root / "packages" / "android" / "app" / "build" / "outputs" / "apk" / "release"
+        built.mkdir(parents=True)
+        (built / "app-release.apk").write_bytes(b"REBUILT-BINARY")
+
+        self.env = {
+            "VERSION_NAME": "0.7.2",
+            "VERSION_CODE": version_code,
+            "APK_NAME": "trindade-0.7.2.apk",
+            "BUILD_TOOLS": str(tools),
+            "EXPECTED_CERT_SHA256": self.CERT,
+            "FAKE_VERSION_CODE": version_code,
+            "FAKE_VERSION_NAME": "0.7.2",
+            "FAKE_CERT": cert,
+        }
+        return tmp
+
+    def test_the_committed_production_binary_becomes_the_asset(self) -> None:
+        with self._workspace() as tmp:
+            root = Path(tmp)
+            code, out, err = run_step_script(self.script, root, self.env)
+
+            self.assertEqual(0, code, err)
+            staged = root / "release-assets" / "trindade-0.7.2.apk"
+            self.assertEqual(b"PRODUCTION-BINARY", staged.read_bytes(), out)
+            self.assertIn("sha256", out.lower())
+
+    def test_a_sidecar_that_does_not_match_fails_closed(self) -> None:
+        with self._workspace() as tmp:
+            root = Path(tmp)
+            (root / "packages" / "backend" / "apk" / "trindade-0.7.2.apk.sha256").write_text(
+                "0" * 64 + "  trindade-0.7.2.apk\n", encoding="utf-8"
+            )
+
+            code, _out, err = run_step_script(self.script, root, self.env)
+
+            self.assertNotEqual(0, code)
+            self.assertRegex(err.upper(), r"FAILED|DID NOT MATCH")
+            self.assertFalse((root / "release-assets" / "trindade-0.7.2.apk").exists())
+
+    def test_a_production_binary_with_another_version_fails_closed(self) -> None:
+        with self._workspace(version_code="7012") as tmp:
+            root = Path(tmp)
+            self.env["VERSION_CODE"] = "7013"
+
+            code, _out, err = run_step_script(self.script, root, self.env)
+
+            self.assertNotEqual(0, code)
+            self.assertIn("7013", err)
+            self.assertFalse((root / "release-assets" / "trindade-0.7.2.apk").exists())
+
+    def test_a_missing_production_binary_leaves_the_built_apk_as_the_asset(self) -> None:
+        with self._workspace() as tmp:
+            root = Path(tmp)
+            for path in (root / "packages" / "backend" / "apk").iterdir():
+                path.unlink()
+
+            code, out, err = run_step_script(self.script, root, self.env)
+
+            self.assertEqual(0, code, err)
+            self.assertIn("no production binary", out.lower())
+            self.assertFalse((root / "release-assets" / "trindade-0.7.2.apk").exists())
+
+    def test_the_staging_step_publishes_the_preferred_binary(self) -> None:
+        staging = extract_step_script(self.content, "Stage the release asset")
+
+        self.assertIn("PRODUCTION_ASSET_SHA256", staging)
+        self.assertIn("release-assets", staging)
 
 
 if __name__ == "__main__":
