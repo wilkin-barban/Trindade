@@ -52,7 +52,7 @@ describe('App Routes - /api/app', () => {
     assert.strictEqual(body.version, FALLBACK_RELEASE.version);
     assert.strictEqual(body.apkUrl, TRINDADE_APK_DOWNLOAD_URL);
     assert.strictEqual(body.apkName, 'trindade.apk');
-    assert.strictEqual(body.buildNumber, 7013);
+    assert.strictEqual(body.buildNumber, 7014);
     assert.strictEqual(body.webUrl, 'https://trindademasas.duckdns.org');
   });
 
@@ -207,10 +207,10 @@ describe('App Routes - /api/app', () => {
       const body = JSON.parse(response.body);
       // The version the endpoint answers with is the version of the binary this build ships. Pinned to the
       // string rather than to the constant on both sides, which would agree while naming the wrong file.
-      assert.strictEqual(body.version, 'v0.7.2');
+      assert.strictEqual(body.version, 'v0.7.3');
       assert.strictEqual(body.apkUrl, TRINDADE_APK_DOWNLOAD_URL);
       assert.strictEqual(body.apkSize, 'PK\x03\x04signed-apk-bytes'.length);
-      assert.strictEqual(body.buildNumber, 7013);
+      assert.strictEqual(body.buildNumber, 7014);
     });
 
     it('serves the local binary as the download', async () => {

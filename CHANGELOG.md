@@ -10,6 +10,38 @@ verificaciones está en [docs/release-android-historial.md](docs/release-android
 
 ---
 
+## [0.7.3] — 2026-11-04
+
+Las cajas del día se cuentan una sola vez. La pantalla redondeaba cada línea y después sumaba las cajas, así que
+dos líneas parciales del mismo producto mostraban dos cajas abiertas y la planta cargaba una caja que nadie
+había llenado; el operario de la tableta, además, desaparecía del filtro cuando no tenía cuenta en Trindade.
+
+### Corregido
+
+- **Las cajas se calculan con el total del producto, no línea por línea.** El backend, la web y Android suman
+  primero las unidades exactas y redondean después: `182 un` de una caja de `15` son `13 cx`, y dos líneas de
+  `3 un` con caja de `10` son una caja, no dos. Las unidades se conservan intactas (`182 un`) y ninguna caja se
+  guarda redondeada.
+- **La caja abierta se dice con palabras.** Cuando el total deja resto, la fila agrega `incluye 1 caja abierta`
+  (`inclui 1 caixa aberta` en portugués) en lugar de dejar que el `13` se lea como trece cajas cerradas. La
+  nota aparece sólo con resto mayor que cero.
+- **Los operarios que sólo existen en el ERP entran al día.** Lançamentos Individuais y Resumo Coletivo se
+  alimentan de las filas unificadas (lanzamientos locales + espejo) y el filtro usa una clave estable por
+  nombre (`operatorKey`) en vez de `user_id`: un asiento registrado en la tableta por alguien sin cuenta
+  aparece, se filtra y suma su subtotal en las dos secciones, y web y Android muestran lo mismo.
+- **Un asiento parcial se muestra, pero no se importa.** Las cajas fraccionarias quedan como fila ERP-only de
+  sólo lectura con su operario y sus cajas; no se ofrece importar porque la importación local se cuenta en
+  cajas y habría que inventar unidades. Los asientos de cajas enteras siguen importables y editables.
+
+### Verificación
+
+- Backend: 17 pruebas de la regla (182/15, 3/10, dos líneas parciales del mismo producto y operador, total del
+  producto y del día) y el contrato de `/api/massas/report` sin cambios de campos existentes.
+- Web: 26 pruebas de la librería unificada, 18 de las cajas y el componente de las dos secciones; 565 pruebas
+  de `node:test` y 125 de `vitest` en verde.
+- Android: pruebas de las filas unificadas (asiento parcial, caja abierta, redondeo único, filtro ERP-only y
+  subtotal por trabajador), de las dos secciones y de los textos en ES/PT.
+
 ## [0.7.2] — 2026-11-04
 
 Remediación de los hallazgos de auditoría de los ciclos 7006, 7007 y 0.7.1. Nada de lo reportado llegó a
