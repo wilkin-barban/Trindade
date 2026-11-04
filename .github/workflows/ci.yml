@@ -17,6 +17,12 @@ jobs:
           cache: npm
       - name: Run canonical CI gate
         run: bash scripts/ci.sh
+      # The release workflow has its own contract tests, and they run here so a change to it cannot land
+      # unexercised. The derivation they cover is what Android compares when it decides whether an install is
+      # an update, and the file had already drifted from the formula the workflow implements before this step
+      # existed: six of its expectations described an encoding the workflow no longer uses.
+      - name: Test the Android release workflow
+        run: python3 scripts/test_android_release_workflow.py
 
   # A separate job, because the Node gate deliberately refuses to run outside Node 24 and this lane
   # needs a JDK. The same script runs locally through `make ci-android`, so the checks are one

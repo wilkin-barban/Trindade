@@ -51,6 +51,32 @@ jobs:
       - name: Check out the tagged commit
         uses: actions/checkout@v4
 
+      - name: Read the internal build production serves
+        # The versionCode is not the tag's alone, and this is the case that forced the distinction: the tag
+        # v0.7.1 derives 7001, while production already served build 7012 through /api/app/latest-release.
+        # Publishing an APK numbered 7001 would be a downgrade for every install the endpoint had just told
+        # to update, and Android refuses it as one. The number therefore comes from the same constant the
+        # API answers with and never from a second copy: an APK published from a tag and the build the
+        # endpoint announces cannot disagree, because they are the same literal.
+        #
+        # It fails closed. A missing file or a declaration that no longer has the documented form leaves the
+        # job without the number, and the only alternative then -- falling back to the tag's code -- is the
+        # silent downgrade this step exists to prevent.
+        run: |
+          set -euo pipefail
+          declaration="packages/backend/src/modules/app/app.service.ts"
+          if [[ ! -f "$declaration" ]]; then
+            printf 'No %s in the checkout, so the internal build production serves cannot be read.\n' "$declaration" >&2
+            exit 1
+          fi
+          build="$(sed -n 's/^export const LOCAL_APK_BUILD_NUMBER = \([0-9][0-9]*\);$/\1/p' "$declaration")"
+          if [[ -z "$build" ]]; then
+            printf 'No LOCAL_APK_BUILD_NUMBER declaration in the documented form was found in %s.\n' "$declaration" >&2
+            exit 1
+          fi
+          printf 'Production serves internal build %s.\n' "$build"
+          printf 'PRODUCTION_BUILD_NUMBER=%s\n' "$build" >> "$GITHUB_ENV"
+
       - name: Derive the version from the tag or repair branch
         # The encoding is major * 1000000 + minor * 1000 + patch, and the digit budget is checked here
         # rather than assumed: 1.1000.0 and 2.0.0 would both encode to 2000000, so a tag whose minor or
@@ -62,8 +88,15 @@ jobs:
         # nothing above the minor, so v0.5.2 encoded to 502 while v0.5.1 had already been published by hand
         # as versionCode 511. Android compares that number to decide what is an update, so the release built
         # from the tag was one no 0.5.1 install would accept: a downgrade. The wider factors put every 0.x
-        # tag above the codes already in the field (v0.5.2 is 5002, v0.5.3 is 5003) without inventing a
-        # second source of truth, since the tag still decides both the name and the code.
+        # tag above the codes already in the field (v0.5.2 is 5002, v0.5.3 is 5003).
+        #
+        # The tag decides the name and the floor of the code. The code itself is the higher of what the tag
+        # derives and the internal build production serves, read in the step above (PRODUCTION_BUILD_NUMBER):
+        # rebuilding the same public version with a higher build is how this project ships a fix without
+        # moving a tag, and v0.7.1 is the first tag where the two disagree (7001 from the tag, 7012 in
+        # production). Publishing the tag's lower number would be the very downgrade the wide factors above
+        # were introduced to avoid. When production's build is at or below the tag's code -- every fresh
+        # version does that -- the tag decides and this step behaves exactly as it did before.
         #
         # Ref agreement contract:
         # - Tags strictly require GITHUB_REF="refs/tags/<GITHUB_REF_NAME>" and GITHUB_REF_TYPE="tag".
@@ -110,6 +143,19 @@ jobs:
             fi
             version_name="${major}.${minor}.${patch}"
             version_code=$(( major * 1000000 + minor * 1000 + patch ))
+            production_build="${PRODUCTION_BUILD_NUMBER:-}"
+            if [[ -n "$production_build" ]]; then
+              if [[ ! "$production_build" =~ ^[1-9][0-9]*$ ]]; then
+                printf 'PRODUCTION_BUILD_NUMBER="%s" is not a positive decimal number, so it cannot decide the versionCode of a release.\n' "$production_build" >&2
+                exit 1
+              fi
+              if (( production_build > version_code )); then
+                printf 'Production already serves build %s, above the tag code %s, so the release carries %s.\n' "$production_build" "$version_code" "$production_build"
+                version_code="$production_build"
+              else
+                printf 'Production build %s is at or below the tag code %s, so the tag decides.\n' "$production_build" "$version_code"
+              fi
+            fi
             printf 'Tag %s -> versionName %s, versionCode %s\n' "$tag_name" "$version_name" "$version_code"
           else
             printf 'Ref "%s" is neither the allowed repair branch (refs/heads/feature/android-v0.3.0-ux-repair) nor a tag under refs/tags/. The ref fails closed.\n' "$ref" >&2
@@ -227,11 +273,11 @@ jobs:
           fi
           printf 'Signed by the project release key: %s\n' "$got"
 
-      - name: Assert the APK carries the version the tag declares
-        # The version is passed into the build from the tag, and this is the assertion that it arrived: the
-        # numbers in the manifest are the ones Android compares when it decides whether an install is an
-        # update. It reads aapt2's badging line, the only place the packaged values are visible without an
-        # emulator.
+      - name: Assert the APK carries the version this release declares
+        # The version is decided from the tag and the internal build production serves, and this is the
+        # assertion that it arrived: the numbers in the manifest are the ones Android compares when it
+        # decides whether an install is an update. It reads aapt2's badging line, the only place the
+        # packaged values are visible without an emulator.
         run: |
           set -euo pipefail
           apk="packages/android/app/build/outputs/apk/release/app-release.apk"
@@ -256,7 +302,7 @@ jobs:
               exit 1
               ;;
           esac
-          printf 'The packaged version matches the tag: %s (versionCode %s).\n' "$VERSION_NAME" "$VERSION_CODE"
+          printf 'The packaged version matches the release: %s (versionCode %s).\n' "$VERSION_NAME" "$VERSION_CODE"
 
       - name: Stage the release asset
         run: |

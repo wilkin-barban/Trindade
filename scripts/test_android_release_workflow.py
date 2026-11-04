@@ -5,6 +5,12 @@ Verifies triggers, permissions, exact publication guard conditions,
 security preservation guards, and executes the extracted version derivation
 shell script across exact ref agreements, unknown prefixes, mismatches,
 empty inputs, and malformed tags.
+
+The derivation has two inputs on a tag: the tag itself, and the internal build
+production serves. The tag names the version and sets the floor of the code; the
+release carries the higher of the two, because a build production already serves
+must never be republished under a lower number. Every case below that omits
+PRODUCTION_BUILD_NUMBER is the historical behaviour, unchanged on purpose.
 """
 
 import os
@@ -312,12 +318,15 @@ class TestVersionDerivationExecution(unittest.TestCase):
         self.assertEqual(env_out.get("APK_NAME"), "trindade-0.3.0.apk")
 
     def test_valid_tag_derivation_formula(self) -> None:
+        # The wide encoding the workflow documents: major * 1000000 + minor * 1000 + patch. The last case is
+        # the widest tag the digit budget allows, so the boundary is fixed here rather than assumed.
         cases = [
-            ("v0.3.0", "0.3.0", "300", "trindade-0.3.0.apk"),
-            ("v1.2.3", "1.2.3", "10203", "trindade-1.2.3.apk"),
+            ("v0.3.0", "0.3.0", "3000", "trindade-0.3.0.apk"),
+            ("v1.2.3", "1.2.3", "1002003", "trindade-1.2.3.apk"),
             ("v0.0.1", "0.0.1", "1", "trindade-0.0.1.apk"),
-            ("v2.0.0", "2.0.0", "20000", "trindade-2.0.0.apk"),
-            ("v0.99.99", "0.99.99", "9999", "trindade-0.99.99.apk"),
+            ("v2.0.0", "2.0.0", "2000000", "trindade-2.0.0.apk"),
+            ("v0.99.99", "0.99.99", "99099", "trindade-0.99.99.apk"),
+            ("v1.999.999", "1.999.999", "1999999", "trindade-1.999.999.apk"),
         ]
         for tag, expected_name, expected_code, expected_apk in cases:
             with self.subTest(tag=tag):
@@ -461,13 +470,100 @@ class TestVersionDerivationExecution(unittest.TestCase):
                 self.assertNotIn("VERSION_NAME", env_out)
                 self.assertNotIn("VERSION_CODE", env_out)
 
+    def test_production_build_above_the_tag_code_wins(self) -> None:
+        # v0.7.1 derives 7001, and production already served 7012. Publishing 7001 would be the downgrade
+        # this rule exists to prevent, so the release has to carry production's build.
+        code, env_out, stdout, stderr = run_derivation_script(
+            self.script,
+            {
+                "GITHUB_REF": "refs/tags/v0.7.1",
+                "GITHUB_REF_NAME": "v0.7.1",
+                "GITHUB_REF_TYPE": "tag",
+                "PRODUCTION_BUILD_NUMBER": "7012",
+            },
+        )
+        self.assertEqual(code, 0, f"Script failed with stderr: {stderr}")
+        self.assertEqual(env_out.get("VERSION_NAME"), "0.7.1")
+        self.assertEqual(env_out.get("VERSION_CODE"), "7012")
+        self.assertEqual(env_out.get("APK_NAME"), "trindade-0.7.1.apk")
+        self.assertIn("7012", stdout)
+
+    def test_tag_code_wins_when_the_production_build_is_not_above_it(self) -> None:
+        # A fresh version outranks whatever the last release of the previous one carried, and an equal
+        # number is not an override but agreement. Both leave the tag as the deciding input.
+        cases = [
+            ("v0.7.1", "7001", "7001"),  # equal
+            ("v1.0.0", "7012", "1000000"),  # production below the next major
+            ("v0.8.0", "7000", "8000"),  # next minor already outranks the old build
+        ]
+        for tag, production_build, expected_code in cases:
+            with self.subTest(tag=tag, production_build=production_build):
+                code, env_out, stdout, stderr = run_derivation_script(
+                    self.script,
+                    {
+                        "GITHUB_REF": f"refs/tags/{tag}",
+                        "GITHUB_REF_NAME": tag,
+                        "GITHUB_REF_TYPE": "tag",
+                        "PRODUCTION_BUILD_NUMBER": production_build,
+                    },
+                )
+                self.assertEqual(code, 0, f"Tag {tag} failed: {stderr}")
+                self.assertEqual(env_out.get("VERSION_CODE"), expected_code)
+
+    def test_a_production_build_that_is_not_a_number_fails_closed(self) -> None:
+        # The value decides what Android installs, so a malformed one is refused instead of ignored: a
+        # release that quietly fell back to the tag would be the downgrade the rule prevents.
+        for value in ["0", "-5", "12a", "7012.0", "00712", " 7012"]:
+            with self.subTest(value=value):
+                code, env_out, stdout, stderr = run_derivation_script(
+                    self.script,
+                    {
+                        "GITHUB_REF": "refs/tags/v0.7.1",
+                        "GITHUB_REF_NAME": "v0.7.1",
+                        "GITHUB_REF_TYPE": "tag",
+                        "PRODUCTION_BUILD_NUMBER": value,
+                    },
+                )
+                self.assertNotEqual(code, 0, f"'{value}' should have been rejected")
+                self.assertNotIn("VERSION_CODE", env_out)
+                self.assertIn("PRODUCTION_BUILD_NUMBER", stderr)
+
+    def test_the_repair_branch_ignores_the_production_build(self) -> None:
+        # The repair branch builds an artifact under a fixed pair, publishes nothing, and keeps behaving
+        # exactly as before this rule existed.
+        code, env_out, stdout, stderr = run_derivation_script(
+            self.script,
+            {
+                "GITHUB_REF": "refs/heads/feature/android-v0.3.0-ux-repair",
+                "GITHUB_REF_NAME": "feature/android-v0.3.0-ux-repair",
+                "GITHUB_REF_TYPE": "branch",
+                "PRODUCTION_BUILD_NUMBER": "7012",
+            },
+        )
+        self.assertEqual(code, 0, f"Script failed with stderr: {stderr}")
+        self.assertEqual(env_out.get("VERSION_NAME"), "0.3.0")
+        self.assertEqual(env_out.get("VERSION_CODE"), "301")
+
+    def test_an_empty_production_build_keeps_the_tag_formula(self) -> None:
+        code, env_out, stdout, stderr = run_derivation_script(
+            self.script,
+            {
+                "GITHUB_REF": "refs/tags/v0.7.1",
+                "GITHUB_REF_NAME": "v0.7.1",
+                "GITHUB_REF_TYPE": "tag",
+                "PRODUCTION_BUILD_NUMBER": "",
+            },
+        )
+        self.assertEqual(code, 0, f"Script failed with stderr: {stderr}")
+        self.assertEqual(env_out.get("VERSION_CODE"), "7001")
+
     def test_rejected_tags(self) -> None:
         rejected_tags = [
             "v1.2",  # missing patch
             "v1.2.3.4",  # 4 components
             "0.3.0",  # missing leading v
-            "v1.100.0",  # minor > 99
-            "v1.0.100",  # patch > 99
+            "v1.1000.0",  # minor > 999, which the encoding cannot hold without colliding with v2.0.0
+            "v1.0.1000",  # patch > 999, same collision
             "vabc",  # non-numeric
             "",  # empty
         ]
@@ -484,6 +580,36 @@ class TestVersionDerivationExecution(unittest.TestCase):
                 self.assertNotEqual(code, 0, f"Tag '{tag}' should have been rejected")
                 self.assertNotIn("VERSION_NAME", env_out)
                 self.assertNotIn("VERSION_CODE", env_out)
+
+
+class TestProductionBuildSource(unittest.TestCase):
+    """The build the release adopts is read from the API's own constant, not from a copy.
+
+    The step exists because two numbers that describe the same binary drift apart the moment one of them is
+    a second source. This test reads the workflow and the file the step greps, so a rename on either side
+    fails here instead of on a tag.
+    """
+
+    def test_the_workflow_reads_the_api_constant(self) -> None:
+        content = load_workflow_text()
+        self.assertIn("LOCAL_APK_BUILD_NUMBER", content)
+        self.assertIn("packages/backend/src/modules/app/app.service.ts", content)
+        self.assertIn('"$GITHUB_ENV"', content)
+
+    def test_the_constant_is_a_positive_decimal(self) -> None:
+        declaration = (
+            REPO_ROOT / "packages" / "backend" / "src" / "modules" / "app" / "app.service.ts"
+        )
+        match = re.search(
+            r"^export const LOCAL_APK_BUILD_NUMBER = ([0-9]+);$",
+            declaration.read_text(encoding="utf-8"),
+            re.MULTILINE,
+        )
+        self.assertIsNotNone(
+            match,
+            "app.service.ts must declare LOCAL_APK_BUILD_NUMBER in the form the workflow greps",
+        )
+        self.assertGreater(int(match.group(1)), 0)
 
 
 if __name__ == "__main__":
