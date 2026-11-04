@@ -24,6 +24,9 @@ interface Row {
 const WEB_URL = 'http://192.168.25.250:1453/api/entradasitem';
 const ANDROID_WS = 'http://192.168.25.250:1453/api';
 const ANDROID_NOTE = 'Android App / ERP · client=android · via=native · launch #42';
+/** `AeroAudit.note(detail)` writes the prefix, then the detail the caller passed. */
+const ANDROID_PREFIX = 'Android App / ERP · client=android · via=native';
+const androidNote = (detail: string) => `${ANDROID_PREFIX} · ${detail}`;
 
 const rows: readonly Row[] = [
   // ---- web: lib/aero-audit.ts callers ----
@@ -176,15 +179,97 @@ const rows: readonly Row[] = [
     accepted: true,
   },
   {
+    // Transcribed from `aeroImportAuditEvent`: the web takes a seat from `/movimentoitem` into a local
+    // launch, and the line is the only place the company's `ent_lan` is paired with it.
+    who: 'web imports an ERP seat as a local launch',
+    body: {
+      event: 'import',
+      phase: 'result',
+      destinationUrl: '/api/massas-launch',
+      note: 'date=2026-11-03 · ent_lan=35947 · product=000084 · boxes=12',
+      error: null,
+      client: 'web',
+      attemptId: 'attempt-5b7d2c10',
+      durationMs: 120,
+    },
+    accepted: true,
+  },
+  {
+    // Transcribed from `AeroDispatcher.logQueueRejected`: the queue of a closed or expired day is dropped,
+    // and the line has to carry which day, which launches and which code, because that is all a person
+    // diagnosing the plant has to tell a lost box from a deliberate drop.
     who: 'android records a queued item it will not retry',
     body: {
       event: 'queue_rejected',
       phase: 'result',
       destinationUrl: '/api/massas-launch',
       httpStatus: null,
+      note: androidNote('aero_queue_rejected · date=2026-11-03 · launchIds=101,102 · code=AERO_QUEUE_EXPIRED'),
+      error: 'AERO_QUEUE_EXPIRED',
+      appVersion: '0.7.2',
+      buildNumber: 7013,
+    },
+    accepted: true,
+  },
+  {
+    who: 'android records a seat it imported into Trindade',
+    body: {
+      event: 'import',
+      phase: 'result',
+      destinationUrl: '/api/massas-launch',
+      note: androidNote('date=2026-11-03 · ent_lan=35947 · product=000084 · boxes=12'),
+      appVersion: '0.7.2',
+      buildNumber: 7013,
+    },
+    accepted: true,
+  },
+  {
+    who: 'android records a snapshot the backend refused, which is not an unreachable plant',
+    body: {
+      event: 'read_history',
+      phase: 'result',
+      destinationUrl: `${ANDROID_WS}/movimentoitem`,
+      httpStatus: 200,
+      durationMs: 455,
+      error: 'AERO_SNAPSHOT_BACKEND_UNREACHABLE',
+      note: androidNote('movimentoitem · seats=7 · saved=0'),
+      appVersion: '0.7.2',
+      buildNumber: 7013,
+    },
+    accepted: true,
+  },
+
+  // ---- the aliases an APK already in the field still writes ----
+  {
+    who: 'an older APK records a dispatch with the old event name',
+    body: {
+      event: 'dispatch',
+      phase: 'response',
+      destinationUrl: WEB_URL,
+      httpStatus: 200,
       note: ANDROID_NOTE,
-      appVersion: '0.7.0',
-      buildNumber: 7007,
+    },
+    accepted: true,
+  },
+  {
+    who: 'an older APK records a read with the old event name',
+    body: {
+      event: 'sync',
+      phase: 'response',
+      destinationUrl: `${ANDROID_WS}/movimentos`,
+      httpStatus: 200,
+      note: ANDROID_NOTE,
+    },
+    accepted: true,
+  },
+  {
+    who: 'an older APK records a connection test with the old event name',
+    body: {
+      event: 'test',
+      phase: 'response',
+      destinationUrl: `${ANDROID_WS}/usuarios`,
+      httpStatus: 200,
+      note: ANDROID_NOTE,
     },
     accepted: true,
   },
@@ -311,6 +396,42 @@ describe('the Aero audit contract, pinned to the bodies each client sends', () =
       [...pairs.values()].some((count) => count >= 2),
       'no two web rows share an attempt, so nothing pairs'
     );
+  });
+
+  it('keeps the fields a queue rejection is diagnosed by', () => {
+    // Accepting the body is half the contract: the line only helps if the day, the launches and the code
+    // survive the parse. A schema that accepted the note and dropped the detail would pass the row above
+    // and still leave the plant without an answer.
+    const row = rows.find((r) => r.body && (r.body as { event?: string }).event === 'queue_rejected');
+    assert.ok(row, 'no queue_rejected row to check');
+    const parsed = AeroLogBodySchema.parse(row.body) as { note?: string; error?: string };
+
+    assert.match(parsed.note ?? '', /date=2026-11-03/);
+    assert.match(parsed.note ?? '', /launchIds=101,102/);
+    assert.match(parsed.note ?? '', /code=AERO_QUEUE_EXPIRED/);
+    assert.equal(parsed.error, 'AERO_QUEUE_EXPIRED');
+  });
+
+  it('has a real emitter for every canonical event, written by the client that produces it', () => {
+    // One row per event is not enough: the web and the phone write the same event with different notes and
+    // different fields, and a contract pinned only to one of them drifts the moment the other changes.
+    const canonical = ['launch_sync', 'read_history', 'test_connection', 'import', 'queue_rejected'];
+    const authors = new Map<string, Set<string>>();
+    for (const row of rows.filter((r) => r.accepted)) {
+      const body = row.body as { event?: string; client?: string; note?: string };
+      if (!body.event || !canonical.includes(body.event)) continue;
+      if (!body.note) continue;
+      const author = body.note.startsWith('Android App / ERP') ? 'android' : (body.client ?? 'unknown');
+      const set = authors.get(body.event) ?? new Set<string>();
+      set.add(author);
+      authors.set(body.event, set);
+    }
+
+    for (const event of canonical) {
+      assert.ok(authors.has(event), `no accepted fixture for ${event}`);
+      const who = authors.get(event)!;
+      assert.ok(who.size >= 2 || event === 'queue_rejected', `${event} is pinned to a single author: ${[...who]}`);
+    }
   });
 
   it('refuses every row with the same sentence and code, so a client can branch on it', () => {

@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { apiError } from '../../utils/api-error.js';
-import { AERO_ERROR_CODES, AeroLogBodySchema, AeroLogClientSchema } from './aero.schema.js';
+import { AERO_ERROR_CODES, AeroLogAttemptSchema, AeroLogBodySchema, AeroLogClientSchema } from './aero.schema.js';
 import { appendAeroLog } from './aero.log.service.js';
 import { AERO_MOVEMENTS_ERROR_CODES, AeroMovementsBodySchema } from './aero.movements.schema.js';
 import {
@@ -147,6 +147,12 @@ export async function aeroIntegrationRoutes(fastify: FastifyInstance) {
         const rawClient = request.headers['x-trindade-client'];
         const parsedClient =
           typeof rawClient === 'string' ? AeroLogClientSchema.safeParse(rawClient) : null;
+        // The attempt belongs to the caller, like the client: the web page writes it down before leaving
+        // for the shortcut and sends it back on the return. Inventing one here would pair the refusal with
+        // a request that never existed.
+        const rawAttempt = request.headers['x-trindade-attempt'];
+        const parsedAttempt =
+          typeof rawAttempt === 'string' ? AeroLogAttemptSchema.safeParse(rawAttempt) : null;
         appendAeroLog({
           ts: new Date().toISOString(),
           event: 'read_history',
@@ -161,7 +167,7 @@ export async function aeroIntegrationRoutes(fastify: FastifyInstance) {
           launchId: null,
           note: 'sync_refused',
           client: parsedClient?.success ? parsedClient.data : null,
-          attemptId: null,
+          attemptId: parsedAttempt?.success ? parsedAttempt.data : null,
           durationMs: null,
         });
         return reply.status(409).send(apiError(saved.error, saved.code));
