@@ -35,18 +35,17 @@ La guía de firma y publicación está en [release-android.md](release-android.m
 | 0.7.0 | — | 2026-11-03 | Reemplazada | Payload de movimientos alineado con el puente web, vista de solo lectura de días cerrados en el Histórico de Cargamento y orden de Lanzamiento de Masas de la web; asset de GitHub | `5dd77e331edb1aace6e2b656e899697819a506068dc375528c8dc6f5a5ade922` |
 | 0.7.1 | — | 2026-11-03 | Reemplazada | Versión pública servida por `latest-release`; el endpoint expone el `buildNumber` interno y el detector lo usa cuando la versión no cambia | `41f87a148e28cc1f40bb2ac25a2e70f31587c598e806f2c65efa37411a46c545` |
 | 0.7.1 | 7012 | 2026-11-03 | **Publicada** | Conciliación automática de Masas después de cada envío en Android y web, y contraseña del ERP en la sesión de la pestaña; asset de GitHub Release `v0.7.1` y binario de producción | `f325edb6d3c03eba2f058b7aa099961fa99ba12243c6ffbec2d8e44e7683de1f` |
+| 0.7.2 | 7013 | 2026-11-04 | **En entrega** | Remediación de los hallazgos de auditoría 7006/7007/0.7.1: espejo que distingue backend inalcanzable de rechazo, sesión que olvida la contraseña del ERP y la lectura pendiente, despacho serializado, cola con traza, borrado de lote sólo Administrador, intento correlacionado, histórico de Relatórios táctil y release atada al binario de producción | `0f7c2eef842510fbcce94bc82866fda4b91b9106bd10d2a70f14e9f2ed1c2cb3` |
 
 Notas:
 
 - **Interna** significa distribuida por `GET /api/app/download-apk`, sin tag ni release de GitHub.
+
 - **Publicación del 2026-11-03 (0.7.1, build 7012):** la instancia de producción sirve
   `packages/backend/apk/trindade-0.7.1.apk` por `GET /api/app/download-apk` y
   `GET /api/app/latest-release` publica `v0.7.1` con el `buildNumber` interno. Digest
   `f325edb6d3c03eba2f058b7aa099961fa99ba12243c6ffbec2d8e44e7683de1f` (11.277.888 bytes), firmado con la
   huella oficial. El código de build es interno y no se publica. No se instaló en el emulador.
-
-  El tamaño coincide con el de la build anterior: por eso el `buildNumber` es lo único que distingue esta
-  actualización, que es exactamente el caso para el que se hizo.
 
 - **Publicación del 2026-11-04 (tag `v0.7.1`):** el tag anotado se creó sobre el commit de `main` con CI verde y
   el workflow `Android release` firmó, verificó la huella oficial y publicó la GitHub Release `v0.7.1`. El
@@ -55,21 +54,34 @@ Notas:
   `f325edb6…`, publicado con su `.sha256`; el APK que compiló el propio workflow tenía la misma versión y la
   misma firma pero un digest distinto, así que se reemplazó para que release y producción coincidieran. Una
   sola release, sin assets heredados de `v0.7.0`, que no se movió.
+
+- **Publicación del 2026-11-04 (0.7.2, build 7013):** la instancia de producción sirve
+  `packages/backend/apk/trindade-0.7.2.apk` por `GET /api/app/download-apk` y `GET /api/app/latest-release`
+  publica `v0.7.2` con el `buildNumber` interno. Digest
+  `0f7c2eef842510fbcce94bc82866fda4b91b9106bd10d2a70f14e9f2ed1c2cb3` (11.278.564 bytes), firmado con la
+  huella oficial `ee0e404b211052b311ae0e0730606e9c7d5554315463d02f9ef33c9573c431f6`. El workflow
+  `Android release` publica ese mismo archivo como asset de la release `v0.7.2` y valida el sidecar, el
+  `versionCode` y el certificado antes de subirlo. No se instaló en el emulador.
+
 - **Reemplazo del 2026-11-02 (build 7006):** la build **7006** reemplazó al asset de GitHub y al binario que
   servía producción. El asset, su `.sha256`, `packages/backend/apk/trindade-0.7.0.apk`, la copia de escritorio
   y `https://trindademasas.duckdns.org/api/app/download-apk` apuntaron al mismo digest
   `f77643b7a5442cf2a74d721f621a3977612ae074d2624c4fe735bb38441f3702` (11.260.812 bytes). Verificada en
   `emulator-5554` (Android 14) instalada sobre la 7005.
+
 - **Reemplazo del 2026-11-01 (build 7004):** la build **7004** reemplazó al asset de GitHub y al binario que
   servía producción. El asset, su `.sha256`, `packages/backend/apk/trindade-0.7.0.apk` y
   `https://trindademasas.duckdns.org/api/app/download-apk` apuntan al mismo digest
   `7622756da304157904a1e47eccacff04e65d97d46615ecc804d62d24f0d1674f` (11.194.408 bytes).
+
 - **Reemplazo del 2026-11-01 (build 7003):** la build **7003** reemplazó al asset anterior de GitHub y al
   binario que servía producción, con digest
   `82fce07f17e98206a0ad6916463c80053154a87b5991b3679d47e001747e5810` (11.187.920 bytes). La discrepancia previa
   (asset 7000 frente a notas que citaban 7001, producción en 7002) queda cerrada por este reemplazo.
+
 - El tag `v0.7.0` no se movió. Un tag publicado no se mueve ni se reutiliza: si hace falta distribuir otra build,
   se reemplazan los assets de la misma release y se sube el `versionCode`, o se corta un tag nuevo.
+
 - Si se reemplaza el asset de GitHub, actualizar esta tabla, el `.sha256` y las notas de la release en el mismo
   movimiento. La verificación de la descarga debe comparar el `versionCode` empaquetado, no solo el nombre del
   archivo.
