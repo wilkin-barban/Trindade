@@ -741,7 +741,8 @@
       "createOperator": "+ Crear Operario: {{name}}",
       "operatorCreated": "¡Operario registrado con éxito!",
       "operatorNotLinked": "Operador no vinculado",
-      "operatorInactive": "Operador inactivo: reactívelo en Admin › Operarios"
+      "operatorInactive": "Operador inactivo: reactívelo en Admin › Operarios",
+      "openBox": "incluye 1 caja abierta"
     },
     "syncHeader": {
       "action": "Sincronizar con ERP",
@@ -771,7 +772,8 @@
     },
     "historyDaysLabel": "Días del historial",
     "historyDaysUnavailable": "No se pudieron leer los días con lanzamientos; podés abrir ayer.",
-    "historyEmptyDay": "No hay lanzamientos registrados en ese día."
+    "historyEmptyDay": "No hay lanzamientos registrados en ese día.",
+    "erpOnlyReadOnly": "Solo lectura (ERP)"
   },
   "moduleHelp": {
     "dashboard": {

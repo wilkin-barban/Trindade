@@ -9,6 +9,8 @@ import {
   calculateOperatorSubtotal,
   groupProductsFromLaunches,
   productWorkerNames,
+  boxesForUnits,
+  openBoxUnits,
   compareWorkerNames,
   type MassasLaunchDayView,
   type MassaIndividualLaunch,
@@ -342,5 +344,57 @@ describe('massas worker ordering', () => {
       'Bruno Lima',
       'Álvaro Nunes',
     ]);
+  });
+});
+
+describe('massas boxes from units', () => {
+  it('rounds a product up from its exact units, never from the boxes of each line', () => {
+    // Two lines of three units in a ten-unit box are one open box. Rounding the lines first would report two.
+    const launches: MassaIndividualLaunch[] = [
+      {
+        id: 1,
+        launch_date: '2026-10-21',
+        product_code: '1045',
+        product_name: 'MASSA CASEIRA',
+        boxes: 0,
+        units: 3,
+        user_id: 10,
+        username: 'carlos',
+        display_name: 'Carlos Bento',
+        created_at: '2026-10-21T09:00:00Z',
+        updated_at: '2026-10-21T09:00:00Z',
+      },
+      {
+        id: 2,
+        launch_date: '2026-10-21',
+        product_code: '1045',
+        product_name: 'MASSA CASEIRA',
+        boxes: 0,
+        units: 3,
+        user_id: 10,
+        username: 'carlos',
+        display_name: 'Carlos Bento',
+        created_at: '2026-10-21T10:00:00Z',
+        updated_at: '2026-10-21T10:00:00Z',
+      },
+    ];
+    const catalog: MassaProductTotal[] = [
+      { code: '1045', name: 'MASSA CASEIRA', unitsPerBox: 10, totalBoxes: 0, totalUnits: 0, openBoxUnits: 0 },
+    ];
+
+    const [caseira] = groupProductsFromLaunches(launches, catalog);
+
+    assert.equal(caseira.totalUnits, 6);
+    assert.equal(caseira.totalBoxes, 1);
+    assert.equal(caseira.openBoxUnits, 6);
+  });
+
+  it('keeps 182 units of a 15-unit box at 13 boxes and two open units', () => {
+    assert.equal(boxesForUnits(182, 15), 13);
+    assert.equal(openBoxUnits(182, 15), 2);
+    assert.equal(boxesForUnits(940, 20), 47);
+    assert.equal(openBoxUnits(940, 20), 0);
+    assert.equal(boxesForUnits(3, 10), 1);
+    assert.equal(openBoxUnits(3, 10), 3);
   });
 });

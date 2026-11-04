@@ -126,11 +126,21 @@ export function MassasUnifiedTable({
                     <p className="mt-0.5 text-xs tabular-nums text-gray-500">
                       {row.boxes} cx · {row.units} un
                     </p>
+                    {/* The number alone could read as closed boxes; the note says the last one is open, and
+                        only when there is a remainder to explain. */}
+                    {row.openBoxUnits > 0 && (
+                      <p className="mt-0.5 text-[11px] text-amber-700" data-testid={`massas-open-box-${row.key}`}>
+                        {t('massas.unified.openBox')}
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex shrink-0 flex-col items-end gap-1.5">
                     {row.state === 'erpOnly' &&
                       onImport &&
+                      // A partial seat never reaches the button: importing it would invent units the ERP
+                      // never counted. `canImportRow` already says so; the row asks explicitly too.
+                      row.importable &&
                       canImportRow(row, { userId: currentUserId, isAdmin }) && (
                         <button
                           type="button"

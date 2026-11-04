@@ -103,7 +103,9 @@ describe('aero bridge wiring: a reconciled launch is settled', () => {
   it('never offers to edit or delete a launch the ERP already has', () => {
     // Delphi holds the seat. Changing its boxes or removing it here would leave the plant's day and the
     // company's book disagreeing, so the rule is drawn into the row instead of trusted to the operator.
-    assert.ok(collective.includes('reconciledLaunchIds(unifiedRows)'));
+    // The row carries the state now: a reconciled row is drawn without controls, and its launch is looked up
+    // only to render the number and the author.
+    assert.ok(collective.includes("const reconciled = row.state === 'reconciled'"));
     assert.ok(collective.includes('!reconciled'));
     // Y el listado del historial, que no tiene mitad ERP, no se vuelve de sólo lectura por esto.
     assert.ok(collective.includes('const canManage = '));

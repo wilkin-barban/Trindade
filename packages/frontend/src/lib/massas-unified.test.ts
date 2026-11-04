@@ -7,6 +7,8 @@ import {
   seatNeedsReactivation,
   seatOwnerStatus,
   massasUnifiedRows,
+  massasUnifiedOperators,
+  massasUnifiedSummary,
   reconciledLaunchIds,
   type MassasUnifiedInput,
   type MassasUnifiedRow,
@@ -342,5 +344,100 @@ describe('who the table offers the import to', () => {
     assert.equal(partial.importable, false);
     assert.equal(canImportRow(partial, { userId: 12, isAdmin: false }), false);
     assert.equal(canImportRow(partial, { userId: 1, isAdmin: true }), false);
+  });
+});
+
+describe('massas boxes, operators and the two summary sections', () => {
+  const QUADRADA = [{ code: '1192', name: 'MASSA QUADRADA', unitsPerBox: 15 }];
+
+  it('rounds the boxes of a row up from its exact units', () => {
+    // 182 units of a 15-unit box occupy 13 boxes: twelve closed and one open with two units. The units stay
+    // 182 because they are what the company counted.
+    const rows = massasUnifiedRows(
+      input({
+        products: QUADRADA,
+        movements: [seat({ entLan: 35983, productCode: '001192', quantity: 182, operatorName: 'VINICIUS R' })],
+      }),
+    );
+
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].boxes, 13);
+    assert.equal(rows[0].units, 182);
+    assert.equal(rows[0].unitsPerBox, 15);
+    assert.equal(rows[0].openBoxUnits, 2);
+  });
+
+  it('counts a row that does not reach a box as one open box, never as zero', () => {
+    // The phone truncated 3/10 to zero, telling the plant a box that left never existed.
+    const rows = massasUnifiedRows(
+      input({ movements: [seat({ entLan: 35949, productCode: '1045', quantity: 3, operatorName: 'JOAO H' })] }),
+    );
+
+    assert.equal(rows[0].boxes, 1);
+    assert.equal(rows[0].openBoxUnits, 3);
+    assert.equal(rows[0].importable, false, 'a partial still does not fit whole boxes');
+  });
+
+  it('offers every operator of the unified day, including the ones with no account', () => {
+    const rows = massasUnifiedRows(
+      input({
+        launches: [launch({ id: 7, user_id: 3, display_name: 'Alice', product_code: '1045' })],
+        movements: [
+          seat({ entLan: 35983, productCode: '1045', quantity: 30, operatorName: 'VINICIUS R' }),
+          seat({ entLan: 35984, productCode: '1045', quantity: 20, operatorName: 'ALICE' }),
+        ],
+      }),
+    );
+
+    const operators = massasUnifiedOperators(rows);
+
+    assert.deepEqual(
+      operators.map((operator) => operator.name),
+      ['Alice', 'VINICIUS R'],
+    );
+    assert.equal(operators.find((operator) => operator.name === 'VINICIUS R')?.key, 'vinicius r');
+  });
+
+  it('consolidates one product from the exact units of every line, never from rounded lines', () => {
+    // Two seats of three units in a ten-unit box are one open box, not two: summing the rows' boxes would
+    // report a box the plant never packed.
+    const rows = massasUnifiedRows(
+      input({
+        movements: [
+          seat({ entLan: 9101, productCode: '1045', quantity: 3, operatorName: 'JOAO H' }),
+          seat({ entLan: 9102, productCode: '1045', quantity: 3, operatorName: 'JOAO H' }),
+        ],
+      }),
+    );
+
+    const summary = massasUnifiedSummary(rows);
+
+    assert.equal(summary.products.length, 1);
+    assert.equal(summary.products[0].totalUnits, 6);
+    assert.equal(summary.products[0].totalBoxes, 1);
+    assert.equal(summary.products[0].openBoxUnits, 6);
+    assert.equal(summary.workers[0].units, 6);
+    assert.equal(summary.workers[0].boxes, 1);
+    assert.deepEqual(summary.workerNamesByProduct.get('1045'), ['JOAO H']);
+  });
+
+  it('adds a worker boxes product by product, because each product has its own box', () => {
+    const rows = massasUnifiedRows(
+      input({
+        products: [...PRODUCTS, ...QUADRADA],
+        movements: [
+          seat({ entLan: 9201, productCode: '1192', quantity: 182, operatorName: 'VINICIUS R' }),
+          seat({ entLan: 9202, productCode: '1045', quantity: 940, operatorName: 'VINICIUS R' }),
+        ],
+      }),
+    );
+
+    const summary = massasUnifiedSummary(rows);
+    const vinicius = summary.workers.find((worker) => worker.name === 'VINICIUS R');
+
+    assert.ok(vinicius);
+    assert.equal(vinicius.units, 1122);
+    assert.equal(vinicius.boxes, 13 + 94);
+    assert.equal(vinicius.openBoxUnits, 2);
   });
 });
