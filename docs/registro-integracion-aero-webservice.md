@@ -18,8 +18,9 @@ Content-Type: application/json
 ```
 
 - El WebService de producción escucha en `http://192.168.25.250:1453/api`.
-- Las credenciales se configuran por dispositivo y se guardan cifradas en Android o en el `localStorage` del
-  iPhone en la web.
+- Las credenciales se configuran por dispositivo y se guardan cifradas en Android. En la web, la dirección y el
+  usuario viven en el `localStorage` del iPhone y la contraseña en el `sessionStorage` de la pestaña, que no
+  sobrevive al cierre de sesión.
 - El `CODIGO` numérico que devuelve `/usuarios` es informativo. El campo `ENT_USU` viaja con el **nombre de usuario
   en mayúsculas**, igual que en el binario Delphi.
 

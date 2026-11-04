@@ -375,11 +375,10 @@ class LoadingHistoryViewModel @Inject constructor(
     private fun refusalMessage(statusCode: Int, code: String? = null): String = when (statusCode) {
         // The session is gone, not the network. The app's own sign-in is the way back.
         401 -> SESSION_EXPIRED
-        // Both routes check for Administrador, and on the batch routes this is the pair where the
-        // server's own flag overstates the caller: the history drew a delete action for a Trabalhador
-        // because `canDelete` said so, and the route answers 403. Naming the role the server checks is
-        // the honest thing to say -- the client cannot know the caller's role, only that it was refused
-        // here.
+        // Both routes check for Administrador. The batch projection mirrors that role now, so a 403
+        // here is a server that has not adopted it yet or a session whose role changed mid-flight;
+        // naming the role the server checks is still the only honest thing to say, because the client
+        // cannot know the caller's role, only that it was refused here.
         403 -> ADMIN_ONLY
         404 -> GONE
         // A day that is closed to writes: the massas history's own refusal, which these routes share.
@@ -416,7 +415,15 @@ private const val FIRST_PAGE = 1
  */
 internal fun offersDeactivate(item: ScheduleHistoryResponseItemsInner): Boolean = item.canDeactivate == true
 
-/** Whether the server offered to delete this batch. See [offersDeactivate]. */
+/**
+ * Whether the server offered to delete this batch. See [offersDeactivate].
+ *
+ * This flag is not the row's authorship: deleting a batch takes the whole day through an
+ * administrator-only route, and the server projects it with `projectBatchDeletePermission`, which keeps
+ * the calendar and answers only for the administrator on an open day. The screen offers what arrives and
+ * never re-derives it from the role, because a second rule here would disagree with the server the day
+ * either side changes.
+ */
 internal fun offersDelete(item: ScheduleHistoryResponseItemsInner): Boolean = item.canDelete == true
 
 /**

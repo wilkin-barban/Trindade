@@ -105,8 +105,8 @@ jq -r 'select(.client=="android") | [.appVersion,.buildNumber] | @tsv' \
 
 ## 7. Verificación del build publicado
 
-- APK final: `versionName 0.7.1`, sha256
-  `f325edb6d3c03eba2f058b7aa099961fa99ba12243c6ffbec2d8e44e7683de1f`, firmado con la huella oficial.
+- APK de esta auditoría: `versionName 0.7.1`, firmado con la huella oficial. El código de build y el sha256 se
+  consultan en `docs/release-android-historial.md`, que es donde se operan; no se repiten aquí.
 - La conciliación posterior al lanzamiento deja su propio par en el log: `read_history` automático después
   de un lote, una fila suelta o una cola drenada, con la fecha en `note` y el mismo `attemptId` en
   `requested`/`result`. Masas concilia con ese snapshot; Recebimento y Relatório siguen viendo los insumos
@@ -117,17 +117,19 @@ jq -r 'select(.client=="android") | [.appVersion,.buildNumber] | @tsv' \
   mismo número.
 - La lectura de movimientos usa el cuerpo certificado de la web: `_method: PATCH`, `ENTSAI: "E"` y los
   filtros abiertos en `null`. El test de contrato de `AeroErpClientTest` fija ese cuerpo exacto.
-- Para verificar el log sin publicar el build se instaló una variante de prueba `0.7.1`: el detector de
-  actualización la considera más nueva que el `v0.7.0` que sirve producción y no bloquea la app.
+- Para verificar el log se usó una variante de prueba de la misma versión pública: el detector de actualización
+  la considera más nueva que la release anterior y no bloquea la app.
 - La sincronización ERP generó el par:
   - `read_history` / `requested` / `client=android` / `appVersion=0.7.1`;
   - `read_history` / `result` / mismo `attemptId` / `httpStatus=null` / `durationMs=2687` /
     `error=AERO_ERP_UNREACHABLE`.
 - El `buildNumber` viaja en la línea para diagnóstico interno; no se documenta ni publica su valor.
-- Verificación: backend **712/712**, Android **1336/1336**, `BUILD SUCCESSFUL`.
-- El APK final `0.7.0` queda en `packages/android/app/build/outputs/apk/release/app-release.apk` y en
-  Desktop. Producción sirve ese mismo binario en `GET /api/app/download-apk`, y `latest-release` informa
-  `apkSize: 11277888`; una instalación del build final ya no recibe el bloqueo de actualización.
+- Verificación: las suites de backend y Android en verde en la entrega auditada; el conteo exacto vive en el
+  historial de release, que es donde se actualiza.
+- El APK final queda en `packages/android/app/build/outputs/apk/release/app-release.apk` y en
+  `packages/backend/apk/`. Producción sirve ese mismo binario en `GET /api/app/download-apk`, y una instalación
+  del build final ya no recibe el bloqueo de actualización; el tamaño y el sha256 los publica
+  `/api/app/latest-release`, que es la fuente que compara el actualizador.
 
 ## 8. Límites
 

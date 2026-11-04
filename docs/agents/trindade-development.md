@@ -211,6 +211,13 @@ La app consulta `GET /api/app/latest-release`. La respuesta incluye:
 Por eso **cada build interna debe subir el `versionCode` y el `buildNumber` que publica la API**. Una rebuild que
 solo cambia el código pero conserva ambos es invisible para clientes ya instalados.
 
+### 6.4.1 Verificar la integración con el ERP real
+
+El runbook de la prueba de punta a punta desde la tablet —lanzar un lote en un día abierto, comprobar la
+lectura automática, el espejo completo y las filas conciliadas, y qué no tocar si falla— está en
+[`docs/verificacion-erp-tablet.md`](../verificacion-erp-tablet.md). Esa prueba se corre en la planta; desde
+una máquina fuera de la LAN de la fábrica no se puede completar.
+
 ### 6.5 Publicar un APK de producción
 
 1. Compilar y firmar con `versionCode` mayor.
@@ -280,8 +287,9 @@ La excepción de cleartext del release Android es **solo** `192.168.25.250`; no 
 ### 8.2 Configuración
 
 - URL: `http://192.168.25.250:1453/api` (sin barra final duplicada).
-- Usuario y contraseña del WebService se configuran por dispositivo; Android los guarda cifrados, la web en
-  `localStorage` del iPhone.
+- Usuario y contraseña del WebService se configuran por dispositivo; Android los guarda cifrados. En la web, la
+  dirección y el usuario viven en el `localStorage` del iPhone, y la contraseña en el `sessionStorage` de la
+  pestaña: muere con la sesión, se borra al cerrar sesión y con **Limpiar**, y nunca llega al servidor.
 - No hay un campo separado de código: el operario viaja como `ENT_USU`/`PED_USU` en mayúsculas.
 - El código numérico que devuelve `/usuarios` es informativo.
 

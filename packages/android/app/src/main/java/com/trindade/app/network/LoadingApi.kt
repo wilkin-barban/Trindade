@@ -70,9 +70,15 @@ interface LoadingApi {
      * answers and the date the export names are not the same number.
      *
      * The five lifecycle flags -- `isActive`, `readOnly`, `canEdit`, `canDeactivate`, `canDelete` --
-     * are the server's own projection, from `projectHistoryPermissions`, which is the only party that
-     * knows the caller's role and where the one-hour edit window has landed; `readOnly` there is
-     * exactly `!canEdit`. All five are required in the contract here, unlike the report history's.
+     * are the server's own projection, which is the only party that knows the caller's role and where
+     * the one-hour edit window has landed; `readOnly` there is exactly `!canEdit`. All five are
+     * required in the contract here, unlike the report history's.
+     *
+     * `canDelete` is the one that does not come from `projectHistoryPermissions`: this row is a whole
+     * batch, and its route takes a day at a time and is administrator-only. The server answers it with
+     * `projectBatchDeletePermission`, which keeps the calendar rule and drops authorship -- an operator
+     * could not delete a batch even the one they wrote, and a flag derived from authorship would offer a
+     * thumb a 403. The other four still describe the row itself.
      *
      * Each item is typed `ScheduleHistoryResponseItemsInner`, and the document also declares a
      * `LoadingBatchHistoryItem` component that nothing references. The second is the name this
