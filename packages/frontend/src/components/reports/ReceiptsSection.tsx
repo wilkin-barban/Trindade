@@ -162,20 +162,30 @@ export function ReceiptsSection({
   return (
     <div className="mb-6" data-testid="receipts-section">
       {hideHeader ? (
-        <div className="mb-3 flex items-center justify-between border-b border-gray-100 pb-2">
-          <h4 className="flex items-center gap-2 text-sm font-semibold text-gray-800">
-            <Truck className="h-4 w-4" />
-            <span>{title}</span>
-          </h4>
-          {syncedAtLabel && (
-            <span className="text-[11px] text-gray-500" data-testid="receipts-synced-at">
-              {t('reports.receiptsSyncedAt', { time: syncedAtLabel })}
-            </span>
-          )}
+        <div className="mb-3 border-b border-gray-100 pb-2">
+          <div className="flex items-center justify-between gap-2">
+            <h4 className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+              <Truck className="h-4 w-4" />
+              <span>{title}</span>
+            </h4>
+            {syncedAtLabel && (
+              <span className="text-[11px] text-gray-500" data-testid="receipts-synced-at">
+                {t('reports.receiptsSyncedAt', { time: syncedAtLabel })}
+              </span>
+            )}
+          </div>
+          <p className="mt-1 text-xs text-gray-600" data-testid="receipts-subtitle">
+            {t('reports.receiptsSubtitle')}
+          </p>
         </div>
       ) : (
         <div className="mb-3 flex flex-col gap-2 border-b border-gray-200 pb-2 sm:flex-row sm:items-center sm:justify-between">
-          <h3 className="text-md font-semibold text-gray-800">{title}</h3>
+          <div className="min-w-0">
+            <h3 className="text-md font-semibold text-gray-800">{title}</h3>
+            <p className="mt-1 text-xs text-gray-600" data-testid="receipts-subtitle">
+              {t('reports.receiptsSubtitle')}
+            </p>
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             {syncedAtLabel && (
               <span className="text-[11px] text-gray-500" data-testid="receipts-synced-at">

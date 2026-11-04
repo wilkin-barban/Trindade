@@ -309,7 +309,7 @@ export function ReportsPage() {
       */}
       <CardHeader className="flex flex-col gap-3 pb-3 sm:flex-row sm:items-center sm:justify-between">
         <CardTitle className="text-base font-bold leading-snug sm:text-lg">
-          {t('reports.erpMovementsTitle', 'Movimentações do ERP (Massas e Recebimento)')}
+          {t('reports.erpMovementsTitle', 'Movimentações do ERP')}
         </CardTitle>
         <Button
           type="button"
@@ -324,10 +324,17 @@ export function ReportsPage() {
           {canSyncErp ? t('massas.syncHeader.action', 'Sincronizar com ERP') : t('reports.receiptsRefresh', 'Atualizar')}
         </Button>
       </CardHeader>
-      <CardContent className="pt-2 space-y-6">
-        <MassasReportSection date={reportDate} hideRefresh refetchKey={movementsRefreshKey} />
+      <CardContent className="pt-2 space-y-4">
+        {/*
+          Two blocks, two lists. The massas come from the report's products and the insumos from the mirrored
+          receipts; sharing one card is a matter of one sync action, not of one list, so neither block reads the
+          other's rows.
+        */}
+        <div className="rounded-xl border border-gray-100 bg-white p-3 sm:p-4" data-testid="massas-block">
+          <MassasReportSection date={reportDate} hideRefresh refetchKey={movementsRefreshKey} />
+        </div>
         {usesErpReceipts(reportDate) && (
-          <div className="border-t border-gray-100 pt-6">
+          <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-3 sm:p-4" data-testid="receipts-block">
             <ReceiptsSection
               date={reportDate}
               hideHeader
