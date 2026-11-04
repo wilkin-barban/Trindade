@@ -9,7 +9,7 @@ import type {
   HistoryQuery,
   LoadingBatchHistoryItem,
 } from './loading.schema.js';
-import { projectHistoryPermissions, type HistoryActor } from '../history-permissions.js';
+import { projectBatchDeletePermission, projectHistoryPermissions, type HistoryActor } from '../history-permissions.js';
 import { getSaoPauloDateString } from '../../utils/date.js';
 
 // ---- Schedule CRUD ----
@@ -604,7 +604,14 @@ export function listScheduleHistory(
       canEdit: Boolean(permissions.canEdit),
       canDeactivate: Boolean(permissions.canDeactivate),
       canActivate: Boolean(permissions.canActivate),
-      canDelete: Boolean(permissions.canDelete),
+      // A batch is a day, and the route that erases a day is administrator-only: the row-level rule
+      // this projection also computes would offer a worker a control the server refuses.
+      canDelete: projectBatchDeletePermission(actor, {
+        user_id: row.user_id,
+        created_at: row.created_at ?? '',
+        is_active: row.is_active,
+        day_date: row.batch_date,
+      }),
       creator: row.user_id ? { id: row.user_id, display_name: row.creator_name ?? '' } : null,
     } satisfies LoadingBatchHistoryItem;
   });

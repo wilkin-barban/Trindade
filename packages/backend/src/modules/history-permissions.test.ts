@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   isWithinOneHour,
   isWithinReportsEditWindow,
+  projectBatchDeletePermission,
   projectHistoryPermissions,
 } from './history-permissions.js';
 
@@ -163,6 +164,30 @@ describe('history permissions', () => {
     // A report carries its date elsewhere; without `day_date` the projection keeps its own window.
     const report = { user_id: 1, created_at: '2026-08-20T11:30:00.000Z', is_active: 1 };
     assert.strictEqual(projectHistoryPermissions({ sub: 1, role: 'Trabalhador' }, report, 'sao-paulo-current-and-previous-day', now).isClosedDay, false);
+  });
+
+  describe('a whole batch, which only an administrator may erase', () => {
+    // The batch routes check the role before they look at the date, so a flag derived from authorship
+    // would offer a Trabalhador a control whose only answer is 403. Row-level erasing keeps its own
+    // rule: the worker erases what they wrote, and the administrator erases anything.
+    const today = { user_id: 7, created_at: '2026-08-24T11:30:00.000Z', is_active: 1, day_date: '2026-08-24' };
+    const past = { ...today, day_date: '2026-08-20' };
+
+    it('is offered to an administrator on an open day and to nobody on a past one', () => {
+      assert.strictEqual(projectBatchDeletePermission({ sub: 1, role: 'Administrador' }, today, now), true);
+      assert.strictEqual(projectBatchDeletePermission({ sub: 1, role: 'Administrador' }, past, now), false);
+    });
+
+    it('is never offered to a worker, even for a batch they created today', () => {
+      assert.strictEqual(projectBatchDeletePermission({ sub: 7, role: 'Trabalhador' }, today, now), false);
+      // The row-level answer is unchanged: the worker still erases what they wrote.
+      assert.strictEqual(projectHistoryPermissions({ sub: 7, role: 'Trabalhador' }, today, 'one-hour', now).canDelete, true);
+    });
+
+    it('closes a day whose erasing date is behind, even for an administrator', () => {
+      const reportDay = { ...today, day_date: '2026-08-24', erase_day_date: '2026-08-20' };
+      assert.strictEqual(projectBatchDeletePermission({ sub: 1, role: 'Administrador' }, reportDay, now), false);
+    });
   });
 
   it('projects the reports window when asked for it', () => {
