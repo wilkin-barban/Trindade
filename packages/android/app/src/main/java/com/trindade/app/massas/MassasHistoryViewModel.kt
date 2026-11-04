@@ -10,6 +10,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 @HiltViewModel
@@ -33,17 +34,22 @@ class MassasHistoryViewModel @Inject constructor(
 
     fun loadHistory() {
         viewModelScope.launch {
-            _state.value = _state.value.copy(isLoading = true, errorMessage = null)
+            _state.update { it.copy(isLoading = true, errorMessage = null) }
             val result = repository.history()
-            _state.value = _state.value.copy(
-                isLoading = false,
-                days = result ?: emptyList(),
-                errorMessage = if (result == null) UiText.of(R.string.massas_history_error_load) else null,
-            )
+            // `update` and not `_state.value = _state.value.copy(...)`: the read and the write are one
+            // atomic step, so a toggle that lands while this load is in flight is not overwritten by a
+            // snapshot taken before it. The two fields belong to different events and must compose.
+            _state.update {
+                it.copy(
+                    isLoading = false,
+                    days = result ?: emptyList(),
+                    errorMessage = if (result == null) UiText.of(R.string.massas_history_error_load) else null,
+                )
+            }
         }
     }
 
     fun toggleHelpDialog(show: Boolean) {
-        _state.value = _state.value.copy(showHelpDialog = show)
+        _state.update { it.copy(showHelpDialog = show) }
     }
 }
