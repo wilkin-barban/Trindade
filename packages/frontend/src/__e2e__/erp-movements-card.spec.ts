@@ -79,9 +79,9 @@ test.describe('ERP movements card', () => {
     await expect(card.locator('[data-testid="massas-report-products"]')).toContainText('QUADRADA');
     await expect(card.locator('[data-testid="massas-report-products"]')).toContainText(`${quadradaUnits} un`);
 
-    // The insumos lens reads the same day from the other side: the supply is listed there, and it never
-    // reaches the massas summary.
-    await expect(card).toContainText('Recebimento');
+    // The insumos lens reads the same day from the other side: the supply is listed under its own heading,
+    // and it never reaches the massas summary.
+    await expect(card).toContainText('Insumos');
     await expect(card.locator('[data-testid="receipt-line-41002-009001"]')).toContainText('FARINHA DE TRIGO');
     await expect(card.locator('[data-testid="massas-report-products"]')).not.toContainText('FARINHA');
   });
