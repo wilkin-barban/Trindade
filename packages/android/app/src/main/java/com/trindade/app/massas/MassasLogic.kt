@@ -47,10 +47,24 @@ fun brazilianDate(date: String): String {
  * Formats WhatsApp message for massas launches with the collective summary of the day
  * plus a per-worker breakdown, with the redundant "MASSA" prefix removed from names.
  */
-fun formatMassasWhatsAppMessage(view: MassasLaunchDayView): String {
+fun formatMassasWhatsAppMessage(
+    view: MassasLaunchDayView,
+    rows: List<MassasUnifiedRow>? = null,
+): String {
     val lines = mutableListOf<String>()
     lines.add("🍝 *Lançamento de Massas — ${brazilianDate(view.date)}*")
     lines.add("")
+
+    // With the unified rows the message covers the whole day: the launches recorded here and the seats the
+    // plant recorded on its tablet, already deduplicated by `massasUnifiedRows`. Without them it falls back to
+    // the local launches, which is what the screen had before the mirror existed.
+    if (rows != null && rows.isNotEmpty()) {
+        val body = unifiedMessageLines(view, rows)
+        if (body != null) {
+            lines.addAll(body)
+            return lines.joinToString("\n")
+        }
+    }
 
     val launchedProducts = view.products.filter { it.totalUnits > 0 }
     if (launchedProducts.isEmpty()) {
@@ -81,6 +95,85 @@ fun formatMassasWhatsAppMessage(view: MassasLaunchDayView): String {
     }
 
     return lines.joinToString("\n")
+}
+
+/**
+ * The body of the message when the unified rows are available: the whole day, insumos excluded by the day's own
+ * catalogue and each worker's boxes rounded per product exactly like the table does.
+ *
+ * Returns null when the rows carry nothing to say, so the caller keeps its "nothing yet" answer.
+ */
+private fun unifiedMessageLines(
+    view: MassasLaunchDayView,
+    rows: List<MassasUnifiedRow>,
+): List<String>? {
+    // The catalogue is the ten massas: a supply the mirror returned is not part of this message, and the
+    // description never gets a vote.
+    val catalog = view.products.map { it.code }.toSet()
+    val massas = rows.filter { it.productCode.isNotBlank() && (catalog.isEmpty() || it.productCode in catalog) }
+    if (massas.isEmpty()) return null
+
+    data class ProductAccumulator(var name: String, var units: Int, var unitsPerBox: Int)
+    data class WorkerProduct(var name: String, var units: Int, var unitsPerBox: Int)
+    data class WorkerAccumulator(
+        val name: String,
+        var erpOnly: Boolean,
+        val units: LinkedHashMap<String, WorkerProduct>,
+    )
+
+    val products = linkedMapOf<String, ProductAccumulator>()
+    val workers = linkedMapOf<String, WorkerAccumulator>()
+
+    for (row in massas) {
+        val product = products.getOrPut(row.productCode) {
+            ProductAccumulator(row.productName, 0, row.unitsPerBox)
+        }
+        product.units += row.units
+        if (product.unitsPerBox <= 0 && row.unitsPerBox > 0) product.unitsPerBox = row.unitsPerBox
+
+        val worker = workers.getOrPut(row.operatorKey) {
+            WorkerAccumulator(row.operatorName, true, linkedMapOf())
+        }
+        if (row.state != MassasRowState.ERP_ONLY) worker.erpOnly = false
+        val line = worker.units.getOrPut(row.productCode) {
+            WorkerProduct(row.productName, 0, row.unitsPerBox)
+        }
+        line.units += row.units
+    }
+
+    val catalogOrder = view.products.map { it.code }
+    val byCatalog = compareBy<String> { code ->
+        val index = catalogOrder.indexOf(code)
+        if (index < 0) Int.MAX_VALUE else index
+    }
+
+    val lines = mutableListOf<String>()
+    lines.add("*Resumo Coletivo:*")
+    for (code in products.keys.sortedWith(byCatalog)) {
+        val product = products.getValue(code)
+        lines.add(
+            "• ${stripMassasPrefix(product.name)}: ${product.units} un (${boxesForUnits(product.units, product.unitsPerBox)} cx)"
+        )
+    }
+
+    val people = workers.values.sortedWith(compareBy { it.name.lowercase() })
+    if (people.isNotEmpty()) {
+        lines.add("")
+        lines.add("*Por Trabalhador:*")
+        people.forEachIndexed { index, worker ->
+            if (index > 0) lines.add("")
+            // The mark says the worker has no account here: the plant recorded him and Trindade only mirrors it.
+            lines.add("👤 *${worker.name}${if (worker.erpOnly) " (só ERP)" else ""}:*")
+            for (code in worker.units.keys.sortedWith(byCatalog)) {
+                val line = worker.units.getValue(code)
+                lines.add(
+                    "• ${stripMassasPrefix(line.name)}: ${line.units} un (${boxesForUnits(line.units, line.unitsPerBox)} cx)"
+                )
+            }
+        }
+    }
+
+    return lines
 }
 
 private val MASSAS_PREFIX_REGEX = Regex("^MASSA\\s+(?:DE\\s+)?", RegexOption.IGNORE_CASE)

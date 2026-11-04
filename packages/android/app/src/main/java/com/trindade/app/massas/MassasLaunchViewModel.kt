@@ -1232,13 +1232,14 @@ class MassasLaunchViewModel @Inject constructor(
 
     fun getWhatsAppLink(): String? {
         val view = _state.value.dayView ?: return null
-        val message = formatMassasWhatsAppMessage(view)
+        val message = formatMassasWhatsAppMessage(view, _state.value.unifiedRows)
         return waMeLink(_state.value.phone, message)
     }
 
     fun getShareText(): String {
         val view = _state.value.dayView ?: return ""
-        return formatMassasWhatsAppMessage(view)
+        // The whole day, not only what this phone launched: an ERP-only worker and his massas travel too.
+        return formatMassasWhatsAppMessage(view, _state.value.unifiedRows)
     }
 
     fun toggleHelpDialog(show: Boolean) {

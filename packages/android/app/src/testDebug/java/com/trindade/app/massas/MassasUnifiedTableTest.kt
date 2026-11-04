@@ -61,7 +61,7 @@ class MassasUnifiedTableTest {
     }
 
     @Test
-    fun `un asiento que no cierra cajas enteras dice por que no se importa`() {
+    fun `un asiento que no cierra cajas enteras muestra el dato compacto, no la explicacion`() {
         val seat = AeroErpMovement(
             entLan = 35940,
             productCode = "1192",
@@ -76,8 +76,11 @@ class MassasUnifiedTableTest {
         draw(MassasLaunchViewModel.UiState(dayView = day(), aeroMirror = listOf(seat)))
 
         composeRule
-            .onNodeWithText(string(R.string.massas_import_hint_whole_boxes, 15, 10))
+            .onNodeWithText(string(R.string.massas_open_box_compact, 5))
             .assertIsDisplayed()
+        composeRule
+            .onNodeWithText("não fecham caixas inteiras", substring = true)
+            .assertDoesNotExist()
     }
 
     @Test
