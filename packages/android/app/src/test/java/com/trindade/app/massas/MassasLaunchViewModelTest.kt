@@ -563,11 +563,11 @@ class MassasLaunchViewModelTest {
 
     @Test
     fun selectOperator_updatesSelectedOperatorId() {
-        assertNull(viewModel.state.value.selectedOperatorId)
-        viewModel.selectOperator(15)
-        assertEquals(15, viewModel.state.value.selectedOperatorId)
-        viewModel.selectOperator(null)
-        assertNull(viewModel.state.value.selectedOperatorId)
+        assertNull(viewModel.state.value.selectedOperatorKey)
+        viewModel.selectOperatorKey("carlos")
+        assertEquals("carlos", viewModel.state.value.selectedOperatorKey)
+        viewModel.selectOperatorKey(null)
+        assertNull(viewModel.state.value.selectedOperatorKey)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)

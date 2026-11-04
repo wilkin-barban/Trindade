@@ -57,6 +57,8 @@ data class MassasUnifiedRow(
     val ownerStatus: String? = null,
     /** Units in one box for this product, so a row that cannot be imported can say the size it misses. */
     val unitsPerBox: Int = 0,
+    /** Units left in the last, open box; zero when the last box is full or the size is unknown. */
+    val openBoxUnits: Int = 0,
 )
 
 /**
@@ -268,6 +270,7 @@ fun massasUnifiedRows(input: MassasUnifiedInput, operatorFilter: String = ""): L
         if (filter.isNotEmpty() && names.none { it.contains(filter) }) continue
 
         val reconciled = launch.id in matchedLaunchIds
+        val unitsPerBox = productFor(input.products, launch.productCode)?.unitsPerBox ?: 0
         rows.add(
             MassasUnifiedRow(
                 key = "launch-${launch.id}",
@@ -286,7 +289,8 @@ fun massasUnifiedRows(input: MassasUnifiedInput, operatorFilter: String = ""): L
                 importable = false,
                 tabletAcked = !reconciled && launch.id in input.ackedLaunchIds,
                 ownerUserId = launch.userId,
-                unitsPerBox = productFor(input.products, launch.productCode)?.unitsPerBox ?: 0,
+                unitsPerBox = unitsPerBox,
+                openBoxUnits = openUnitsInBox(launch.units, unitsPerBox),
             ),
         )
     }
@@ -299,6 +303,7 @@ fun massasUnifiedRows(input: MassasUnifiedInput, operatorFilter: String = ""): L
         if (filter.isNotEmpty() && !operator.lowercase().contains(filter)) continue
 
         val plan = aeroImportPlan(seat, input.products)
+        val units = seat.quantity.toInt()
         rows.add(
             MassasUnifiedRow(
                 key = "seat-${seat.entLan}",
@@ -307,8 +312,10 @@ fun massasUnifiedRows(input: MassasUnifiedInput, operatorFilter: String = ""): L
                 operatorKey = operator.lowercase(),
                 productCode = product.code,
                 productName = product.name,
-                boxes = if (product.unitsPerBox > 0) (seat.quantity / product.unitsPerBox).toInt() else 0,
-                units = seat.quantity.toInt(),
+                // The boxes are what the plant loads, so they round up; the units stay exactly as the ERP
+                // recorded them, and the row says how many travel in the open box.
+                boxes = boxesForUnits(units, product.unitsPerBox),
+                units = units,
                 launchIds = emptyList(),
                 entLans = listOf(seat.entLan),
                 importable = plan != null,
@@ -316,11 +323,165 @@ fun massasUnifiedRows(input: MassasUnifiedInput, operatorFilter: String = ""): L
                 ownerUserId = seat.ownerUserId,
                 ownerStatus = seat.ownerStatus,
                 unitsPerBox = product.unitsPerBox,
+                openBoxUnits = openUnitsInBox(units, product.unitsPerBox),
             ),
         )
     }
 
     return rows.sortedWith(stateOrder)
+}
+
+
+/**
+ * The boxes a quantity occupies, rounded up: the plant loads a box as soon as it puts one unit in it.
+ *
+ * The web made this a module of its own because the same rounding was written twice with two answers. The
+ * rule is: add the units of a product first, round once afterwards. A rounding per line inflates the day.
+ */
+fun boxesForUnits(units: Int, unitsPerBox: Int): Int {
+    if (units <= 0 || unitsPerBox <= 0) return 0
+    return (units + unitsPerBox - 1) / unitsPerBox
+}
+
+/** The units the last box carries, or zero when it is full. */
+fun openUnitsInBox(units: Int, unitsPerBox: Int): Int {
+    if (units <= 0 || unitsPerBox <= 0) return 0
+    return units % unitsPerBox
+}
+
+/** One worker in the day, with the exact units and the boxes those units occupy. */
+data class MassaUnifiedOperator(
+    /** Lowercased name: the only identity an operator who exists only in the ERP has. */
+    val key: String,
+    val name: String,
+    val boxes: Int,
+    val units: Int,
+)
+
+/** A product's total for the day, rounded once over the units of every row. */
+data class MassaUnifiedProduct(
+    val code: String,
+    val name: String,
+    val unitsPerBox: Int,
+    val totalBoxes: Int,
+    val totalUnits: Int,
+    val openBoxUnits: Int,
+)
+
+/** What one worker did on the day, across products. */
+data class MassaUnifiedWorker(
+    val key: String,
+    val name: String,
+    val boxes: Int,
+    val units: Int,
+    val openBoxUnits: Int,
+)
+
+/** The two lower sections of the day, computed once so they cannot disagree. */
+data class MassaUnifiedSummary(
+    val products: List<MassaUnifiedProduct>,
+    val workers: List<MassaUnifiedWorker>,
+    /** The workers who touched each product, by product code, for the "who made this" line. */
+    val workerNamesByProduct: Map<String, List<String>>,
+)
+
+/**
+ * The workers of the day, read from the rows instead of from the local accounts.
+ *
+ * A seat recorded on the company tablet belongs to a name that may have no account here. Building the filter
+ * from `launches` hid that worker and, with him, his boxes.
+ */
+fun massasUnifiedOperators(rows: List<MassasUnifiedRow>): List<MassaUnifiedOperator> {
+    data class Accumulator(
+        var name: String,
+        val units: LinkedHashMap<String, Int>,
+        val unitsPerBox: MutableMap<String, Int>,
+    )
+
+    val byKey = linkedMapOf<String, Accumulator>()
+    for (row in rows) {
+        val accumulator = byKey.getOrPut(row.operatorKey) {
+            Accumulator(row.operatorName, linkedMapOf(), mutableMapOf())
+        }
+        accumulator.units[row.productCode] = (accumulator.units[row.productCode] ?: 0) + row.units
+        accumulator.unitsPerBox[row.productCode] = row.unitsPerBox
+    }
+
+    return byKey.map { (key, accumulator) ->
+        MassaUnifiedOperator(
+            key = key,
+            name = accumulator.name,
+            // Each product has its own box size, so the worker's boxes are the sum of the products' boxes.
+            boxes = accumulator.units.entries.sumOf { (code, units) ->
+                boxesForUnits(units, accumulator.unitsPerBox[code] ?: 0)
+            },
+            units = accumulator.units.values.sum(),
+        )
+    }.sortedWith(compareBy({ it.name.lowercase() }, { it.key }))
+}
+
+/**
+ * The collective summary of what is on screen.
+ *
+ * The defect this closes: four products with remainders showed four open boxes per row, and the day looked
+ * like it had more boxes than the plant loaded. Units are added, rounding happens once per product.
+ */
+fun massasUnifiedSummary(rows: List<MassasUnifiedRow>): MassaUnifiedSummary {
+    data class ProductAccumulator(var name: String, var unitsPerBox: Int, var totalUnits: Int)
+    data class WorkerAccumulator(
+        var name: String,
+        val units: LinkedHashMap<String, Int>,
+        val unitsPerBox: MutableMap<String, Int>,
+    )
+
+    val products = linkedMapOf<String, ProductAccumulator>()
+    val workers = linkedMapOf<String, WorkerAccumulator>()
+    val namesByProduct = linkedMapOf<String, LinkedHashSet<String>>()
+
+    for (row in rows) {
+        val product = products.getOrPut(row.productCode) {
+            ProductAccumulator(row.productName, row.unitsPerBox, 0)
+        }
+        product.totalUnits += row.units
+        if (product.unitsPerBox <= 0 && row.unitsPerBox > 0) product.unitsPerBox = row.unitsPerBox
+
+        val worker = workers.getOrPut(row.operatorKey) {
+            WorkerAccumulator(row.operatorName, linkedMapOf(), mutableMapOf())
+        }
+        worker.units[row.productCode] = (worker.units[row.productCode] ?: 0) + row.units
+        worker.unitsPerBox[row.productCode] = row.unitsPerBox
+
+        namesByProduct.getOrPut(row.productCode) { linkedSetOf() }.add(row.operatorName)
+    }
+
+    return MassaUnifiedSummary(
+        products = products.map { (code, product) ->
+            MassaUnifiedProduct(
+                code = code,
+                name = product.name,
+                unitsPerBox = product.unitsPerBox,
+                totalBoxes = boxesForUnits(product.totalUnits, product.unitsPerBox),
+                totalUnits = product.totalUnits,
+                openBoxUnits = openUnitsInBox(product.totalUnits, product.unitsPerBox),
+            )
+        },
+        workers = workers.map { (key, worker) ->
+            MassaUnifiedWorker(
+                key = key,
+                name = worker.name,
+                boxes = worker.units.entries.sumOf { (code, units) ->
+                    boxesForUnits(units, worker.unitsPerBox[code] ?: 0)
+                },
+                units = worker.units.values.sum(),
+                openBoxUnits = worker.units.entries.sumOf { (code, units) ->
+                    openUnitsInBox(units, worker.unitsPerBox[code] ?: 0)
+                },
+            )
+        }.sortedWith(compareBy({ it.name.lowercase() }, { it.key })),
+        workerNamesByProduct = namesByProduct.mapValues { (_, names) ->
+            names.sortedWith(compareBy { it.lowercase() })
+        },
+    )
 }
 
 /** Pending first: it is the only state that asks for an action here. */

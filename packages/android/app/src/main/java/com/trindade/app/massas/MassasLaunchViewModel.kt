@@ -102,7 +102,13 @@ class MassasLaunchViewModel @Inject constructor(
         val confirmItems: List<MassaConfirmItem> = emptyList(),
         val resultDialogMessage: UiText? = null,
         val resultDialogIsSuccess: Boolean = false,
-        val selectedOperatorId: Int? = null,
+        /**
+         * The worker the lower sections are filtered by, as the normalised name.
+         *
+         * A name and not an account: the operator who typed on the company tablet has no `user_id` here, and
+         * filtering by id would hide his boxes from both sections.
+         */
+        val selectedOperatorKey: String? = null,
         val isReadOnly: Boolean = false,
         /** The integration as this device holds it; blank credentials mean "not configured yet". */
         val aeroSettings: AeroSettings = AeroSettings(),
@@ -357,8 +363,8 @@ class MassasLaunchViewModel @Inject constructor(
             ?: UiText.of(fallbackRes, result.statusCode)
     }
 
-    fun selectOperator(operatorId: Int?) {
-        _state.value = _state.value.copy(selectedOperatorId = operatorId)
+    fun selectOperatorKey(operatorKey: String?) {
+        _state.value = _state.value.copy(selectedOperatorKey = operatorKey)
     }
 
     /**

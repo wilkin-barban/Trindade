@@ -386,8 +386,14 @@ fun MassasLaunchScreen(
                     color = MaterialTheme.colorScheme.onSurface,
                 )
 
-                val launches = state.dayView?.launches ?: emptyList()
-                val operators = remember(launches) { extractOperators(launches) }
+                // The sections read the unified day, not the local launches: a seat that only the tablet
+                // recorded has a worker, boxes and a place here, and the filter has to offer him.
+                val rows = state.unifiedRows
+                val operators = remember(rows) { massasUnifiedOperators(rows) }
+                val selectedKey = state.selectedOperatorKey
+                val displayedRows = remember(rows, selectedKey) {
+                    rows.filter { selectedKey == null || it.operatorKey == selectedKey }
+                }
 
                 // 1. Chips de filtro por operador no topo
                 if (operators.isNotEmpty()) {
@@ -398,51 +404,46 @@ fun MassasLaunchScreen(
                                 .horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
-                            val isAllSelected = state.selectedOperatorId == null
                             MassasFilterChip(
-                                selected = isAllSelected,
-                                onClick = { viewModel.selectOperator(null) },
+                                selected = selectedKey == null,
+                                onClick = { viewModel.selectOperatorKey(null) },
                                 label = stringResource(R.string.massas_all_workers),
                             )
 
                             operators.forEach { op ->
-                                val isSelected = state.selectedOperatorId == op.id
                                 MassasFilterChip(
-                                    selected = isSelected,
-                                    onClick = { viewModel.selectOperator(op.id) },
+                                    selected = selectedKey == op.key,
+                                    onClick = { viewModel.selectOperatorKey(op.key) },
                                     label = "👤 ${op.name}",
                                 )
                             }
                         }
 
-                        // 2. Subtotal do operador selecionado
-                        if (state.selectedOperatorId != null) {
-                            val subtotal = calculateOperatorSubtotal(launches, state.selectedOperatorId)
-                            val opName = operators.find { it.id == state.selectedOperatorId }?.name ?: ""
-                            if (subtotal != null) {
-                                Card(
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                                    modifier = Modifier.fillMaxWidth(),
+                        // 2. Subtotal do operador selecionado: as caixas de cada produto, as unidades exatas.
+                        val worker = operators.firstOrNull { it.key == selectedKey }
+                        if (worker != null) {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
-                                        Text(
-                                            text = stringResource(R.string.massas_worker_subtotal, opName),
-                                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                        Text(
-                                            text = "${subtotal.first} cx (${subtotal.second} un)",
-                                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.ExtraBold),
-                                            color = MaterialTheme.colorScheme.primary,
-                                        )
-                                    }
+                                    Text(
+                                        text = stringResource(R.string.massas_worker_subtotal, worker.name),
+                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    Text(
+                                        text = "${worker.boxes} cx (${worker.units} un)",
+                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.ExtraBold),
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
                                 }
                             }
                         }
@@ -450,22 +451,15 @@ fun MassasLaunchScreen(
                 }
 
                 // 3. Lista de lançamentos individuais (máxima prioridade visual)
-                val displayedLaunches = filterLaunchesByOperator(launches, state.selectedOperatorId)
-
-                if (displayedLaunches.isEmpty()) {
+                if (displayedRows.isEmpty()) {
                     Text(
                         text = stringResource(R.string.massas_no_launches_today),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 } else {
-                    // Lo que el ERP ya asentó no se edita ni se borra: la fila lo dice en lugar de ofrecer los
-                    // botones deshabilitados, porque un botón apagado sin motivo se lee como un error de la app.
-                    val settledIds = reconciledLaunchIds(state.unifiedRows)
-
-                    displayedLaunches.forEach { launch ->
-                        val reconciled = launch.id in settledIds
-                        val canEdit = viewModel.canEdit(launch)
+                    displayedRows.forEach { row ->
+                        val launch = state.dayView?.launches?.firstOrNull { it.id in row.launchIds }
 
                         Card(
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
@@ -483,13 +477,22 @@ fun MassasLaunchScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     Text(
-                                        text = launch.productName,
+                                        text = row.productName,
                                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                                     )
                                     Text(
-                                        text = "${launch.boxes} cx (${launch.units} un)",
+                                        text = "${row.boxes} cx (${row.units} un)",
                                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                                         color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+
+                                // A caixa aberta só se explica quando existe uma: a nota sem resto mentiria.
+                                if (row.openBoxUnits > 0) {
+                                    Text(
+                                        text = stringResource(R.string.massas_open_box_note),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.tertiary,
                                     )
                                 }
 
@@ -498,20 +501,27 @@ fun MassasLaunchScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    val operatorName = launch.displayName.ifBlank { launch.username }
                                     Text(
-                                        text = stringResource(R.string.massas_by_operator, operatorName),
+                                        text = stringResource(R.string.massas_by_operator, row.operatorName),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
 
-                                    if (reconciled) {
+                                    if (launch == null) {
+                                        // La tableta lo registró y nadie acá lo lanzó: se lee, no se edita.
+                                        // La tarjeta unificada de arriba tiene la acción que le corresponde.
+                                        Text(
+                                            text = stringResource(R.string.massas_erp_only_read_only),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    } else if (row.state == MassasRowState.RECONCILED) {
                                         Text(
                                             text = stringResource(R.string.massas_state_reconciled),
                                             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
                                             color = MaterialTheme.colorScheme.primary,
                                         )
-                                    } else if (canEdit) {
+                                    } else if (viewModel.canEdit(launch)) {
                                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                             TextButton(
                                                 onClick = { viewModel.startEdit(launch) },
@@ -536,7 +546,6 @@ fun MassasLaunchScreen(
                         }
                     }
                 }
-
             }
         }
 
@@ -557,12 +566,15 @@ fun MassasLaunchScreen(
                     color = MaterialTheme.colorScheme.onSurface,
                 )
 
-                val catalog = state.dayView?.products ?: emptyList()
-                val allLaunches = state.dayView?.launches ?: emptyList()
-                val visibleLaunches = filterLaunchesByOperator(allLaunches, state.selectedOperatorId)
-                val collectiveProducts = remember(visibleLaunches, catalog) {
-                    groupProductsFromLaunches(visibleLaunches, catalog)
+                // Una sola redondeada por producto: las unidades de todas las filas se suman antes de contar
+                // las cajas, y el resumen no puede decir más cajas que las que se cargaron.
+                val rows = state.unifiedRows
+                val selectedKey = state.selectedOperatorKey
+                val visibleSummary = remember(rows, selectedKey) {
+                    massasUnifiedSummary(rows.filter { selectedKey == null || it.operatorKey == selectedKey })
                 }
+                val collectiveProducts = visibleSummary.products
+                val worker = visibleSummary.workers.firstOrNull { it.key == selectedKey }
 
                 if (collectiveProducts.isEmpty()) {
                     Text(
@@ -572,7 +584,7 @@ fun MassasLaunchScreen(
                     )
                 } else {
                     collectiveProducts.forEach { product ->
-                        val workerNames = productWorkerNames(visibleLaunches, product.code)
+                        val workerNames = visibleSummary.workerNamesByProduct[product.code].orEmpty()
 
                         Card(
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
@@ -626,6 +638,25 @@ fun MassasLaunchScreen(
                                             )
                                         }
                                     }
+                                }
+
+                                // El subtotal por trabajador y la nota del resumen dicen lo mismo en las dos
+                                // pantallas, porque salen del mismo cálculo.
+                                if (worker != null) {
+                                    Text(
+                                        text = stringResource(R.string.massas_worker_subtotal, worker.name) +
+                                            " ${worker.boxes} cx (${worker.units} un)",
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+
+                                if (product.openBoxUnits > 0) {
+                                    Text(
+                                        text = stringResource(R.string.massas_open_box_note),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.tertiary,
+                                    )
                                 }
 
                                 if (workerNames.isNotEmpty()) {

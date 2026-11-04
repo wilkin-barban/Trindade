@@ -190,6 +190,15 @@ private fun UnifiedRow(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                // The number alone could read as closed boxes; the note says the last one is open, and only
+                // when there is a remainder to explain.
+                if (row.openBoxUnits > 0) {
+                    Text(
+                        text = stringResource(R.string.massas_open_box_note),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.tertiary,
+                    )
+                }
             }
         }
 
