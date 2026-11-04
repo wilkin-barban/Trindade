@@ -946,6 +946,8 @@
     <string name="massas_state_reconciled">Conciliado</string>
     <string name="massas_state_pending">Pendiente</string>
     <string name="massas_state_erp_only">Sólo ERP</string>
+    <string name="massas_open_box_note">incluye 1 caja abierta</string>
+    <string name="massas_erp_only_read_only">Solo lectura (ERP)</string>
     <string name="massas_action_send">Enviar</string>
     <string name="massas_action_on_tablet">Ya en la tablet</string>
     <string name="massas_action_undo_on_tablet">Deshacer</string>

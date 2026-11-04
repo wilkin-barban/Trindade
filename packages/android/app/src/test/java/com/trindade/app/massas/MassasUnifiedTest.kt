@@ -144,7 +144,10 @@ class MassasUnifiedTest {
         assertEquals(2, whole.boxes)
         assertEquals(listOf(901), whole.entLans)
         assertFalse(fraction.importable)
-        assertEquals(2, fraction.boxes)
+        // 30 units of a 12-unit box need three boxes, the last one carrying six: the partial seat occupies
+        // what the plant really loads, and it still cannot be imported.
+        assertEquals(3, fraction.boxes)
+        assertEquals(6, fraction.openBoxUnits)
         // Whole boxes are what an import sends, so the panel can post it without asking anything else.
         assertEquals(AeroImportPlan(productCode = "1192", boxes = 2), aeroImportPlan(seat(901), products))
     }
@@ -420,5 +423,117 @@ class MassasUnifiedTest {
             ),
         )
         assertEquals(1, rows.single().ownerUserId)
+    }
+
+    // --- Cajas con decimales: una sola vez por producto, nunca una por fila ---
+
+    private val quadrada = AeroImportProduct(code = "1045", name = "MASSA QUADRADA", unitsPerBox = 15)
+
+    @Test
+    fun `a partial seat keeps every unit and says how many are in the open box`() {
+        // 182 units of a 15-unit box are 13 boxes and a last one with 2. The row shows all three numbers
+        // because the operator has to load 13 closed boxes and one open one, and the ERP never recorded 195.
+        val rows = massasUnifiedRows(
+            MassasUnifiedInput(
+                launches = emptyList(),
+                movements = listOf(seat(entLan = 950, productCode = "1045", quantity = 182.0)),
+                products = products + quadrada,
+            ),
+        )
+
+        val row = rows.single()
+        assertEquals(13, row.boxes)
+        assertEquals(182, row.units)
+        assertEquals(2, row.openBoxUnits)
+        assertFalse("A partial seat is not importable", row.importable)
+    }
+
+    @Test
+    fun `a whole seat has no open box and keeps offering the import`() {
+        val rows = massasUnifiedRows(
+            MassasUnifiedInput(
+                launches = emptyList(),
+                movements = listOf(seat(entLan = 951, quantity = 24.0)),
+                products = products,
+            ),
+        )
+
+        val row = rows.single()
+        assertEquals(2, row.boxes)
+        assertEquals(0, row.openBoxUnits)
+        assertTrue(row.importable)
+    }
+
+    @Test
+    fun `two rows of the same product round once, so the day is thirteen boxes and not fourteen`() {
+        // The defect: the local launch rounded its line and the seat rounded its own, and the plant loaded one
+        // box that does not exist. Units are added first, boxes are counted after.
+        val rows = massasUnifiedRows(
+            MassasUnifiedInput(
+                launches = listOf(launch(id = 70, productCode = "1045", boxes = 7, units = 100)),
+                movements = listOf(seat(entLan = 952, productCode = "1045", quantity = 82.0, operatorName = "WILKIN")),
+                products = products + quadrada,
+            ),
+        )
+
+        val summary = massasUnifiedSummary(rows)
+        val product = summary.products.single { it.code == "1045" }
+        assertEquals(182, product.totalUnits)
+        assertEquals(13, product.totalBoxes)
+        assertEquals(2, product.openBoxUnits)
+    }
+
+    @Test
+    fun `the operator filter offers a worker who only exists in the ERP`() {
+        // Nobody here launched for Victor: his boxes arrived through the tablet. A filter built from local
+        // accounts cannot see him, and his 182 units then disappear from both sections.
+        val rows = massasUnifiedRows(
+            MassasUnifiedInput(
+                launches = emptyList(),
+                movements = listOf(seat(entLan = 953, productCode = "1045", quantity = 182.0, operatorName = "VICTOR MARQUES")),
+                products = products + quadrada,
+            ),
+        )
+
+        val operator = massasUnifiedOperators(rows).single()
+        assertEquals("victor marques", operator.key)
+        assertEquals("VICTOR MARQUES", operator.name)
+        assertEquals(13, operator.boxes)
+        assertEquals(182, operator.units)
+    }
+
+    @Test
+    fun `a worker subtotal adds the boxes of each product and keeps the exact units`() {
+        // Each product has its own box, so the boxes are added; the units are not rounded anywhere.
+        val rows = massasUnifiedRows(
+            MassasUnifiedInput(
+                launches = listOf(launch(id = 71, productCode = "1045", boxes = 7, units = 100)),
+                movements = listOf(
+                    seat(entLan = 954, productCode = "1045", quantity = 82.0),
+                    seat(entLan = 955, productCode = "1192", quantity = 30.0),
+                ),
+                products = products + quadrada,
+            ),
+        )
+
+        val summary = massasUnifiedSummary(rows)
+        val worker = summary.workers.single { it.key == "jefferson" }
+        // 182 units of 15 = 13 boxes; 30 units of 12 = 3 boxes (the last one carries 6).
+        assertEquals(16, worker.boxes)
+        assertEquals(212, worker.units)
+        assertEquals(8, worker.openBoxUnits)
+    }
+
+    @Test
+    fun `a worker who shares a name with a launch is one row in the filter`() {
+        val rows = massasUnifiedRows(
+            MassasUnifiedInput(
+                launches = listOf(launch(id = 72, username = "VICTOR", displayName = "Victor")),
+                movements = listOf(seat(entLan = 956, operatorName = "VICTOR")),
+                products = products,
+            ),
+        )
+
+        assertEquals(1, massasUnifiedOperators(rows).size)
     }
 }
