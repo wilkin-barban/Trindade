@@ -251,6 +251,10 @@ class AeroDispatcherTest {
 
         val line = recorder.logs.single()
         assertEquals(AeroAudit.Event.IMPORT, line.event)
+        // An import is an outcome, not a placeholder: it is written once, after the backend answered, so
+        // its phase is the same `result` the web writes for the same event. `response` is the old spelling
+        // the server still accepts, and a reader filtering by phase would put this line in the wrong half.
+        assertEquals("result", line.phase)
         assertEquals("/api/massas-launch", line.destinationUrl)
         assertEquals(null, line.error)
         assertEquals("android", line.client)
@@ -347,12 +351,35 @@ class AeroDispatcherTest {
     }
 
     @Test
-    fun `a backend that refuses the snapshot is reported as a failure, not as a sync`() = runTest {
+    fun `a backend that never answers is reported as unreachable, not as a refusal`() = runTest {
         val recorder = Recorder()
 
+        // The day was read from the plant and lost on the way home. Saying "refused" here would send the
+        // operator to look at the plant or at the day, when the only thing that failed was Trindade's own
+        // server: the plant never said anything about this read.
         val outcome = dispatcher(recorder, saved = null).syncDay(settings, "2026-10-30")
 
-        assertEquals(AeroSyncOutcome.Failed(AeroFailure(AeroFailureCode.SNAPSHOT_REFUSED)), outcome)
+        val failure = (outcome as AeroSyncOutcome.Failed).failure
+        assertEquals(AeroFailureCode.SNAPSHOT_BACKEND_UNREACHABLE, failure.code)
+        assertEquals(true, failure.retryable)
+        assertEquals("AERO_SNAPSHOT_BACKEND_UNREACHABLE", failure.code.auditCode)
+        assertEquals("AERO_SNAPSHOT_BACKEND_UNREACHABLE", recorder.logs.last().error)
+    }
+
+    @Test
+    fun `a backend that answers a refusal still reports the snapshot as refused`() = runTest {
+        val recorder = Recorder()
+
+        val outcome = dispatcher(
+            recorder,
+            refusal = AeroSnapshotSave.Refused(status = 500, code = "SNAPSHOT_WRITE_FAILED"),
+        ).syncDay(settings, "2026-10-30")
+
+        val failure = (outcome as AeroSyncOutcome.Failed).failure
+        assertEquals(AeroFailureCode.SNAPSHOT_REFUSED, failure.code)
+        assertEquals(500, failure.serverStatus)
+        assertEquals("SNAPSHOT_WRITE_FAILED", failure.serverCode)
+        assertEquals("SNAPSHOT_WRITE_FAILED", recorder.logs.last().error)
     }
 }
 

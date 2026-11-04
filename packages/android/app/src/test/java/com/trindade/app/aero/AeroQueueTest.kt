@@ -92,6 +92,50 @@ class AeroQueueTest {
         assertNull(readAeroQueue(null))
     }
 
+    /**
+     * Una cola vencida no es lo mismo que no tener nada pendiente.
+     *
+     * El store la borraba y devolvía null, que el teléfono leía como "no hay trabajo": la caja que la planta
+     * nunca vio desaparecía del registro y del log a la vez. La lectura tiene que decir qué se descartó y por
+     * qué, con los lanzamientos que se pierden, para que quede una línea.
+     */
+    @Test
+    fun `una cola vencida se descarta diciendo qué llevaba`() {
+        val now = 1_700_000_000_000L
+        val queue = AeroQueue(createdAt = now, date = "2026-02-10", items = listOf(item(7), item(8, "001046")))
+
+        val read = readAeroQueueResult(encodeAeroQueue(queue), now + AERO_QUEUE_TTL_MS + 60_000)
+
+        val rejected = read as AeroQueueRead.Rejected
+        assertEquals(AeroQueueRejection.EXPIRED, rejected.reason)
+        assertEquals("2026-02-10", rejected.date)
+        assertEquals(listOf(7, 8), rejected.items.flatMap { it.launchIds })
+    }
+
+    @Test
+    fun `un texto que no es una cola se descarta como malformado, no como vacío`() {
+        val malformed = readAeroQueueResult("no es json", 1_700_000_000_000L)
+
+        assertEquals(AeroQueueRejection.MALFORMED, (malformed as AeroQueueRead.Rejected).reason)
+        assertTrue(malformed.items.isEmpty())
+    }
+
+    @Test
+    fun `una cola fresca se entrega como pendiente`() {
+        val now = 1_700_000_000_000L
+        val queue = AeroQueue(createdAt = now, date = "2026-02-10", items = listOf(item()))
+
+        val read = readAeroQueueResult(encodeAeroQueue(queue), now + 60_000)
+
+        assertEquals(queue, (read as AeroQueueRead.Pending).queue)
+    }
+
+    @Test
+    fun `sin nada guardado no hay rechazo que registrar`() {
+        assertEquals(AeroQueueRead.Empty, readAeroQueueResult(null, 1_700_000_000_000L))
+        assertEquals(AeroQueueRead.Empty, readAeroQueueResult("", 1_700_000_000_000L))
+    }
+
     @Test
     fun `un lote viaja de a ocho y el resto queda esperando`() {
         val now = 1_700_000_000_000L

@@ -993,6 +993,7 @@
     <string name="aero_failure_no_answer">Sem resposta do ERP. Verifique a rede e tente de novo.</string>
     <string name="aero_failure_erp_refused">O ERP recusou: %1$s</string>
     <string name="aero_failure_snapshot_refused">O ERP respondeu, mas o servidor não guardou o dia. Tente de novo.</string>
+    <string name="aero_failure_snapshot_backend_unreachable">O ERP respondeu, mas não conseguimos chegar ao servidor para guardar o dia. Verifique a conexão e tente de novo.</string>
     <string name="aero_failure_day_closed">O dia já foi fechado e não aceita sincronização. Reabra o dia para enviar de novo.</string>
     <string name="admin_integration_probe_ok">Conectado ao ERP: %1$s.</string>
     <string name="admin_integration_probe_refused">O ERP recusou o usuário ou a senha.</string>

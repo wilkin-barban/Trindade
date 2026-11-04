@@ -5,6 +5,10 @@ import com.trindade.app.R
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trindade.app.aero.AERO_CLOSED_DAY_CODE
+import com.trindade.app.aero.AERO_QUEUE_EXPIRED_CODE
+import com.trindade.app.aero.AERO_QUEUE_MALFORMED_CODE
+import com.trindade.app.aero.AeroQueueRead
+import com.trindade.app.aero.AeroQueueRejection
 import com.trindade.app.aero.AeroDispatchOutcome
 import com.trindade.app.aero.AeroFailure
 import com.trindade.app.aero.AeroDispatchRequest
@@ -43,6 +47,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 data class MassaConfirmItem(
     val productCode: String,
@@ -155,6 +161,24 @@ class MassasLaunchViewModel @Inject constructor(
      * tiene un botón esperando. Este sólo impide que dos lecturas se pisen; el indicador queda para la prensa.
      */
     private var readInFlight = false
+
+    /**
+     * La única salida al ERP, de a una.
+     *
+     * El lote, el reintento de una fila y el drenaje de la cola escriben la misma cola persistida: leerla en
+     * dos corrutinas y escribir cada una su copia deja el trabajo de la primera borrado por la segunda, y el
+     * mismo `launchId` puede viajar dos veces. El mutex cubre la lectura de la cola, el despacho y su
+     * escritura, que es la unidad que tiene que ser atómica.
+     */
+    private val erpDispatchMutex = Mutex()
+
+    /**
+     * Asientos que esta sesión ya entregó al ERP.
+     *
+     * El espejo tarda en reflejarlos, y en esa ventana la fila todavía se dibuja pendiente: sin esta marca, un
+     * segundo toque reenviaría lo que el primero acaba de mandar.
+     */
+    private val dispatchedLaunchIds = mutableSetOf<Int>()
 
     init {
         loadCurrentUser()
@@ -398,13 +422,18 @@ class MassasLaunchViewModel @Inject constructor(
             when (val result = repository.createLaunch(state.value.date, apiItems)) {
                 is MassasWriteResult.Saved -> {
                     _state.value = _state.value.copy(
-                        isSubmitting = false,
                         dayView = result.view,
                         quantities = emptyMap(),
                         resultDialogMessage = UiText.of(R.string.massas_success),
                         resultDialogIsSuccess = true,
                     )
-                    dispatchToErp(result.created, items)
+                    // El estado dura hasta que el lote termina de viajar: liberarlo con la escritura local
+                    // hecha dejaba la pantalla aceptando un segundo toque con las mismas cajas en vuelo.
+                    try {
+                        erpDispatchMutex.withLock { dispatchToErp(result.created, items) }
+                    } finally {
+                        _state.value = _state.value.copy(isSubmitting = false)
+                    }
                 }
                 is MassasWriteResult.Refused -> {
                     _state.value = _state.value.copy(
@@ -479,6 +508,7 @@ class MassasLaunchViewModel @Inject constructor(
             when (val outcome = aeroDispatcher.dispatch(settings, request)) {
                 is AeroDispatchOutcome.Sent -> {
                     sent++
+                    dispatchedLaunchIds += request.launchId
                     queueSnapshot = queueSnapshot.settle(listOf(request.launchId))
                     aeroQueueStore.write(queueSnapshot)
                 }
@@ -641,42 +671,82 @@ class MassasLaunchViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            _state.value = _state.value.copy(noticeMessage = null, errorMessage = null)
-            val request = AeroDispatchRequest(
-                launchId = launch.id,
-                productCode = launch.productCode,
-                productName = row.productName,
-                units = row.units.toDouble(),
-                date = state.value.date,
-                // The row carries who the launch belongs to; the launch answers it when the owner is a
-                // resolved account. Either way `ENT_USU` names the operator and not the phone's user.
-                operatorName = row.operatorName.ifBlank { launch.displayName.ifBlank { launch.username } },
-            )
-            // El reintento de una fila pasa por la misma cola que el lote: si se cae la conexión a mitad del
-            // viaje, el pendiente ya está guardado y la próxima apertura del día lo vuelve a intentar.
-            var queue = aeroQueueStore.read()
-                ?: AeroQueue(createdAt = System.currentTimeMillis(), date = request.date)
-            queue = queue.enqueue(queueItemFor(request))
-            aeroQueueStore.write(queue)
-
-            when (val outcome = aeroDispatcher.dispatch(settings, request)) {
-                is AeroDispatchOutcome.Sent -> {
-                    aeroQueueStore.write(queue.settle(listOf(request.launchId)))
-                    // El asiento recién enviado se busca en el mismo viaje que el lote: una lectura, y la
-                    // fila deja de estar pendiente sin que el operario toque «Sincronizar con ERP».
-                    val failure = readAeroDayAfterLaunch(state.value.date)
-                    _state.value = _state.value.copy(
-                        noticeMessage = failure?.describe() ?: UiText.of(R.string.massas_aero_sent),
-                    )
-                }
-                is AeroDispatchOutcome.Failed ->
-                    _state.value = _state.value.copy(errorMessage = outcome.failure.describe())
-            }
-            refreshQueuedCount()
+            erpDispatchMutex.withLock { sendPendingRow(row, launch, settings) }
         }
     }
 
+    /**
+     * El viaje de una fila pendiente, ya dentro del turno de salida.
+     *
+     * Separado para que el mutex cubra el viaje completo sin envolver el cuerpo en un bloque: la cola se
+     * lee, se encola el pendiente, se despacha y se liquida como una sola operación.
+     */
+    private suspend fun sendPendingRow(
+        row: MassasUnifiedRow,
+        launch: MassaIndividualLaunch,
+        settings: AeroSettings,
+    ) {
+        _state.value = _state.value.copy(noticeMessage = null, errorMessage = null)
+        // La fila se revalida dentro del turno: entre el toque y este punto pudo terminar el envío que
+        // estaba en vuelo, y repetirlo es exactamente la caja duplicada que esta salida serializada evita.
+        if (launch.id in settledLaunchIds()) {
+            _state.value = _state.value.copy(errorMessage = UiText.of(R.string.massas_error_reconciled))
+            return
+        }
+        val request = AeroDispatchRequest(
+            launchId = launch.id,
+            productCode = launch.productCode,
+            productName = row.productName,
+            units = row.units.toDouble(),
+            date = state.value.date,
+            // The row carries who the launch belongs to; the launch answers it when the owner is a
+            // resolved account. Either way `ENT_USU` names the operator and not the phone's user.
+            operatorName = row.operatorName.ifBlank { launch.displayName.ifBlank { launch.username } },
+        )
+        // El reintento de una fila pasa por la misma cola que el lote: si se cae la conexión a mitad del
+        // viaje, el pendiente ya está guardado y la próxima apertura del día lo vuelve a intentar.
+        var queue = aeroQueueStore.read()
+            ?: AeroQueue(createdAt = System.currentTimeMillis(), date = request.date)
+        queue = queue.enqueue(queueItemFor(request))
+        aeroQueueStore.write(queue)
+
+        when (val outcome = aeroDispatcher.dispatch(settings, request)) {
+            is AeroDispatchOutcome.Sent -> {
+                dispatchedLaunchIds += request.launchId
+                aeroQueueStore.write(queue.settle(listOf(request.launchId)))
+                // El asiento recién enviado se busca en el mismo viaje que el lote: una lectura, y la
+                // fila deja de estar pendiente sin que el operario toque «Sincronizar con ERP».
+                val failure = readAeroDayAfterLaunch(state.value.date)
+                _state.value = _state.value.copy(
+                    noticeMessage = failure?.describe() ?: UiText.of(R.string.massas_aero_sent),
+                )
+            }
+            is AeroDispatchOutcome.Failed ->
+                _state.value = _state.value.copy(errorMessage = outcome.failure.describe())
+        }
+        refreshQueuedCount()
+    }
+
     // ---- La cola de lo que la planta todavía no tiene (T23) ----
+
+    /**
+     * Deja en el registro la cola que se descartó, con el motivo y los asientos que llevaba.
+     *
+     * El evento es `queue_rejected`, el mismo que el día cerrado usa: quien diagnostica filtra por evento y
+     * lee el código para saber si fue un día que ya pasó, una cola vencida o un blob que este build no pudo
+     * leer. Sin esta línea, el teléfono olvidaba trabajo y nadie podía enterarse.
+     */
+    private suspend fun logRejectedQueue(read: AeroQueueRead.Rejected) {
+        val code = when (read.reason) {
+            AeroQueueRejection.EXPIRED -> AERO_QUEUE_EXPIRED_CODE
+            AeroQueueRejection.MALFORMED -> AERO_QUEUE_MALFORMED_CODE
+        }
+        aeroDispatcher.logQueueRejected(
+            date = read.date ?: state.value.date,
+            launchIds = read.items.flatMap { it.launchIds },
+            code = code,
+        )
+    }
 
     /**
      * El pendiente de un envío, con la forma con la que se guarda.
@@ -703,9 +773,27 @@ class MassasLaunchViewModel @Inject constructor(
      * reintenta sola en cada apertura sería una alarma que el operario no puede apagar.
      */
     private suspend fun flushPendingQueue() {
+        // La cola comparte archivo con el lote y con el reintento de una fila: drenarla fuera del mutex
+        // reenviaba lo que el lote tenía en vuelo y escribía encima de su liquidación.
+        erpDispatchMutex.withLock { drainQueueLocked() }
+    }
+
+    /** El drenaje, ya dentro del turno de salida: se lee la cola, se despacha y se escribe como una unidad. */
+    private suspend fun drainQueueLocked() {
         val settings = state.value.aeroSettings
         if (!settings.ready) return
-        val stored = aeroQueueStore.read() ?: return
+        // La cola se lee diciendo qué pasó con ella: una vencida o rota se descarta, pero deja su línea con
+        // los lanzamientos que se pierden. Antes el store la borraba y devolvía null, que se leía como "no hay
+        // nada pendiente" y mandaba la caja que la planta nunca vio al olvido sin rastro.
+        val stored = when (val read = aeroQueueStore.readResult()) {
+            is AeroQueueRead.Pending -> read.queue
+            is AeroQueueRead.Rejected -> {
+                logRejectedQueue(read)
+                refreshQueuedCount()
+                return
+            }
+            AeroQueueRead.Empty -> return
+        }
         val today = saopauloToday()
 
         // Lo que la planta ya registró no se vuelve a mandar, y la única forma de saberlo es leer el día
@@ -748,6 +836,7 @@ class MassasLaunchViewModel @Inject constructor(
                 when (aeroDispatcher.dispatch(settings, request)) {
                     is AeroDispatchOutcome.Sent -> {
                         sent++
+                        dispatchedLaunchIds += item.launchIds
                         queue = queue.settle(item.launchIds)
                     }
                     // El motivo no se guarda: lo que la cola conserva es el trabajo, no el diagnóstico. La
@@ -1000,7 +1089,8 @@ class MassasLaunchViewModel @Inject constructor(
     }
 
     /** Los lanzamientos que el ERP ya asentó, tal como los ve la tabla del día. */
-    private fun settledLaunchIds(): Set<Int> = reconciledLaunchIds(state.value.unifiedRows)
+    private fun settledLaunchIds(): Set<Int> =
+        reconciledLaunchIds(state.value.unifiedRows) + dispatchedLaunchIds
 
     /**
      * Reads how much work the queue is holding.
