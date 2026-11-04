@@ -15,7 +15,6 @@ import com.trindade.app.contract.models.RefreshResponse
 import com.trindade.app.contract.models.RegisterRequest
 import com.trindade.app.contract.models.RegisterResponse
 import com.trindade.app.contract.models.SetupStatusResponse
-import com.trindade.app.contract.models.SuccessResponse
 import com.trindade.app.contract.models.UpdateProfileRequest
 import com.trindade.app.network.AuditApi
 import com.trindade.app.network.AuthApi
@@ -609,10 +608,10 @@ private class FakeAuthApi(var role: String? = AuditViewModel.ADMIN) : AuthApi {
 
     override suspend fun login(body: LoginRequest): Response<LoginResponse> = error("unused")
     override suspend fun refresh(body: RefreshRequest): Response<RefreshResponse> = error("unused")
-    override suspend fun logout(body: LogoutRequest): Response<SuccessResponse> = error("unused")
+    override suspend fun logout(body: LogoutRequest): Response<Unit> = error("unused")
     override suspend fun me(): Response<ProfileResponse> = profile()
     override suspend fun updateProfile(body: UpdateProfileRequest): Response<ProfileResponse> = error("unused")
-    override suspend fun changePassword(body: ChangePasswordRequest): Response<SuccessResponse> = error("unused")
+    override suspend fun changePassword(body: ChangePasswordRequest): Response<Unit> = error("unused")
     override suspend fun setupStatus(): Response<SetupStatusResponse> = error("unused")
     override suspend fun register(body: RegisterRequest): Response<RegisterResponse> = error("unused")
 }

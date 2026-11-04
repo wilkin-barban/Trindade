@@ -306,11 +306,11 @@ class RegisterViewModelTest {
         }
         override suspend fun login(body: LoginRequest): Response<LoginResponse> = error("unused")
         override suspend fun refresh(body: RefreshRequest): Response<RefreshResponse> = error("unused")
-        override suspend fun logout(body: LogoutRequest): Response<SuccessResponse> = error("unused")
+        override suspend fun logout(body: LogoutRequest): Response<Unit> = error("unused")
         override suspend fun me(): Response<ProfileResponse> = error("unused")
         override suspend fun profile(): Response<ProfileResponse> = error("unused")
         override suspend fun updateProfile(body: UpdateProfileRequest): Response<ProfileResponse> = error("unused")
-        override suspend fun changePassword(body: ChangePasswordRequest): Response<SuccessResponse> = error("unused")
+        override suspend fun changePassword(body: ChangePasswordRequest): Response<Unit> = error("unused")
         override suspend fun setupStatus(): Response<SetupStatusResponse> = error("unused")
     }
 
