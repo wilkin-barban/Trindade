@@ -10,6 +10,29 @@ verificaciones está en [docs/release-android-historial.md](docs/release-android
 
 ---
 
+## [0.7.4] — 2026-11-04
+
+Una sola regla decide qué es masa: el código. Los diez códigos del catálogo son producción; cualquier otro
+código es insumo, aunque su descripción empiece con «MASSA». Con eso, Relatório separa Masas de Insumos en dos
+bloques, el WhatsApp del día incluye a los trabajadores que sólo existen en el ERP y la tableta deja de explicar
+con una frase lo que un dato compacto dice mejor.
+
+### Corregido
+
+- **Un producto terceirizado ya no se cuenta como masa.** `MASSA P PIZZA KIT` y sus parientes son insumos si su
+  código no está entre los diez (`1045, 39, 60, 84, 91, 1192, 5000, 1047, 22, 1616`). La clasificación vive en un
+  único predicado `isMassa(code)` y no mira la descripción; el espejo del ERP se sigue guardando completo y se
+  clasifica al leer, sin migrar `aero_movements`.
+- **Relatório muestra dos bloques, no una lista revuelta.** La web y Android dibujan **Masas** e **Insumos** por
+  separado, cada uno con su título y su subtítulo, y el botón de sincronización con el ERP sigue siendo uno.
+- **El WhatsApp del día incluye a los trabajadores Só ERP.** El mensaje se construye desde las filas unificadas
+  (lanzamientos locales + espejo, deduplicadas por asiento y lanzamiento), así que un operario que sólo existe en
+  el ERP aparece con su nombre marcado «(só ERP)», sus productos y sus cajas. Un lanzamiento ya conciliado se
+  cuenta una sola vez y ningún insumo entra al mensaje. Web y Android generan el mismo texto.
+- **La tableta ya no explica la caja abierta dos veces.** Bajo el operario y en el resumen queda un solo dato
+  compacto —«1 caixa aberta · 5 un» / «1 caja abierta · 5 un»— y desaparecen la nota larga y la explicación de que
+  las unidades no cierran cajas enteras. El significado es el mismo: hay una caja abierta con ese resto.
+
 ## [0.7.3] — 2026-11-04
 
 Las cajas del día se cuentan una sola vez. La pantalla redondeaba cada línea y después sumaba las cajas, así que
