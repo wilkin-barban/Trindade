@@ -37,7 +37,32 @@ versionCode = major * 1000000 + minor * 1000 + patch
 | `v1.2.3` | `1.2.3` | `1002003` |
 | `v2.0.0` | `2.0.0` | `2000000` |
 
-El tag `v0.7.0` deriva `7000`; la versión publicada es `0.7.0`, con un build interno superior al anterior para que Android acepte la actualización.
+### El build interno de producción
+
+El tag fija el `versionName` y el **piso** del `versionCode`. El número que la release lleva es el mayor entre lo
+que deriva el tag y el build interno que la instancia de producción ya sirve:
+
+```text
+versionCode = max(major * 1000000 + minor * 1000 + patch, LOCAL_APK_BUILD_NUMBER)
+```
+
+`LOCAL_APK_BUILD_NUMBER` vive en `packages/backend/src/modules/app/app.service.ts` y es la misma constante que
+`/api/app/latest-release` publica como `buildNumber` y la que describe al APK de `/api/app/download-apk`. El
+workflow la lee del commit etiquetado, así que el APK de la release y el binario que anuncia la producción no
+pueden discrepar: son el mismo literal.
+
+- **El build interno es mayor que el código del tag:** la release lo adopta. Es el caso de una reconstrucción de
+  la misma versión pública — `v0.7.1` deriva `7001` y producción ya servía `7012`, así que la release lleva
+  `7012`. Publicar `7001` habría sido un downgrade para quien ya instaló la reconstrucción, y Android lo
+  rechaza como tal.
+- **Es igual o menor:** manda el tag. Toda versión nueva lo supera, porque el código del tag es mayor que el de
+  la versión anterior.
+- **No es un entero decimal positivo, o el archivo no está:** el job falla cerrado en lugar de adivinar. Un
+  fallback silencioso al código del tag es exactamente el downgrade que esta regla evita.
+- **Límite conocido:** los builds internos de la línea `0.x` viven por encima del código de su tag, así que una
+  seguidilla de reconstrucciones puede adelantarse al código de un `patch` alto del futuro — `7012` es el mismo
+  número que derivaría `v0.7.12`. El `max` garantiza monotonía, no unicidad: antes de taggear, el build interno
+  tiene que superar el último código publicado.
 
 Reglas:
 
@@ -47,6 +72,8 @@ Reglas:
   Android habría rechazado esa release como un downgrade.
 - `minor` y `patch` tienen tres dígitos cada uno. `v1.1000.0` codificaría `2000000`, el mismo código que
   `v2.0.0`; el workflow lo rechaza en lugar de publicar una colisión. Para superar el límite, subir el major.
+- El `versionCode` final nunca es menor que el build interno que producción sirve; ver *El build interno de
+  producción*. El `versionName` sí sale sólo del tag.
 - La `v` pertenece al tag, no al `versionName`. Un `-PversionName` con `v` inicial falla la validación del
   build.
 - Una build release **exige** `-PversionName` y `-PversionCode`. No hay valores por defecto para release, así
@@ -112,14 +139,18 @@ este documento. Si cambia la imagen, hay que actualizar todas las copias.
 ### 4.3 Pasos del job `build`
 
 1. Checkout del commit del tag.
-2. Derivación de `versionName` y `versionCode`; rechazo de tags mal formados y de `minor`/`patch` mayores a 999.
-3. Decodificación del keystore desde `ANDROID_KEYSTORE_BASE64` a un directorio temporal del runner, nunca al
+2. Lectura de `LOCAL_APK_BUILD_NUMBER` desde `app.service.ts`; si falta la declaración con la forma esperada, el
+   job falla cerrado.
+3. Derivación de `versionName` y `versionCode`, que es el mayor entre el código del tag y ese build interno;
+   rechazo de tags mal formados y de `minor`/`patch` mayores a 999.
+4. Decodificación del keystore desde `ANDROID_KEYSTORE_BASE64` a un directorio temporal del runner, nunca al
    workspace; se borra al final del job.
-4. `:app:assembleRelease` con `-PapiBaseUrl`, `-PversionName`, `-PversionCode` y `-PrequireSigned=true`.
-5. Verificación de que el artefacto es `app-release.apk` y no `app-release-unsigned.apk`.
-6. `apksigner verify` y comparación de la huella SHA-256 del certificado con la fijada en el workflow.
-7. `aapt2 dump badging` para confirmar que el APK declara el `versionName` y `versionCode` del tag.
-8. Publicación del artifact para el job `publish`.
+5. `:app:assembleRelease` con `-PapiBaseUrl`, `-PversionName`, `-PversionCode` y `-PrequireSigned=true`.
+6. Verificación de que el artefacto es `app-release.apk` y no `app-release-unsigned.apk`.
+7. `apksigner verify` y comparación de la huella SHA-256 del certificado con la fijada en el workflow.
+8. `aapt2 dump badging` para confirmar que el APK declara el `versionName` y el `versionCode` que la release
+   decidió.
+9. Publicación del artifact para el job `publish`.
 
 ### 4.4 Job `publish`
 
@@ -272,7 +303,8 @@ placeholder es un tag.
 - [ ] `ANDROID_API_BASE_URL` termina en `/` y usa `https://`.
 - [ ] El workflow construye, verifica la huella y publica APK + `.sha256`.
 - [ ] La descarga publicada se verifica con `sha256sum -c` y `apksigner`.
-- [ ] Las notas de la release declaran el mismo `versionCode` y hash que el asset publicado.
+- [ ] Las notas de la release declaran el mismo `versionName` y hash que el asset publicado. El `versionCode`
+      es interno: no se publica como valor.
 - [ ] El APK se instala sobre la versión anterior con `adb install -r`.
 - [ ] El histórico de builds se actualiza con la versión, el build y el hash.
 
@@ -284,6 +316,6 @@ placeholder es un tag.
 | El workflow falla al decodificar el keystore | `ANDROID_KEYSTORE_BASE64` vacío o con formato inválido | Regenerar el base64 en una sola línea |
 | `A release build requires -PversionName` | Faltan las propiedades de versión | Pasar `-PversionName` y `-PversionCode` |
 | `A release build requires -PapiBaseUrl=` | Falta la URL base o no es `https` | Configurar `ANDROID_API_BASE_URL` con barra final |
-| `versionCode` menor que el instalado | Tag o fórmula incorrectos | Revisar la fórmula y usar un tag superior; no mover el tag |
+| `versionCode` menor que el instalado | Tag o fórmula incorrectos, o el build interno quedó por debajo de lo publicado | Revisar la fórmula y `LOCAL_APK_BUILD_NUMBER`; subir el build interno o usar un tag superior; no mover el tag |
 | El APK no aparece en la release | Job `publish` falló o no se ejecutó | Revisar logs del job y reejecutarlo |
 | El `.sha256` no coincide | Asset reemplazado por una build distinta | Regenerar el sidecar desde el job de publicación |

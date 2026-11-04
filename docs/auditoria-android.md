@@ -112,7 +112,9 @@ jq -r 'select(.client=="android") | [.appVersion,.buildNumber] | @tsv' \
   `requested`/`result`. Masas concilia con ese snapshot; Recebimento y Relatório siguen viendo los insumos
   que el espejo guardó completos.
 - `/api/app/latest-release` expone el `buildNumber` interno; el detector lo usa antes que el tamaño cuando
-  la versión pública no cambia.
+  la versión pública no cambia. Ese número es también el `versionCode` que el workflow de release adopta para un
+  tag, porque lo lee de `LOCAL_APK_BUILD_NUMBER`: el APK publicado y el binario que anuncia la API declaran el
+  mismo número.
 - La lectura de movimientos usa el cuerpo certificado de la web: `_method: PATCH`, `ENTSAI: "E"` y los
   filtros abiertos en `null`. El test de contrato de `AeroErpClientTest` fija ese cuerpo exacto.
 - Para verificar el log sin publicar el build se instaló una variante de prueba `0.7.1`: el detector de

@@ -194,7 +194,7 @@ La app consulta `GET /api/app/latest-release`. La respuesta incluye:
   "apkUrl": "https://trindademasas.duckdns.org/api/app/download-apk",
   "apkName": "trindade.apk",
   "apkSize": 11277888,
-  "buildNumber": 7011,
+  "buildNumber": 7012,
   "publishedAt": "2026-11-03T20:11:58.000Z",
   "webUrl": "https://trindademasas.duckdns.org"
 }
@@ -230,6 +230,19 @@ solo cambia el código pero conserva ambos es invisible para clientes ya instala
 Una build de la **misma versión pública** reemplaza el APK de producción y sube el código/build; una versión
 pública nueva actualiza el `versionName`, el tag/release si se usa GitHub y la versión que devuelve la API. No
 mover un tag ya publicado.
+
+La release de GitHub se publica con el tag, no a mano:
+
+```bash
+git tag -a v<versión> -m "Trindade Android v<versión>"
+git push origin v<versión>
+```
+
+Eso dispara `.github/workflows/android-release.yml`, que firma, verifica la huella del certificado y publica
+`trindade-<versión>.apk` con su `.sha256`. El `versionCode` que el workflow adopta es el mayor entre el que deriva
+el tag y `LOCAL_APK_BUILD_NUMBER`, así que el asset publicado lleva el mismo número que `/latest-release` anuncia
+(ver [docs/release-android.md](../release-android.md) §2). El tag se crea cuando el commit ya está verde y no se
+mueve: para corregir un binario se sube el build interno y se despliega por la instancia, no se re-etiqueta.
 
 ### 6.6 Instalación
 

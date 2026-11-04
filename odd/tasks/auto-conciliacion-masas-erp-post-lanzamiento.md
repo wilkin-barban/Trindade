@@ -146,12 +146,13 @@ Un `200` en `/entradasitem` dice que el ERP recibió la entrada en su buffer. El
 - **S13 — Android: un solo camino de lectura.** Un método privado (`readDay(date, mode)`) usado por el botón y por el camino automático; el automático actualiza `aeroSyncedAt` y no muestra spinner; el botón sigue mostrando `massas_aero_sync_done` y su indicador.
 - **S14 — Observabilidad.** Cada lectura deja un par `read_history` `requested`/`result` con el mismo `attemptId`, la fecha en `note`, `buildNumber` del APK instalado y `saved` en la respuesta.
 - **S15 — Día cerrado.** Un 409 `MASSAS_HISTORY_FROZEN` no se reintenta: se muestra el motivo y la fila queda pendiente.
-- **S16 — Release.** `versionName` 0.7.1, `versionCode`/`buildNumber` **7012**, firmado con la clave oficial, `/latest-release` con `buildNumber 7012` y el `apkSize`/sha256 del archivo nuevo; sin tag ni release nuevos.
+- **S16 — Release.** `versionName` 0.7.1, `versionCode`/`buildNumber` **7012**, firmado con la clave oficial, `/latest-release` con `buildNumber 7012` y el `apkSize`/sha256 del archivo nuevo; sin tag ni release nuevos *en esta fase* (Q3). La publicación en GitHub se rige por S18.
 - **S17 — Copia.** `massas.erp.mirrorHint` deja de pedir una actualización manual; se reescribe en `es.json` y `pt-BR.json` con paridad, y el test que la cita se actualiza.
+- **S18 — Publicación del tag.** Un tag anotado `v0.7.1` sobre el commit de `main` con CI verde publica la GitHub Release `v0.7.1` con `trindade-0.7.1.apk` y su `.sha256`, y ese sha256 es el del APK que sirve producción. El `versionCode` del asset es el build interno de producción (7012), nunca el derivado del tag (7001), porque publicarlo sería un downgrade: el workflow lee `LOCAL_APK_BUILD_NUMBER` y aplica `max(código del tag, build interno)`, con tests del workflow. No se mueve ni se reutiliza `v0.7.0`, no se crea una segunda release, y el `versionCode` no aparece como valor en las notas públicas.
 
 ## 6. Tareas
 
-Fase 1 — Android (T1, T2). Fase 2 — Web (T3, T4). Fase 3 — contrato y conciliación (T5). Fase 4 — documentación y entrega (T6, T7).
+Fase 1 — Android (T1, T2). Fase 2 — Web (T3, T4). Fase 3 — contrato y conciliación (T5). Fase 4 — documentación y entrega (T6, T7). Fase 5 — publicación (T8).
 
 - [x] **T1 — Android: una lectura después del lote.** Specs S1 S2 S3 S5 S9 S13.
   - Archivos: `packages/android/app/src/main/java/com/trindade/app/massas/MassasLaunchViewModel.kt`, `packages/android/app/src/test/java/com/trindade/app/massas/MassasLaunchViewModelTest.kt`, `AeroTestFakes.kt`.
@@ -193,8 +194,13 @@ Fase 1 — Android (T1, T2). Fase 2 — Web (T3, T4). Fase 3 — contrato y conc
     sha256 `f325edb6d3c03eba2f058b7aa099961fa99ba12243c6ffbec2d8e44e7683de1f`; copiado a
     `packages/backend/apk/trindade-0.7.1.apk` con su `.sha256`; `LOCAL_APK_BUILD_NUMBER = 7012`; `api` y `web`
     reconstruidos y sanos; `latest-release` público responde `buildNumber 7012`, `apkSize 11277888` y la
-    descarga coincide con el sha256. Sin tag ni release de GitHub.
+    descarga coincide con el sha256. Sin tag ni release de GitHub en esta fase.
   - Commit: `chore(release): ship Android 7012 with the post-launch reconciliation`.
+- [ ] **T8 — Publicación 0.7.1.** Spec S18. Depende de T7 y de CI verde en el commit etiquetado. Riesgo alto (entrega).
+  - Pasos: documentar 0.7.1, el build interno y `sessionStorage`; cambiar el workflow de release para que el `versionCode` del tag sea el mayor entre el derivado y `LOCAL_APK_BUILD_NUMBER`, con tests; commit, push y CI verde; crear y subir el tag anotado `v0.7.1` sobre ese commit; ejecutar y vigilar el workflow `Android release`; ajustar título y notas de la release sin publicar el `versionCode`; verificar `gh release view`, la descarga, el sha256, `/api/app/latest-release` y que el tag no se movió.
+  - Aceptación: S18 y AC9. No instalar en emulador ni teléfonos; no mover `v0.7.0`; no crear una segunda release.
+  - Checks: `python3 scripts/test_android_release_workflow.py`, CI del commit etiquetado, run del workflow del tag, `gh release view v0.7.1`, `sha256sum` del asset descargado contra `f325edb6…`, `curl /api/app/latest-release`, `git rev-parse v0.7.1`.
+  - Commit: `ci(release): derive the tag build from the internal build production serves` (workflow, tests, documentación); la publicación en sí no lleva commit.
 
 ## 7. Criterios de aceptación
 
@@ -287,6 +293,7 @@ Esperado después del cambio, en un lote de tres: un `read_history` `requested`,
 | S15 | T2 | 409 mostrado y no reintentado |
 | S16 | T7 | `/latest-release`, sha256, firma |
 | S17 | T3 | paridad i18n y test de copia |
+| S18 | T8 | `test_android_release_workflow.py`, workflow del tag, `gh release view` y sha256 de la descarga |
 
 ## 12. Log
 
@@ -385,3 +392,30 @@ Condiciones de la opción C:
 
 *Hallazgo que la motivó:* el e2e del segundo viaje probó que la vuelta del atajo llega en un documento nuevo, y
 con la contraseña sólo en memoria el cierre gastaba la marca y no podía leer. Queda registrado como Q6.
+
+- **L7 — Fase de publicación autorizada (2026-11-03, verbatim):**
+
+```text
+FASE de publicación autorizada. Repo /home/wilkin/proyectos/Trindade, rama main, sin ramas nuevas. El usuario autoriza ahora crear y subir el tag `v0.7.1` y publicar la GitHub Release `v0.7.1`. No instalar nada en el emulador/teléfonos; el usuario lo hará manualmente.
+
+Estado actual:
+- main está en 4aee312; CI de main verde.
+- Producción `/api/app/latest-release` ya sirve `v0.7.1`, buildNumber 7012; APK firmado `packages/backend/apk/trindade-0.7.1.apk`, sha256 f325edb6d3c03eba2f058b7aa099961fa99ba12243c6ffbec2d8e44e7683de1f, versionName 0.7.1, versionCode 7012.
+- Release GitHub existente: v0.7.0 (asset 0.7.0); no existe v0.7.1.
+- `.github/workflows/android-release.yml` deriva versionCode del tag: v0.7.1 -> 7001, que es menor que 7012 y sería un downgrade. NO permitas que la release final quede con 7001.
+
+Objetivo:
+1. Documenta la versión 0.7.1 y el flujo de auto-conciliación/`buildNumber`/sessionStorage en README, CHANGELOG, docs/release-android.md, docs/release-android-historial.md y docs/auditoria-android.md, sin publicar el `versionCode` como valor en notas públicas.
+2. Crea un tag anotado `v0.7.1` en el commit correcto de main (no muevas ni reutilices `v0.7.0`) y súbelo a origin. El tag debe quedar publicado.
+3. Maneja el workflow disparado por el tag. Preferencia: hacer que la release final contenga el APK 7012 firmado, no el 7001 derivado del tag. Si el workflow publica 7001, espera a que termine y reemplaza el asset con el APK 7012 + su `.sha256`, pero no crees una segunda release. Si puedes hacer un arreglo durable y pequeño en el workflow para que la build del tag use el build interno 7012 (por ejemplo, una variable/repositorio o metadata de build), hazlo con tests/docs y commit antes del tag; no rompas el gate de tag. No inventes otro esquema de versionado sin documentarlo.
+4. La GitHub Release v0.7.1 debe quedar con título/notas de 0.7.1, asset `trindade-0.7.1.apk` y sidecar, URL funcional y hash que coincida con producción. No dejes el asset 7001 ni un asset 0.7.0 bajo la tag nueva.
+5. Verifica: `gh release view v0.7.1`, descarga del asset y sha256, `/api/app/latest-release`, API/web healthy, y que el tag no se movió. Ejecuta/verifica CI y el workflow de release; si algo falla, corrígelo y espera verde. No crees ramas.
+6. Limpieza de archivos/worktrees propios; no borres datos, volúmenes ni assets históricos sin autorización.
+7. Reporta tag, release URL, assets, versión/build/hash, estado del workflow/CI y cualquier desviación. No digas que publicaste 7001 si fue reemplazado: deja claro qué asset quedó.
+
+Trabaja con pausas de control de 5 minutos; no dupliques releases ni tags. Si el workflow no puede producir el 7012 sin un cambio mayor, detente y reporta antes de publicar una release incorrecta.
+```
+
+*Decisión tomada al ejecutarla:* el arreglo durable es leer `LOCAL_APK_BUILD_NUMBER` desde el commit etiquetado y
+publicar `max(código del tag, build interno)`; así el asset del tag y el binario que anuncia `/latest-release`
+llevan el mismo número sin una segunda fuente de verdad ni configuración fuera del repositorio.
