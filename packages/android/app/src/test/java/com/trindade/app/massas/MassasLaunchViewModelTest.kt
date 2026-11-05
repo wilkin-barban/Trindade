@@ -783,6 +783,180 @@ class MassasLaunchViewModelTest {
         assertTrue(testVm.state.value.aeroMirror.isEmpty())
     }
 
+    /**
+     * El caso que trajo esta remediación, con los números que la planta vio.
+     *
+     * La tableta lanzó 113 (producto 22, 8 cajas = 120 un) y 114 (producto 5000, 30 cajas = 300 un) a nombre de
+     * JAIME. El ERP los registró como 36017 y 36018. La web ya los muestra conciliados; la pregunta es si este
+     * estado, con este espejo, dice lo mismo.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `the two launches the plant reconciled are reconciled here too`() = runTest {
+        val today = MassasLaunchViewModel.saopauloToday()
+        val jaime = "jaime"
+        val first = launch(113, boxes = 8, units = 120, username = jaime, displayName = "JAIME", productCode = "22", productName = "MASSA TOKO")
+        val second = launch(114, boxes = 30, units = 300, username = jaime, displayName = "JAIME", productCode = "5000", productName = "MASSA DE PIZZA")
+        val repo = DayRepository(
+            massasApi,
+            view = dayOf(today, listOf(first, second)),
+            stored = AeroMovementsStoredDay(
+                date = today,
+                movements = listOf(
+                    AeroStoredMovement(
+                        entLan = 36017,
+                        productCode = "000022",
+                        productDesc = "MASSA TOKO",
+                        quantity = 120.0,
+                        entryDate = today,
+                        operatorName = "JAIME",
+                        movementType = "E",
+                    ),
+                    AeroStoredMovement(
+                        entLan = 36018,
+                        productCode = "005000",
+                        productDesc = "MASSA DE PIZZA",
+                        quantity = 300.0,
+                        entryDate = today,
+                        operatorName = "JAIME",
+                        movementType = "E",
+                    ),
+                ),
+            ),
+        )
+        val testVm = newViewModel(repo)
+        testVm.refresh()
+        testScheduler.runCurrent()
+
+        val rows = testVm.state.value.unifiedRows
+        assertEquals(
+            listOf(MassasRowState.RECONCILED, MassasRowState.RECONCILED),
+            rows.map { it.state },
+        )
+        assertEquals(setOf(113, 114), reconciledLaunchIds(rows))
+        // Y con las dos filas conciliadas ninguna se ofrece para editar ni para borrar, aunque se pida igual.
+        assertFalse(testVm.canEdit(first))
+        assertFalse(testVm.canEdit(second))
+        testVm.startEdit(first)
+        assertEquals(null, testVm.state.value.editingLaunchId)
+        testVm.promptDelete(114)
+        assertEquals(null, testVm.state.value.deleteConfirmLaunchId)
+    }
+
+    /**
+     * Reanudar la pantalla vuelve a leer el espejo, no sólo el día.
+     *
+     * Es el defecto reportado: el operario vuelve a la app con los asientos ya en el ERP y la fila sigue
+     * ofreciendo Editar. `silentRefresh` refrescaba las cifras del día y dejaba el espejo en la lectura de la
+     * mañana, así que la fila se quedaba en PENDING_ERP hasta reiniciar la app.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `coming back to the screen re-reads the mirror and settles the rows`() = runTest {
+        val today = MassasLaunchViewModel.saopauloToday()
+        val first = launch(113, boxes = 8, units = 120, username = "jaime", displayName = "JAIME", productCode = "22", productName = "MASSA TOKO")
+        val second = launch(114, boxes = 30, units = 300, username = "jaime", displayName = "JAIME", productCode = "5000", productName = "MASSA DE PIZZA")
+        // El espejo que este teléfono tiene al abrir: el día sin asientos todavía.
+        val repo = DayRepository(
+            massasApi,
+            view = dayOf(today, listOf(first, second)),
+            stored = AeroMovementsStoredDay(date = today, movements = emptyList()),
+        )
+        val testVm = newViewModel(repo)
+        testVm.loadDay(today)
+        testScheduler.runCurrent()
+        assertEquals(
+            listOf(MassasRowState.PENDING_ERP, MassasRowState.PENDING_ERP),
+            testVm.state.value.unifiedRows.map { it.state },
+        )
+
+        // La planta terminó de registrarlos mientras el teléfono estaba en el bolsillo.
+        repo.stored = AeroMovementsStoredDay(
+            date = today,
+            movements = listOf(
+                AeroStoredMovement(
+                    entLan = 36017,
+                    productCode = "000022",
+                    productDesc = "MASSA TOKO",
+                    quantity = 120.0,
+                    entryDate = today,
+                    operatorName = "JAIME",
+                    movementType = "E",
+                ),
+                AeroStoredMovement(
+                    entLan = 36018,
+                    productCode = "005000",
+                    productDesc = "MASSA DE PIZZA",
+                    quantity = 300.0,
+                    entryDate = today,
+                    operatorName = "JAIME",
+                    movementType = "E",
+                ),
+            ),
+        )
+
+        // El polling arranca con la pantalla y no lo para nadie si la prueba falla a mitad de camino: sin el
+        // finally, un rojo se convierte en un cuelgue que runTest no puede drenar.
+        try {
+            testVm.onScreenActive(true)
+            testScheduler.runCurrent()
+
+            assertEquals(
+                listOf(MassasRowState.RECONCILED, MassasRowState.RECONCILED),
+                testVm.state.value.unifiedRows.map { it.state },
+            )
+            assertEquals(setOf(113, 114), reconciledLaunchIds(testVm.state.value.unifiedRows))
+        } finally {
+            // El polling no tiene que quedar corriendo por una prueba que sólo quería una lectura.
+            testVm.onScreenActive(false)
+        }
+    }
+
+    /**
+     * Recargar el mismo día no borra el espejo que ya estaba, y una lectura que falla conserva el último bueno.
+     *
+     * `loadDay` limpiaba el espejo siempre, incluso cuando la fecha pedida era la que ya estaba en pantalla: una
+     * recarga sin red dejaba la mañana sin asientos y las filas volvían a ofrecer Editar. Cambiar de fecha sí
+     * tiene que limpiarlo -- un asiento de ayer sobre hoy se lee como de esta mañana --, y eso ya lo fija
+     * `switching to a day with no snapshot does not keep the previous day's erp seats`.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `reloading the same day keeps the mirror it already read`() = runTest {
+        val today = MassasLaunchViewModel.saopauloToday()
+        val first = launch(113, boxes = 8, units = 120, username = "jaime", displayName = "JAIME", productCode = "22", productName = "MASSA TOKO")
+        val repo = DayRepository(
+            massasApi,
+            view = dayOf(today, listOf(first)),
+            stored = AeroMovementsStoredDay(
+                date = today,
+                movements = listOf(
+                    AeroStoredMovement(
+                        entLan = 36017,
+                        productCode = "000022",
+                        productDesc = "MASSA TOKO",
+                        quantity = 120.0,
+                        entryDate = today,
+                        operatorName = "JAIME",
+                        movementType = "E",
+                    ),
+                ),
+            ),
+        )
+        val testVm = newViewModel(repo)
+        testVm.loadDay(today)
+        testScheduler.runCurrent()
+        assertEquals(MassasRowState.RECONCILED, testVm.state.value.unifiedRows.single().state)
+
+        // La misma fecha, con el espejo inalcanzable: lo que ya se leyó no se tira.
+        repo.stored = null
+        testVm.loadDay(today)
+        testScheduler.runCurrent()
+
+        assertEquals(listOf(36017), testVm.state.value.aeroMirror.map { it.entLan })
+        assertEquals(MassasRowState.RECONCILED, testVm.state.value.unifiedRows.single().state)
+    }
+
     /** A day already loaded, so a test about what happens next does not also depend on the network. */
     private class DayRepository(
         api: MassasApi,
@@ -823,11 +997,13 @@ class MassasLaunchViewModelTest {
         units: Int = 30,
         username: String = "wilkin",
         displayName: String = "Wilkin",
+        productCode: String = "1045",
+        productName: String = "MASSA CASEIRA",
     ) = MassaIndividualLaunch(
         id = id,
         launchDate = MassasLaunchViewModel.saopauloToday(),
-        productCode = "1045",
-        productName = "MASSA CASEIRA",
+        productCode = productCode,
+        productName = productName,
         boxes = boxes,
         units = units,
         userId = 1,
@@ -835,6 +1011,25 @@ class MassasLaunchViewModelTest {
         displayName = displayName,
         createdAt = "2025-05-18T10:00:00Z",
         updatedAt = "2025-05-18T10:00:00Z",
+    )
+
+    /** The day of this remediation's case: the two products the plant launched, each with its own box size. */
+    private fun dayOf(date: String, launches: List<MassaIndividualLaunch>) = MassasLaunchDayView(
+        date = date,
+        products = launches
+            .distinctBy { it.productCode }
+            .map { launch ->
+                com.trindade.app.network.MassaProductTotal(
+                    code = launch.productCode,
+                    name = launch.productName,
+                    unitsPerBox = if (launch.boxes == 0) 1 else launch.units / launch.boxes,
+                    totalBoxes = launches.filter { it.productCode == launch.productCode }.sumOf { it.boxes },
+                    totalUnits = launches.filter { it.productCode == launch.productCode }.sumOf { it.units },
+                )
+            },
+        launches = launches,
+        totalBoxes = launches.sumOf { it.boxes },
+        totalUnits = launches.sumOf { it.units },
     )
 
     private fun dayWith(vararg launches: MassaIndividualLaunch) = MassasLaunchDayView(
