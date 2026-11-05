@@ -15,6 +15,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -279,6 +283,19 @@ fun ReportDetailRoute(
     viewModel: ReportDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+
+    // The day this report is about keeps moving while the report sits open or parked: the ERP is read by other
+    // hands and other phones, and the card would otherwise be a photograph of the moment it first opened. The
+    // resume is the event that says "look again" -- one read per arrival, on the lifecycle and never on a timer --
+    // and the date it asks for is the report's own, which is why the view model reads it from the report.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.onScreenResumed()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     // Forced, and keyed on the id: this route is drawn again every time the operator arrives at a
     // report, including on the way back from the edit screen, and the instance it talks to is scoped to

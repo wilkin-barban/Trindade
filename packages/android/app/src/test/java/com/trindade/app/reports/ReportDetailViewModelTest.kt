@@ -310,6 +310,63 @@ class ReportDetailViewModelTest {
         assertFalse(model.state.value.isSyncingErp)
     }
 
+    // ---- The day's mirror, re-read when the report comes back into view (S2, S3) ----
+
+    /**
+     * The failure as the operator met it: a report left open, or opened again later, kept the day it first read.
+     *
+     * The report's own date is the day its card is about, so the refresh has to ask for that date and not for the
+     * device's today: a report of the 30th that read the 4th would show a day the report was never about. The two
+     * reads are recorded, which is how the assertion can say both that the refresh happened and what it asked for.
+     */
+    @Test
+    fun `resuming the report re-reads the day it belongs to, and not the device's today`() {
+        val source = GrowingDetailDaySource(
+            first = listOf(detailOperator("Ana Paula")),
+            second = listOf(detailOperator("Ana Paula"), detailOperator("Beto Souza", erpOnly = true)),
+        )
+        val model = ReportDetailViewModel(
+            repository = ReportsRepository(FakeReportsApi()),
+            compressor = FakePhotoCompressor(),
+            massasRepository = source,
+        )
+
+        model.load(REPORT_ID)
+        // The fake report is the 18th; the device's today is whatever day the suite runs on.
+        assertEquals(listOf("2026-09-18"), source.dates)
+        assertEquals(listOf("Ana Paula"), model.state.value.massasDay?.operators?.map { it.displayName })
+
+        model.onScreenResumed()
+
+        assertEquals(listOf("2026-09-18", "2026-09-18"), source.dates)
+        assertEquals(
+            listOf("Ana Paula", "Beto Souza"),
+            model.state.value.massasDay?.operators?.map { it.displayName },
+        )
+        assertEquals(listOf(false, true), model.state.value.massasDay?.operators?.map { it.erpOnly })
+    }
+
+    /**
+     * Nothing to refresh before the report arrives: the date the card would ask for is the report's own.
+     *
+     * Reading `saopauloToday()` here would be the bug this pins -- the time between the screen appearing and the
+     * report landing would become a second, wrong date the card is allowed to show.
+     */
+    @Test
+    fun `resuming before the report arrived reads nothing at all`() {
+        val source = GrowingDetailDaySource(first = listOf(detailOperator("Ana Paula")), second = null)
+        val model = ReportDetailViewModel(
+            repository = ReportsRepository(FakeReportsApi()),
+            compressor = FakePhotoCompressor(),
+            massasRepository = source,
+        )
+
+        model.onScreenResumed()
+
+        assertEquals(emptyList<String>(), source.dates)
+        assertNull(model.state.value.massasDay)
+    }
+
     private companion object {
         const val REPORT_ID = 42
 
@@ -405,3 +462,59 @@ private class RecordingReportSettingsPort(
     override fun syncedAt(date: String): String? = syncMarks[date]
     override fun markSynced(date: String, at: String) { syncMarks[date] = at }
 }
+
+/**
+ * A day that answers differently on the second read, and remembers which dates it was asked for.
+ *
+ * Both halves matter for this screen: the dates are the claim that the card follows the report's own day, and the
+ * second answer is the claim that a resume is a new read rather than the one the screen already had.
+ */
+private class GrowingDetailDaySource(
+    private val first: List<com.trindade.app.contract.models.MassasReportDayViewOperatorsInner>,
+    private val second: List<com.trindade.app.contract.models.MassasReportDayViewOperatorsInner>?,
+) : com.trindade.app.massas.MassasDaySource {
+
+    /** Every date asked for, in order, which is how the assertions see the refresh and its target. */
+    val dates = mutableListOf<String>()
+
+    override suspend fun reportDay(date: String): MassasReportDayView? {
+        dates += date
+        val operators = if (dates.size == 1) first else second ?: return null
+        return MassasReportDayView(
+            date = date,
+            operators = operators,
+            products = emptyList(),
+            totalBoxes = java.math.BigDecimal.ZERO,
+            totalUnits = java.math.BigDecimal.ZERO,
+            balance = com.trindade.app.contract.models.MassasReportDayViewBalance(
+                producedBoxes = java.math.BigDecimal.ZERO,
+                producedUnits = java.math.BigDecimal.ZERO,
+                registeredBoxes = java.math.BigDecimal.ZERO,
+                registeredUnits = java.math.BigDecimal.ZERO,
+                differenceUnits = java.math.BigDecimal.ZERO,
+                reconciledSeats = java.math.BigDecimal.ZERO,
+                pendingSeats = java.math.BigDecimal.ZERO,
+            ),
+            reconciledEntLans = emptyList(),
+        )
+    }
+}
+
+/** One operator of the day: a name, its totals, and whether only the mirror knows it. */
+private fun detailOperator(
+    displayName: String,
+    erpOnly: Boolean = false,
+): com.trindade.app.contract.models.MassasReportDayViewOperatorsInner =
+    com.trindade.app.contract.models.MassasReportDayViewOperatorsInner(
+        operatorKey = displayName.lowercase().replace(" ", "-"),
+        name = displayName,
+        displayName = displayName,
+        username = displayName.lowercase().replace(" ", "."),
+        boxes = java.math.BigDecimal("1"),
+        units = java.math.BigDecimal("10"),
+        openBoxUnits = java.math.BigDecimal.ZERO,
+        products = emptyList(),
+        erpOnly = erpOnly,
+        onlyErp = erpOnly,
+        entLans = emptyList(),
+    )

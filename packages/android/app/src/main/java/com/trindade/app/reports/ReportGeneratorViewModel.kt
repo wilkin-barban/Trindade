@@ -201,6 +201,21 @@ class ReportGeneratorViewModel @Inject constructor(
     /** The way out of a read that could not supply what the form needs. */
     fun retry() = load()
 
+    /**
+     * The screen came back into view.
+     *
+     * The card's day is a photograph of the plant's mirror, and the mirror moves while this screen is open or
+     * parked in the background: another operator launches from the ERP, a colleague syncs from their phone.
+     * Re-reading here is what makes the photograph current, and doing it on the lifecycle event rather than on a
+     * timer is what keeps it from becoming a poll.
+     */
+    fun onScreenResumed() {
+        // The day is read again and the state is only written when the read answered something: a refresh that
+        // came back empty leaves the count the operator was already reading, because "nobody launched anything"
+        // and "the plant's network did not answer" are different sentences and only one of them is true.
+        loadMassasDay()
+    }
+
     fun selectTurno(turno: String) {
         _state.update { current ->
             current.copy(

@@ -162,20 +162,98 @@ fun ErpMovementsCard(
                         )
 
                         massasDay.operators.forEach { operator ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
+                            // One block per operator, and its own products inside it. The tag is what lets a
+                            // reader -- and a test -- say which operator a line belongs to when two of them
+                            // produced the same massa, which is the ordinary case on a shift.
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("report-massas-operator-${operator.operatorKey}"),
+                                verticalArrangement = Arrangement.spacedBy(2.dp),
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        text = operator.displayName,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    Text(
+                                        text = "${operator.boxes.stripZeros()} cx · ${operator.units.stripZeros()} un",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                // What the operator produced, product by product, which is what the web draws
+                                // under each name: a total alone cannot tell a massa from another, and Relatório
+                                // is read to compare them.
+                                operator.products.forEach { product ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(start = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Text(
+                                            text = product.name,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                        Text(
+                                            text = stringResource(
+                                                R.string.report_receipts_units,
+                                                product.units.stripZeros(),
+                                            ),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // The day's own closing line: what the whole shift produced per massa, which is the
+                        // section the web calls Resumo coletivo. Only the massas that were actually produced are
+                        // listed -- a zero is absence, and a list of every code in the catalogue would bury the
+                        // ones that matter.
+                        val dayProducts = massasDay.products.filter { it.totalUnits > 0 }
+                        if (dayProducts.isNotEmpty()) {
+                            HorizontalDivider()
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("report-massas-summary"),
+                                verticalArrangement = Arrangement.spacedBy(2.dp),
                             ) {
                                 Text(
-                                    text = operator.displayName,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    modifier = Modifier.weight(1f),
+                                    text = stringResource(R.string.report_massas_summary),
+                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                                    color = MaterialTheme.colorScheme.primary,
                                 )
-                                Text(
-                                    text = "${operator.boxes.stripZeros()} cx · ${operator.units.stripZeros()} un",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
+                                dayProducts.forEach { product ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Text(
+                                            text = product.name,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                        Text(
+                                            text = stringResource(
+                                                R.string.report_receipts_units,
+                                                product.totalUnits.toString(),
+                                            ),
+                                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
                             }
                         }
                     }

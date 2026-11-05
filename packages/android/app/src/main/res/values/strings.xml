@@ -933,6 +933,7 @@
     <string name="report_massas_day_empty">Nenhum lançamento registrado.</string>
     <string name="report_massas_day_operators">Operadores: %1$d</string>
     <string name="report_massas_day_balance">Balanço: %1$s</string>
+    <string name="report_massas_summary">Resumo coletivo</string>
     <!-- Reports: unified ERP movements card (massas and receipts). -->
     <string name="report_erp_movements_title">Movimentações do ERP</string>
     <string name="report_erp_sync">Sincronizar com ERP</string>
