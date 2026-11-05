@@ -132,7 +132,7 @@ verificaciones completas están en [release-android-historial.md](release-androi
 > detecta por la comparación de `buildNumber` que publica `/api/app/latest-release`
 > (`SAME_RELEASE_PATCH`), no por el tamaño ni por la versión.
 >
-> **Estado anterior, 2026-11-04.** La versión **0.7.3** (build 7014) es la publicada: `packages/backend/apk/trindade-0.7.3.apk`
+> **Estado anterior, 2026-11-04.** La versión **0.7.3** (build 7014) fue la publicada hasta ese día: `packages/backend/apk/trindade-0.7.3.apk`
 > son 11.295.876 bytes, sha256 `593ffc646efc01c4b0e7cedddfe728e9acb45544ec81a3bf4a6a1ba85576aa21`, firmada con el mismo
 > certificado del proyecto. La release anterior (0.7.2, build 7013) sigue intacta como asset de `v0.7.2`.
 >
