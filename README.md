@@ -91,7 +91,7 @@ La guía de contribución y las reglas de trabajo están en [CONTRIBUTING.md](CO
 | [docs/integracion-aero-masas-web.md](docs/integracion-aero-masas-web.md) | Flujo operativo con el ERP Aero32 |
 | [docs/integracion-aero32.md](docs/integracion-aero32.md) | Auditoría técnica del WebService Aero32 |
 | [docs/registro-integracion-aero-webservice.md](docs/registro-integracion-aero-webservice.md) | Contratos exactos de los endpoints |
-| [PRD_Trindade.md](PRD_Trindade.md) | Especificación de producto y reglas de negocio |
+| [doc/PRD_Trindade.md](doc/PRD_Trindade.md) | Especificación de producto y reglas de negocio |
 | [CHANGELOG.md](CHANGELOG.md) | Historial de cambios por versión |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Flujo de trabajo, commits y pruebas |
 

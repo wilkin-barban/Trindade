@@ -16,7 +16,7 @@ Este directorio reúne la documentación operativa y técnica del proyecto. La p
 | Integrar o depurar Aero32 | [integracion-aero-masas-web.md](integracion-aero-masas-web.md) |
 | Leer los contratos exactos del WebService | [registro-integracion-aero-webservice.md](registro-integracion-aero-webservice.md) |
 | Revisar la auditoría técnica del ERP | [integracion-aero32.md](integracion-aero32.md) |
-| Conocer el producto y sus reglas de negocio | [../PRD_Trindade.md](../PRD_Trindade.md) |
+| Conocer el producto y sus reglas de negocio | [../doc/PRD_Trindade.md](../doc/PRD_Trindade.md) |
 | Contribuir al repositorio | [../CONTRIBUTING.md](../CONTRIBUTING.md) |
 | Ver cambios por versión | [../CHANGELOG.md](../CHANGELOG.md) |
 

@@ -238,4 +238,4 @@ sequenceDiagram
 - [release-android.md](release-android.md) — firma y publicación Android.
 - [integracion-aero-masas-web.md](integracion-aero-masas-web.md) — flujo con el ERP.
 - [../packages/contracts/README.md](../packages/contracts/README.md) — contrato OpenAPI.
-- [../PRD_Trindade.md](../PRD_Trindade.md) — reglas de producto.
+- [../doc/PRD_Trindade.md](../doc/PRD_Trindade.md) — reglas de producto.
