@@ -107,6 +107,22 @@ class ReportDetailViewModel @Inject constructor(
     }
 
     /**
+     * The screen came back into view.
+     *
+     * The card is about the day the report belongs to, and that day's mirror keeps moving: the ERP is read by
+     * other hands, from other phones, while this report sits open or parked. Re-reading on the way in is what
+     * keeps the card from being a photograph of the moment the screen first opened, and the date it asks for is
+     * the report's own rather than the device's today, because a report of the 30th is not about the 4th.
+     */
+    fun onScreenResumed() {
+        // No report, no date: the card follows the report's own day, so before it arrives there is nothing to ask
+        // for and `saopauloToday()` would be a second, wrong answer to a question this screen never asks.
+        val report = state.value.report ?: return
+        refreshMassas(report)
+        refreshReceipts(report)
+    }
+
+    /**
      * Reads the day's massas for this report.
      *
      * A report has a date, and the card is about that date's production, not about this report's own answers:
@@ -127,7 +143,9 @@ class ReportDetailViewModel @Inject constructor(
         val date = report?.reportDate?.takeIf { it.isNotBlank() } ?: return
         viewModelScope.launch {
             val receipts = repository.receipts(date)
-            _state.update { it.copy(receipts = receipts) }
+            // Same rule as the massas half: a refresh that answered nothing must not erase what the operator is
+            // reading. At load the state holds null anyway, so this changes nothing about opening the screen.
+            if (receipts != null) _state.update { it.copy(receipts = receipts) }
         }
     }
 

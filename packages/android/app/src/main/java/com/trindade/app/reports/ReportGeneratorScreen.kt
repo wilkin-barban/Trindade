@@ -10,6 +10,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -324,6 +328,19 @@ fun ReportGeneratorRoute(
     viewModel: ReportGeneratorViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+
+    // Same reason as the detail's, from the other side: this form files today's report and the card above it is
+    // the day it will be filed against. A worker who reaches the mirror after the screen opened -- because a
+    // colleague launched from the ERP, or because a sync ran on another phone -- must be in the count the
+    // operator reads before pressing save. One read per resume; the sync button still refreshes on demand.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.onScreenResumed()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     ReportGeneratorScreen(
         state = state,

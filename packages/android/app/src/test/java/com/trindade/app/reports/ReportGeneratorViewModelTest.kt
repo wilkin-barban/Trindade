@@ -2,6 +2,7 @@ package com.trindade.app.reports
 
 import com.trindade.app.contract.models.CategoriesResponseCategoriesInner
 import com.trindade.app.contract.models.CreateReportRequest
+import com.trindade.app.contract.models.MassasReportDayView
 import com.trindade.app.contract.models.ReportCategoryTasksInner
 import com.trindade.app.contract.models.ReportResponse
 import com.trindade.app.reports.FakeReportsApi.Companion.CHECK_TASK_ID
@@ -664,6 +665,84 @@ class ReportGeneratorViewModelTest {
         assertEquals(true, model.state.value.canSubmit)
     }
 
+    // ---- The day's mirror, refreshed by the screen instead of read once on open (S1, S3, S4) ----
+
+    /**
+     * The failure this group exists for, reproduced as the operator met it.
+     *
+     * The card read the day once, when the view model was built, and never again. An operator who reaches the
+     * mirror afterwards -- because a colleague launched in the ERP from the plant's machine, or because the
+     * mirror moved while this screen sat in the background -- was simply absent from the count, and nothing on
+     * the screen said that the list was old. The resume is the event that says "look again".
+     */
+    @Test
+    fun `an operator that reaches the mirror after the first read appears when the screen resumes`() {
+        val source = GrowingMassasDaySource(
+            first = listOf(reportOperator("Ana Paula")),
+            second = listOf(reportOperator("Ana Paula"), reportOperator("Beto Souza", erpOnly = true)),
+        )
+        val model = ReportGeneratorViewModel(ReportsRepository(api), massasDaySource = source)
+
+        assertEquals(listOf("Ana Paula"), model.state.value.massasDay?.operators?.map { it.displayName })
+
+        model.onScreenResumed()
+
+        assertEquals(
+            listOf("Ana Paula", "Beto Souza"),
+            model.state.value.massasDay?.operators?.map { it.displayName },
+        )
+        // The ERP-only operator is drawn as one more: the state keeps the whole list and no flag filters it.
+        assertEquals(listOf(false, true), model.state.value.massasDay?.operators?.map { it.erpOnly })
+        // One read per resume, never a poll: the resume is the only second read there is.
+        assertEquals(2, source.calls)
+    }
+
+    /**
+     * A refresh is not a reset: a read that answers nothing leaves the count the operator was already reading.
+     *
+     * Blanking the block on a failed read would turn a plant Wi-Fi problem into "nobody launched anything
+     * today", which is the sentence that hides a problem instead of reporting it.
+     */
+    @Test
+    fun `a resume whose read answers nothing keeps the day already drawn`() {
+        val source = GrowingMassasDaySource(first = listOf(reportOperator("Ana Paula")), second = null)
+        val model = ReportGeneratorViewModel(ReportsRepository(api), massasDaySource = source)
+
+        model.onScreenResumed()
+
+        assertEquals(listOf("Ana Paula"), model.state.value.massasDay?.operators?.map { it.displayName })
+        assertEquals(2, source.calls)
+    }
+
+    /**
+     * The other moment the mirror can have moved: the operator asked the plant for it and it answered.
+     *
+     * The card's own button already re-read both halves; what this pins is that the resumption path and the
+     * sync path land on the same state field, so the two ways of asking cannot disagree about what the day is.
+     */
+    @Test
+    fun `syncing from the card re-reads the day as well`() {
+        val source = GrowingMassasDaySource(
+            first = listOf(reportOperator("Ana Paula")),
+            second = listOf(reportOperator("Ana Paula"), reportOperator("Beto Souza", erpOnly = true)),
+        )
+        val model = ReportGeneratorViewModel(
+            repository = ReportsRepository(api),
+            massasDaySource = source,
+            aeroDispatcher = com.trindade.app.aero.AeroDispatcher(
+                erp = SyncedReportErpPort(),
+                mirror = SyncedReportMirrorPort(),
+                reachability = com.trindade.app.massas.FakeReachability(),
+            ),
+            aeroSettingsStore = ReadyAeroSettingsPort(),
+        )
+
+        model.syncErp()
+
+        assertEquals(listOf("Ana Paula", "Beto Souza"), model.state.value.massasDay?.operators?.map { it.displayName })
+        assertEquals(2, source.calls)
+    }
+
     /** The catalogue's temperature category: the four tasks and the five readings the server validates. */
     private fun productionTemperatureCategories() = listOf(
         CategoriesResponseCategoriesInner(
@@ -693,6 +772,111 @@ class ReportGeneratorViewModelTest {
 }
 
 private val EMPTY_BODY: okhttp3.ResponseBody = "{}".toResponseBody("application/json".toMediaType())
+
+/**
+ * A day that answers differently on the second read.
+ *
+ * This is the whole point of the group above: the mirror is not a fixture, it is a list that grows while the
+ * screen is open, and the only way to prove the screen noticed is to have the second read answer something the
+ * first one did not. `null` on the second read is the failed-refresh case, which must keep the first answer.
+ */
+private class GrowingMassasDaySource(
+    private val first: List<com.trindade.app.contract.models.MassasReportDayViewOperatorsInner>,
+    private val second: List<com.trindade.app.contract.models.MassasReportDayViewOperatorsInner>?,
+) : com.trindade.app.massas.MassasDaySource {
+
+    /** How many times the day was read, which is the half of the claim a state cannot make. */
+    var calls = 0
+        private set
+
+    override suspend fun reportDay(date: String): MassasReportDayView? {
+        calls++
+        val operators = if (calls == 1) first else second ?: return null
+        return reportDayOf(operators)
+    }
+}
+
+/** One operator of the day, with the fields the card and the tests read and nothing else. */
+private fun reportOperator(
+    displayName: String,
+    units: String = "10",
+    boxes: String = "1",
+    erpOnly: Boolean = false,
+): com.trindade.app.contract.models.MassasReportDayViewOperatorsInner =
+    com.trindade.app.contract.models.MassasReportDayViewOperatorsInner(
+        operatorKey = displayName.lowercase().replace(" ", "-"),
+        name = displayName,
+        displayName = displayName,
+        username = displayName.lowercase().replace(" ", "."),
+        boxes = BigDecimal(boxes),
+        units = BigDecimal(units),
+        openBoxUnits = BigDecimal.ZERO,
+        products = emptyList(),
+        erpOnly = erpOnly,
+        onlyErp = erpOnly,
+        entLans = emptyList(),
+    )
+
+/** A whole day around a list of operators, which is all the card's massas block reads. */
+private fun reportDayOf(
+    operators: List<com.trindade.app.contract.models.MassasReportDayViewOperatorsInner>,
+): MassasReportDayView = MassasReportDayView(
+    date = "2026-11-04",
+    operators = operators,
+    products = emptyList(),
+    totalBoxes = BigDecimal.ZERO,
+    totalUnits = BigDecimal.ZERO,
+    balance = com.trindade.app.contract.models.MassasReportDayViewBalance(
+        producedBoxes = BigDecimal.ZERO,
+        producedUnits = BigDecimal.ZERO,
+        registeredBoxes = BigDecimal.ZERO,
+        registeredUnits = BigDecimal.ZERO,
+        differenceUnits = BigDecimal.ZERO,
+        reconciledSeats = BigDecimal.ZERO,
+        pendingSeats = BigDecimal.ZERO,
+    ),
+    reconciledEntLans = emptyList(),
+)
+
+/** The ERP settings a sync needs, already filled in. */
+private class ReadyAeroSettingsPort : com.trindade.app.aero.AeroSettingsPort {
+    override fun load(): com.trindade.app.aero.AeroSettings =
+        com.trindade.app.aero.AeroSettings(
+            wsUrl = "http://plant.lan/ws",
+            username = "trindade",
+            password = "secret",
+        )
+
+    override fun save(settings: com.trindade.app.aero.AeroSettings) = Unit
+    override fun isConfigured(): Boolean = true
+    override fun syncedAt(date: String): String? = null
+    override fun markSynced(date: String, at: String) = Unit
+}
+
+/** An ERP port whose read of the day succeeds without a network. */
+private class SyncedReportErpPort : com.trindade.app.aero.AeroErpPort {
+    override suspend fun postEntry(
+        settings: com.trindade.app.aero.AeroSettings,
+        payload: com.trindade.app.aero.AeroEntryPayload,
+    ): com.trindade.app.aero.AeroWriteResult = com.trindade.app.aero.AeroWriteResult.Ok(null)
+
+    override suspend fun readMovements(
+        settings: com.trindade.app.aero.AeroSettings,
+        date: String,
+    ): com.trindade.app.aero.AeroMovementsResult =
+        com.trindade.app.aero.AeroMovementsResult.Ok(emptyList(), skipped = 0)
+}
+
+/** The backend that keeps the day's snapshot, accepting everything. */
+private class SyncedReportMirrorPort : com.trindade.app.aero.AeroMirrorPort {
+    override suspend fun saveMovements(
+        date: String,
+        movements: List<com.trindade.app.aero.AeroErpMovement>,
+    ): com.trindade.app.aero.AeroSnapshotSave =
+        com.trindade.app.aero.AeroSnapshotSave.Saved(com.trindade.app.network.AeroMovementsSaved(0, 0))
+
+    override suspend fun log(request: com.trindade.app.network.AeroAuditLogRequest) = Unit
+}
 
 /**
  * The envelope a refusal arrives in, with the same sentence in `error` and `message` as the server sends it.

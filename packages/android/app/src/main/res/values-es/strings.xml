@@ -932,6 +932,7 @@
     <string name="report_massas_day_operators">Operarios: %1$d</string>
     <string name="report_massas_day_balance">Balance: %1$s</string>
     <!-- Reportes: tarjeta unificada de movimientos del ERP (masas y recepción). -->
+    <string name="report_massas_summary">Resumen colectivo</string>
     <string name="report_erp_movements_title">Movimientos del ERP</string>
     <string name="report_erp_sync">Sincronizar con ERP</string>
     <string name="report_receipts_title">Insumos</string>

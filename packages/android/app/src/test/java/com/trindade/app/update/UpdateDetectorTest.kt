@@ -128,6 +128,24 @@ class UpdateDetectorTest {
     }
 
     @Test
+    fun `the replacement of 0_7_4 is a patch for the binary it replaces`() {
+        // The pinned fact of this release: 0.7.4 build 7015 was published and then replaced by 7016 under the same
+        // public version, with an APK of exactly the same size. Nothing but the build number can tell those two
+        // binaries apart, so a phone running 7015 has to see the update -- and if a future change ever stopped
+        // raising the number, this is the test that says so.
+        val availability = UpdateDetector.checkUpdate(
+            release = release("v0.7.4", apkSize = 11_295_724L, buildNumber = 7016),
+            currentVersionName = "0.7.4",
+            currentBuildTimeMillis = Instant.parse("2026-11-04T12:00:00Z").toEpochMilli(),
+            installedSizeBytes = 11_295_724L,
+            currentBuildNumber = 7015,
+        )
+
+        assertEquals(UpdateType.SAME_RELEASE_PATCH, availability.type)
+        assertTrue(availability.isUpdateAvailable)
+    }
+
+    @Test
     fun `the same or an older build number is not an update`() {
         val same = UpdateDetector.checkUpdate(
             release = release("v0.7.1", apkSize = 11_149_040L, buildNumber = 7011),
