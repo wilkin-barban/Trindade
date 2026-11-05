@@ -194,7 +194,7 @@ La app consulta `GET /api/app/latest-release`. La respuesta incluye:
   "apkUrl": "https://trindademasas.duckdns.org/api/app/download-apk",
   "apkName": "trindade.apk",
   "apkSize": <tamaño del APK de 0.7.4>,
-  "buildNumber": 7017,
+  "buildNumber": 7018,
   "publishedAt": "<fecha de publicación de v0.7.4>",
   "webUrl": "https://trindademasas.duckdns.org"
 }

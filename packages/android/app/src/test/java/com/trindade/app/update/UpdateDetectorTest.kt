@@ -129,16 +129,17 @@ class UpdateDetectorTest {
 
     @Test
     fun `the replacement of 0_7_4 is a patch for the binary it replaces`() {
-        // The pinned fact of this release: 0.7.4 build 7015 was published, replaced by 7016, and then by 7017 the
-        // same day -- each time under the same public version and, at least once, with an APK of exactly the same
-        // size. Nothing but the build number can tell those binaries apart, so a phone running the previous one
-        // has to see the update. If a future change ever stopped raising the number, this is the test that says so.
+        // The pinned fact of this release: 0.7.4 build 7015 was published, replaced by 7016, then by 7017, and
+        // then by 7018 -- each time under the same public version and, more than once, with an APK of exactly
+        // the same size. Nothing but the build number can tell those binaries apart, so a phone running the
+        // previous one has to see the update. If a future change ever stopped raising the number, this is the
+        // test that says so.
         val availability = UpdateDetector.checkUpdate(
-            release = release("v0.7.4", apkSize = 11_296_176L, buildNumber = 7017),
+            release = release("v0.7.4", apkSize = 11_296_176L, buildNumber = 7018),
             currentVersionName = "0.7.4",
             currentBuildTimeMillis = Instant.parse("2026-11-04T12:00:00Z").toEpochMilli(),
             installedSizeBytes = 11_296_176L,
-            currentBuildNumber = 7016,
+            currentBuildNumber = 7017,
         )
 
         assertEquals(UpdateType.SAME_RELEASE_PATCH, availability.type)
@@ -147,14 +148,14 @@ class UpdateDetectorTest {
 
     @Test
     fun `an install two builds behind still sees only a patch`() {
-        // The plant does not update on the day the binary ships. A phone that stayed on 7015 must reach 7017 by
+        // The plant does not update on the day the binary ships. A phone that stayed on 7016 must reach 7018 by
         // the same comparison, one step, without a public version change to lean on.
         val availability = UpdateDetector.checkUpdate(
-            release = release("v0.7.4", apkSize = 11_296_176L, buildNumber = 7017),
+            release = release("v0.7.4", apkSize = 11_296_176L, buildNumber = 7018),
             currentVersionName = "0.7.4",
             currentBuildTimeMillis = 0L,
-            installedSizeBytes = 11_295_724L,
-            currentBuildNumber = 7015,
+            installedSizeBytes = 11_296_176L,
+            currentBuildNumber = 7016,
         )
 
         assertEquals(UpdateType.SAME_RELEASE_PATCH, availability.type)

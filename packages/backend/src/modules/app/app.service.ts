@@ -34,8 +34,12 @@ export const LOCAL_APK_FILENAME = 'trindade-0.7.4.apk';
  * wrote a failed read over it, so the screen could turn into "nothing was launched today" because the network
  * blinked. A build number is never reused -- 7016 is already installed somewhere -- so this correction gets its
  * own, and an installed 7016 updates exactly as 7015 did.
+ *
+ * 7018 replaced 7017 for the Massas screen: coming back to it refreshed the day and not the plant's mirror, so a
+ * launch whose seat was already in the ERP kept offering Editar until the app was restarted. Same rule, third
+ * time: the number goes up, the assets of `v0.7.4` are replaced, and a phone running 7017 sees the update.
  */
-export const LOCAL_APK_BUILD_NUMBER = 7017;
+export const LOCAL_APK_BUILD_NUMBER = 7018;
 
 const LOCAL_APK_PATH = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
