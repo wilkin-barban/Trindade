@@ -66,13 +66,33 @@ guardó: no es un problema de la planta y no se arregla reintentando contra el E
 
 ```bash
 sqlite3 <ruta-a-la-base> \
-  "select date, count(*), sum(case when reconciled_at is not null then 1 else 0 end)
-     from aero_movements where date = '<día-de-hoy>' group by date;"
+  "select movement_date, count(*) as seats
+     from aero_movements where movement_date = '<día-de-hoy>'
+     group by movement_date;"
 ```
 
-Esperado: el día tiene los asientos que el ERP informó en `seats`, y las filas lanzadas aparecen conciliadas
-(`reconciled_at` no nulo). El espejo guarda **todo** lo que el ERP devolvió —masas e insumos—; la tabla de
-Masas oculta los insumos y eso no es un filtro de la base.
+Para ver qué asientos concretos llegaron:
+
+```bash
+sqlite3 <ruta-a-la-base> \
+  "select ent_lan, product_code, quantity, operator_name, movement_type
+     from aero_movements where movement_date = '<día-de-hoy>'
+     order by ent_lan, product_code;"
+```
+
+Esperado: el día tiene los asientos que el ERP informó en `seats`. La tabla guarda **todo** lo que el ERP
+devolvió —masas e insumos—; la tabla de Masas oculta los insumos y eso no es un filtro de la base.
+
+`aero_movements` es un espejo crudo del ERP y **no tiene una columna `reconciled_at`**. La conciliación se
+calcula al leer, comparando los lanzamientos locales con los asientos por fecha, producto, unidades y operador.
+Para comprobar ese estado, usá la tabla unificada de la app/web o:
+
+```text
+GET /api/massas-launch/report?date=<día-de-hoy>
+```
+
+Ese endpoint devuelve `reconciledEntLans` y las filas del reporte; no consultes una columna de conciliación
+persistida porque no existe.
 
 ## 5. Qué mirar si falla
 
