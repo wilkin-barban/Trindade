@@ -32,4 +32,4 @@ test-results/
 
 # Documentation and process artifacts that no image needs.
 openspec/
-PRD_Trindade.md
+doc/

@@ -4,15 +4,18 @@ Runbook para comprobar, en la planta y con un día **abierto**, que el lanzamien
 lectura del día, que esa lectura deja el espejo completo y que las filas quedan conciliadas sin que nadie
 pulse «Sincronizar com ERP».
 
-> **Estado:** pendiente de ejecución real. Este documento se escribió desde una máquina que no alcanza
-> `192.168.25.250:1453`; los pasos están listos para que los ejecute quien tenga la tablet en la LAN de la
-> fábrica. Hasta que se corra, la verificación de punta a punta con el ERP real sigue abierta.
+> **Estado:** verificado en planta el **2026-11-05**.
+>
+> Los cinco lanzamientos de la jornada quedaron conciliados y el operador confirmó el estado también en la
+> tablet y en la base del ERP de la empresa. El detalle está en el §7.
 
 ## 0. Antes de empezar
 
 - Un día **abierto** (hoy en São Paulo), con al menos una caja pendiente de lanzar en Masas.
-- La tablet con el build `0.7.2` instalado y la integración configurada: URL `http://192.168.25.250:1453/api`,
-  usuario y contraseña del WebService, y el atajo `Aero32 Bridge` en la app Atajos.
+- La tablet con el build `0.7.4` instalado y la integración configurada: URL `http://192.168.25.250:1453/api`,
+  usuario y contraseña del WebService, y el atajo `Aero32 Bridge` en la app Atajos. La ejecución del
+  2026-11-05 usó `7017` para los primeros envíos y `7018` para `#116`; el actualizador pasa de un build al
+  siguiente por `buildNumber`.
 - La tablet en la Wi-Fi de la planta. Sin esa red, el ERP no es alcanzable y todo lo que sigue falla con
   `AERO_NO_PLANT_WIFI` o `AERO_ERP_UNREACHABLE`.
 - Acceso SSH al servidor de Trindade para leer el log y la base.
@@ -116,8 +119,27 @@ persistida porque no existe.
 - No instalar el APK desde el emulador ni por `adb`: la tablet la actualiza el operador con el actualizador de
   la app.
 
-## 7. Cómo se cierra
+## 7. Resultado de la ejecución — 2026-11-05
 
-La prueba queda cerrada cuando los cuatro puntos anteriores se cumplen con el día de hoy: una lectura por
+| Lanzamiento | Asiento ERP | Unidades | Lectura |
+| --- | ---: | ---: | --- |
+| `#112` (`5000`, 223 cajas) | `36016` | 2.230 | `13/13` |
+| `#113` (`22`, 8 cajas) | `36017` | 120 | `15/15` |
+| `#114` (`5000`, 30 cajas) | `36018` | 300 | `15/15` |
+| `#115` (`5000`, 30 cajas) | `36020` | 300 | `17/17` |
+| `#116` (`5000`, 60 cajas) | `36024` | 600 | `21/21` |
+
+- La reconciliación del backend emparejó los cinco lanzamientos con esos cinco asientos, sin
+  `unmatchedLaunchIds`.
+- `#116` tuvo intentos previos con `AERO_NO_PLANT_WIFI` y `AERO_ERP_UNREACHABLE`; al volver a la red de la
+  planta terminó con `launch_sync` HTTP 200 y una lectura final `seats=21 saved=21`. No dejó asiento duplicado.
+- El operador confirmó los cinco productos como conciliados en la tablet y en la base del ERP de la empresa.
+- El espejo `aero_movements` del día contiene 21 asientos; no se usó `reconciled_at` porque esa columna no
+  existe. La conciliación se comprobó por la tabla unificada y por la función real del backend.
+
+## 8. Cómo se cierra
+
+La prueba queda cerrada cuando se cumplen los cuatro puntos anteriores con el día de hoy: una lectura por
 lote, `seats == saved`, el espejo con el día completo y las filas lanzadas conciliadas. Se anota la fecha, el
-`attemptId` del par y el resultado en el historial de release.
+`attemptId` del par y el resultado en el historial de release. La ejecución del 2026-11-05 quedó cerrada con
+los datos de la tabla anterior.
