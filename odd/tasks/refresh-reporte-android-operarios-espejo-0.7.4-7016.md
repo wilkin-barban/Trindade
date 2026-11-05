@@ -46,8 +46,8 @@ S14. El reporte final incluye ODD, commits, tests, CI, hashes, el asset reemplaz
 - [x] T8 — Suites afectadas verdes (Android, backend, web) y typecheck. `S1-S5`.
 - [x] T9 — Entrega 7016: `app.service.ts` con `LOCAL_APK_BUILD_NUMBER=7016`, test de `UpdateDetector` 7015 → 7016, CHANGELOG, docs de release y notas internas. `S6-S8, S10`.
 - [x] T10 — APK firmado 7016, verificación de firma y sha256, reemplazo de assets del release `v0.7.4` con `--clobber`. `S8, S9`.
-- [ ] T11 — Imágenes API y web, despliegue, salud, `/latest-release`, descarga y sha256. `S11`.
-- [ ] T12 — Push a `main`, CI verde y reporte final. `S12-S14`.
+- [x] T11 — Imágenes API y web, despliegue, salud, `/latest-release`, descarga y sha256. `S11`.
+- [x] T12 — Push a `main`, CI verde y reporte final. `S12-S14`.
 
 ## Riesgos
 
@@ -142,3 +142,23 @@ L5 — Entrega 7016 (misma versión pública, sin tag nuevo):
 - Constancia: este documento, `CHANGELOG.md` (sin el número), `docs/release-android.md`,
   `docs/release-android-historial.md` (donde vive el código de build interno) y
   `docs/agents/trindade-development.md`.
+
+L6 — Publicación y cierre (2026-11-04 22:07–22:22 -03):
+
+- Commits en `main`: `8303fedc` (fix Android + ODD) y `a8c2763d` (entrega 7016, APK, sidecar y docs). Push
+  `460130d6..a8c2763d` a `origin/main`; CI del head de código: `verify` y `android` en verde, run
+  `41946818304` completado con éxito.
+- Imágenes `api` y `web` reconstruidas y recreadas; `trindade-api-1` y `trindade-web-1` en `healthy`.
+  Producción (puertos internos `3005`/`8085` detrás del proxy) responde:
+  - `GET /api/app/latest-release` → `version v0.7.4`, `buildNumber 7016`, `apkSize 11296176`;
+  - `GET /` → `200`, `GET /api/health` → `{"status":"ok"}`;
+  - `GET /api/app/download-apk` → 11.296.176 bytes, sha256 `7b4ae3df…0851`, **idéntico** al APK construido.
+- Assets del release `v0.7.4` reemplazados con `gh release upload v0.7.4 … --clobber`: el APK del release pasó
+  de 11.295.724 a 11.296.176 bytes y su sidecar verifica con `sha256sum -c`; la descarga desde GitHub es byte a
+  byte el mismo binario. El tag no se movió: `v0.7.4` sigue siendo el objeto anotado `94e7f203`, que apunta a
+  `4aef9141`. `v0.7.0`–`v0.7.3` sin tocar.
+- Notas públicas del release corregidas en lo que la sustitución dejó falso (tamaño, sha256 y el conteo de
+  pruebas) y ampliadas con el arreglo de Relatório; **sin** publicar el `buildNumber` como valor.
+- Suites finales: Android 1382/1382 en 147 clases (incluye el pin 7015 → 7016), backend 737/737, web `test:node`
+  574/574. Ningún APK instalado en emulador ni teléfono. El archivo temporal con la contraseña del keystore se
+  borró al terminar.
