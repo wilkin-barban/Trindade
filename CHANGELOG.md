@@ -38,6 +38,10 @@ con una frase lo que un dato compacto dice mejor.
   el detalle releen al retomar la pantalla y después de sincronizar, siempre para el día del reporte y nunca para
   el «hoy» del dispositivo; una respuesta vacía conserva lo que el operario está leyendo. Cada operario muestra su
   desglose por producto y el día cierra con el **Resumo coletivo**, igual que la web.
+- **Massas deja de ofrecer Editar para lo que el ERP ya registró.** Al volver a la pantalla sólo se refrescaba
+  el día, no el espejo de la planta: dos lanzamientos que el ERP ya tenía como asientos seguían dibujándose
+  pendientes y ofrecían Editar y Eliminar hasta reiniciar la app. Ahora reanudar —y cada turno del polling— lee el
+  día y el espejo juntos, y recargar la misma fecha conserva el espejo que ya se había leído en vez de vaciarlo.
 
 ## [0.7.3] — 2026-11-04
 

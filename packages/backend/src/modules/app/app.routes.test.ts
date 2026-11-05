@@ -52,7 +52,7 @@ describe('App Routes - /api/app', () => {
     assert.strictEqual(body.version, FALLBACK_RELEASE.version);
     assert.strictEqual(body.apkUrl, TRINDADE_APK_DOWNLOAD_URL);
     assert.strictEqual(body.apkName, 'trindade.apk');
-    assert.strictEqual(body.buildNumber, 7017);
+    assert.strictEqual(body.buildNumber, 7018);
     assert.strictEqual(body.webUrl, 'https://trindademasas.duckdns.org');
   });
 
@@ -210,9 +210,9 @@ describe('App Routes - /api/app', () => {
       assert.strictEqual(body.version, 'v0.7.4');
       assert.strictEqual(body.apkUrl, TRINDADE_APK_DOWNLOAD_URL);
       assert.strictEqual(body.apkSize, 'PK\x03\x04signed-apk-bytes'.length);
-      // 7017 and not 7016: this is the second replacement of the 0.7.4 binary under the same public version,
-      // and the number is the only thing an installed 7016 can compare to notice it has to update.
-      assert.strictEqual(body.buildNumber, 7017);
+      // 7018 and not 7017: this is the third replacement of the 0.7.4 binary under the same public version,
+      // and the number is the only thing an installed 7017 can compare to notice it has to update.
+      assert.strictEqual(body.buildNumber, 7018);
     });
 
     it('serves the local binary as the download', async () => {
