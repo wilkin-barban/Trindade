@@ -59,6 +59,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.trindade.app.R
+import com.trindade.app.network.MassaIndividualLaunch
 import com.trindade.app.ui.BrazilianPhoneVisualTransformation
 import com.trindade.app.ui.components.AdminSecondaryButton
 import com.trindade.app.ui.components.HelpSection
@@ -507,40 +508,13 @@ fun MassasLaunchScreen(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
 
-                                    if (launch == null) {
-                                        // La tableta lo registró y nadie acá lo lanzó: se lee, no se edita.
-                                        // La tarjeta unificada de arriba tiene la acción que le corresponde.
-                                        Text(
-                                            text = stringResource(R.string.massas_erp_only_read_only),
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    } else if (row.state == MassasRowState.RECONCILED) {
-                                        Text(
-                                            text = stringResource(R.string.massas_state_reconciled),
-                                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                                            color = MaterialTheme.colorScheme.primary,
-                                        )
-                                    } else if (viewModel.canEdit(launch)) {
-                                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                            TextButton(
-                                                onClick = { viewModel.startEdit(launch) },
-                                                modifier = Modifier.defaultMinSize(minHeight = 48.dp),
-                                            ) {
-                                                Text(stringResource(R.string.massas_edit), style = MaterialTheme.typography.labelMedium)
-                                            }
-                                            TextButton(
-                                                onClick = { viewModel.promptDelete(launch.id) },
-                                                modifier = Modifier.defaultMinSize(minHeight = 48.dp),
-                                            ) {
-                                                Text(
-                                                    stringResource(R.string.massas_delete),
-                                                    style = MaterialTheme.typography.labelMedium,
-                                                    color = MaterialTheme.colorScheme.error,
-                                                )
-                                            }
-                                        }
-                                    }
+                                    MassasLaunchRowActions(
+                                        state = row.state,
+                                        launch = launch,
+                                        canEdit = viewModel::canEdit,
+                                        onEdit = viewModel::startEdit,
+                                        onDelete = { viewModel.promptDelete(it.id) },
+                                    )
                                 }
                             }
                         }
@@ -966,6 +940,53 @@ fun MassasLaunchScreen(
 /**
  * Filter chip matching Material 3 token roles with an outer >=48dp touch target and inner 32dp pill.
  */
+@Composable
+internal fun MassasLaunchRowActions(
+    state: MassasRowState,
+    launch: MassaIndividualLaunch?,
+    canEdit: (MassaIndividualLaunch) -> Boolean,
+    onEdit: (MassaIndividualLaunch) -> Unit,
+    onDelete: (MassaIndividualLaunch) -> Unit,
+) {
+    // The order is the rule: a seat nobody launched here is read only, and a launch the plant already has is
+    // settled -- offering the buttons for it would let one of the two records disagree with the other. `canEdit`
+    // asks the ViewModel, which asks the same rows, so this branch is the belt to that braces.
+    if (launch == null) {
+        // La tableta lo registró y nadie acá lo lanzó: se lee, no se edita.
+        // La tarjeta unificada de arriba tiene la acción que le corresponde.
+        Text(
+            text = stringResource(R.string.massas_erp_only_read_only),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    } else if (state == MassasRowState.RECONCILED) {
+        Text(
+            text = stringResource(R.string.massas_state_reconciled),
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = MaterialTheme.colorScheme.primary,
+        )
+    } else if (canEdit(launch)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            TextButton(
+                onClick = { onEdit(launch) },
+                modifier = Modifier.defaultMinSize(minHeight = 48.dp),
+            ) {
+                Text(stringResource(R.string.massas_edit), style = MaterialTheme.typography.labelMedium)
+            }
+            TextButton(
+                onClick = { onDelete(launch) },
+                modifier = Modifier.defaultMinSize(minHeight = 48.dp),
+            ) {
+                Text(
+                    stringResource(R.string.massas_delete),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun MassasFilterChip(
     selected: Boolean,
