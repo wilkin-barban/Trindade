@@ -347,6 +347,34 @@ class ReportDetailViewModelTest {
     }
 
     /**
+     * A resume whose massas read answers nothing keeps the day already drawn.
+     *
+     * The refresh exists because the mirror moves; it must not be able to take the day away. A phone that walks
+     * out of the plant's Wi-Fi and comes back has a report open, one failed read behind it, and no business
+     * being shown "nothing was launched today" -- that sentence is a claim about the plant, not about the network.
+     */
+    @Test
+    fun `a resume whose massas read answers nothing keeps the day already drawn`() {
+        val source = GrowingDetailDaySource(first = listOf(detailOperator("Ana Paula")), second = null)
+        val model = ReportDetailViewModel(
+            repository = ReportsRepository(FakeReportsApi()),
+            compressor = FakePhotoCompressor(),
+            massasRepository = source,
+        )
+
+        model.load(REPORT_ID)
+        assertEquals(listOf("Ana Paula"), model.state.value.massasDay?.operators?.map { it.displayName })
+
+        model.onScreenResumed()
+
+        assertEquals(listOf("2026-09-18", "2026-09-18"), source.dates)
+        assertEquals(
+            listOf("Ana Paula"),
+            model.state.value.massasDay?.operators?.map { it.displayName },
+        )
+    }
+
+    /**
      * Nothing to refresh before the report arrives: the date the card would ask for is the report's own.
      *
      * Reading `saopauloToday()` here would be the bug this pins -- the time between the screen appearing and the

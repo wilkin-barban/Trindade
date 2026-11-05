@@ -29,8 +29,13 @@ export const LOCAL_APK_FILENAME = 'trindade-0.7.4.apk';
  * 7016 replaced 7015 while `versionName` stayed 0.7.4: the 0.7.4 binary Relatório shipped in did not redraw the
  * operators that arrive through the ERP mirror, and the public version could not move for a fix. An installed
  * 7015 compares this number, sees it went up and updates itself; anything lower would leave it silently stale.
+ *
+ * 7017 replaced 7016 the same day for the other half of that fix: the detail refreshed its day on resume and
+ * wrote a failed read over it, so the screen could turn into "nothing was launched today" because the network
+ * blinked. A build number is never reused -- 7016 is already installed somewhere -- so this correction gets its
+ * own, and an installed 7016 updates exactly as 7015 did.
  */
-export const LOCAL_APK_BUILD_NUMBER = 7016;
+export const LOCAL_APK_BUILD_NUMBER = 7017;
 
 const LOCAL_APK_PATH = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),

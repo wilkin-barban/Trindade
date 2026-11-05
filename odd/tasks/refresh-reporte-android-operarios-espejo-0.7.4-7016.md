@@ -162,3 +162,29 @@ L6 — Publicación y cierre (2026-11-04 22:07–22:22 -03):
 - Suites finales: Android 1382/1382 en 147 clases (incluye el pin 7015 → 7016), backend 737/737, web `test:node`
   574/574. Ningún APK instalado en emulador ni teléfono. El archivo temporal con la contraseña del keystore se
   borró al terminar.
+
+L7 — Verificación independiente y corrección 7017 (2026-11-04 23:00 -03):
+
+- El verificador independiente (`gentle-ai-verify`, read-only) confirmó por observación los puntos de entrega:
+  árbol limpio en `d8622131`, `v0.7.4` en `4aef9141` sin tags nuevos, APK del release idéntico al de producción
+  en bytes y sha256, firma v2 con el certificado fijado, `latest-release` = `v0.7.4` / 7016 y documentación
+  coherente con el hash vigente.
+- Encontró un defecto real que L4 daba por resuelto: en `ReportDetailViewModel.refreshMassas` la lectura del día
+  se escribía **sin** guarda de nulo, así que una reanudación sin red borraba el día ya dibujado y dejaba el
+  detalle en «nada se lanzó hoy». `refreshReceipts` y `ReportGeneratorViewModel` sí tenían la guarda: el
+  comentario que decía «same rule as the massas half» era falso. Severidad media; el 7016 publicado lo llevaba.
+- RED: `a resume whose massas read answers nothing keeps the day already drawn` falla con
+  `AssertionError at ReportDetailViewModelTest.kt:371` (17 tests, 1 fallo) antes del arreglo.
+- GREEN: guarda `if (day != null)` en `refreshMassas`; suite completa 1384/1384 en 147 clases, backend 737/737
+  con `LOCAL_APK_BUILD_NUMBER = 7017` (RED previo: 2 fallos con 735 en verde), web `test:node` 574/574.
+- Un número de build no se reutiliza: el 7016 ya está instalado en algún teléfono, así que la corrección sale
+  como 7017 y se sustituyen otra vez los assets de `v0.7.4` con `--clobber`. El APK nuevo pesa exactamente lo
+  mismo que el 7016 (11.296.176 bytes) y sólo el `buildNumber` los distingue; el pin de `UpdateDetectorTest`
+  cubre 7016 → 7017 y un teléfono que se quedó en 7015.
+- APK 7017: `versionCode 7017`, `versionName 0.7.4`, firma v2, certificado `ee0e404b…9573c431f6`, sha256
+  `4e6da04819bb3bc1f7bdfe0de02ce590f2f5493d23d81a3401c5f9e339b21c79`. Producción sirve ese hash y el mismo
+  tamaño; el tag sigue en `4aef9141`.
+- Segunda observación del verificador, no corregida a propósito: al entrar por primera vez hay una lectura
+  extra del día (el `DisposableEffect` recibe `ON_RESUME` al registrarse y `init` ya había leído). Es una
+  petición de más sobre un snapshot idempotente, sin doble conteo ni estado inconsistente; quitarla exigiría
+  una bandera de UI sin prueba, que es peor que la lectura sobrante.

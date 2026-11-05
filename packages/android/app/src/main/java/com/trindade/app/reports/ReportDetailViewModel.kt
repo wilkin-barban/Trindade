@@ -135,7 +135,10 @@ class ReportDetailViewModel @Inject constructor(
         val date = report?.reportDate?.takeIf { it.isNotBlank() } ?: return
         viewModelScope.launch {
             val day = source.reportDay(date)
-            _state.update { it.copy(massasDay = day) }
+            // A refresh that answered nothing must not erase what the operator is reading: an unreachable ERP
+            // would otherwise turn this report into "nothing was launched today", which is a sentence about the
+            // plant and not about the network. At load the state holds null anyway, so opening is unaffected.
+            if (day != null) _state.update { it.copy(massasDay = day) }
         }
     }
 
