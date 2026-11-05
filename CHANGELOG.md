@@ -32,6 +32,12 @@ con una frase lo que un dato compacto dice mejor.
 - **La tableta ya no explica la caja abierta dos veces.** Bajo el operario y en el resumen queda un solo dato
   compacto —«1 caixa aberta · 5 un» / «1 caja abierta · 5 un»— y desaparecen la nota larga y la explicación de que
   las unidades no cierran cajas enteras. El significado es el mismo: hay una caja abierta con ese resto.
+- **Relatório deja de quedarse con la foto del primer momento.** El bloque del día se leía una sola vez al abrir
+  la pantalla, así que un operario que llegaba al espejo del ERP después —porque un compañero lanzó desde el ERP o
+  porque la sincronización corrió en otro teléfono— no aparecía hasta salir y volver a entrar. Ahora el generador y
+  el detalle releen al retomar la pantalla y después de sincronizar, siempre para el día del reporte y nunca para
+  el «hoy» del dispositivo; una respuesta vacía conserva lo que el operario está leyendo. Cada operario muestra su
+  desglose por producto y el día cierra con el **Resumo coletivo**, igual que la web.
 
 ## [0.7.3] — 2026-11-04
 
