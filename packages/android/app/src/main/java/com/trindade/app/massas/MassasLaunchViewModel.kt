@@ -238,6 +238,10 @@ class MassasLaunchViewModel @Inject constructor(
         isScreenActive = active
         val isToday = state.value.date == saopauloToday()
         if (active && isToday) {
+            // Volver a la pantalla es el momento en que el operario mira la fila y decide: el espejo que este
+            // teléfono leyó al abrir puede ser de hace horas, y la planta escribe desde otros teléfonos. Se lee
+            // el día y el espejo juntos, antes de que el polling tenga su primer turno.
+            viewModelScope.launch { refreshDayAndMirror(state.value.date) }
             if (pollingJob == null || pollingJob?.isActive != true) {
                 startPolling()
             }
@@ -257,7 +261,7 @@ class MassasLaunchViewModel @Inject constructor(
                 val isSubmitting = currentState.isSubmitting
                 val isToday = currentState.date == saopauloToday()
                 if (shouldPollMassas(isScreenActive, isEditing, isSubmitting, isToday)) {
-                    silentRefresh()
+                    refreshDayAndMirror(currentState.date)
                 }
             }
         }
@@ -266,6 +270,9 @@ class MassasLaunchViewModel @Inject constructor(
     fun loadDay(date: String) {
         val isToday = date == saopauloToday()
         val isReadOnly = !isToday
+        // La fecha es el token del espejo: la misma fecha es la misma mañana y su espejo ya leído sigue
+        // sirviendo; otra fecha no, porque un asiento de ayer dibujado sobre hoy se lee como de esta mañana.
+        val keepsMirror = date == state.value.date
         if (isReadOnly) {
             pollingJob?.cancel()
             pollingJob = null
@@ -285,21 +292,20 @@ class MassasLaunchViewModel @Inject constructor(
                 // closed day look launchable, and an open one launch what the operator meant for yesterday.
                 quantities = emptyMap(),
                 showConfirmLaunchDialog = false,
-                // The mirror belongs to the day like the boxes do. A seat left over from yesterday drawn over
-                // today is worse than no seat: the operator reads it as this morning's and credits it to the
-                // wrong shift. `refreshMirror` then fills it with whatever Trindade stored for this date.
-                aeroMirror = emptyList(),
+                // Recargar la misma fecha no tira el espejo que ya estaba: la lectura que sigue puede no llegar
+                // y la pantalla se quedaría sin asientos, ofreciendo Editar para lo que la planta ya registró.
+                aeroMirror = if (keepsMirror) state.value.aeroMirror else emptyList(),
                 aeroSyncedAt = aeroSettingsStore.syncedAt(date),
             )
-            val result = repository.day(date)
-            _state.value = _state.value.copy(
-                isLoading = false,
-                dayView = result,
-                errorMessage = if (result == null) UiText.of(R.string.massas_error_load) else null,
-            )
-            // Always, and regardless of this phone's ERP credentials: the day the plant lived is already in
-            // Trindade's database, and opening it is a read of that, not a trip to the factory.
-            refreshMirror(date)
+            val loaded = refreshDayAndMirror(date)
+            // La carga sí dice cuando no trajo nada; el polling no, porque un turno sin respuesta no es una
+            // pantalla sin datos y el aviso quedaría encendido cada quince segundos.
+            if (state.value.date == date) {
+                _state.value = _state.value.copy(
+                    isLoading = false,
+                    errorMessage = if (loaded) null else UiText.of(R.string.massas_error_load),
+                )
+            }
             // Una línea de auditoría que no llegó al backend se reintenta al abrir el día; el lanzamiento
             // nunca depende de este intento.
             aeroDispatcher.flushAudit()
@@ -316,10 +322,33 @@ class MassasLaunchViewModel @Inject constructor(
     }
 
     private suspend fun silentRefresh() {
-        val result = repository.day(state.value.date)
+        refreshDayAndMirror(state.value.date)
+    }
+
+    /**
+     * Reads the day and the plant's mirror together, as one answer.
+     *
+     * They are two different reads and the screen needs both: the day is what this phone launched, the mirror is
+     * what the plant has registered, and a row's state is the question of whether those two agree. Refreshing
+     * only the day -- what the polling used to do -- left the mirror at the reading of the morning, so a launch
+     * whose seat already existed in the ERP kept offering Editar.
+     *
+     * The date is the token, like in [refreshMirror]: an answer for a day that is no longer on screen is dropped.
+     * A read that answers nothing keeps what is already drawn, because "the network did not answer" and "the
+     * plant has nothing" are different sentences and only one of them is about the plant.
+     */
+    private suspend fun refreshDayAndMirror(date: String): Boolean {
+        val result = repository.day(date)
+        if (state.value.date != date) return false
+        // Only the day and the mirror: `errorMessage` belongs to whatever the operator just tried, and a poll
+        // that clears it every fifteen seconds would erase the reason a launch was refused.
         if (result != null) {
             _state.value = _state.value.copy(dayView = result)
         }
+        // Always, and regardless of this phone's ERP credentials: the day the plant lived is already in
+        // Trindade's database, and opening it is a read of that, not a trip to the factory.
+        refreshMirror(date)
+        return result != null
     }
 
     fun onQuantityChange(productCode: String, value: String) {
