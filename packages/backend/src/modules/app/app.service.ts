@@ -25,8 +25,12 @@ export const LOCAL_APK_FILENAME = 'trindade-0.7.4.apk';
  * weak accident of compression. The app compares this number when the public version is unchanged;
  * `versionCode` stays out of the public release notes, but the update endpoint has to expose the
  * identity the installed client needs to make the decision.
+ *
+ * 7016 replaced 7015 while `versionName` stayed 0.7.4: the 0.7.4 binary Relatório shipped in did not redraw the
+ * operators that arrive through the ERP mirror, and the public version could not move for a fix. An installed
+ * 7015 compares this number, sees it went up and updates itself; anything lower would leave it silently stale.
  */
-export const LOCAL_APK_BUILD_NUMBER = 7015;
+export const LOCAL_APK_BUILD_NUMBER = 7016;
 
 const LOCAL_APK_PATH = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),

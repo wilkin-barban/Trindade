@@ -106,16 +106,26 @@ Los dos números se calculan una sola vez en `build.gradle.kts` y alimentan tant
 | 0.7.1 | — | **Publicada** | Actualización por `buildNumber` en `/latest-release`, versión pública servida por producción y asset de GitHub Release `v0.7.1`. El código de build es interno. |
 | 0.7.3 | 7014 | 2026-11-04 | **Publicada** | Las cajas del día se calculan con el total del producto (redondeo único), la caja abierta se anota en palabras y las dos secciones inferiores se alimentan de las filas unificadas, de modo que un operario que sólo existe en el ERP aparece, se filtra y suma su subtotal. |
 | 0.7.2 | 7013 | 2026-11-04 | **Publicada** | Remediación de los hallazgos de auditoría 7006/7007/0.7.1: espejo distinto de backend inalcanzable, sesión que olvida la contraseña del ERP, despacho serializado, cola con traza, borrado de lote sólo Administrador, intento correlacionado y histórico táctil. |
-| 0.7.4 | 7015 | 2026-11-04 | **Publicada** | La masa se decide por código: sólo los diez del catálogo son producción y el resto es insumo, así que Relatório separa Masas de Insumos, el WhatsApp del día incluye a los operarios Só ERP desde las filas unificadas y la tableta muestra la caja abierta como un dato compacto (`1 caixa aberta · N un`) en lugar de la explicación larga. |
+| 0.7.4 | 7016 | 2026-11-04 | **Publicada** | Sustitución de la 0.7.4/7015 sin mover la versión pública: Relatório relee las masas del día al reanudar la pantalla y después de sincronizar, el detalle respeta la fecha del reporte y cada operario muestra su desglose por producto junto al resumen colectivo del día. |
+| 0.7.4 | 7015 | 2026-11-04 | Reemplazada | La masa se decide por código: sólo los diez del catálogo son producción y el resto es insumo, así que Relatório separa Masas de Insumos, el WhatsApp del día incluye a los operarios Só ERP desde las filas unificadas y la tableta muestra la caja abierta como un dato compacto (`1 caixa aberta · N un`) en lugar de la explicación larga. |
 
 Las builds 0.6.x se distribuyeron por `GET /api/app/download-apk`, no por un tag de GitHub. Los hashes y las
 verificaciones completas están en [release-android-historial.md](release-android-historial.md).
 
-> **Estado final del 2026-11-04.** La versión **0.7.4** (build 7015) es la publicada: `packages/backend/apk/trindade-0.7.4.apk`
-> son 11.295.724 bytes, sha256 `cfde493af39b8a8ef749e4162b84f7a4a8a157c13d0ef14b76f04b1318175342`, firmada con el mismo
+> **Estado final del 2026-11-04.** La versión **0.7.4** (build 7016) es la publicada: `packages/backend/apk/trindade-0.7.4.apk`
+> son 11.296.176 bytes, sha256 `7b4ae3df7d632a55cfa2ed6c09444f000763e01a1703c1d638a08ad4b0df0851`, firmada con el mismo
 > certificado del proyecto, y la GitHub Release `v0.7.4` publica ese mismo binario con su `.sha256`
-> (`https://github.com/wilkinbarban/Trindade/releases/tag/v0.7.4`). La release anterior (0.7.3, build 7014)
+> (`https://github.com/wilkinbarban/Trindade/releases/tag/v0.7.4`). El tag `v0.7.4` no se movió: sus assets se
+> reemplazaron con `--clobber`, porque la 0.7.4/7015 mostraba en Relatório la foto del espejo ERP que había al
+> abrir la pantalla y no la de los operarios que llegaban después. La release anterior (0.7.3, build 7014)
 > sigue intacta como asset de `v0.7.3`.
+>
+> **Estado anterior, 2026-11-04.** La versión **0.7.4** (build 7015) fue la publicada esa mañana:
+> `packages/backend/apk/trindade-0.7.4.apk` eran 11.295.724 bytes, sha256
+> `cfde493af39b8a8ef749e4162b84f7a4a8a157c13d0ef14b76f04b1318175342`, firmada con el mismo certificado del
+> proyecto. Sustituida el mismo día por el build 7016 bajo la misma versión pública; una instalación de 7015 lo
+> detecta por la comparación de `buildNumber` que publica `/api/app/latest-release`
+> (`SAME_RELEASE_PATCH`), no por el tamaño ni por la versión.
 >
 > **Estado anterior, 2026-11-04.** La versión **0.7.3** (build 7014) es la publicada: `packages/backend/apk/trindade-0.7.3.apk`
 > son 11.295.876 bytes, sha256 `593ffc646efc01c4b0e7cedddfe728e9acb45544ec81a3bf4a6a1ba85576aa21`, firmada con el mismo
