@@ -7,7 +7,7 @@ export const TRINDADE_APK_DOWNLOAD_URL =
   'https://trindademasas.duckdns.org/api/app/download-apk';
 
 export const FALLBACK_UPSTREAM_APK_URL =
-  'https://github.com/wilkin-barban/Trindade/releases/download/v0.7.4/trindade-0.7.4.apk';
+  'https://github.com/wilkin-barban/Trindade/releases/download/v0.7.5/trindade-0.7.5.apk';
 
 /**
  * The signed APK this project ships.
@@ -16,7 +16,7 @@ export const FALLBACK_UPSTREAM_APK_URL =
  * backend and is served from disk. Resolving it from this module and not from `process.cwd()` keeps the same
  * path in `tsx` (src/modules/app) and in the image (dist/modules/app), three levels below `packages/backend`.
  */
-export const LOCAL_APK_FILENAME = 'trindade-0.7.4.apk';
+export const LOCAL_APK_FILENAME = 'trindade-0.7.5.apk';
 
 /**
  * The internal build the file on disk carries.
@@ -38,8 +38,15 @@ export const LOCAL_APK_FILENAME = 'trindade-0.7.4.apk';
  * 7018 replaced 7017 for the Massas screen: coming back to it refreshed the day and not the plant's mirror, so a
  * launch whose seat was already in the ERP kept offering Editar until the app was restarted. Same rule, third
  * time: the number goes up, the assets of `v0.7.4` are replaced, and a phone running 7017 sees the update.
+ *
+ * 0.7.5 is the first public version raised since 0.7.3, and it is raised for one reason: `RELEASES_URL` is
+ * compiled into the APK, so the Perfil screen of every installed 7018 still opens the repository the project
+ * left, which no longer resolves. No server-side change can reach a string that lives inside a signed binary;
+ * only a new binary can. The build number keeps its own monotonically rising series (7019), so a phone running
+ * 7018 compares it, sees it went up and updates, while the public version is what tells everyone else that this
+ * is a release of its own rather than another replacement of 0.7.4.
  */
-export const LOCAL_APK_BUILD_NUMBER = 7018;
+export const LOCAL_APK_BUILD_NUMBER = 7019;
 
 const LOCAL_APK_PATH = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -70,7 +77,7 @@ function localApk(): { path: string; size: number; modifiedAt: string } | null {
 }
 
 export const FALLBACK_RELEASE: LatestReleaseResponse = {
-  version: 'v0.7.4',
+  version: 'v0.7.5',
   apkUrl: TRINDADE_APK_DOWNLOAD_URL,
   apkName: 'trindade.apk',
   apkSize: null,

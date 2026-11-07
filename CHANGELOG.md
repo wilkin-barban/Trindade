@@ -10,6 +10,31 @@ verificaciones está en [docs/release-android-historial.md](docs/release-android
 
 ---
 
+## [0.7.5] — 2026-11-07
+
+El repositorio oficial del proyecto pasa a `github.com/wilkin-barban/Trindade`, y la versión pública se mueve
+por primera vez desde 0.7.3 para que los equipos instalados puedan alcanzarlo.
+
+### Añadido
+
+- APK firmado **0.7.5**, build interno **7019**: el único cambio de producto es el enlace **Perfil → Releases**,
+  que ahora abre el repositorio oficial nuevo.
+
+### Cambiado
+
+- El feed de releases del backend, su URL de respaldo del APK y el default `RELEASES_URL` de Gradle apuntan al
+  repositorio nuevo; el anterior (`wilkinbarban/Trindade`) ya no resuelve.
+- README, guía de despliegue y documentación de release actualizados al repositorio nuevo.
+
+### Notas
+
+- La versión pública se mueve por una razón de empaquetado y no por funcionalidad: `RELEASES_URL` se compila
+  dentro del APK, así que ningún cambio del servidor puede corregir el enlace de un equipo que ya tiene 0.7.4.
+  Sólo un binario nuevo alcanza esa cadena. El `versionCode` sigue su serie interna para que un equipo con el
+  build anterior compare y vea que tiene que actualizarse.
+- La instalación no depende de GitHub: la app consulta `GET /api/app/latest-release` y descarga por
+  `GET /api/app/download-apk`. La release de GitHub conserva el binario junto a su versión y su `.sha256`.
+
 ## [0.7.4] — 2026-11-04
 
 Una sola regla decide qué es masa: el código. Los diez códigos del catálogo son producción; cualquier otro
