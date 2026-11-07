@@ -74,7 +74,7 @@ val effectiveVersionCode = declaredVersionCode ?: 6003
 // this APK is published, because a README and a Gradle default cannot be one value here. The duplication is
 // therefore deliberate and each copy names the other: if the page moves, this line and that one change
 // together. Nothing reads the README from here, and no mechanism is invented to make the two agree.
-val defaultReleasesUrl = "https://github.com/wilkinbarban/Trindade/releases/latest"
+val defaultReleasesUrl = "https://github.com/wilkin-barban/Trindade/releases/latest"
 
 // Read at script level as well as inside defaultConfig, because the release guard below runs outside the
 // android block and cannot see a value that only exists in there. One read, so the field the app receives

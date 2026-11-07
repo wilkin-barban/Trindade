@@ -309,7 +309,7 @@ Perder el keystore significa que ninguna copia instalada de la app podrá actual
 
 Hay dos vías:
 
-1. **GitHub Releases:** <https://github.com/wilkinbarban/Trindade/releases/latest>. El asset se llama
+1. **GitHub Releases:** <https://github.com/wilkin-barban/Trindade/releases/latest>. El asset se llama
    `trindade-<versión>.apk` y va acompañado de su `.sha256`.
 2. **Instancia de producción:** `GET /api/app/download-apk`, que sirve el APK incluido en
    `packages/backend/apk/`. La app consulta `GET /api/app/latest-release` para verificar la versión.
