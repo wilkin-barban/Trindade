@@ -13,7 +13,7 @@ nombran los commits, qué pruebas ejecutar antes de publicar y cómo se mantiene
 ## 2. Puesta en marcha
 
 ```bash
-git clone https://github.com/wilkinbarban/Trindade.git
+git clone https://github.com/wilkin-barban/Trindade.git
 cd Trindade
 make install
 cp .env.example .env

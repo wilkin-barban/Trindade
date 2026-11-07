@@ -416,7 +416,7 @@ docker volume create trindade_sqlite_data
 Luego:
 
 ```bash
-git clone https://github.com/wilkinbarban/Trindade.git
+git clone https://github.com/wilkin-barban/Trindade.git
 cd Trindade
 cp .env.example .env
 # Editar .env:

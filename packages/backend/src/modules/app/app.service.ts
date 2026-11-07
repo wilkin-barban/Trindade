@@ -7,7 +7,7 @@ export const TRINDADE_APK_DOWNLOAD_URL =
   'https://trindademasas.duckdns.org/api/app/download-apk';
 
 export const FALLBACK_UPSTREAM_APK_URL =
-  'https://github.com/wilkinbarban/Trindade/releases/download/v0.7.4/trindade-0.7.4.apk';
+  'https://github.com/wilkin-barban/Trindade/releases/download/v0.7.4/trindade-0.7.4.apk';
 
 /**
  * The signed APK this project ships.
@@ -80,7 +80,7 @@ export const FALLBACK_RELEASE: LatestReleaseResponse = {
 };
 
 export const GITHUB_LATEST_RELEASE_URL =
-  'https://api.github.com/repos/wilkinbarban/Trindade/releases/latest';
+  'https://api.github.com/repos/wilkin-barban/Trindade/releases/latest';
 
 export const RELEASE_CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutos en memoria
 
@@ -156,7 +156,7 @@ export async function getLatestRelease(options: { forceRefresh?: boolean } = {})
 
     const upstreamApkUrl =
       apkAsset?.browser_download_url ||
-      `https://github.com/wilkinbarban/Trindade/releases/download/${tagName}/trindade-${cleanTag}.apk`;
+      `https://github.com/wilkin-barban/Trindade/releases/download/${tagName}/trindade-${cleanTag}.apk`;
 
     const apkSize = typeof apkAsset?.size === 'number' ? apkAsset.size : null;
     const publishedAt = payload.published_at || null;

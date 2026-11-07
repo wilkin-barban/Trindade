@@ -70,7 +70,7 @@ describe('App Routes - /api/app', () => {
             {
               name: 'trindade-0.5.0.apk',
               browser_download_url:
-                'https://github.com/wilkinbarban/Trindade/releases/download/v0.5.0/trindade-0.5.0.apk',
+                'https://github.com/wilkin-barban/Trindade/releases/download/v0.5.0/trindade-0.5.0.apk',
               size: 26500000,
             },
           ],
@@ -107,7 +107,7 @@ describe('App Routes - /api/app', () => {
             {
               name: 'trindade-0.5.1.apk',
               browser_download_url:
-                'https://github.com/wilkinbarban/Trindade/releases/download/v0.5.1/trindade-0.5.1.apk',
+                'https://github.com/wilkin-barban/Trindade/releases/download/v0.5.1/trindade-0.5.1.apk',
               size: 27000000,
             },
           ],

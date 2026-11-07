@@ -1,8 +1,8 @@
 # Trindade Massas Operações
 
-[![Release](https://img.shields.io/github/v/release/wilkinbarban/Trindade?label=Release&color=blue)](https://github.com/wilkinbarban/Trindade/releases/latest)
-[![CI](https://img.shields.io/badge/CI-Passing-brightgreen)](https://github.com/wilkinbarban/Trindade/actions/workflows/ci.yml)
-[![Android APK](https://img.shields.io/badge/Android-APK%20firmado-purple)](https://github.com/wilkinbarban/Trindade/releases/latest)
+[![Release](https://img.shields.io/github/v/release/wilkin-barban/Trindade?label=Release&color=blue)](https://github.com/wilkin-barban/Trindade/releases/latest)
+[![CI](https://img.shields.io/badge/CI-Passing-brightgreen)](https://github.com/wilkin-barban/Trindade/actions/workflows/ci.yml)
+[![Android APK](https://img.shields.io/badge/Android-APK%20firmado-purple)](https://github.com/wilkin-barban/Trindade/releases/latest)
 [![Licencia: MIT](https://img.shields.io/badge/Licencia-MIT-yellow.svg)](LICENSE)
 
 Plataforma operativa de **Trindade Massas** para registrar la producción de masas, los reportes de higiene y temperatura, el cronograma de cargas, el conteo de stock y la administración de la planta. Funciona en web responsive y en una aplicación Android nativa con las mismas reglas de negocio, e integra los lanzamientos de producción con el ERP **Aero32** de la empresa.
@@ -57,7 +57,7 @@ El detalle de cada entrega está en [CHANGELOG.md](CHANGELOG.md). El histórico 
 
 ```bash
 # 1. Clonar el repositorio
-git clone https://github.com/wilkinbarban/Trindade.git
+git clone https://github.com/wilkin-barban/Trindade.git
 cd Trindade
 
 # 2. Instalar dependencias de todos los workspaces
