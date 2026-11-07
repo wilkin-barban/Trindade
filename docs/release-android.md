@@ -110,10 +110,20 @@ Los dos números se calculan una sola vez en `build.gradle.kts` y alimentan tant
 | 0.7.4 | 7017 | 2026-11-04 | Reemplazada | Segunda sustitución de la 0.7.4, sin mover la versión pública: el detalle de Relatório escribía encima del día una lectura fallida, así que una red que parpadeaba podía dejarlo en «nada se lanzó hoy»; ahora la lectura vacía conserva lo que se está leyendo. Reemplazada el mismo día por 7018. |
 | 0.7.4 | 7016 | 2026-11-04 | Reemplazada | Sustitución de la 0.7.4/7015 sin mover la versión pública: Relatório relee las masas del día al reanudar la pantalla y después de sincronizar, el detalle respeta la fecha del reporte y cada operario muestra su desglose por producto junto al resumen colectivo del día; reemplazada el mismo día por 7017. |
 | 0.7.4 | 7015 | 2026-11-04 | Reemplazada | La masa se decide por código: sólo los diez del catálogo son producción y el resto es insumo, así que Relatório separa Masas de Insumos, el WhatsApp del día incluye a los operarios Só ERP desde las filas unificadas y la tableta muestra la caja abierta como un dato compacto (`1 caixa aberta · N un`) en lugar de la explicación larga. |
+| 0.7.5 | 7019 | **Publicada** | El enlace **Perfil → Releases** abre el repositorio oficial nuevo (`github.com/wilkin-barban/Trindade`); nada más del producto cambia respecto de 0.7.4/7018. Es la primera subida de versión pública desde 0.7.3 y no es cosmética: `RELEASES_URL` se compila dentro del APK, así que ningún cambio del servidor alcanza a un equipo ya instalado. |
 
 Las builds 0.6.x se distribuyeron por `GET /api/app/download-apk`, no por un tag de GitHub. Los hashes y las
 verificaciones completas están en [release-android-historial.md](release-android-historial.md).
 
+> **Estado final del 2026-11-07.** La versión **0.7.5** (build 7019) es la publicada:
+> `packages/backend/apk/trindade-0.7.5.apk` son 11.296.176 bytes, sha256
+> `c43182756745147fff03a642f79ad614299ebb9db9d11eb59965a634a7758a20`, firmada con el certificado del proyecto y
+> publicada como asset de la GitHub Release `v0.7.5`
+> (`https://github.com/wilkin-barban/Trindade/releases/tag/v0.7.5`) junto a su `.sha256`. Es la primera versión
+> pública nueva desde 0.7.3 y su único cambio de producto es el enlace **Perfil → Releases**, que ahora abre el
+> repositorio oficial: `RELEASES_URL` se compila dentro del APK, así que ningún cambio del servidor podía
+> alcanzar a un equipo con 0.7.4 instalado. La release `v0.7.4` sigue intacta con el binario de 7018.
+>
 > **Estado final del 2026-11-04.** La versión **0.7.4** (build 7018) es la publicada: `packages/backend/apk/trindade-0.7.4.apk`
 > son 11.296.176 bytes, sha256 `8c9261515359a64b71a6abb9602d60e1f7db28d95c60ad72747e559e0b2eb522`, firmada con el mismo
 > certificado del proyecto, y la GitHub Release `v0.7.4` publica ese mismo binario con su `.sha256`

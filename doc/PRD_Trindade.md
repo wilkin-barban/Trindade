@@ -3,8 +3,8 @@
 **Versión:** 3.1
 **Estado:** vigente
 **Reemplaza a:** PRD v3.0
-**Última actualización:** 2026-11-05
-**Implementación de referencia:** 0.7.4, build interno 7018 (Android), publicada el 2026-11-05
+**Última actualización:** 2026-11-07
+**Implementación de referencia:** 0.7.5, build interno 7019 (Android), publicada el 2026-11-07
 
 Esta especificación describe el producto que existe hoy: web responsive, aplicación Android nativa, integración con el ERP Aero32 y administración centralizada. Las decisiones técnicas de implementación están en [docs/arquitectura.md](../docs/arquitectura.md); los procedimientos operativos, en [docs/despliegue.md](../docs/despliegue.md) y [docs/release-android.md](../docs/release-android.md).
 
