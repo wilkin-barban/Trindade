@@ -1,0 +1,65 @@
+name: Reporte de error
+description: Reporta un comportamiento incorrecto en Trindade.
+title: "[bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gracias por reportar. No incluyas credenciales, datos de producción, el keystore ni APKs firmados.
+  - type: textarea
+    id: description
+    attributes:
+      label: Descripción
+      description: ¿Qué ocurrió?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Versión / build
+      description: Versión web o Android (por ejemplo 0.7.5 / 7019).
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Plataforma
+      options:
+        - Web
+        - Android
+        - Backend/API
+        - Docker/Despliegue
+        - Integración Aero32
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Pasos para reproducir
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Resultado esperado
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Resultado actual
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs sanitizados
+      description: Sin rutas personales, tokens ni datos de producción.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Confirmación
+      options:
+        - label: Revisé que no incluye secretos ni datos personales.
+          required: true

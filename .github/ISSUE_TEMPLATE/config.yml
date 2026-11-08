@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentación del proyecto
+    url: https://github.com/wilkin-barban/Trindade/tree/main/docs
+    about: Guías de instalación, despliegue, arquitectura y release Android.
+  - name: Reporte privado de seguridad
+    url: https://github.com/wilkin-barban/Trindade/security/advisories/new
+    about: No publiques vulnerabilidades en un issue público.

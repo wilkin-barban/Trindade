@@ -1,0 +1,35 @@
+name: Solicitud de mejora
+description: Propón una mejora o una nueva capacidad para Trindade.
+title: "[feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problema o necesidad
+      description: ¿Qué situación operativa o técnica querés resolver?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Propuesta
+      description: ¿Cómo debería comportarse el sistema?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativas consideradas
+  - type: textarea
+    id: context
+    attributes:
+      label: Contexto adicional
+      description: Capturas, enlaces o detalles de despliegue sin datos sensibles.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Confirmación
+      options:
+        - label: Revisé que no incluye secretos ni datos de producción.
+          required: true

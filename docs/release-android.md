@@ -127,7 +127,7 @@ verificaciones completas están en [release-android-historial.md](release-androi
 > **Estado final del 2026-11-04.** La versión **0.7.4** (build 7018) es la publicada: `packages/backend/apk/trindade-0.7.4.apk`
 > son 11.296.176 bytes, sha256 `8c9261515359a64b71a6abb9602d60e1f7db28d95c60ad72747e559e0b2eb522`, firmada con el mismo
 > certificado del proyecto, y la GitHub Release `v0.7.4` publica ese mismo binario con su `.sha256`
-> (`https://github.com/wilkinbarban/Trindade/releases/tag/v0.7.4`). El tag `v0.7.4` no se movió: sus assets se
+> (`https://github.com/wilkin-barban/Trindade/releases/tag/v0.7.4`). El tag `v0.7.4` no se movió: sus assets se
 > reemplazaron tres veces con `--clobber` el mismo día. La release anterior (0.7.3, build 7014)
 > sigue intacta como asset de `v0.7.3`.
 >
@@ -217,6 +217,8 @@ Configurar una vez en GitHub, en *Settings → Secrets and variables → Actions
 | `ANDROID_KEYSTORE_PASSWORD` | Contraseña del keystore |
 | `ANDROID_KEY_ALIAS` | Alias de la clave: `trindade` |
 | `ANDROID_KEY_PASSWORD` | **Opcional**. Solo si la clave usa una contraseña distinta de la del store; en PKCS12 normalmente no se define |
+
+> Los secretos y la variable `ANDROID_API_BASE_URL` están configurados en el repositorio (2026-11-08).
 
 Variable de repositorio:
 
