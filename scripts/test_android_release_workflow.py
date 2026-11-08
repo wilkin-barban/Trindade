@@ -310,7 +310,7 @@ class TestWorkflowTriggersAndPermissions(unittest.TestCase):
         )
 
         # Upload artifact preserved
-        self.assertIn("uses: actions/upload-artifact@v4", self.content)
+        self.assertIn("uses: actions/upload-artifact@v6", self.content)
         self.assertIn("name: android-release", self.content)
 
 
