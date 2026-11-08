@@ -43,10 +43,10 @@ jobs:
   # The image is also about 18 months old as of this pin, so it changes nothing about today's build and
   # everything about tomorrow's.
   #
-  # UNVERIFIED AS WRITTEN. A GitHub-hosted runner cannot be run from the development host, so this
-  # workflow has never executed and the first tag push is its test. The commands in the build and verify
-  # steps below were run by hand inside this same image before they were written here (docs/release-android.md
-  # records that); the tag-to-version step, the artifact hand-off and the gh call have not been run anywhere.
+  # VALIDATED on the v0.7.5 re-run (run 42331021190, attempt 2, 2026-11-08): the build and publish jobs
+  # completed successfully. The actions are pinned to checkout@v7, upload-artifact@v6 and
+  # download-artifact@v7 for the next tag; the build and verify commands were already exercised locally
+  # and in the v0.7.5 release run.
   build:
     runs-on: ubuntu-latest
     container:
@@ -57,7 +57,7 @@ jobs:
         shell: bash
     steps:
       - name: Check out the tagged commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Read the internal build production serves
         # The versionCode is not the tag's alone, and this is the case that forced the distinction: the tag
@@ -382,7 +382,7 @@ jobs:
         # actions/upload-artifact is GitHub-owned: no third-party action is handed the signed artifact. The
         # uploaded copy exists only to carry the APK to the publish job, which runs outside the container
         # because gh is preinstalled on the runner and is not in the SDK image.
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: android-release
           path: release-assets/*.apk
@@ -409,7 +409,7 @@ jobs:
       contents: write
     steps:
       - name: Download the verified APK
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: android-release
           path: release-assets
