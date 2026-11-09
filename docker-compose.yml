@@ -17,6 +17,9 @@ services:
       - ./logs:/app/packages/backend/logs
     environment:
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required. Copy .env.example to .env and set a strong secret.}
+      # AES-256-GCM key for the ERP vault. The API refuses to start in production without it; generate the
+      # value once with `openssl rand -base64 32` and keep it in .env, never in the repository.
+      - AERO_VAULT_KEY=${AERO_VAULT_KEY:-}
       # Without this line the container never receives the variable and silently uses the code
       # default of 30 days, so setting it in .env would have no effect.
       - REFRESH_TOKEN_TTL_DAYS=${REFRESH_TOKEN_TTL_DAYS:-30}
