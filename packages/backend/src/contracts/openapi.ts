@@ -129,6 +129,13 @@ import {
   AeroLogResponseSchema,
 } from '../modules/integration/aero.schema.js';
 import {
+  AeroBridgeEnvelopeSchema,
+  AeroBridgeTicketRequestSchema,
+  AeroBridgeTicketResponseSchema,
+  AeroVaultSettingsRequestSchema,
+  AeroVaultSettingsResponseSchema,
+} from '../modules/integration/aero.vault.contract.js';
+import {
   AeroMovementSchema,
   AeroMovementsBodySchema,
   AeroMovementsListResponseSchema,
@@ -337,6 +344,11 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
   registerComponent(registry, 'MassasReportDayView', MassasReportDayViewSchema);
   registerComponent(registry, 'AeroLogRequest', AeroLogBodySchema);
   registerComponent(registry, 'AeroLogResponse', AeroLogResponseSchema);
+  registerComponent(registry, 'AeroVaultSettings', AeroVaultSettingsResponseSchema);
+  registerComponent(registry, 'AeroVaultSettingsRequest', AeroVaultSettingsRequestSchema);
+  registerComponent(registry, 'AeroBridgeTicketRequest', AeroBridgeTicketRequestSchema);
+  registerComponent(registry, 'AeroBridgeTicketResponse', AeroBridgeTicketResponseSchema);
+  registerComponent(registry, 'AeroBridgeEnvelope', AeroBridgeEnvelopeSchema);
   registerComponent(registry, 'AeroMovement', AeroMovementSchema);
   registerComponent(registry, 'AeroMovementsBody', AeroMovementsBodySchema);
   registerComponent(registry, 'AeroMovementsListResponse', AeroMovementsListResponseSchema);
@@ -1732,6 +1744,105 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
         AeroErrorResponseSchema,
       ),
       503: jsonResponse('The mirror table has not been migrated yet', AeroErrorResponseSchema),
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/api/integration/aero/settings',
+    summary: "Read the ERP vault's configuration without the password",
+    description:
+      'The ERP password is stored encrypted in SQLite and never leaves the server; this endpoint answers only ' +
+      'whether a password is stored. Exclusive to the `wilkin` owner with the `Administrador` role: the guard ' +
+      'is the server, not the panel. Answers 503 `AERO_VAULT_NOT_CONFIGURED` until `AERO_VAULT_KEY` is present ' +
+      'and a password has been saved.',
+    tags: ['integration'],
+    responses: {
+      200: jsonResponse('The stored configuration, never the secret', AeroVaultSettingsResponseSchema),
+      401: UNAUTHORIZED,
+      403: errorResponse('The caller is not the owner with the administrator role'),
+      503: jsonResponse('The vault is not configured on this deployment', ErrorEnvelopeSchema),
+    },
+  });
+
+  registry.registerPath({
+    method: 'put',
+    path: '/api/integration/aero/settings',
+    summary: "Save the ERP connection settings and, optionally, its password",
+    description:
+      'A non-empty `password` is encrypted with AES-256-GCM and replaces the stored one. An absent or empty ' +
+      '`password` keeps the stored secret untouched, so the URL and the user can be changed without retyping ' +
+      'it; a first save with no password is refused. Owner-only, like the read.',
+    tags: ['integration'],
+    request: jsonRequest(AeroVaultSettingsRequestSchema),
+    responses: {
+      200: jsonResponse('The stored configuration, never the secret', AeroVaultSettingsResponseSchema),
+      400: jsonResponse(
+        'The URL or the user is invalid, or there is no stored password and none was sent',
+        ErrorEnvelopeSchema,
+      ),
+      401: UNAUTHORIZED,
+      403: errorResponse('The caller is not the owner with the administrator role'),
+      503: jsonResponse('The vault is not configured on this deployment', ErrorEnvelopeSchema),
+    },
+  });
+
+  registry.registerPath({
+    method: 'delete',
+    path: '/api/integration/aero/settings',
+    summary: 'Delete the stored ERP credentials and the pending tickets of the owner',
+    description:
+      'Removes the vault row and the owner\'s unused bridge tickets. Signing out does NOT do this: the whole ' +
+      'point of the vault is that the next session and the next tab reuse it. Owner-only.',
+    tags: ['integration'],
+    responses: {
+      204: { description: 'Deleted' },
+      401: UNAUTHORIZED,
+      403: errorResponse('The caller is not the owner with the administrator role'),
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/integration/aero/bridge-tickets',
+    summary: 'Issue a one-time ticket that the iPhone shortcut redeems for the ERP envelope',
+    description:
+      'The server, not the browser, decides the ERP endpoint and serialises the bodies. The token is 32 random ' +
+      'bytes, stored only as its SHA-256, valid for 120 seconds and usable once; it never travels in a URL. ' +
+      '`callbackPath` must stay on the origin of `PUBLIC_APP_URL`. Owner-only.',
+    tags: ['integration'],
+    request: jsonRequest(AeroBridgeTicketRequestSchema),
+    responses: {
+      201: jsonResponse('The token and the absolute redemption URL', AeroBridgeTicketResponseSchema),
+      400: jsonResponse(
+        'The action, the payload count or the callback path is invalid',
+        ErrorEnvelopeSchema,
+      ),
+      401: UNAUTHORIZED,
+      403: errorResponse('The caller is not the owner with the administrator role'),
+      503: jsonResponse('The vault is not configured on this deployment', ErrorEnvelopeSchema),
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/integration/aero/bridge-tickets/redeem',
+    summary: 'Redeem a bridge ticket for the ready-to-send ERP envelope',
+    description:
+      'Unauthenticated by design: the ticket IS the credential, because the iPhone shortcut has no session. ' +
+      'Present it in the `X-Trindade-Ticket` header, never in the URL. The ticket is marked used in the same ' +
+      'transaction that answers, so a replay finds it unusable. An unknown ticket answers 404; a used or ' +
+      'expired one answers 410 with the same body, so the response never says which it was. The password is ' +
+      'not returned separately: it only appears inside the `Authorization` header of the envelope.',
+    tags: ['integration'],
+    request: {
+      headers: z.object({ 'x-trindade-ticket': z.string().min(1) }),
+    },
+    responses: {
+      200: jsonResponse('The envelope the shortcut sends to the ERP', AeroBridgeEnvelopeSchema),
+      401: jsonResponse('The ticket header is missing', ErrorEnvelopeSchema),
+      404: jsonResponse('No ticket matches that token', ErrorEnvelopeSchema),
+      410: jsonResponse('The ticket was already used or has expired', ErrorEnvelopeSchema),
     },
   });
 

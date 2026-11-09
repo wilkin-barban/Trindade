@@ -2215,6 +2215,165 @@
         ],
         "additionalProperties": false
       },
+      "AeroVaultSettings": {
+        "type": "object",
+        "properties": {
+          "configured": {
+            "type": "boolean"
+          },
+          "wsUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "username": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hasPassword": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "configured",
+          "wsUrl",
+          "username",
+          "hasPassword",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "AeroVaultSettingsRequest": {
+        "type": "object",
+        "properties": {
+          "wsUrl": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "required": [
+          "wsUrl",
+          "username"
+        ],
+        "additionalProperties": false
+      },
+      "AeroBridgeTicketRequest": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "entrada",
+              "entrada_lote",
+              "movimentos",
+              "test"
+            ]
+          },
+          "payloads": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {}
+            },
+            "minItems": 1,
+            "maxItems": 8
+          },
+          "callbackPath": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          }
+        },
+        "required": [
+          "action",
+          "payloads"
+        ],
+        "additionalProperties": false
+      },
+      "AeroBridgeTicketResponse": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "string",
+            "minLength": 1
+          },
+          "ticketUrl": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expiresAt": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "ticket",
+          "ticketUrl",
+          "expiresAt"
+        ],
+        "additionalProperties": false
+      },
+      "AeroBridgeEnvelope": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "POST"
+            ]
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "body": {
+            "type": "string"
+          },
+          "bodies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "callback": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "url",
+          "method",
+          "headers",
+          "body",
+          "callback"
+        ],
+        "additionalProperties": false
+      },
       "AeroMovement": {
         "type": "object",
         "properties": {
@@ -9722,6 +9881,289 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AeroLogError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integration/aero/settings": {
+      "get": {
+        "summary": "Read the ERP vault's configuration without the password",
+        "description": "The ERP password is stored encrypted in SQLite and never leaves the server; this endpoint answers only whether a password is stored. Exclusive to the `wilkin` owner with the `Administrador` role: the guard is the server, not the panel. Answers 503 `AERO_VAULT_NOT_CONFIGURED` until `AERO_VAULT_KEY` is present and a password has been saved.",
+        "tags": [
+          "integration"
+        ],
+        "responses": {
+          "200": {
+            "description": "The stored configuration, never the secret",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AeroVaultSettings"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, or expired credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is not the owner with the administrator role",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The vault is not configured on this deployment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Save the ERP connection settings and, optionally, its password",
+        "description": "A non-empty `password` is encrypted with AES-256-GCM and replaces the stored one. An absent or empty `password` keeps the stored secret untouched, so the URL and the user can be changed without retyping it; a first save with no password is refused. Owner-only, like the read.",
+        "tags": [
+          "integration"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AeroVaultSettingsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The stored configuration, never the secret",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AeroVaultSettings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The URL or the user is invalid, or there is no stored password and none was sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, or expired credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is not the owner with the administrator role",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The vault is not configured on this deployment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete the stored ERP credentials and the pending tickets of the owner",
+        "description": "Removes the vault row and the owner's unused bridge tickets. Signing out does NOT do this: the whole point of the vault is that the next session and the next tab reuse it. Owner-only.",
+        "tags": [
+          "integration"
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "401": {
+            "description": "Missing, invalid, or expired credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is not the owner with the administrator role",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integration/aero/bridge-tickets": {
+      "post": {
+        "summary": "Issue a one-time ticket that the iPhone shortcut redeems for the ERP envelope",
+        "description": "The server, not the browser, decides the ERP endpoint and serialises the bodies. The token is 32 random bytes, stored only as its SHA-256, valid for 120 seconds and usable once; it never travels in a URL. `callbackPath` must stay on the origin of `PUBLIC_APP_URL`. Owner-only.",
+        "tags": [
+          "integration"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AeroBridgeTicketRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The token and the absolute redemption URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AeroBridgeTicketResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The action, the payload count or the callback path is invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, or expired credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is not the owner with the administrator role",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The vault is not configured on this deployment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integration/aero/bridge-tickets/redeem": {
+      "post": {
+        "summary": "Redeem a bridge ticket for the ready-to-send ERP envelope",
+        "description": "Unauthenticated by design: the ticket IS the credential, because the iPhone shortcut has no session. Present it in the `X-Trindade-Ticket` header, never in the URL. The ticket is marked used in the same transaction that answers, so a replay finds it unusable. An unknown ticket answers 404; a used or expired one answers 410 with the same body, so the response never says which it was. The password is not returned separately: it only appears inside the `Authorization` header of the envelope.",
+        "tags": [
+          "integration"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "x-trindade-ticket",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The envelope the shortcut sends to the ERP",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AeroBridgeEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The ticket header is missing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No ticket matches that token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "The ticket was already used or has expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
                 }
               }
             }
