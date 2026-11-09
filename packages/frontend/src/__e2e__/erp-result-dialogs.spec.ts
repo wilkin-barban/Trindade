@@ -74,7 +74,7 @@ test.describe('result dialogs on a phone screen', () => {
     await expect(page.locator('[data-testid="aero-result-hint"]')).toContainText('Firebird indisponível');
   });
 
-  test('the connection test opens its own verdict window', async ({ page }) => {
+  test('the connection test asks for a ticket and shows the verdict the shortcut returns', async ({ page }) => {
     // The integration lives in the admin area now, so the run needs that account to exist (S11).
     await ensureAeroOwner(page);
     await loginViaApi(page, AERO_OWNER);
@@ -88,13 +88,27 @@ test.describe('result dialogs on a phone screen', () => {
     await urlField.fill('http://127.0.0.1:9/usuarios/');
     await page.locator('[data-testid="aero-ws-user"]').fill('wilkin');
     await page.locator('[data-testid="aero-ws-pass"]').fill('segredo');
+    await page.locator('[data-testid="aero-save"]').click();
+    await expect(page.getByText(/guardada en el servidor|guardada no servidor/i).first()).toBeVisible();
 
+    // The page cannot reach the plant's LAN, so it no longer probes: it asks for a `test` ticket and the
+    // shortcut is the one that calls `/usuarios`. Chromium cannot open a shortcuts:// URL, and that is fine:
+    // what is asserted is the ticket, which is the whole hand-off.
+    const ticket = page.waitForResponse(
+      (response) => response.url().includes('/bridge-tickets') && response.request().method() === 'POST',
+    );
     await page.locator('[data-testid="aero-test"]').click();
+    const issued = await ticket;
+    expect(issued.status()).toBe(201);
+    expect((issued.request().postDataJSON() as { action?: string }).action).toBe('test');
 
-    // Nothing is listening on that port: the test ends in failure, and the failure is a window.
+    // The verdict travels back in the return URL, exactly as the shortcut would deliver it.
+    const answer = encodeURIComponent(JSON.stringify({ success: false, message: 'Firebird indisponível' }));
+    await page.goto(`/admin?tab=integration&aero_action=test&aero_data=${answer}`);
+
     const dialog = page.locator('[data-testid="aero-test-result-modal"]');
     await expect(dialog).toBeVisible();
-    await expect(dialog).toContainText('Falha no Teste');
+    await expect(dialog).toContainText(/Falha no Teste|Falla en la Prueba/);
 
     const close = page.locator('[data-testid="aero-result-close"]');
     expect((await close.boundingBox())!.height).toBeGreaterThanOrEqual(44);
