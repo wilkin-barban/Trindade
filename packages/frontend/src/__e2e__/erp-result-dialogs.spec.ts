@@ -104,7 +104,10 @@ test.describe('result dialogs on a phone screen', () => {
 
     // The verdict travels back in the return URL, exactly as the shortcut would deliver it.
     const answer = encodeURIComponent(JSON.stringify({ success: false, message: 'Firebird indisponível' }));
-    await page.goto(`/admin?tab=integration&aero_action=test&aero_data=${answer}`);
+    const callbackUrl = `/admin?tab=integration&aero_action=test&aero_data=${answer}`;
+    // The click set `window.location` to `shortcuts://`, and Chromium cancels that navigation when the next one
+    // starts; the cancellation can surface as ERR_ABORTED on this goto. One retry, and only for that case.
+    await page.goto(callbackUrl).catch(() => page.goto(callbackUrl));
 
     const dialog = page.locator('[data-testid="aero-test-result-modal"]');
     await expect(dialog).toBeVisible();

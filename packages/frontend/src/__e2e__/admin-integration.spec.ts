@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { IPHONE_UA, getE2EIdentities, loginViaApi } from './auth-helpers';
-import { AERO_OWNER, loginAsAeroOwner } from './aero-owner';
+import { AERO_OWNER, loginAeroOwnerForApi, resetAeroVault } from './aero-owner';
 
 /**
  * The company integration, where the plant keeps it now.
@@ -13,7 +13,9 @@ test.use({ viewport: { width: 375, height: 667 }, userAgent: IPHONE_UA });
 
 test.describe('integration tab in the admin panel', () => {
   test('the owner finds the plant address already written and may change it', async ({ page }) => {
-    await loginAsAeroOwner(page);
+    // The vault is one row in the server, shared by the whole run: «already written» means an empty vault
+    // where the panel starts from the plant's own default.
+    await resetAeroVault(page);
     await page.goto('/admin');
     await page.locator('[data-testid="admin-tab-integration"]').click();
 
@@ -78,23 +80,26 @@ test.describe('integration tab in the admin panel', () => {
   });
 
   /**
-   * The password does not survive the device, and the screen says so before anyone wonders.
+   * The password leaves the browser on save and the vault is the only place that keeps it.
    *
    * It used to sit in `localStorage` in clear, next to the IP of the plant: any backup of the profile or the
-   * next launch of the app could read the company's credentials. It now lives in the tab's `sessionStorage`:
-   * out of the device, alive across a reload and across the return trip of the shortcut -- which is what makes
-   * the read that follows a launch possible -- and gone when the tab, the session or the configuration ends.
-   * The cost stays visible: the panel says the secret is not kept on the device.
+   * next launch of the app could read the company's credentials, and moving it to `sessionStorage` only hid it
+   * from the disk. It now goes to the server encrypted, no endpoint returns it, and the browser keeps neither
+   * the secret nor the ciphertext. What the screen shows is the fact: configured, saved on the server, and an
+   * empty field that asks for a new secret and never redraws the stored one.
    */
-  test('saving keeps the password out of the device and in this tab session', async ({ page }) => {
-    await loginAsAeroOwner(page);
+  test('saving keeps the password out of the device and in the server vault', async ({ page }) => {
+    await resetAeroVault(page);
     await page.goto('/admin');
     await page.locator('[data-testid="admin-tab-integration"]').click();
 
     const pass = page.locator('[data-testid="aero-ws-pass"]');
     await expect(pass).toHaveValue('');
-    // The language of the run is the operator's: the sentence is matched in both.
-    await expect(page.locator('[data-testid="aero-pass-notice"]')).toContainText(/no se guarda|não é guardada/);
+    // Nothing stored yet, and the panel says so instead of implying the app lost something.
+    await expect(page.locator('[data-testid="aero-pass-notice"]')).toContainText(
+      /No hay contraseña guardada|Não há senha guardada/,
+    );
+    await expect(page.locator('[data-testid="aero-state"]')).toContainText(/Sin configurar|Sem configurar/);
 
     // A fresh profile carries no user either: the save needs the address and the user, and the secret is
     // what it deliberately does not keep on disk.
@@ -103,28 +108,57 @@ test.describe('integration tab in the admin panel', () => {
     await page.locator('[data-testid="aero-save"]').click();
     await expect(page.getByText(/Configuración guardada|Configuração salva/)).toBeVisible();
 
-    const stored = await page.evaluate(() => localStorage.getItem('trindade.aero.integration.v1') ?? '');
-    expect(stored).not.toContain('segredo-do-erp');
-    expect(stored).toContain('192.168.25.250');
-    // The tab keeps it, and only the tab: a reload is the same session.
-    expect(
-      await page.evaluate(() => window.sessionStorage.getItem('trindade.aero.session.v1')),
-    ).toBe('segredo-do-erp');
+    // Neither storage holds the secret, and the legacy session key is gone rather than emptied.
+    const storage = await page.evaluate(() => ({
+      local: { ...localStorage },
+      session: { ...sessionStorage },
+      legacy: sessionStorage.getItem('trindade.aero.session.v1'),
+    }));
+    expect(JSON.stringify(storage)).not.toContain('segredo-do-erp');
+    expect(storage.legacy).toBeNull();
+    // Only the address and the user are cached locally: a save that added a secret did not move the plant.
+    expect(storage.local['trindade.aero.integration.v1'] ?? '').toContain('192.168.25.250');
 
+    // The vault answered, so the screen can say it: configured, secret on the server, field empty again.
+    await expect(page.locator('[data-testid="aero-state"]')).toContainText(/Configurado/);
+    await expect(page.locator('[data-testid="aero-pass-notice"]')).toContainText(
+      /Contraseña guardada en el servidor|Senha guardada no servidor/,
+    );
+    await expect(pass).toHaveValue('');
+
+    // And the contract itself carries the fact, never the secret nor the ciphertext.
+    const token = await loginAeroOwnerForApi(page);
+    const settings = await page.request.get('http://localhost:3099/api/integration/aero/settings', {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(settings.status()).toBe(200);
+    const stored = (await settings.json()) as Record<string, unknown>;
+    expect(stored.hasPassword).toBe(true);
+    expect(Object.keys(stored).sort()).toEqual(['configured', 'hasPassword', 'updatedAt', 'username', 'wsUrl']);
+    expect(JSON.stringify(stored)).not.toContain('segredo-do-erp');
+    expect(stored.password).toBeUndefined();
+    expect(stored.password_ciphertext).toBeUndefined();
+
+    // A reload is a new document reaching the same vault: configured, and still nothing to redraw.
     await page.reload();
     await page.locator('[data-testid="admin-tab-integration"]').click();
 
-    await expect(page.locator('[data-testid="aero-ws-pass"]')).toHaveValue('segredo-do-erp');
-    // Configured, not «sin configurar»: the address survived the reload and so did the session secret.
     await expect(page.locator('[data-testid="aero-state"]')).toContainText(/Configurado/);
+    await expect(page.locator('[data-testid="aero-ws-pass"]')).toHaveValue('');
     await expect(page.locator('[data-testid="aero-ws-url"]')).toHaveValue('http://192.168.25.250:1453/api');
 
-    // Clearing the configuration closes the session too: the tab keeps no secret once the setup is gone.
+    // Clearing the configuration is what empties the vault, and only then does the screen stop saying so.
     page.on('dialog', (dialog) => dialog.accept());
-    await page.getByRole('button', { name: /Limpar/ }).click();
-    await expect(page.locator('[data-testid="aero-state"]')).toContainText(/Sin configurar|Não configurado/);
-    expect(
-      await page.evaluate(() => window.sessionStorage.getItem('trindade.aero.session.v1')),
-    ).toBeNull();
+    await page.getByRole('button', { name: /Borrar|Apagar/ }).click();
+    await expect(page.locator('[data-testid="aero-state"]')).toContainText(/Sin configurar|Sem configurar/);
+    await expect(page.locator('[data-testid="aero-pass-notice"]')).toContainText(
+      /No hay contraseña guardada|Não há senha guardada/,
+    );
+
+    const cleared = await page.request.get('http://localhost:3099/api/integration/aero/settings', {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(cleared.status()).toBe(200);
+    expect(((await cleared.json()) as Record<string, unknown>).configured).toBe(false);
   });
 });
