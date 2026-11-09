@@ -30,6 +30,8 @@ describe('Database Initialization', () => {
 
     const tables = tableNames(db);
     const expected = [
+      'aero_bridge_tickets',
+      'aero_integration_settings',
       'audit_logs',
       'auth_sessions',
       'stock_counts',

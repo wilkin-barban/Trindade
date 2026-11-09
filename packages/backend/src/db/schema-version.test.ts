@@ -11,6 +11,7 @@ import {
   REVISION_FIVE_TABLES,
   REVISION_SIX_TABLES,
   REVISION_SEVEN_TABLES,
+  REVISION_TEN_TABLES,
   REVISION_TWO_TABLES,
   SCHEMA_TABLES,
   SCHEMA_VERSION,
@@ -95,6 +96,7 @@ describe('schema revision', () => {
         ...REVISION_FIVE_TABLES,
         ...REVISION_SIX_TABLES,
         ...REVISION_SEVEN_TABLES,
+        ...REVISION_TEN_TABLES,
       ].sort(),
     );
   });
