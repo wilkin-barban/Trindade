@@ -642,3 +642,17 @@ levantado. Las dos tablas nuevas están en 0 filas: la senha real del ERP no se 
 fila se compararon contra el backup y difieren en `aero_movements` +1 y `massa_launches` +1, con marcas de tiempo
 16:41:02 y 16:41:07, posteriores al backup de 16:40:17 y anteriores a la detención: es tráfico real, no efecto de
 la migración.
+
+L10 — Cierre de verificación. Suites locales: backend 778/778, frontend `test:node` 574/574, `test:unit` 130/130,
+`tsc --noEmit` limpio en ambos workspaces, `npm run build` del frontend correcto, artefacto OpenAPI current. E2E
+completo: **116/116**. Los tres fallos de fotos no eran producto: reproducidos con el e2e-server en primer plano
+devolvían `{"error":"Failed to save file"}`, y la misma ruta contra un servidor limpio responde 201; la causa es
+un e2e-server viejo reutilizado (`reuseExistingServer` local) cuyo `photosDir` temporal ya no existía, con 272
+directorios huérfanos acumulados en `/tmp` como evidencia del harness. Los otros fallos eran aserciones del
+contrato viejo (dirección precargada, senha «en esta pestaña», iCloud «listo para instalar», receta de 20
+acciones) y el auto-read, que ahora pide ticket en vez de postear el espejo. El aislamiento se resolvió con
+`resetAeroVault`/`saveAeroVault` en `aero-owner.ts`: el cofre es estado del servidor y cada spec declara el que
+necesita. El primer CI falló en el lane Android, no por comportamiento: el generador emite
+`List<@Contextual Map<String, Any?>>` y kotlinx rechaza el `Any?` anidado; `generate-android-contract.sh` ahora
+mueve la anotación al tipo interno antes de copiar, de modo que el árbol commiteado y la verificación de frescura
+coinciden por construcción. Sin cambios de UI, comportamiento ni APK de Android.
