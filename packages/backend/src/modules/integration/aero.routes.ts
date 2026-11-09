@@ -9,6 +9,7 @@ import {
   saveAeroMovements,
 } from './aero.movements.service.js';
 import { movementLenses } from '../reports/receipts.service.js';
+import { aeroVaultRoutes } from './aero.vault.routes.js';
 
 /**
  * Integration module — Fastify plugin, registered at /api/integration/aero.
@@ -18,8 +19,13 @@ import { movementLenses } from '../reports/receipts.service.js';
  * a launch from their own phone and the plant needs the real author of each line. The ERP mirror is read by
  * the whole plant: the bridge can only run on one phone, and every other device reads the snapshot it left
  * behind.
+ *
+ * The vault and its bridge tickets are registered here, as a child plugin, so they share this prefix: the paths
+ * are /settings, /bridge-tickets and /bridge-tickets/redeem inside /api/integration/aero.
  */
 export async function aeroIntegrationRoutes(fastify: FastifyInstance) {
+  await fastify.register(aeroVaultRoutes);
+
   /**
    * POST /api/integration/aero/log
    *

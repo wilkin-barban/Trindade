@@ -41,6 +41,13 @@ export interface TestFixtures {
   jwtSecret: string;
 }
 
+/**
+ * The vault key every test uses. It is a fixed, obviously fake value that never exists outside this repository,
+ * and `buildTestApp` stamps it over whatever the shell exported so a developer machine holding the production key
+ * can never encrypt a fixture with it.
+ */
+export const TEST_VAULT_KEY = Buffer.alloc(32, 7).toString('base64');
+
 export function buildTemperatureReadings(db: import('better-sqlite3').Database) {
   const tasks = db.prepare(
     `SELECT rt.name_pt, rt.temperature_readings
@@ -69,6 +76,9 @@ export async function buildTestApp(options: Pick<AuthRoutesOptions, 'authAdmissi
 }> {
   const db = new Database(':memory:');
   db.pragma('foreign_keys = ON');
+
+  // Overwrite, never default: a test run must not be able to reach a real vault key through the shell.
+  process.env.AERO_VAULT_KEY = TEST_VAULT_KEY;
 
   // Load schema + seed
   const schemaPath = join(import.meta.dirname, 'db/schema.sql');
