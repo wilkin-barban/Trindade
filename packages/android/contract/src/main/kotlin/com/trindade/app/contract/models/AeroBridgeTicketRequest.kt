@@ -43,7 +43,7 @@ data class AeroBridgeTicketRequest (
     val action: AeroBridgeTicketRequest.Action,
 
     @SerialName(value = "payloads")
-    val payloads: kotlin.collections.List<@Contextual kotlin.collections.Map<kotlin.String, kotlin.Any?>>,
+    val payloads: kotlin.collections.List<kotlin.collections.Map<kotlin.String, @Contextual kotlin.Any?>>,
 
     @SerialName(value = "callbackPath")
     val callbackPath: kotlin.String? = null
