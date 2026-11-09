@@ -13,24 +13,20 @@ export const AERO_PENDING_SYNC_STORAGE_KEY = 'trindade.aero.pending-sync.v1';
 export const AERO_INTEGRATION_USERNAME = 'wilkin';
 
 /**
- * The one shortcut: a blind HTTP proxy that posts whatever envelope the page hands it.
+ * The one shortcut: a bridge that redeems a one-time ticket and performs the ERP call the server described.
  *
- * The factory used to need two shortcuts -- one for the entry, one that only proved the connection -- and the
- * person installing them had to build each recipe by hand. One bridge that carries `{ url, auth, body,
- * callback }` covers the entry, the stock exit, the movement query and the connection test, so only one thing
- * is ever installed and the iPhone never has to be edited again when a credential or an address changes.
- *
- * It exists at all because the browser cannot reach a plain-HTTP WebService from an HTTPS page: the bridge is
- * the only instrument on the phone that can, and the envelope is what lets it stay ignorant of the business.
+ * The factory's phone never installs a credential. The page asks the server for a ticket, the shortcut trades
+ * it for the request the ERP expects, and the password stays encrypted in the vault -- so the browser cannot
+ * reach the plant's LAN, cannot read the secret and cannot mint a request of its own.
  */
 export const AERO_DEFAULT_BRIDGE_SHORTCUT_NAME = 'Aero32 Bridge';
 
 /**
- * The shortcut Wilkin built and certified on his own iPhone.
+ * The shortcut Wilkin built and certified on his own iPhone, for the twenty-action bridge.
  *
- * Building twenty actions by hand is where a new phone loses a step, so this link is the main path: it opens
- * the Atajos app with the shortcut ready to install, and the recipe below stays as the explanation and as the
- * fallback for a phone that cannot reach iCloud.
+ * It is legacy: the ticket flow needs three actions at the head of the recipe that this link does not have,
+ * so installing it as is produces a shortcut that never redeems a ticket. It stays here because it documents
+ * the twenty actions the delta builds on, and the dialog presents it as the old version, not as an install.
  */
 export const AERO_SHORTCUT_ICLOUD_URL =
   'https://www.icloud.com/shortcuts/3216695a428f42539fec7abbd5419f34';
@@ -83,10 +79,18 @@ export const AERO_DEFAULT_CST = '000';
  */
 export const AERO_FALLBACK_USER_CODE = 1;
 
+/**
+ * What this page knows about the integration, and it is no longer the password.
+ *
+ * `wsUrl` and `username` are cached here so a phone draws the panel before the server answers, `hasPassword`
+ * is what the vault answered, and the rest are local preferences. The secret never appears in this shape:
+ * a baggage with a `password` field is a baggage every component can accidentally render, log or persist.
+ */
 export interface AeroSettings {
   wsUrl: string;
   username: string;
-  password: string;
+  /** What `GET /integration/aero/settings` said about the vault of this owner. */
+  hasPassword: boolean;
   shortcutName: string;
   syncEnabled: boolean;
   lastSyncAt: string | null;
@@ -98,7 +102,7 @@ export const AERO_DEFAULT_WS_URL = 'http://192.168.25.250:1453/api';
 export const DEFAULT_AERO_SETTINGS: AeroSettings = {
   wsUrl: AERO_DEFAULT_WS_URL,
   username: '',
-  password: '',
+  hasPassword: false,
   shortcutName: AERO_DEFAULT_BRIDGE_SHORTCUT_NAME,
   syncEnabled: false,
   lastSyncAt: null,
@@ -111,20 +115,11 @@ export interface StorageLike {
 }
 
 /**
- * The ERP password, in this tab's `sessionStorage` and nowhere else.
+ * The key an older build used to keep the ERP password in the tab's `sessionStorage`.
  *
- * It used to live in `localStorage` in clear, next to the IP of the plant: any script on the page, any backup
- * of the profile and any other tab of the same origin could read the company's credentials, for as long as the
- * phone was switched on. Keeping it out of `localStorage`, cookies and the server is the most this side can do
- * while the ERP stays inside the plant's LAN -- a server-side vault needs the on-prem bridge, which does not
- * exist yet.
- *
- * It moved from the ghost memory of the module to `sessionStorage` for one reason: every trip through the
- * shortcut returns in a fresh document, and the read of `/movimentoitem` that follows a launch has to leave
- * from that document. A value that died with the page made the automatic read impossible on the web.
- * `sessionStorage` is per tab and per session: it survives reloads and the return trip in the same tab, dies
- * when the tab closes, and is removed on logout and when the configuration is cleared. A tab opened without an
- * opener starts empty, so the landing page can still ask for the secret -- which is what the panel says.
+ * It is dead weight now: the vault keeps the secret encrypted on the server and the page never receives it
+ * back. The key survives only so the purge below, the logout and the 401 handler can delete whatever a phone
+ * still has written there -- never so anything can read it.
  */
 export const AERO_SESSION_PASSWORD_KEY = 'trindade.aero.session.v1';
 
@@ -132,32 +127,31 @@ function browserSessionStorage(): StorageLike | null {
   return typeof sessionStorage === 'undefined' ? null : sessionStorage;
 }
 
-/** The password this tab holds, or an empty string when none was typed in this session. */
-export function aeroSessionPassword(store?: StorageLike | null): string {
-  const target = store ?? browserSessionStorage();
-  if (!target) return '';
-  try {
-    return target.getItem(AERO_SESSION_PASSWORD_KEY) ?? '';
-  } catch {
-    return '';
-  }
-}
-
-/** Remembers the password for the rest of the session. Never reaches `localStorage` nor the server. */
-export function setAeroSessionPassword(value: string, store?: StorageLike | null): void {
+/**
+ * Deletes the legacy secret from this tab, and never reads it.
+ *
+ * Called on every load, on logout, on the 401 handler and when the configuration is cleared (S14). A phone
+ * that upgraded keeps no trace of the value it used to hold, and a storage that refuses to be written -- a
+ * private window, a locked profile -- is not an error here: there is nothing to protect if nothing is stored.
+ */
+export function purgeLegacyAeroPassword(store?: StorageLike | null): void {
   const target = store ?? browserSessionStorage();
   if (!target) return;
   try {
-    if (value) target.setItem(AERO_SESSION_PASSWORD_KEY, value);
-    else target.removeItem(AERO_SESSION_PASSWORD_KEY);
+    target.removeItem(AERO_SESSION_PASSWORD_KEY);
   } catch {
-    /* a browser that refuses to store it still has the in-page envelope for this call */
+    /* a store that cannot be written cannot be holding the secret either */
   }
 }
 
-/** Forgets it: used on logout and when the settings are cleared. */
+/**
+ * The name the session lifecycles already call.
+ *
+ * Logout and the 401 handler were written against the old session password and are outside this change's
+ * surface; keeping the name pointing at the purge is what makes S14 hold there without touching them.
+ */
 export function clearAeroSessionPassword(store?: StorageLike | null): void {
-  setAeroSessionPassword('', store);
+  purgeLegacyAeroPassword(store);
 }
 
 /**
@@ -186,12 +180,16 @@ function aeroShortcutName(parsed: unknown, legacyDefault: string): string {
 }
 
 /**
- * Loads company WebService settings from local storage, merging with defaults.
+ * Loads the local half of the integration: where the plant is, who launches and how this phone behaves.
+ *
+ * The secret is not part of it and cannot be: `hasPassword` starts false and only the vault read raises it.
+ * A legacy `password` key found in the payload is dropped on the way through, and the old `sessionStorage`
+ * entry is deleted without ever being read.
  */
 export function loadAeroSettings(
   storage?: Pick<Storage, 'getItem'> | StorageLike | null,
-  session?: StorageLike | null,
 ): AeroSettings {
+  purgeLegacyAeroPassword();
   const target = storage ?? (typeof localStorage !== 'undefined' ? localStorage : null);
   if (!target) return { ...DEFAULT_AERO_SETTINGS };
 
@@ -216,7 +214,8 @@ export function loadAeroSettings(
     return {
       wsUrl: typeof parsed.wsUrl === 'string' ? parsed.wsUrl : DEFAULT_AERO_SETTINGS.wsUrl,
       username: typeof parsed.username === 'string' ? parsed.username : DEFAULT_AERO_SETTINGS.username,
-      password: aeroSessionPassword(session),
+      // Never read from the payload: the vault is the only authority on whether a password exists.
+      hasPassword: false,
       shortcutName: aeroShortcutName(parsed.shortcutName, AERO_DEFAULT_SHORTCUT_NAME),
       syncEnabled:
         typeof parsed.syncEnabled === 'boolean' ? parsed.syncEnabled : DEFAULT_AERO_SETTINGS.syncEnabled,
@@ -228,37 +227,52 @@ export function loadAeroSettings(
 }
 
 /**
- * Persists company WebService settings to local storage.
+ * Persists the non-secret half of the integration.
+ *
+ * `hasPassword` is deliberately not written: it is the vault's answer, and a cached copy would let a phone
+ * show «configurado» for a vault somebody deleted from another device. `sessionStorage` is not touched at all.
  */
 export function saveAeroSettings(
   settings: AeroSettings,
   storage?: Pick<Storage, 'setItem'> | StorageLike | null,
-  session?: StorageLike | null,
 ): AeroSettings {
-  // The password stays in the session: what is written to `localStorage` is the settings without it. A save
-  // with a typed password is also what opens the session, so the envelope can be built right after without
-  // asking again, and the read that follows the next launch can leave from the returned document.
-  if (settings.password) setAeroSessionPassword(settings.password, session);
-  const { password: _secret, ...persisted } = settings;
+  const persisted = {
+    wsUrl: settings.wsUrl,
+    username: settings.username,
+    shortcutName: settings.shortcutName,
+    syncEnabled: settings.syncEnabled,
+    lastSyncAt: settings.lastSyncAt,
+  };
 
   const target = storage ?? (typeof localStorage !== 'undefined' ? localStorage : null);
   if (target) {
-    target.setItem(AERO_SETTINGS_STORAGE_KEY, JSON.stringify(persisted));
+    try {
+      target.setItem(AERO_SETTINGS_STORAGE_KEY, JSON.stringify(persisted));
+    } catch {
+      // A profile that refuses the write keeps the settings in memory for this visit; nothing secret is lost,
+      // because nothing secret is stored.
+    }
   }
   return settings;
 }
 
 /**
- * Removes company WebService settings from local storage.
+ * Removes the local settings, the legacy secret and the auto-read mark.
+ *
+ * The vault itself is not touched: it belongs to the server and only `DELETE /settings` removes it (I7).
  */
 export function clearAeroSettings(
   storage?: Pick<Storage, 'removeItem'> | StorageLike | null,
   session?: StorageLike | null,
 ): void {
-  clearAeroSessionPassword(session);
+  purgeLegacyAeroPassword(session);
   const target = storage ?? (typeof localStorage !== 'undefined' ? localStorage : null);
   if (target) {
-    target.removeItem(AERO_SETTINGS_STORAGE_KEY);
+    try {
+      target.removeItem(AERO_SETTINGS_STORAGE_KEY);
+    } catch {
+      /* same refusal as the save: nothing to clear means nothing to protect */
+    }
   }
   // Clearing the integration closes the session it configured, so the mark a launch left behind goes
   // with it: a read armed for this setup must not fire under the next one.
@@ -268,35 +282,30 @@ export function clearAeroSettings(
 /**
  * What is missing before an action can reach the ERP, if anything.
  *
- * `setup` is an address or a user nobody filled in; `password` is a configured integration whose tab no longer
- * holds the secret. The two are different sentences on screen: sending the operator to retype a URL that is
+ * `setup` is an address or a user nobody filled in; `password` is a configured integration whose vault holds
+ * no password yet. The two are different sentences on screen: sending the operator to retype a URL that is
  * already saved gives up the configuration for lost, and saying only «no configurado» hides the one thing the
  * person has to do.
  */
 export function aeroMissingSetup(
-  settings: Pick<AeroSettings, 'wsUrl' | 'username' | 'password'> | null | undefined,
+  settings: Pick<AeroSettings, 'wsUrl' | 'username' | 'hasPassword'> | null | undefined,
 ): 'setup' | 'password' | null {
   if (!settings) return 'setup';
   if (!normalizeAeroWsUrl(settings.wsUrl ?? '')) return 'setup';
   if (!settings.username || !settings.username.trim()) return 'setup';
-  if (!settings.password) return 'password';
+  if (!settings.hasPassword) return 'password';
   return null;
 }
 
 /**
- * Indicates whether the settings contain everything the operator is responsible for.
+ * Indicates whether the vault and the local settings can reach the ERP.
  *
- * Deliberately three fields: where the ERP is, and who it is. Nothing else is asked of a person at the counter,
- * and no value the ERP reveals gates the switch -- the identity travels as the username in uppercase, which is
- * what `ENT_USU` carries in the Delphi binary.
+ * Deliberately three facts: where the ERP is, who it is and whether the server keeps its password. Nothing the
+ * ERP reveals gates the switch -- the identity travels as the username in uppercase, which is what `ENT_USU`
+ * carries in the Delphi binary -- and nothing secret has to exist on this device.
  */
 export function aeroSettingsReady(settings: AeroSettings): boolean {
-  if (!settings) return false;
-  const normalized = normalizeAeroWsUrl(settings.wsUrl ?? '');
-  if (!normalized) return false;
-  if (!settings.username || !settings.username.trim()) return false;
-  if (!settings.password) return false;
-  return true;
+  return aeroMissingSetup(settings) === null;
 }
 
 /**
@@ -335,15 +344,6 @@ export function aeroEndpoint(wsUrl: string, path: string): string {
   const cleanBase = wsUrl.replace(/\/+$/, '');
   const cleanPath = path.replace(/^\/+/, '');
   return `${cleanBase}/${cleanPath}`;
-}
-
-/**
- * Generates an HTTP Basic Authentication header value supporting UTF-8 credentials.
- */
-export function basicAuthHeader(username: string, password: string): string {
-  const bytes = new TextEncoder().encode(`${username}:${password}`);
-  const binary = Array.from(bytes, (b) => String.fromCharCode(b)).join('');
-  return `Basic ${btoa(binary)}`;
 }
 
 /**
@@ -979,88 +979,56 @@ function aeroReconciledKey(movementKey: string, operator: string | null | undefi
 /**
  * What the bridge can be asked to do, one word each.
  *
- * The word travels in the callback query string and in the envelope's `url`, so it is also the name the page
- * uses to decide what a returning phone means.
+ * The word travels in the callback query string and in the ticket the server issues, so it is also the name
+ * the page uses to decide what a returning phone means. `saida` survives because a callback may still carry
+ * it; the vault only issues the other four.
  */
 export type AeroBridgeAction = 'entrada' | 'entrada_lote' | 'saida' | 'movimentos' | 'test';
 
 /**
- * The one thing the bridge shortcut receives: where to post, who it is, what to send and where to come back.
+ * The deep link that runs the bridge, handing it the two keys the ticket flow needs.
  *
- * `body` is a string on purpose. A dictionary value dropped into the phone's "Request Body: Text" field is
- * not re-serialised as JSON -- Shortcuts renders it as a property list -- so an object here would produce a
- * body the ERP refuses while the header still claimed `application/json`. The page serialises it before the
- * phone ever sees it.
+ * The dictionary is exactly `{ ticket, ticketUrl }`: the token lives 120 s, burns on the first redemption and
+ * carries no credential of its own. Everything the phone used to read out of an envelope built here -- the
+ * address, the headers, the body, the callback -- is now the server's answer to that one POST, so nothing
+ * about the factory can be read from this page's memory or from the shortcut's input.
  */
-export interface AeroBridgeEnvelope {
-  url: string;
-  method: 'POST';
-  headers: { Authorization: string; 'Content-Type': string; Accept: string };
-  body: string;
-  /**
-   * The same request repeated for every product of a batch, as serialised texts.
-   *
-   * Present only when the over envelope carries two or more payloads: one product keeps the shape it has had
-   * since the bridge was built, and a phone with the old shortcut ignores this key instead of rejecting the
-   * envelope. The shortcut's "Repeat with each item" reads it as a list of texts and posts each one.
-   */
-  bodies?: string[];
-  callback: string;
+export function buildAeroBridgeTriggerUrl(args: { name: string; ticket: string; ticketUrl: string }): string {
+  return aeroShortcutTriggerUrl({
+    name: args.name,
+    payload: { ticket: args.ticket, ticketUrl: args.ticketUrl },
+  });
 }
 
 /**
- * Builds the envelope the bridge posts, credentials included.
+ * The base path the app is served under: no origin, no trailing slash.
  *
- * The header travels in the envelope rather than inside the shortcut ("opción B"): the factory changes a
- * password in the web panel and the iPhone keeps working without editing anything. The cost is two more
- * dictionary reads on the phone, which is cheaper than a shortcut nobody can update.
+ * The absolute URL of the callback belongs to the server, which validates the path against `PUBLIC_APP_URL` and
+ * builds the rest. This side only says which route and which action, which is the part a page can know.
  */
-export function buildAeroBridgeEnvelope(args: {
-  wsUrl: string;
-  username: string;
-  password: string;
-  /** The endpoint path the bridge posts to, such as `saidasitem` or `usuarios/`. */
-  endpoint: string;
-  /** Serialised into the envelope's `body`; never handed to the phone as a dictionary. */
-  payload: unknown;
-  /** Where the bridge opens once it is done, with the data slot left open. */
-  callbackUrl: string;
-}): AeroBridgeEnvelope {
-  return {
-    url: aeroEndpoint(args.wsUrl, args.endpoint),
-    method: 'POST',
-    headers: {
-      Authorization: basicAuthHeader(args.username, args.password),
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-    body: JSON.stringify(args.payload),
-    callback: args.callbackUrl,
-  };
+function aeroBasePath(raw: string | undefined): string {
+  const value = (raw ?? '/').trim().replace(/\/+$/, '');
+  if (!value || value === '/') return '';
+  return value.startsWith('/') ? value : `/${value}`;
 }
 
 /**
- * Builds the deep link that runs the bridge, handing it the whole envelope as one text input.
- */
-export function buildAeroBridgeTriggerUrl(args: { name: string; envelope: AeroBridgeEnvelope }): string {
-  return aeroShortcutTriggerUrl({ name: args.name, payload: args.envelope });
-}
-
-/**
- * The callback the bridge opens, with the slot the ERP answer is appended to.
+ * The callback the shortcut opens, as a path with its query and nothing else.
  *
- * One prefix per action, all on the same page: the phone appends whatever the ERP answered, URL-encoded, and
- * the page reads it back as `aero_action` plus `aero_data`.
+ * Same origin by construction: there is no host here to be wrong about. A route this app cannot come back to
+ * falls to the launch page, exactly as it did when the URL was absolute, and the two parameters the ERP answer
+ * is appended to are always the last thing in the string.
  */
-export function aeroBridgeCallbackPrefix(args: {
-  origin: string;
-  basePath?: string;
+export function aeroBridgeCallbackPath(args: {
   action: AeroBridgeAction;
   /** Router route to come back to, such as `/reports/67`. Only a same-origin path is honoured. */
   path?: string;
+  /** The deploy base, injected by callers that know it; by default it is the one the app was built with. */
+  basePath?: string;
 }): string {
+  const base = aeroBasePath(args.basePath ?? import.meta.env?.BASE_URL);
   const route = aeroInternalRoute(args.path);
-  const target = route ? aeroRouteUrl(args, route.path) : aeroLaunchPageUrl(args);
+  const target = route ? `${base}${route.path}` : `${base}/massas-launch`;
   // A route may carry a query of its own -- the admin panel comes back to its integration tab -- and it has
   // to sit before the two parameters the shortcut appends, not replace them.
   const own = route?.query ? `${route.query}&` : '';
@@ -1089,71 +1057,57 @@ function aeroInternalRoute(path: string | undefined): { path: string; query: str
 /**
  * The callback the running page has to come back to, for one action.
  *
- * The panel's test, the dialog's sample and every launch build the same URL from the page they are on, so the
- * derivation lives here instead of being retyped in three places.
+ * The panel's test, the dialog's recipe and every launch build the same path from the page they are on, so the
+ * derivation lives here instead of being retyped in three places. It answers with a path: the owner of the
+ * absolute URL is the server, which is the only side that knows `PUBLIC_APP_URL`.
  */
 export function aeroBridgeCallbackFor(action: AeroBridgeAction, path?: string): string {
-  const origin = typeof window === 'undefined' ? '' : window.location.origin;
-  const basePath = (import.meta.env?.BASE_URL ?? '/').replace(/\/$/, '');
-  return aeroBridgeCallbackPrefix({ origin, basePath, action, path });
+  return aeroBridgeCallbackPath({ action, path });
 }
 
 export interface AeroBridgeShortcutRecipe {
   /** The one shortcut the phone must have installed. */
   name: string;
   /**
-   * The dictionary keys every action reads, in the order they are built.
+   * How many actions the recipe really takes on the phone: five new ones at the head (the input dictionary,
+   * the two reads and the redemption) plus the twenty the certified shortcut already had.
+   */
+  actionCount: number;
+  /**
+   * The dictionary keys the ERP answer carries, in the order the actions read them.
    *
-   * `authorization` is not a key of the envelope: it is read from inside `headers`, which is the shape the
-   * envelope really has. The recipe used to name an `auth` key the envelope never carried, and an operator
-   * following it to the letter read a key that was not there.
+   * `authorization` is not a key of the answer: it is read from inside `headers`, which is the shape the
+   * server returns. The recipe used to name an `auth` key the answer never carried, and an operator following
+   * it to the letter read a key that was not there.
    */
   keys: {
     url: string;
     headers: string;
     authorization: string;
     body: string;
-    /** Only present in a batch envelope: the phone repeats this list instead of posting one body. */
+    /** Only present in a batch answer: the phone repeats this list instead of posting one body. */
     bodies: string;
     callback: string;
   };
-  /** What the POST action must declare it is sending. */
-  contentType: string;
-  /** What the POST action must declare it accepts, the same one every ERP call carries. */
-  accept: string;
-  /** The header value the page now puts in each envelope, quoted so the panel can show it. */
-  authorization: string;
-  /**
-   * How many actions the recipe really takes on the phone, in four blocks: unpacking the envelope (five
-   * reads), the batch branch (the `bodies` test, the empty list, the repeat, the join, the bracket and the
-   * encode), the single-product branch (the `body_item` rename, its POST and its encode) and the return.
-   * Twenty counting both branches, which is what the certified shortcut has.
-   */
-  actionCount: number;
+  /** The key of the input dictionary that carries the one-time token. */
+  ticketKey: string;
+  /** The key of the input dictionary that carries the redeem endpoint. */
+  ticketUrlKey: string;
   /** The endpoints the one bridge can reach, so the dialog never understates what it covers. */
   endpoints: Record<AeroBridgeAction, string>;
-  /** A ready envelope for the connection test, the only action that needs no launch data. */
-  sampleEnvelope: AeroBridgeEnvelope;
 }
 
 /**
  * The bridge recipe, in the shape the dialog copies it.
  *
- * Counted honestly, and in four blocks: unpacking the envelope, the batch branch (a `bodies` test, an empty
- * `respostas`, a repeat that posts each element and appends it, a join, a bracket and an encode), the
- * single-product branch (the `body_item` rename, its POST and its encode) and the return to Safari. Twenty
- * actions, one shortcut, and a phone with the old eight still works because it ignores `bodies` and posts
- * `body`.
+ * Secret-free by construction: there is no password to show, no `Authorization` value to quote and no sample
+ * envelope to paste, because the page no longer assembles one. The recipe describes the phone's twenty-three
+ * actions and the dictionary keys each of them reads, which is everything an operator has to type.
  */
-export function aeroBridgeShortcutRecipe(args: {
-  wsUrl: string;
-  username: string;
-  password: string;
-  origin: string;
-  basePath?: string;
-}): AeroBridgeShortcutRecipe {
+export function aeroBridgeShortcutRecipe(args: { wsUrl: string }): AeroBridgeShortcutRecipe {
   return {
     name: AERO_DEFAULT_BRIDGE_SHORTCUT_NAME,
+    actionCount: 23,
     keys: {
       url: 'url',
       headers: 'headers',
@@ -1162,10 +1116,8 @@ export function aeroBridgeShortcutRecipe(args: {
       bodies: 'bodies',
       callback: 'callback',
     },
-    contentType: 'application/json',
-    accept: 'application/json',
-    authorization: basicAuthHeader(args.username, args.password),
-    actionCount: 20,
+    ticketKey: 'ticket',
+    ticketUrlKey: 'ticketUrl',
     endpoints: {
       entrada: aeroEndpoint(args.wsUrl, 'entradasitem'),
       // El lote va al mismo endpoint, una vez por producto: el atajo repite la petición.
@@ -1174,14 +1126,6 @@ export function aeroBridgeShortcutRecipe(args: {
       movimentos: aeroEndpoint(args.wsUrl, 'movimentoitem'),
       test: aeroEndpoint(args.wsUrl, 'usuarios'),
     },
-    sampleEnvelope: buildAeroBridgeEnvelope({
-      wsUrl: args.wsUrl,
-      username: args.username,
-      password: args.password,
-      endpoint: 'usuarios',
-      payload: {},
-      callbackUrl: aeroBridgeCallbackPrefix({ origin: args.origin, basePath: args.basePath, action: 'test' }),
-    }),
   };
 }
 
@@ -1194,24 +1138,6 @@ export function aeroBridgeShortcutRecipe(args: {
 export function aeroShortcutTriggerUrl(args: { name: string; payload: unknown }): string {
   const body = JSON.stringify(args.payload);
   return `shortcuts://x-callback-url/run-shortcut?name=${encodeURIComponent(args.name)}&input=text&text=${encodeURIComponent(body)}`;
-}
-
-/**
- * The page the phone comes back to, before any query string.
- */
-function aeroBaseUrl(args: { origin: string; basePath?: string }): string {
-  const cleanOrigin = args.origin.replace(/\/+$/, '');
-  const rawBase = args.basePath ?? '';
-  const cleanBase = !rawBase || rawBase === '/' ? '' : `/${rawBase.replace(/^\/+|\/+$/g, '')}`;
-  return `${cleanOrigin}${cleanBase}`;
-}
-
-function aeroRouteUrl(args: { origin: string; basePath?: string }, route: string): string {
-  return `${aeroBaseUrl(args)}/${route.replace(/^\/+/, '')}`;
-}
-
-function aeroLaunchPageUrl(args: { origin: string; basePath?: string }): string {
-  return aeroRouteUrl(args, 'massas-launch');
 }
 
 /**

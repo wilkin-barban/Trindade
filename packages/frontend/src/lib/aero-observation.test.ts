@@ -45,8 +45,8 @@ describe('buildEntradaItemPayload ENT_OBS', () => {
   });
 });
 
-describe('the certified envelope', () => {
-  it('travels the Trindade observation verbatim, so the shortcut needs no change', () => {
+describe('the certified payload', () => {
+  it('travels the Trindade observation verbatim inside the payload the ticket carries', () => {
     const payload = buildEntradaItemPayload({
       productCode: '1192',
       productName: 'MASSA QUADRADA',
@@ -57,15 +57,15 @@ describe('the certified envelope', () => {
     });
     const [trip] = buildAeroLaunchTrips({
       payloads: [payload],
-      wsUrl: 'http://192.168.1.50:8000',
-      username: 'wilkin',
-      password: 'secreto',
-      endpoint: 'entradasitem',
-      singleCallbackUrl: 'https://example.test/single',
-      batchCallbackUrl: 'https://example.test/batch',
+      singleCallbackPath: '/massas-launch',
+      batchCallbackPath: '/massas-launch',
     });
 
-    assert.equal(trip!.envelope.body, JSON.stringify(payload));
-    assert.equal(JSON.parse(trip!.envelope.body!).ENT_OBS, 'Trindade #77');
+    // The page no longer builds the envelope: the server serialises it from these payloads. What must survive the
+    // trip is the observation, because the shortcut sends exactly what came back in `body`.
+    assert.equal(trip!.action, 'entrada');
+    assert.equal(trip!.payloads.length, 1);
+    assert.equal((trip!.payloads[0] as { ENT_OBS: string }).ENT_OBS, 'Trindade #77');
+    assert.equal(JSON.parse(JSON.stringify(trip!.payloads[0])).ENT_OBS, 'Trindade #77');
   });
 });

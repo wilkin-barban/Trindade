@@ -10,9 +10,11 @@ import { passwordIssue, passwordIssueKey } from '../../lib/password-policy';
 import { cleanPhone, filterPhoneInput } from '../../lib/phone';
 import { ROLE_ID } from '../../lib/roles';
 import { AeroIntegrationPanel } from '../massas/AeroIntegrationPanel';
+import { fetchAeroVaultSettings } from '../../lib/aero-vault';
 import {
   aeroSettingsEditable,
   loadAeroSettings,
+  saveAeroSettings,
   type AeroSettings,
 } from '../../lib/aero-integration';
 
@@ -207,6 +209,37 @@ export function AdminDashboard() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [reloadCount, setReloadCount] = useState(0);
+
+  /**
+   * The vault, read where the panel is shown.
+   *
+   * The password lives encrypted in the API, so this tab cannot answer «configurado» from local storage: it
+   * asks. What it caches afterwards is only the address and the user, which are not secrets and let the next
+   * reload draw the panel before the server answers.
+   */
+  useEffect(() => {
+    if (activeTab !== 'integration') return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const vault = await fetchAeroVaultSettings();
+        if (cancelled || !vault.configured) return;
+        setAeroSettings((current) =>
+          saveAeroSettings({
+            ...current,
+            wsUrl: vault.wsUrl ?? current.wsUrl,
+            username: vault.username ?? current.username,
+            hasPassword: vault.hasPassword,
+          }),
+        );
+      } catch {
+        // El panel tiene su propio estado de error y su reintento: acá no se duplica la frase.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab]);
 
   // Data stores
   const [categories, setCategories] = useState<Category[]>([]);

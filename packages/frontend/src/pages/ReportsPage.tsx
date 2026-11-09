@@ -22,6 +22,7 @@ import { MassasReportSection } from '../components/reports/MassasReportSection';
 import { ERP_RECEIPT_CATEGORY_ID, usesErpReceipts } from '../lib/receipts';
 import { saoPauloToday } from '../lib/date';
 import { aeroEndpoint, aeroSettingsReady, loadAeroSettings } from '../lib/aero-integration';
+import { fetchAeroVaultSettings } from '../lib/aero-vault';
 import { triggerAeroMovementsSync } from '../lib/aero-mirror';
 import { aeroSyncRefusedEvent, postAeroAuditEvent } from '../lib/aero-audit';
 
@@ -59,9 +60,31 @@ export function ReportsPage() {
   const [createdReportId, setCreatedReportId] = useState<number | null>(null);
   const [movementsRefreshKey, setMovementsRefreshKey] = useState(0);
   // Company access is a device setting, read once: without it the button refreshes the day it already read
-  // instead of promising a sync it cannot start.
-  const aeroSettings = useMemo(() => loadAeroSettings(), []);
+  // instead of promising a sync it cannot start. The password is not part of it any more -- the server keeps
+  // it -- so the vault is asked whether it holds one, and until it answers the button stays where it was.
+  const [aeroSettings, setAeroSettings] = useState(() => loadAeroSettings());
   const canSyncErp = aeroSettingsReady(aeroSettings);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const vault = await fetchAeroVaultSettings();
+        if (cancelled || !vault.configured) return;
+        setAeroSettings((current) => ({
+          ...current,
+          wsUrl: vault.wsUrl ?? current.wsUrl,
+          username: vault.username ?? current.username,
+          hasPassword: vault.hasPassword,
+        }));
+      } catch {
+        // Un cofre ilegible deja el botón como estaba: el reporte se sigue leyendo y se sigue enviando a mano.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   /**
    * The day the report is about, read once.
@@ -72,8 +95,12 @@ export function ReportsPage() {
   const reportDate = useMemo(() => saoPauloToday(), []);
 
   const handleSyncErpMovements = useCallback(() => {
-    const fired = triggerAeroMovementsSync(aeroSettings, { date: reportDate, callbackPath: location.pathname });
-    if (!fired) {
+    void (async () => {
+      const fired = await triggerAeroMovementsSync(aeroSettings, {
+        date: reportDate,
+        callbackPath: location.pathname,
+      });
+      if (fired) return;
       // A device without company access refreshes what it already read, and says so in the log: the
       // operator pressed a button, and a press that reached nothing is not the same as one never made.
       void postAeroAuditEvent(
@@ -83,7 +110,7 @@ export function ReportsPage() {
         }),
       );
       setMovementsRefreshKey((key) => key + 1);
-    }
+    })();
   }, [aeroSettings, location.pathname, reportDate]);
 
   const handleMovementsSynced = useCallback(() => {

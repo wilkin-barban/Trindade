@@ -30,7 +30,11 @@ describe('result dialogs wiring', () => {
     // El veredicto puede llegar por props (lanzamiento) o por almacenamiento (Panel Admin).
     assert.ok(panel.includes('connectionVerdictTone(outcome.verdict)'));
     assert.ok(panel.includes('loadAeroTestOutcome()'));
-    assert.ok(panel.includes('describeProbe(outcome, t)'));
+    // The verdict now comes back from the shortcut, not from a probe in the browser: the panel renders the
+    // three sentence keys the callback resolves.
+    assert.ok(panel.includes("t('massas.aero.testShortcutOk')"));
+    assert.ok(panel.includes("t('massas.aero.testShortcutError')"));
+    assert.equal(panel.includes('probeAeroConnection('), false);
     assert.ok(panel.includes('testId="aero-test-result-modal"'));
   });
 

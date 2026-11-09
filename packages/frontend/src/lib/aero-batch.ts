@@ -1,45 +1,59 @@
-import { buildAeroBridgeEnvelope, type AeroBridgeEnvelope } from './aero-integration';
-
 /**
- * How many products travel in one envelope to the company ERP.
+ * How many products travel in one ticket to the company ERP.
  *
- * The envelope rides inside a `shortcuts://x-callback-url` deep link, which is a URL, not a channel: eight
- * bodies of a few hundred bytes each encode to about three kilobytes, which iOS opens without complaint. A
- * whole day of twenty products would be eight kilobytes, and the link starts to be a bet.
+ * The trip still rides inside a `shortcuts://x-callback-url` deep link, which is a URL, not a channel: the
+ * ticket itself is small, but the audit line and the shortcut's own batch branch read the payloads in order,
+ * and a whole day of twenty products in one trip is a link iOS opens as a bet. Eight has been the ceiling the
+ * factory certified and it stays.
  */
 export const AERO_BATCH_MAX = 8;
 
-/** One trip to the Atajos app: what to send, in which envelope, and which round trip it opens. */
+/** The two actions a launch can ask the server for, and the only ones it ever needs. */
+export type AeroLaunchAction = 'entrada' | 'entrada_lote';
+
+/** One trip to the Atajos app: which action the server has to arm, and what it carries. */
 export interface AeroLaunchTrip {
-  action: 'entrada' | 'entrada_lote';
-  envelope: AeroBridgeEnvelope;
+  action: AeroLaunchAction;
   /** The payloads this trip carries, in the order the shortcut will send them. */
-  payloads: unknown[];
+  payloads: Record<string, unknown>[];
+  /**
+   * Where the shortcut comes back, as a same-origin path.
+   *
+   * The full URL is the server's job: it validates this path against `PUBLIC_APP_URL` and builds the callback
+   * it stores with the ticket. The page only knows which route it is on.
+   */
+  callbackPath: string;
 }
 
 export interface AeroLaunchTripsArgs {
   payloads: readonly unknown[];
-  wsUrl: string;
-  username: string;
-  password: string;
-  /** The endpoint path the bridge posts to. */
-  endpoint: string;
   /** Round trip for a single product, the one a shortcut without the batch branch understands. */
-  singleCallbackUrl: string;
+  singleCallbackPath: string;
   /** Round trip for a batch, which comes back as one array of answers. */
-  batchCallbackUrl: string;
+  batchCallbackPath: string;
 }
 
 /**
- * Splits a launch into the envelopes the phone has to run.
+ * Hands the vault client plain dictionaries.
  *
- * The rule is the product count, and it is Wilkin's: one product travels exactly as it does today -- no
- * `bodies`, the `entrada` round trip, the branch that has been in production for weeks. Two or more share one
- * envelope and come back once. Above eight, the launch is walked in order and the leftover, if it is a single
- * product, becomes a single trip again: a phone should not run a loop for one opinion.
+ * The payload builders answer with typed interfaces, and an interface has no index signature: it is not
+ * assignable to `Record<string, unknown>` even though every key of it is. Copying each payload into a fresh
+ * dictionary is what makes the shape the HTTP body really is explicit, without a cast at the call site.
+ */
+export function aeroTicketPayloads(payloads: readonly unknown[]): Record<string, unknown>[] {
+  return payloads.map((payload) => ({ ...(payload as Record<string, unknown>) }));
+}
+
+/**
+ * Splits a launch into the trips the server has to arm.
+ *
+ * The rule is the product count, and it is Wilkin's: one product travels as `entrada`, two or more travel as
+ * `entrada_lote` and come back once. Above eight, the launch is walked in order and the leftover, if it is a
+ * single product, becomes a single trip again: a phone should not run a loop for one opinion.
  *
  * The order is preserved end to end, because the answers come back in the order they were sent and the page
- * has to know which product each answer belongs to.
+ * has to know which product each answer belongs to. Nothing here is an envelope any more: the action and the
+ * payloads are exactly what `POST /integration/aero/bridge-tickets` takes.
  */
 export function buildAeroLaunchTrips(args: AeroLaunchTripsArgs): AeroLaunchTrip[] {
   const trips: AeroLaunchTrip[] = [];
@@ -51,26 +65,11 @@ export function buildAeroLaunchTrips(args: AeroLaunchTripsArgs): AeroLaunchTrip[
 }
 
 function buildTrip(chunk: readonly unknown[], args: AeroLaunchTripsArgs): AeroLaunchTrip {
-  const payloads = [...chunk];
-  const envelope = buildAeroBridgeEnvelope({
-    wsUrl: args.wsUrl,
-    username: args.username,
-    password: args.password,
-    endpoint: args.endpoint,
-    payload: chunk[0],
-    callbackUrl: chunk.length === 1 ? args.singleCallbackUrl : args.batchCallbackUrl,
-  });
+  const payloads = aeroTicketPayloads(chunk);
 
-  if (chunk.length === 1) {
-    return { action: 'entrada', envelope, payloads };
+  if (payloads.length === 1) {
+    return { action: 'entrada', payloads, callbackPath: args.singleCallbackPath };
   }
 
-  // `bodies` is a list of texts, not dictionaries: "Repeat with each item" hands the element straight to a
-  // text request body, and a dictionary there would need re-serialising on the phone. `body` keeps the first
-  // payload so a shortcut that never learned `bodies` still posts something valid instead of failing.
-  return {
-    action: 'entrada_lote',
-    envelope: { ...envelope, bodies: chunk.map((payload) => JSON.stringify(payload)) },
-    payloads,
-  };
+  return { action: 'entrada_lote', payloads, callbackPath: args.batchCallbackPath };
 }

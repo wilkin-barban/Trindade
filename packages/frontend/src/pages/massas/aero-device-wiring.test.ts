@@ -28,7 +28,8 @@ describe('integration panel honours the device', () => {
       const before = panel.slice(Math.max(0, index - 300), index);
       assert.ok(before.includes('deviceLimited'), `${control} must follow the device rule`);
     }
-    const clear = panel.indexOf('onClick={handleClear}');
+    const clear = panel.indexOf('onClick={() => void handleClear()}');
+    assert.ok(clear > 0, 'the clear control is still wired');
     assert.ok(panel.slice(clear, clear + 400).includes('deviceLimited'));
   });
 

@@ -1,38 +1,20 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { basicAuthHeader } from './aero-integration';
 import {
   aeroImportPayload,
   aeroImportPlan,
   aeroMirrorSeats,
-  aeroMovementsEnvelope,
+  aeroMovementsPayload,
   readAeroMovementsSnapshot,
 } from './aero-mirror';
 
-const credentials = {
-  wsUrl: 'http://192.168.25.250:1453/api',
-  username: 'wilkin',
-  password: 'senha',
-};
+describe('aero-mirror: the movements request the ticket carries', () => {
+  it('asks /movimentoitem for the whole day, every operator, with the certified PATCH body', () => {
+    const payload = aeroMovementsPayload({ date: '2026-10-28' });
 
-describe('aero-mirror: the movements query through the bridge', () => {
-  it('asks /movimentoitem for the whole day, every operator, and comes back to the mirror', () => {
-    const envelope = aeroMovementsEnvelope({
-      ...credentials,
-      date: '2026-10-28',
-      callbackUrl: 'https://trindademasas.duckdns.org/massas-launch?aero_action=movimentos&aero_data=',
-    });
-
-    assert.equal(envelope.url, 'http://192.168.25.250:1453/api/movimentoitem?_method=PATCH');
-    assert.equal(envelope.method, 'POST');
-    assert.equal(envelope.headers.Authorization, basicAuthHeader('wilkin', 'senha'));
-    assert.equal(envelope.headers['Content-Type'], 'application/json');
-    assert.equal(
-      envelope.callback,
-      'https://trindademasas.duckdns.org/massas-launch?aero_action=movimentos&aero_data=',
-    );
-
-    assert.deepEqual(JSON.parse(envelope.body), {
+    // El cuerpo certificado viaja tal cual: `_method` en el cuerpo porque el ERP lo exige ahí y en la query,
+    // y los filtros abiertos en `null` explícito porque el ERP los lee así.
+    assert.deepEqual(payload, {
       _method: 'PATCH',
       CODFOR: null,
       NOMUSU: null,
@@ -44,25 +26,16 @@ describe('aero-mirror: the movements query through the bridge', () => {
   });
 
   it('narrows to one operator when the mirror is asked for one', () => {
-    const envelope = aeroMovementsEnvelope({
-      ...credentials,
-      date: '2026-10-28',
-      userName: 'marcos',
-      callbackUrl: 'https://example.test/massas-launch?aero_action=movimentos&aero_data=',
-    });
-
-    assert.equal(JSON.parse(envelope.body).NOMUSU, 'MARCOS');
+    assert.equal(aeroMovementsPayload({ date: '2026-10-28', userName: 'marcos' }).NOMUSU, 'MARCOS');
   });
 
-  it('carries the body as text, because a dictionary reaches the ERP as a property list', () => {
-    const envelope = aeroMovementsEnvelope({
-      ...credentials,
-      date: '2026-10-28',
-      callbackUrl: 'https://example.test/massas-launch?aero_action=movimentos&aero_data=',
-    });
+  it('carries no request of its own: no Authorization, no URL, no callback', () => {
+    const payload = aeroMovementsPayload({ date: '2026-10-28' });
 
-    assert.equal(typeof envelope.body, 'string');
-    assert.deepEqual(JSON.parse(envelope.body).DTINI, '2026-10-28');
+    // Los tres vive el servidor: quien arma el POST contra la planta es la API, nunca esta página.
+    for (const forbidden of ['Authorization', 'url', 'headers', 'callback', 'body']) {
+      assert.equal(forbidden in payload, false, `the payload still carries ${forbidden}`);
+    }
   });
 });
 

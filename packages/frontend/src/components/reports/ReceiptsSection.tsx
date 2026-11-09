@@ -15,6 +15,7 @@ import {
   readAeroMovements,
 } from '../../lib/aero-integration';
 import { triggerAeroMovementsSync } from '../../lib/aero-mirror';
+import { fetchAeroVaultSettings } from '../../lib/aero-vault';
 import { aeroReceiptsAuditEvent, postAeroAuditEvent } from '../../lib/aero-audit';
 import { aeroEndpoint } from '../../lib/aero-integration';
 import { readReportReceiptsDay, type ReportReceiptsDay } from '../../lib/receipts';
@@ -59,8 +60,31 @@ export function ReceiptsSection({
   // the factory must not replay a result the operator already read.
   const callbackHandled = useRef(false);
 
-  const settings = useMemo(() => loadAeroSettings(), []);
+  const [settings, setSettings] = useState(() => loadAeroSettings());
   const canSync = !readOnly && aeroSettingsReady(settings);
+
+  // The vault is the only authority on whether the ERP password exists; the local settings only say where the
+  // plant is and who launches. Without this read a fresh tab would keep the button off on a configured phone.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const vault = await fetchAeroVaultSettings();
+        if (cancelled || !vault.configured) return;
+        setSettings((current) => ({
+          ...current,
+          wsUrl: vault.wsUrl ?? current.wsUrl,
+          username: vault.username ?? current.username,
+          hasPassword: vault.hasPassword,
+        }));
+      } catch {
+        // An unreadable vault leaves the section as it was; the report and its numbers are still readable.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -147,7 +171,7 @@ export function ReceiptsSection({
   }, [finishSync]);
 
   const handleSync = useCallback(() => {
-    triggerAeroMovementsSync(settings, { date, callbackPath: location.pathname });
+    void triggerAeroMovementsSync(settings, { date, callbackPath: location.pathname });
   }, [date, location.pathname, settings]);
 
   const syncedAtLabel = useMemo(() => {
