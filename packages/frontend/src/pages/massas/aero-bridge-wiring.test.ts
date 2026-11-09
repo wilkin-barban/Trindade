@@ -25,14 +25,19 @@ describe('aero bridge wiring: the panel asks for three things and dispatches the
     assert.equal(panel.includes('aero-user-code'), false);
   });
 
-  it('sends the connection test through the same bridge every launch uses', () => {
-    assert.ok(panel.includes('buildAeroBridgeEnvelope('));
-    assert.ok(panel.includes("endpoint: 'usuarios'"));
+  it('asks the server for a `test` ticket instead of ringing the ERP from the browser', () => {
+    // El panel ya no arma sobres: pide un ticket de la acción `test` y el atajo canjea. La contraseña vive
+    // cifrada en el servidor y esta página no la tiene, así que el sondeo del navegador dejó de existir.
+    assert.ok(panel.includes('requestAeroBridgeTicket('));
+    assert.ok(panel.includes("action: 'test'"));
+    assert.ok(panel.includes('payloads: [{}]'));
     // The test comes back to the tab that asked, not to the launch page: the panel lives in Admin now, so
     // a callback aimed at /massas-launch lands on a page that cannot draw the verdict.
-    assert.ok(panel.includes("aeroBridgeCallbackFor('test', `${window.location.pathname}?tab=integration`),"));
+    assert.ok(panel.includes("aeroBridgeCallbackFor('test', `${window.location.pathname}?tab=integration`)"));
     assert.equal(panel.includes("aeroBridgeCallbackFor('test')"), false);
-    assert.ok(panel.includes('buildAeroBridgeTriggerUrl({ name: settings.shortcutName, envelope })'));
+    assert.ok(panel.includes('buildAeroBridgeTriggerUrl({'));
+    assert.ok(panel.includes('ticket: ticket.ticket'));
+    assert.ok(panel.includes('ticketUrl: ticket.ticketUrl'));
     // Nada del diseño partido sobrevive en el panel.
     assert.equal(panel.includes('aeroTestShortcutTriggerUrl'), false);
     assert.equal(panel.includes('testShortcutName'), false);
@@ -92,10 +97,22 @@ describe('aero bridge wiring: the panel asks for three things and dispatches the
     assert.ok(admin.includes("window.history.replaceState("));
   });
 
-  it('keeps the browser probe for when the page is not blocked', () => {
-    // El puente es el único camino sobre HTTPS; en local el navegador responde en línea y es más rápido.
-    assert.ok(panel.includes('aeroConnectionBlocker('));
-    assert.ok(panel.includes('probeAeroConnection('));
+  it('never sends the ERP request from the browser, in the panel or in the launch screen', () => {
+    // S12: ningún sobre con Authorization en el cliente. El sondeo del navegador hablaba con la planta usando
+    // la contraseña, y su módulo entero se fue con el cofre.
+    for (const source of [panel, launch]) {
+      assert.equal(source.includes('probeAeroConnection'), false);
+      assert.equal(source.includes('aero-connection'), false);
+      assert.equal(source.includes('basicAuthHeader'), false);
+      assert.equal(/Authorization: Basic/.test(source), false);
+      // Nadie lee una contraseña de la configuración ni del cofre: no existen esas propiedades.
+      assert.equal(source.includes('settings.password'), false);
+      assert.equal(source.includes('aeroSettings.password'), false);
+      assert.equal(source.includes('vault.password'), false);
+    }
+    // La página de lanzamiento no tiene contraseña del ERP ni siquiera como borrador: la única que menciona
+    // es la clave temporal que genera al dar de alta un operario.
+    assert.equal(/draft\.password|aeroSettings\.password/.test(launch), false);
   });
 });
 
@@ -119,11 +136,19 @@ describe('aero bridge wiring: the launch hands the bridge a full envelope', () =
     assert.ok(launch.includes('aeroSettings.username?.trim() || user?.username?.trim() || null'));
   });
 
-  it('posts to /entradasitem through the bridge, with its own callback', () => {
-    assert.ok(launch.includes("endpoint: 'entradasitem'"));
-    assert.ok(launch.includes("aeroBridgeCallbackFor('entrada')"));
-    assert.ok(launch.includes('buildAeroBridgeTriggerUrl({ name: aeroSettings.shortcutName, envelope })'));
+  it('asks for an `entrada` ticket with its own callback instead of building the request', () => {
+    assert.ok(launch.includes('requestAeroBridgeTicket({'));
+    assert.ok(launch.includes('payloads: trip.payloads'));
+    assert.ok(launch.includes('callbackPath: trip.callbackPath'));
+    assert.ok(launch.includes("action: trip.action"));
+    // Una entrada y un lote piden callbacks distintos; el viaje que decide la acción también trae el suyo.
+    assert.ok(launch.includes("singleCallbackPath: aeroBridgeCallbackFor('entrada')"));
+    assert.ok(launch.includes("batchCallbackPath: aeroBridgeCallbackFor('entrada_lote')"));
+    assert.ok(launch.includes('buildAeroBridgeTriggerUrl({'));
+    assert.ok(launch.includes('ticket: ticket.ticket'));
     assert.equal(launch.includes('aeroShortcutTriggerUrl('), false);
+    // The request body of the ERP is not assembled here any more: the server serializes it.
+    assert.equal(launch.includes('buildAeroBridgeEnvelope('), false);
   });
 
   it('reads the ERP answer the bridge brought back instead of trusting the visit', () => {
@@ -136,14 +161,14 @@ describe('aero bridge wiring: the launch hands the bridge a full envelope', () =
 });
 
 describe('aero bridge wiring: a launch of many products leaves once', () => {
-  it('splits the queue into one envelope and keeps what does not fit waiting', () => {
+  it('splits the queue into one ticket and keeps what does not fit waiting', () => {
     assert.ok(launch.includes('takeAeroBatch(queue, AERO_BATCH_MAX)'));
     assert.ok(launch.includes('buildAeroLaunchTrips({'));
-    // Un producto viaja por `entrada` y un lote por `entrada_lote`: los dos callbacks se piden acá, no en el
-    // atajo, que no sabe de acciones.
-    assert.ok(launch.includes("singleCallbackUrl: aeroBridgeCallbackFor('entrada')"));
-    assert.ok(launch.includes("batchCallbackUrl: aeroBridgeCallbackFor('entrada_lote')"));
     assert.ok(launch.includes('writeAeroQueue({ ...taken.rest, inFlight: taken.batch })'));
+    // El ticket se pide antes de escribir la cola: si el servidor lo niega, nada salió y nada quedó en vuelo.
+    const ticketIndex = launch.indexOf('requestAeroBridgeTicket({');
+    const queueIndex = launch.indexOf('writeAeroQueue({ ...taken.rest, inFlight: taken.batch })');
+    assert.ok(ticketIndex > 0 && queueIndex > ticketIndex, 'the queue is written only after the ticket arrives');
   });
 
   it('reads the batch answer against the products that were in the phone', () => {
@@ -189,12 +214,16 @@ describe('aero bridge wiring: a launch of many products leaves once', () => {
 });
 
 describe('aero bridge wiring: the ERP mirror', () => {
-  it('asks /movimentoitem through the bridge, with its own callback', () => {
-    assert.ok(launch.includes('aeroMovementsEnvelope('));
+  it('asks for a `movimentos` ticket, with its own callback', () => {
+    assert.ok(launch.includes('aeroMovementsPayload({ date, userName: null })'));
+    assert.ok(launch.includes("action: 'movimentos'"));
     assert.ok(launch.includes("aeroBridgeCallbackFor('movimentos')"));
     assert.ok(launch.includes("parsed.action === 'movimentos'"));
     // La consulta se publica como lectura del historial, no como lanzamiento.
     assert.ok(launch.includes("event: 'read_history'"));
+    // La lectura automática que sigue al lanzamiento entra por el mismo camino: un solo `handleSyncFromErp`.
+    assert.ok(launch.includes('consumeAeroAutoRead(date)'));
+    assert.ok(launch.includes('void handleSyncFromErp()'));
   });
 
   it('keeps the day in Trindade, so the plant reads it without running the shortcut', () => {

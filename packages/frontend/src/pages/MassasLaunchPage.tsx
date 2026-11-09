@@ -41,7 +41,6 @@ import {
   aeroMissingSetup,
   aeroSettingsReady,
   aeroEndpoint,
-  buildAeroBridgeEnvelope,
   buildAeroBridgeTriggerUrl,
   buildAeroMovementsSnapshot,
   buildEntradaItemPayload,
@@ -53,6 +52,7 @@ import {
   saveAeroSettings,
   type AeroSettings,
 } from '../lib/aero-integration';
+import { fetchAeroVaultSettings, requestAeroBridgeTicket } from '../lib/aero-vault';
 import { aeroAttemptHeaders, aeroImportAuditEvent, newAeroAttempt, postAeroAuditEvent } from '../lib/aero-audit';
 import {
   aeroAttemptDate,
@@ -93,7 +93,7 @@ import {
 } from '../lib/aero-feedback';
 import {
   aeroImportPayload,
-  aeroMovementsEnvelope,
+  aeroMovementsPayload,
   lastSyncLabel,
   readAeroMovementsSnapshot,
   type AeroMovementSnapshot,
@@ -102,12 +102,12 @@ import {
 /**
  * What to say when an action needed the ERP and could not reach it.
  *
- * A configured phone whose tab lost the password is not a phone that needs configuring, and the difference is
- * the whole instruction: retype the secret for this session, or finish the setup in Admin.
+ * A configured integration whose vault has no password is not one that needs configuring, and the difference is
+ * the whole instruction: save the secret in Admin, or finish the address and the user.
  */
 function erpNotReadyMessage(
   t: (key: string, options?: Record<string, unknown>) => string,
-  settings: { wsUrl: string; username: string; password: string } | null | undefined,
+  settings: Pick<AeroSettings, 'wsUrl' | 'username' | 'hasPassword'> | null | undefined,
 ): string {
   return aeroMissingSetup(settings) === 'password'
     ? t('massas.aero.passwordNeeded')
@@ -188,6 +188,45 @@ export function MassasLaunchPage() {
     /** What the ERP said when it refused, shown as written instead of paraphrased. */
     detail: string | null;
   } | null>(null);
+
+  /**
+   * The vault, read once per mount.
+   *
+   * The password is not here and cannot be: the page only learns whether the server keeps one. Without this
+   * read a fresh tab would show «sin configurar» -- the address and the user are locally cached, the secret
+   * is not -- and every action would refuse to start on a phone that is perfectly configured.
+   */
+  useEffect(() => {
+    if (!aeroAllowed) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const vault = await fetchAeroVaultSettings();
+        if (cancelled || !vault.configured) return;
+        setAeroSettings((current) =>
+          saveAeroSettings({
+            ...current,
+            wsUrl: vault.wsUrl ?? current.wsUrl,
+            username: vault.username ?? current.username,
+            hasPassword: vault.hasPassword,
+          }),
+        );
+      } catch {
+        // An unreadable vault is not an error the production screen has to shout: the actions that need it
+        // already say what is missing, and the panel in Admin is where the vault itself is fixed.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [aeroAllowed]);
+
+  // El interruptor guardado sólo puede encenderse cuando hay con qué: la lectura del cofre llega después del
+  // primer render, y sin esto un teléfono que ya sincronizaba arrancaría apagado.
+  useEffect(() => {
+    if (!aeroSettings.hasPassword) return;
+    setSyncToErp((want) => want || aeroSettings.syncEnabled);
+  }, [aeroSettings.hasPassword, aeroSettings.syncEnabled]);
 
   const load = useCallback(
     async (targetDate: string, isSilent = false) => {
@@ -342,7 +381,7 @@ export function MassasLaunchPage() {
       if (syncable) {
         const queue: AeroQueue = { createdAt: new Date().toISOString(), date, items: requested, inFlight: [] };
         writeAeroQueue(queue);
-        triggerAeroSync(queue);
+        void triggerAeroSync(queue);
         return;
       }
 
@@ -381,27 +420,24 @@ export function MassasLaunchPage() {
   /**
    * Hands the next batch of pending entries to the Atajos app.
    *
-   * One envelope per trip, and one trip per trip: a launch of three products used to be three returns to
+   * One ticket per trip, and one trip per trip: a launch of three products used to be three returns to
    * Safari, and the operator never knew whether the second one had arrived. Up to `AERO_BATCH_MAX` products
    * now travel together and the shortcut repeats the request on the phone. What does not fit keeps waiting in
-   * the queue and becomes the next envelope.
+   * the queue and becomes the next ticket.
    *
-   * The navigation happens last: everything that must survive the trip -- the log line, the remaining queue,
-   * which products are in the phone -- is written before Safari leaves.
+   * The ticket is asked for before anything is written: a server that refuses it means nothing left the page,
+   * and a queue marked in-flight by a trip that never happened would wait forever. The navigation happens
+   * last: everything that must survive the trip -- the log line, the remaining queue, which products are in
+   * the phone -- is written before Safari leaves.
    */
   const triggerAeroSync = useCallback(
-    (queue: AeroQueue) => {
+    async (queue: AeroQueue) => {
       const taken = takeAeroBatch(queue, AERO_BATCH_MAX);
       if (taken.batch.length === 0) {
         clearAeroQueue();
         setSyncAwaiting(null);
         return;
       }
-
-      // The products travel with the queue so the return can name the failures instead of asking the
-      // operator which of the three it was.
-      writeAeroQueue({ ...taken.rest, inFlight: taken.batch });
-      setSyncAwaiting({ date: queue.date, remaining: taken.batch.length + taken.rest.items.length });
 
       // `ENT_USU` lleva el usuario en mayúsculas: es lo que el binario Delphi manda y lo que el ERP acepta.
       // El lanzamiento pertenece a quien cargó las cajas, así que cada entrada viaja con su operario; el de
@@ -418,21 +454,46 @@ export function MassasLaunchPage() {
           launchIds: item.launchIds,
         }),
       );
-      // El atajo no sabe de massas: recibe dónde, quién, qué y a dónde volver. Cambiar la clave o la IP es
-      // un cambio en la web, y el iPhone no se toca. Un producto viaja exactamente como siempre.
+      // El atajo no sabe de massas: recibe un ticket y lo canjea por lo que el servidor ya armó. Cambiar la
+      // clave o la IP es un cambio en la web, y el iPhone no se toca. Un producto pide `entrada`; varios,
+      // `entrada_lote`.
       const [trip] = buildAeroLaunchTrips({
         payloads,
-        wsUrl: aeroSettings.wsUrl,
-        username: aeroSettings.username,
-        password: aeroSettings.password,
-        endpoint: 'entradasitem',
-        singleCallbackUrl: aeroBridgeCallbackFor('entrada'),
-        batchCallbackUrl: aeroBridgeCallbackFor('entrada_lote'),
+        singleCallbackPath: aeroBridgeCallbackFor('entrada'),
+        batchCallbackPath: aeroBridgeCallbackFor('entrada_lote'),
       });
       if (!trip) return;
 
-      // The bridge leaves the page, so the identifier that pairs this line with the answer the shortcut
-      // brings back has to be written down before leaving. A batch and a single entry are different trips.
+      let ticket: { ticket: string; ticketUrl: string };
+      try {
+        ticket = await requestAeroBridgeTicket({
+          action: trip.action,
+          payloads: trip.payloads,
+          callbackPath: trip.callbackPath,
+        });
+      } catch {
+        // Nothing left the page: the queue keeps every product, and the reason reaches the log and the screen.
+        setSyncAwaiting(null);
+        setNotice({ type: 'error', message: t('massas.aero.vaultTicketError') });
+        void postAeroAuditEvent({
+          event: 'launch_sync',
+          phase: 'requested',
+          destinationUrl: aeroEndpoint(aeroSettings.wsUrl, 'entradasitem'),
+          client: 'web',
+          error: 'AERO_TICKET_REFUSED',
+          note: `${payloads.length} not sent`,
+        });
+        return;
+      }
+
+      // The products travel with the queue so the return can name the failures instead of asking the
+      // operator which of the three it was.
+      writeAeroQueue({ ...taken.rest, inFlight: taken.batch });
+      setSyncAwaiting({ date: queue.date, remaining: taken.batch.length + taken.rest.items.length });
+
+      // The ticket has to be written down before leaving: the identifier that pairs this line with the
+      // answer the shortcut brings back lives in storage, because the page itself is gone by then. A batch
+      // and a single entry are different trips.
       const action: AeroPendingAction = payloads.length === 1 ? 'entrada' : 'entrada_lote';
       const attempt = newAeroAttempt();
       saveAeroPendingAttempt({ action, ...attempt, date });
@@ -452,9 +513,13 @@ export function MassasLaunchPage() {
             : `batch ${payloads.length}${taken.rest.items.length > 0 ? ` · ${taken.rest.items.length} pending` : ''} · via=bridge`,
       });
 
-      window.location.href = buildAeroBridgeTriggerUrl({ name: aeroSettings.shortcutName, envelope: trip.envelope });
+      window.location.href = buildAeroBridgeTriggerUrl({
+        name: aeroSettings.shortcutName,
+        ticket: ticket.ticket,
+        ticketUrl: ticket.ticketUrl,
+      });
     },
-    [aeroSettings, user],
+    [aeroSettings, date, t, user],
   );
 
   /**
@@ -483,9 +548,9 @@ export function MassasLaunchPage() {
       });
       const queue: AeroQueue = { createdAt: new Date().toISOString(), date, items: [item], inFlight: [] };
       writeAeroQueue(queue);
-      triggerAeroSync(queue);
+      void triggerAeroSync(queue);
     },
-    [aeroSettings, date, triggerAeroSync],
+    [aeroSettings, date, t, triggerAeroSync],
   );
 
   /**
@@ -499,34 +564,39 @@ export function MassasLaunchPage() {
     setResultModal(null);
     const queue = readAeroQueue();
     if (!queue) return;
-    triggerAeroSync(queue);
+    void triggerAeroSync(queue);
   }, [triggerAeroSync]);
 
   /**
-   * Asks the company for the day's movements through the same bridge every launch uses.
+   * Asks the company for the day's movements through the same ticket every launch uses.
    *
    * The query leaves the operator filter open on purpose: the boxes are the factory's, and any operator may
    * have launched them. Publishing it as `read_history` keeps the audit trail honest about what this phone
    * actually asked for.
    */
-  const handleSyncFromErp = () => {
+  const handleSyncFromErp = async () => {
     if (!aeroSettingsReady(aeroSettings)) {
       setNotice({ type: 'error', message: erpNotReadyMessage(t, aeroSettings) });
       return;
     }
 
-    const envelope = aeroMovementsEnvelope({
-      wsUrl: aeroSettings.wsUrl,
-      username: aeroSettings.username,
-      password: aeroSettings.password,
-      date,
-      userName: null,
-      callbackUrl: aeroBridgeCallbackFor('movimentos'),
-    });
+    const payload = aeroMovementsPayload({ date, userName: null });
+
+    let ticket: { ticket: string; ticketUrl: string };
+    try {
+      ticket = await requestAeroBridgeTicket({
+        action: 'movimentos',
+        payloads: [payload],
+        callbackPath: aeroBridgeCallbackFor('movimentos'),
+      });
+    } catch {
+      setNotice({ type: 'error', message: t('massas.aero.vaultTicketError') });
+      return;
+    }
 
     const attempt = newAeroAttempt();
     // The date travels with the attempt: the page returns in a fresh document and today's clock there is
-    // not necessarily the day this envelope asked for.
+    // not necessarily the day this request asked for.
     saveAeroPendingAttempt({ action: 'movimentos', ...attempt, date });
 
     void postAeroAuditEvent({
@@ -534,12 +604,16 @@ export function MassasLaunchPage() {
       phase: 'requested',
       destinationUrl: aeroEndpoint(aeroSettings.wsUrl, 'movimentoitem'),
       client: 'web',
-      payload: JSON.parse(envelope.body),
+      payload,
       note: 'via=bridge',
       ...attempt,
     });
 
-    window.location.href = buildAeroBridgeTriggerUrl({ name: aeroSettings.shortcutName, envelope });
+    window.location.href = buildAeroBridgeTriggerUrl({
+      name: aeroSettings.shortcutName,
+      ticket: ticket.ticket,
+      ticketUrl: ticket.ticketUrl,
+    });
   };
 
   /**
@@ -878,7 +952,7 @@ export function MassasLaunchPage() {
             : null;
           if (rest && rest.items.length > 0) {
             writeAeroQueue(rest);
-            triggerAeroSync(rest);
+            void triggerAeroSync(rest);
             return;
           }
           clearAeroQueue();
@@ -957,7 +1031,7 @@ export function MassasLaunchPage() {
         const rest = { ...queue, inFlight: [] };
         if (rest.items.length > 0) {
           writeAeroQueue(rest);
-          triggerAeroSync(rest);
+          void triggerAeroSync(rest);
           return;
         }
       }
@@ -996,7 +1070,7 @@ export function MassasLaunchPage() {
     });
 
     if (parsed.status === 'ok' && queue) {
-      triggerAeroSync(queue);
+      void triggerAeroSync(queue);
       return;
     }
 
@@ -1073,7 +1147,7 @@ export function MassasLaunchPage() {
   const closeResultModal = () => {
     setResultModal(null);
     if (!consumeAeroAutoRead(date)) return;
-    handleSyncFromErp();
+    void handleSyncFromErp();
   };
 
   const handleToggleAck = (row: MassasUnifiedRow) => {

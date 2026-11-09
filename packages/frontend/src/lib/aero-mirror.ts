@@ -1,13 +1,12 @@
 import {
   aeroBridgeCallbackFor,
   aeroSettingsReady,
-  buildAeroBridgeEnvelope,
   buildAeroBridgeTriggerUrl,
   buildMovimentoItemPayload,
-  type AeroBridgeEnvelope,
   type AeroErpMovementItem,
   type AeroSettings,
 } from './aero-integration';
+import { requestAeroBridgeTicket, type AeroVaultClient } from './aero-vault';
 
 /**
  * The mirror, end to end: what to ask the company for, and how to read what came back.
@@ -25,12 +24,31 @@ export interface AeroMovementSnapshot {
 }
 
 /**
- * The envelope that asks Aero32 for the day's movements through the one bridge.
+ * The body that asks Aero32 for the day's movements, through the one bridge.
  *
  * `userName` absent is the ordinary case: the plant reads the whole day, because the boxes are the
  * factory's and any operator may have launched them. `ENTSAI: 'E'` because Trindade only records entries;
  * a stock exit is the company's business and has nothing here to reconcile against.
+ *
+ * `_method: 'PATCH'` travels in the body as well as in the endpoint, which is the certified request the web
+ * and the Android client both send; the server keeps it as the body of the ticket and the shortcut posts it
+ * verbatim.
  */
+export function aeroMovementsPayload(args: {
+  date: string;
+  userName?: string | null;
+}): Record<string, unknown> {
+  return {
+    _method: 'PATCH',
+    ...buildMovimentoItemPayload({
+      userName: args.userName ?? null,
+      startDate: args.date,
+      endDate: args.date,
+      entrySaida: 'E',
+    }),
+  };
+}
+
 export interface AeroMovementsSyncOptions {
   /** The day to ask for. */
   date: string;
@@ -38,59 +56,49 @@ export interface AeroMovementsSyncOptions {
   callbackPath: string;
   /** How the shortcut is launched. The page assigns `location.href`; a test records the URL instead. */
   navigate?: (url: string) => void;
+  /** The vault client, injected by a test. In the app it is the shared API client. */
+  client?: AeroVaultClient;
 }
 
 /**
  * Asks the company for a day of movements, or says it cannot.
  *
  * The report has one sync button for both blocks, so the wiring lives here once: the button, the receipts
- * section and the launch screen all fire the same envelope, and the caller learns whether anything was
- * launched. A device without company access gets `false` and refreshes what it already read instead of
- * showing a spinner for a request that never started.
+ * section and the launch screen all request the same `movimentos` ticket, and the caller learns whether
+ * anything was launched. A device without company access -- or a server that refused the ticket -- gets
+ * `false` and refreshes what it already read instead of showing a spinner for a request that never started.
  */
-export function triggerAeroMovementsSync(settings: AeroSettings, options: AeroMovementsSyncOptions): boolean {
+export async function triggerAeroMovementsSync(
+  settings: AeroSettings,
+  options: AeroMovementsSyncOptions,
+): Promise<boolean> {
   if (!aeroSettingsReady(settings)) return false;
-  const envelope = aeroMovementsEnvelope({
-    wsUrl: settings.wsUrl,
-    username: settings.username,
-    password: settings.password,
-    date: options.date,
-    userName: null,
-    callbackUrl: aeroBridgeCallbackFor('movimentos', options.callbackPath),
+
+  let ticket: { ticket: string; ticketUrl: string };
+  try {
+    ticket = await requestAeroBridgeTicket(
+      {
+        action: 'movimentos',
+        payloads: [aeroMovementsPayload({ date: options.date, userName: null })],
+        callbackPath: aeroBridgeCallbackFor('movimentos', options.callbackPath),
+      },
+      options.client,
+    );
+  } catch {
+    return false;
+  }
+
+  const url = buildAeroBridgeTriggerUrl({
+    name: settings.shortcutName,
+    ticket: ticket.ticket,
+    ticketUrl: ticket.ticketUrl,
   });
-  const url = buildAeroBridgeTriggerUrl({ name: settings.shortcutName, envelope });
   if (options.navigate) {
     options.navigate(url);
   } else {
     window.location.href = url;
   }
   return true;
-}
-
-export function aeroMovementsEnvelope(args: {
-  wsUrl: string;
-  username: string;
-  password: string;
-  date: string;
-  userName?: string | null;
-  callbackUrl: string;
-}): AeroBridgeEnvelope {
-  return buildAeroBridgeEnvelope({
-    wsUrl: args.wsUrl,
-    username: args.username,
-    password: args.password,
-    endpoint: 'movimentoitem?_method=PATCH',
-    payload: {
-      _method: 'PATCH',
-      ...buildMovimentoItemPayload({
-        userName: args.userName ?? null,
-        startDate: args.date,
-        endDate: args.date,
-        entrySaida: 'E',
-      }),
-    },
-    callbackUrl: args.callbackUrl,
-  });
 }
 
 function snapshotText(value: unknown): string | null {

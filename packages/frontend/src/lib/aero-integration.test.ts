@@ -12,17 +12,15 @@ import {
   AERO_ENTRY_SERIES,
   AERO_TEST_TIMEOUT_MS,
   DEFAULT_AERO_SETTINGS,
-  aeroBridgeCallbackPrefix,
+  aeroBridgeCallbackFor,
+  aeroBridgeCallbackPath,
   aeroBridgeShortcutRecipe,
   aeroConnectionBlocker,
   aeroEndpoint,
   aeroMissingSetup,
-  aeroSessionPassword,
   aeroSettingsReady,
   clearAeroSessionPassword,
   aeroShortcutTriggerUrl,
-  basicAuthHeader,
-  buildAeroBridgeEnvelope,
   buildAeroBridgeTriggerUrl,
   buildAeroEntryPayload,
   buildEntradaItemPayload,
@@ -42,6 +40,7 @@ import {
   loadAeroSettings,
   normalizeAeroWsUrl,
   parseAeroCallback,
+  purgeLegacyAeroPassword,
   readAeroBridgeResult,
   readAeroTestResult,
   saveAeroPendingSync,
@@ -69,6 +68,35 @@ class FakeStorage implements StorageLike {
   clear(): void {
     this.store.clear();
   }
+
+  /** Everything ever written, so a test can prove no secret was among it. */
+  get written(): string[] {
+    return [...this.store.values()];
+  }
+}
+
+/**
+ * A storage that refuses every operation, which is what a private window or a locked profile really does.
+ *
+ * The module has to survive it: a phone that cannot write has nothing stored, so there is nothing to leak and
+ * nothing to fail. Throwing is the strictest possible stand-in for "we could not ask".
+ */
+function throwingStorage(): StorageLike {
+  const refuse = (): never => {
+    throw new Error('storage is not available');
+  };
+  return { getItem: refuse, setItem: refuse, removeItem: refuse };
+}
+
+/** Installs a `sessionStorage` the module can find without a browser, and hands back its undo. */
+function withGlobalSessionStorage(store: StorageLike): () => void {
+  const target = globalThis as unknown as { sessionStorage?: StorageLike };
+  const previous = target.sessionStorage;
+  target.sessionStorage = store;
+  return () => {
+    if (previous === undefined) delete target.sessionStorage;
+    else target.sessionStorage = previous;
+  };
 }
 
 describe('aero-integration: clearing the configuration', () => {
@@ -100,7 +128,7 @@ describe('aero-integration: constants & types', () => {
       // La dirección de la planta viaja escrita: un teléfono nuevo sólo pregunta quién lanza (S12).
       wsUrl: 'http://192.168.25.250:1453/api',
       username: '',
-      password: '',
+      hasPassword: false,
       shortcutName: 'Aero32 Bridge',
       syncEnabled: false,
       lastSyncAt: null,
@@ -126,142 +154,124 @@ describe('aero-integration: access control', () => {
   });
 });
 
-describe('aero-integration: settings persistence', () => {
-  // The password lives in this tab's memory, so it outlives a call and every test has to start without one.
-  beforeEach(() => clearAeroSessionPassword());
-
+describe('aero-integration: settings persistence without a secret', () => {
   it('returns default settings when storage is empty or unsupplied', () => {
     const storage = new FakeStorage();
     const settings = loadAeroSettings(storage);
     assert.deepEqual(settings, DEFAULT_AERO_SETTINGS);
   });
 
-  it('round-trips settings through fake storage', () => {
+  it('round-trips the settings that are not secrets, and never grows a password field', () => {
     const storage = new FakeStorage();
     const custom: AeroSettings = {
       wsUrl: 'http://192.168.1.50:8000/api',
       username: 'wilkin',
-      password: 'secret-password',
+      hasPassword: true,
       shortcutName: 'Custom Shortcut',
       syncEnabled: true,
       lastSyncAt: '2026-10-27T10:00:00Z',
     };
 
-    const session = new FakeStorage();
-    saveAeroSettings(custom, storage, session);
-    const loaded = loadAeroSettings(storage, session);
-    assert.deepEqual(loaded, custom);
+    saveAeroSettings(custom, storage);
+    const loaded = loadAeroSettings(storage);
+
+    // `hasPassword` belongs to the vault's answer, not to the disk: a cached copy would show «configurado»
+    // for a vault another device already deleted.
+    assert.deepEqual(loaded, { ...custom, hasPassword: false });
+    const payload = JSON.parse(storage.written[0] ?? '{}') as Record<string, unknown>;
+    assert.deepEqual(Object.keys(payload).sort(), [
+      'lastSyncAt',
+      'shortcutName',
+      'syncEnabled',
+      'username',
+      'wsUrl',
+    ]);
   });
 
   /**
-   * The password is the one thing the browser must keep out of reach.
+   * The password is the one thing this browser must never hold again.
    *
-   * It sat in `localStorage` in clear, next to the IP of the plant, for as long as the phone was on: any
-   * backup of the profile, any other tab of the same origin and the next launch of the app could read the
-   * company's credentials. It now lives in `sessionStorage`: this tab, this session, gone when the tab closes.
-   * The rest of the settings are not secrets and stay where they were.
+   * It used to live in `localStorage` in clear and later in `sessionStorage`, which is exactly the defect this
+   * change removes: iOS can return the shortcut callback in a fresh tab and the secret was gone with it. Now
+   * the save path has nowhere to put it, and the proof is that a storage refusing every operation changes
+   * nothing about the result.
    */
-  it('writes the password into session storage and never into local storage', () => {
+  it('writes no secret to either storage, even when both refuse every operation', () => {
+    const settings: AeroSettings = {
+      ...DEFAULT_AERO_SETTINGS,
+      username: 'wilkin',
+      hasPassword: true,
+    };
+
+    assert.doesNotThrow(() => saveAeroSettings(settings, throwingStorage()));
+    assert.doesNotThrow(() => loadAeroSettings(throwingStorage()));
+    assert.doesNotThrow(() => clearAeroSettings(throwingStorage(), throwingStorage()));
+    assert.doesNotThrow(() => purgeLegacyAeroPassword(throwingStorage()));
+    assert.doesNotThrow(() => clearAeroSessionPassword(throwingStorage()));
+
+    // And with a storage that does write, the payload carries no key that could hold one.
     const storage = new FakeStorage();
-    const session = new FakeStorage();
-
-    saveAeroSettings({ ...DEFAULT_AERO_SETTINGS, username: 'wilkin', password: 'secreta' }, storage, session);
-
-    const raw = storage.getItem(AERO_SETTINGS_STORAGE_KEY) ?? '';
-    assert.ok(!raw.includes('secreta'), 'the password is not on disk');
-    assert.equal(JSON.parse(raw).password, undefined, 'and the field is not there empty either');
-    assert.equal(JSON.parse(raw).username, 'wilkin', 'the rest of the settings still travel');
-    assert.equal(session.getItem(AERO_SESSION_PASSWORD_KEY), 'secreta', 'the tab that typed it holds it');
+    saveAeroSettings({ ...settings, username: 'wilkin' }, storage);
+    for (const written of storage.written) {
+      assert.equal(written.includes('password'), false, `a secret reached the disk: ${written}`);
+    }
   });
 
-  it('keeps the password for the tab that typed it', () => {
+  it('drops the legacy password once, adopts nothing and keeps the rest', () => {
     const storage = new FakeStorage();
-    const session = new FakeStorage();
-
-    saveAeroSettings({ ...DEFAULT_AERO_SETTINGS, username: 'wilkin', password: 'secreta' }, storage, session);
-
-    // Same session: the envelope can be built without asking again.
-    assert.equal(aeroSessionPassword(session), 'secreta');
-    assert.equal(loadAeroSettings(storage, session).password, 'secreta');
-  });
-
-  /**
-   * The document the shortcut returns to has no memory of the one that launched.
-   *
-   * Every trip through the shortcut reloads the page, and the read of the plant that follows a launch has to
-   * leave from that returned document -- the whole reason the password moved out of module memory. Same tab,
-   * same `sessionStorage`, so the session survives the round trip without touching the disk.
-   */
-  it('recovers the password in the document the shortcut returns to', () => {
-    const storage = new FakeStorage();
-    const session = new FakeStorage();
-    saveAeroSettings({ ...DEFAULT_AERO_SETTINGS, username: 'wilkin', password: 'secreta' }, storage, session);
-
-    // A new document with the same tab storage: nothing in the module survives, the session does.
-    const returned = loadAeroSettings(storage, session);
-
-    assert.equal(returned.password, 'secreta');
-    assert.equal(aeroSettingsReady(returned), true, 'and the read can leave without asking again');
-  });
-
-  it('drops the stored password once and does not fill the session with it', () => {
-    const storage = new FakeStorage();
-    // A phone that used the old version carries the password in the payload.
+    // A phone that used the old version carries the password inside the payload.
     storage.setItem(
       AERO_SETTINGS_STORAGE_KEY,
-      JSON.stringify({ ...DEFAULT_AERO_SETTINGS, username: 'wilkin', password: 'vieja' })
+      JSON.stringify({ wsUrl: 'http://192.168.1.50:8000/api', username: 'wilkin', password: 'vieja' }),
     );
 
     const loaded = loadAeroSettings(storage);
 
-    assert.equal(loaded.password, '', 'the migration does not adopt the value it purges');
+    assert.equal(loaded.hasPassword, false, 'the migration does not adopt the value it purges');
+    assert.equal('password' in loaded, false, 'the shape has no field for it');
     assert.ok(!(storage.getItem(AERO_SETTINGS_STORAGE_KEY) ?? '').includes('vieja'), 'the old value is gone');
-    // Once is enough: the second read finds a payload that no longer carries it.
     assert.equal(JSON.parse(storage.getItem(AERO_SETTINGS_STORAGE_KEY) ?? '{}').password, undefined);
     assert.equal(loadAeroSettings(storage).username, 'wilkin', 'the rest survives the purge');
   });
 
-  it('purges the password and forgets the session value when cleared', () => {
+  it('deletes the legacy session value on load and never reads it', () => {
+    // The tab may still hold the value an older build wrote. It is deleted, not consumed: a load after the
+    // purge must not be able to reconstruct it, and no code path below can see it.
+    const session = new FakeStorage();
+    session.setItem(AERO_SESSION_PASSWORD_KEY, 'secreta');
+    const restore = withGlobalSessionStorage(session);
+    try {
+      const storage = new FakeStorage();
+      storage.setItem(AERO_SETTINGS_STORAGE_KEY, JSON.stringify({ username: 'wilkin' }));
+
+      const loaded = loadAeroSettings(storage);
+
+      assert.equal(session.getItem(AERO_SESSION_PASSWORD_KEY), null, 'the legacy value is deleted on load');
+      assert.equal(loaded.hasPassword, false, 'and it never becomes the vault answer');
+    } finally {
+      restore();
+    }
+  });
+
+  it('purges the legacy value on logout and on a rejected session, which call the same door', () => {
+    const session = new FakeStorage();
+    session.setItem(AERO_SESSION_PASSWORD_KEY, 'secreta');
+
+    clearAeroSessionPassword(session);
+
+    assert.equal(session.getItem(AERO_SESSION_PASSWORD_KEY), null);
+  });
+
+  it('clears the settings, the legacy secret and the auto-read mark together', () => {
     const storage = new FakeStorage();
     const session = new FakeStorage();
-    saveAeroSettings({ ...DEFAULT_AERO_SETTINGS, username: 'wilkin', password: 'secreta' }, storage, session);
+    storage.setItem(AERO_SETTINGS_STORAGE_KEY, '{"wsUrl":"http://192.168.25.250:1453","username":"wilkin"}');
+    session.setItem(AERO_SESSION_PASSWORD_KEY, 'secreta');
 
     clearAeroSettings(storage, session);
 
-    assert.equal(aeroSessionPassword(session), '');
-    assert.equal(session.getItem(AERO_SESSION_PASSWORD_KEY), null, 'the tab no longer holds the secret');
     assert.equal(storage.getItem(AERO_SETTINGS_STORAGE_KEY), null);
-  });
-
-  /**
-   * Two different problems, two different sentences.
-   *
-   * An integration with no address is not set up; one with an address and no session password is set up and
-   * waiting for the person. Collapsing them into «no configurado» sends the operator to retype a URL that is
-   * already saved, and tells nobody that the tab needs the password again.
-   */
-  it('separates a missing setup from a missing session password', () => {
-    assert.equal(aeroMissingSetup({ ...DEFAULT_AERO_SETTINGS }), 'setup');
-    assert.equal(
-      aeroMissingSetup({ ...DEFAULT_AERO_SETTINGS, wsUrl: 'http://192.168.25.250:1453/api', username: 'wilkin' }),
-      'password'
-    );
-    assert.equal(
-      aeroMissingSetup({
-        ...DEFAULT_AERO_SETTINGS,
-        wsUrl: 'http://192.168.25.250:1453/api',
-        username: 'wilkin',
-        password: 'secreta',
-      }),
-      null
-    );
-    // `ready` keeps its old meaning -- address, user and a password in hand -- so every guard that already
-    // consulted it still holds; `aeroMissingSetup` is what tells the two gaps apart.
-    assert.equal(
-      aeroSettingsReady({ ...DEFAULT_AERO_SETTINGS, wsUrl: '', username: 'wilkin', password: 'secreta' }),
-      false
-    );
-    assert.equal(aeroSettingsReady({ ...DEFAULT_AERO_SETTINGS, username: 'wilkin' }), false);
+    assert.equal(session.getItem(AERO_SESSION_PASSWORD_KEY), null);
   });
 
   it('tolerates corrupted or non-object JSON and falls back to defaults', () => {
@@ -300,15 +310,36 @@ describe('aero-integration: settings persistence', () => {
     assert.equal('entrySeries' in loaded, false);
     assert.equal('userCode' in loaded, false);
     assert.equal('testShortcutName' in loaded, false);
+    assert.equal('password' in loaded, false);
     assert.equal(loaded.username, 'wilkin');
   });
 
-  it('clears settings from storage', () => {
-    const storage = new FakeStorage();
-    saveAeroSettings({ ...DEFAULT_AERO_SETTINGS, username: 'wilkin' }, storage);
-    assert.ok(storage.getItem(AERO_SETTINGS_STORAGE_KEY));
-    clearAeroSettings(storage);
-    assert.equal(storage.getItem(AERO_SETTINGS_STORAGE_KEY), null);
+  /**
+   * Two different problems, two different sentences.
+   *
+   * An integration with no address is not set up; one with an address and no password in the vault is set up
+   * and waiting for the person. Collapsing them into «no configurado» sends the operator to retype a URL that
+   * is already saved.
+   */
+  it('separates a missing setup from a missing vault password', () => {
+    assert.equal(aeroMissingSetup(DEFAULT_AERO_SETTINGS), 'setup');
+    assert.equal(
+      aeroMissingSetup({ wsUrl: 'http://192.168.25.250:1453/api', username: 'wilkin', hasPassword: false }),
+      'password',
+    );
+    assert.equal(
+      aeroMissingSetup({ wsUrl: 'http://192.168.25.250:1453/api', username: 'wilkin', hasPassword: true }),
+      null,
+    );
+    assert.equal(aeroMissingSetup(null), 'setup');
+    assert.equal(
+      aeroMissingSetup({ wsUrl: '', username: 'wilkin', hasPassword: true }),
+      'setup',
+    );
+    assert.equal(
+      aeroMissingSetup({ wsUrl: 'http://192.168.25.250:1453/api', username: '  ', hasPassword: true }),
+      'setup',
+    );
   });
 });
 
@@ -316,22 +347,23 @@ describe('aero-integration: aeroSettingsReady', () => {
   const valid: AeroSettings = {
     wsUrl: 'http://192.168.1.50:8000/api',
     username: 'wilkin',
-    password: 'pwd',
+    hasPassword: true,
     shortcutName: 'Aero',
     syncEnabled: true,
     lastSyncAt: null,
   };
 
-  it('decides on the three fields the operator types, not on the code only the ERP can reveal', () => {
+  it('decides on the address, the user and the vault, not on the code only the ERP can reveal', () => {
     assert.equal(aeroSettingsReady(valid), true);
 
     // Nada que el ERP revela puede condicionar el interruptor: la identidad viaja como el username.
     assert.equal('userCode' in valid, false);
 
+    // No password in the vault blocks every action, and it is the only thing it blocks.
+    assert.equal(aeroSettingsReady({ ...valid, hasPassword: false }), false);
     // Missing credentials
     assert.equal(aeroSettingsReady({ ...valid, username: '' }), false);
     assert.equal(aeroSettingsReady({ ...valid, username: '   ' }), false);
-    assert.equal(aeroSettingsReady({ ...valid, password: '' }), false);
     // Invalid URL
     assert.equal(aeroSettingsReady({ ...valid, wsUrl: 'not-a-url' }), false);
     assert.equal(aeroSettingsReady({ ...valid, wsUrl: '' }), false);
@@ -369,24 +401,7 @@ describe('aero-integration: aeroEndpoint', () => {
   });
 });
 
-describe('aero-integration: basicAuthHeader', () => {
-  it('formats Basic header with base64 encoded user:pass', () => {
-    assert.equal(basicAuthHeader('wilkin', 'senha'), 'Basic d2lsa2luOnNlbmhh');
-  });
 
-  it('round-trips UTF-8 accented passwords properly', () => {
-    const user = 'wilkin';
-    const pass = 'p@sswórd—açúcar';
-    const header = basicAuthHeader(user, pass);
-    assert.ok(header.startsWith('Basic '));
-
-    const base64Part = header.slice(6);
-    const decodedBinary = atob(base64Part);
-    const bytes = Uint8Array.from(decodedBinary, (c) => c.charCodeAt(0));
-    const decoded = new TextDecoder().decode(bytes);
-    assert.equal(decoded, `${user}:${pass}`);
-  });
-});
 
 describe('aero-integration: aeroConnectionBlocker', () => {
   it('detects mixed_content when page is https: and target is http:', () => {
@@ -852,102 +867,52 @@ describe('aero-integration: movimento payload for the bridge', () => {
   });
 });
 
-describe('aero-integration: bridge envelope', () => {
-  const credentials = {
-    wsUrl: 'http://192.168.1.50:8000/api',
-    username: 'wilkin',
-    password: 'senha',
-  };
-
-  const saida = buildSaidaItemPayload({
-    productCode: '1192',
-    productName: 'MASSA QUADRADA',
-    quantity: 15,
-    exitDate: '2026-10-28',
-    userCode: 'wilkin',
-  });
-
-  it('carries the credentials inside the envelope so the phone never has to be edited again', () => {
-    const envelope = buildAeroBridgeEnvelope({
-      ...credentials,
-      endpoint: 'saidasitem',
-      payload: saida,
-      callbackUrl: aeroBridgeCallbackPrefix({ origin: 'https://trindademasas.duckdns.org', action: 'saida' }),
+describe('aero-integration: the ticket the shortcut receives', () => {
+  it('hands the shortcut exactly the token and the redeem endpoint, and nothing else', () => {
+    const url = buildAeroBridgeTriggerUrl({
+      name: 'Aero32 Bridge',
+      ticket: 'token-de-un-solo-uso',
+      ticketUrl: 'https://trindademasas.duckdns.org/api/integration/aero/bridge-tickets/redeem',
     });
-
-    assert.deepEqual(Object.keys(envelope), ['url', 'method', 'headers', 'body', 'callback']);
-    assert.equal(envelope.url, 'http://192.168.1.50:8000/api/saidasitem');
-    assert.equal(envelope.method, 'POST');
-    assert.deepEqual(envelope.headers, {
-      Authorization: basicAuthHeader('wilkin', 'senha'),
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    });
-    assert.equal(
-      envelope.callback,
-      'https://trindademasas.duckdns.org/massas-launch?aero_action=saida&aero_data=',
-    );
-  });
-
-  it('serialises the body as a plain JSON string, because a dictionary is not JSON on the phone', () => {
-    const envelope = buildAeroBridgeEnvelope({
-      ...credentials,
-      endpoint: 'saidasitem',
-      payload: saida,
-      callbackUrl: aeroBridgeCallbackPrefix({ origin: 'https://trindademasas.duckdns.org', action: 'saida' }),
-    });
-
-    assert.equal(typeof envelope.body, 'string');
-    assert.deepEqual(JSON.parse(envelope.body), saida);
-    // Sin espacios ni saltos: el texto se pega tal cual en «Cuerpo de la petición» del atajo.
-    assert.equal(envelope.body, JSON.stringify(saida));
-  });
-
-  it('hands the whole envelope to the shortcut as its one text input', () => {
-    const envelope = buildAeroBridgeEnvelope({
-      ...credentials,
-      endpoint: 'usuarios/',
-      payload: {},
-      callbackUrl: aeroBridgeCallbackPrefix({ origin: 'https://trindademasas.duckdns.org', action: 'test' }),
-    });
-
-    const url = buildAeroBridgeTriggerUrl({ name: 'Aero32 Bridge', envelope });
     const parsed = new URL(url);
 
     assert.equal(parsed.protocol, 'shortcuts:');
     assert.equal(parsed.searchParams.get('name'), 'Aero32 Bridge');
     assert.equal(parsed.searchParams.get('input'), 'text');
-    assert.deepEqual(JSON.parse(parsed.searchParams.get('text') ?? ''), envelope);
+    // El diccionario es exactamente dos claves: no hay Authorization, ni body, ni callback que el teléfono
+    // pueda leer de acá, porque el servidor los escribe al canjear el ticket.
+    assert.deepEqual(JSON.parse(parsed.searchParams.get('text') ?? '{}'), {
+      ticket: 'token-de-un-solo-uso',
+      ticketUrl: 'https://trindademasas.duckdns.org/api/integration/aero/bridge-tickets/redeem',
+    });
   });
 
-  it('leaves the data slot open in the callback, for every action', () => {
+  it('leaves the data slot open in the callback path, for every action', () => {
     assert.equal(
-      aeroBridgeCallbackPrefix({ origin: 'https://trindademasas.duckdns.org', basePath: '/', action: 'entrada' }),
-      'https://trindademasas.duckdns.org/massas-launch?aero_action=entrada&aero_data=',
+      aeroBridgeCallbackPath({ action: 'entrada', basePath: '/' }),
+      '/massas-launch?aero_action=entrada&aero_data=',
     );
     assert.equal(
-      aeroBridgeCallbackPrefix({ origin: 'https://trindademasas.duckdns.org/', basePath: '/app', action: 'movimentos' }),
-      'https://trindademasas.duckdns.org/app/massas-launch?aero_action=movimentos&aero_data=',
+      aeroBridgeCallbackPath({ action: 'movimentos', basePath: '/app' }),
+      '/app/massas-launch?aero_action=movimentos&aero_data=',
     );
   });
 });
 
 describe('aero-integration: the return path of a bridge callback', () => {
-  const origin = 'https://trindademasas.duckdns.org';
-
-  it('comes back to the page the operator left from', () => {
-    // The shortcut is a blind proxy: it opens the callback it was handed. Sending the report's own route
-    // is what makes the sync start from Recebimento and end there.
+  it('comes back to the page the operator left from, as a same-origin path and nothing more', () => {
+    // El origen no viaja: el servidor lo pone desde PUBLIC_APP_URL, y una URL absoluta armada acá sería una
+    // segunda fuente de verdad sobre dónde termina el viaje.
     assert.equal(
-      aeroBridgeCallbackPrefix({ origin, basePath: '/', action: 'movimentos', path: '/reports/67' }),
-      `${origin}/reports/67?aero_action=movimentos&aero_data=`,
+      aeroBridgeCallbackPath({ action: 'movimentos', path: '/reports/67', basePath: '/' }),
+      '/reports/67?aero_action=movimentos&aero_data=',
     );
   });
 
   it('keeps the base path in front of the return route', () => {
     assert.equal(
-      aeroBridgeCallbackPrefix({ origin, basePath: '/app', action: 'movimentos', path: '/reports/new' }),
-      `${origin}/app/reports/new?aero_action=movimentos&aero_data=`,
+      aeroBridgeCallbackPath({ action: 'movimentos', path: '/reports/new', basePath: '/app' }),
+      '/app/reports/new?aero_action=movimentos&aero_data=',
     );
   });
 
@@ -955,14 +920,10 @@ describe('aero-integration: the return path of a bridge callback', () => {
     // The panel lives in Admin now. Without its own query the phone would come back to the launch page and
     // the verdict would land on a screen that cannot draw it.
     assert.equal(
-      aeroBridgeCallbackPrefix({
-        origin,
-        basePath: '/',
-        action: 'test',
-        path: '/admin?tab=integration',
-      }),
-      `${origin}/admin?tab=integration&aero_action=test&aero_data=`,
+      aeroBridgeCallbackPath({ action: 'test', path: '/admin?tab=integration', basePath: '/' }),
+      '/admin?tab=integration&aero_action=test&aero_data=',
     );
+    assert.equal(aeroBridgeCallbackFor('test', '/admin?tab=integration'), aeroBridgeCallbackPath({ action: 'test', path: '/admin?tab=integration' }));
   });
 
   it('falls back to the launch page instead of trusting a route that could leave the site', () => {
@@ -976,9 +937,9 @@ describe('aero-integration: the return path of a bridge callback', () => {
       'reports/67',
     ]) {
       assert.equal(
-        aeroBridgeCallbackPrefix({ origin, action: 'movimentos', path }),
-        `${origin}/massas-launch?aero_action=movimentos&aero_data=`,
-        `${path} must not become the return URL`,
+        aeroBridgeCallbackPath({ action: 'movimentos', path, basePath: '/' }),
+        '/massas-launch?aero_action=movimentos&aero_data=',
+        `${path} must not become the return path`,
       );
     }
   });
@@ -1102,18 +1063,12 @@ describe('aero-integration: reading the bridge result', () => {
 });
 
 describe('aero-integration: the bridge shortcut recipe', () => {
-  const recipe = aeroBridgeShortcutRecipe({
-    wsUrl: 'http://192.168.25.250:1453/api',
-    username: 'wilkin',
-    password: 'senha',
-    origin: 'https://trindademasas.duckdns.org',
-    basePath: '/',
-  });
+  const recipe = aeroBridgeShortcutRecipe({ wsUrl: 'http://192.168.25.250:1453/api' });
 
   it('names the single shortcut and the dictionary keys its actions really read', () => {
     assert.equal(recipe.name, 'Aero32 Bridge');
-    // Opción (a): la receta lee `headers` y de ahí saca `Authorization`. No existe una clave `auth` en el
-    // sobre, y la receta no puede pedirle al operario que lea algo que nunca viaja.
+    // Opción (a): la receta lee `headers` y de ahí saca `Authorization`. No existe una clave `auth` en la
+    // respuesta, y la receta no puede pedirle al operario que lea algo que nunca viaja.
     assert.deepEqual(recipe.keys, {
       url: 'url',
       headers: 'headers',
@@ -1122,45 +1077,30 @@ describe('aero-integration: the bridge shortcut recipe', () => {
       bodies: 'bodies',
       callback: 'callback',
     });
-    assert.equal(recipe.contentType, 'application/json');
-    // Veinte contando las dos ramas: la de un producto y la del lote, más el renombre a `body_item` y el
-    // cierre del `Si`. Es el número que Wilkin validó contra su enlace de iCloud.
-    assert.equal(recipe.actionCount, 20);
+    // Veintitrés contando las tres del ticket, las dos ramas -- un producto y el lote --, el renombre a
+    // `body_item` y el cierre del `Si`.
+    assert.equal(recipe.actionCount, 23);
+    assert.equal(recipe.ticketKey, 'ticket');
+    assert.equal(recipe.ticketUrlKey, 'ticketUrl');
   });
 
-  it('points at the certified shortcut, so a new phone installs it instead of building it', () => {
-    // El enlace es el camino principal: veinte acciones a mano en un teléfono nuevo es donde se pierde un
-    // paso. La receta queda como respaldo, no como la única forma de instalar.
+  it('carries no secret at all: no password, no Authorization value, no sample envelope', () => {
+    const fields = recipe as unknown as Record<string, unknown>;
+    for (const forbidden of ['password', 'authorization', 'sampleEnvelope', 'contentType', 'accept']) {
+      assert.equal(forbidden in fields, false, `the recipe still carries ${forbidden}`);
+    }
+    // La única aparición de «Authorization» es el nombre de la clave que se lee del diccionario `headers`.
+    assert.equal(JSON.stringify(recipe).match(/Basic /), null);
+  });
+
+  it('still points at the old iCloud shortcut, which is now legacy', () => {
+    // El enlace no se borra: documenta las veinte acciones sobre las que se construye el delta. Lo que cambia
+    // es cómo se presenta -- el diálogo lo marca como obsoleto y no como instalación.
     assert.equal(AERO_SHORTCUT_ICLOUD_URL, 'https://www.icloud.com/shortcuts/3216695a428f42539fec7abbd5419f34');
     const url = new URL(AERO_SHORTCUT_ICLOUD_URL);
     assert.equal(url.protocol, 'https:');
     assert.equal(url.host, 'www.icloud.com');
     assert.match(url.pathname, /^\/shortcuts\/[0-9a-f]{32}$/);
-  });
-
-  it('asks the recipe to read only keys the envelope really carries', () => {
-    const envelope = aeroBridgeShortcutRecipe({
-      wsUrl: 'http://192.168.25.250:1453/api',
-      username: 'wilkin',
-      password: 'senha',
-      origin: 'https://trindademasas.duckdns.org',
-    }).sampleEnvelope as unknown as Record<string, unknown>;
-
-    const carried = new Set(Object.keys(envelope));
-    for (const [name, key] of Object.entries(recipe.keys)) {
-      if (name === 'authorization') {
-        // Sale de la cabecera, no de una clave propia: el atajo la lee del diccionario `headers`.
-        const headers = envelope.headers as Record<string, string>;
-        assert.ok(headers[key], `the sample envelope has no ${key} header`);
-        continue;
-      }
-      if (name === 'bodies') {
-        // `bodies` sólo viaja en un lote: el sobre de la prueba es de un producto y no lo lleva.
-        assert.equal(carried.has(key), false);
-        continue;
-      }
-      assert.ok(carried.has(key), `the recipe reads ${name}, but the envelope has no such key`);
-    }
   });
 
   it('lists the endpoints the one bridge can reach, so the dialog does not lie about them', () => {
@@ -1172,17 +1112,6 @@ describe('aero-integration: the bridge shortcut recipe', () => {
       movimentos: 'http://192.168.25.250:1453/api/movimentoitem',
       test: 'http://192.168.25.250:1453/api/usuarios',
     });
-  });
-
-  it('carries a ready envelope for the connection test, the one that needs no launch data', () => {
-    const envelope = recipe.sampleEnvelope;
-    assert.equal(envelope.url, 'http://192.168.25.250:1453/api/usuarios');
-    assert.equal(envelope.headers.Authorization, basicAuthHeader('wilkin', 'senha'));
-    assert.equal(
-      envelope.callback,
-      'https://trindademasas.duckdns.org/massas-launch?aero_action=test&aero_data=',
-    );
-    assert.deepEqual(JSON.parse(envelope.body), {});
   });
 });
 
