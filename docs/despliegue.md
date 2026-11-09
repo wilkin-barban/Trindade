@@ -24,6 +24,9 @@ producción en <https://trindademasas.duckdns.org>.
 - **Compuerta de recuperación:** antes de cualquier cambio en producción se captura una instantánea consistente
   y se comprueba su restauración en un entorno aislado. Una copia directa del archivo `.db` no alcanza: en modo
   WAL puede haber páginas sin checkpoint en el sidecar `-wal`.
+- **Cofre del ERP:** la contraseña del WebService ya no se guarda en el navegador. Vive cifrada en SQLite con
+  AES-256-GCM y la clave `AERO_VAULT_KEY` en el entorno de la API; nunca en la base, el repositorio, los logs ni
+  una respuesta HTTP. Perder esa clave obliga a cargar la contraseña una vez más (sección 14).
 
 ### Orden de despliegue
 
@@ -42,12 +45,13 @@ y se niega a tocarla; esa negativa es la compuerta funcionando.
 
 | Paso | Efecto |
 | --- | --- |
-| **8 → 9** (release actual) | **Ninguno.** Agrega la columna opcional `massa_launches.ent_lan`; conserva todas las sesiones, incluidas las de administradores. |
+| **9 → 10** (release actual) | **Ninguno.** Crea `aero_integration_settings` y `aero_bridge_tickets` con sus índices. Aditiva: conserva todas las sesiones, incluidas las de administradores. |
+| **8 → 9** | Ninguno. Agrega la columna opcional `massa_launches.ent_lan`. |
 | **3 → 4** | Ninguno. Agrega `drivers.phone`. |
 | **2 → 3** | **Invalida todas las sesiones y refresh tokens**: se sella `users.security_version` y se revocan las sesiones. Los operarios deben volver a iniciar sesión. |
 
-Una base que todavía está en la revisión 2 pasa por `2 → 3` y por todos los pasos siguientes hasta la 9. En ese
-caso sí hay que volver a iniciar sesión. Una base en revisión 8 o 9 no lo requiere.
+Una base que todavía está en la revisión 2 pasa por `2 → 3` y por todos los pasos siguientes hasta la 10. En ese
+caso sí hay que volver a iniciar sesión. Una base en revisión 9 solo ejecuta `9 → 10` y no lo requiere.
 
 ## 2. Primer administrador
 
@@ -162,14 +166,14 @@ Construir mientras la API vieja sigue sirviendo:
 docker compose build
 ```
 
-No se redespliega nada todavía. Antes de continuar, confirmar que la imagen nueva soporta la revisión **9**.
+No se redespliega nada todavía. Antes de continuar, confirmar que la imagen nueva soporta la revisión **10**.
 El comando de clasificación de la sección 6 imprime `schema revision: <n> (this build supports <m>)`. Si `<m>`
-no es 9, la imagen está desactualizada y se negará a migrar.
+no es 10, la imagen está desactualizada y se negará a migrar.
 
 Si la imagen en ejecución o la nueva reportan `incompatible` o `newer`, **detenerse**. Ninguno de esos estados
 se arregla desplegando, y el comando de migración los rechaza.
 
-## 6. Cutover controlado a la revisión 9
+## 6. Cutover controlado a la revisión 10
 
 Agendar una ventana de mantenimiento. Detener la API **antes** de la copia final y de la migración. No permitir
 otros escritores de la base durante la ventana.
@@ -220,9 +224,11 @@ otros escritores de la base durante la ventana.
    | 6 → 7 | Agrega `aero_movements`. Aditivo. |
    | 7 → 8 | Re-clava `aero_movements` por asiento y producto. |
    | 8 → 9 | Agrega `massa_launches.ent_lan` y su índice único parcial. Aditivo. |
+   | 9 → 10 | Crea `aero_integration_settings` y `aero_bridge_tickets` con sus dos índices. Aditivo: no reescribe filas existentes ni invalida sesiones. |
 
-   Una base en revisión 3 ejecuta **todos** los pasos desde `3 → 4` hasta `8 → 9`; no solo `3 → 4`. Una base en
-   revisión 8 ejecuta únicamente `8 → 9`.
+   Una base en revisión 3 ejecuta **todos** los pasos desde `3 → 4` hasta `9 → 10`; no solo `3 → 4`. Una base en
+   revisión 9 ejecuta únicamente `9 → 10`. La migración no crea ni descifra la contraseña del ERP: eso lo hace el
+   panel después del despliegue, con la clave de la sección 14 presente en el entorno.
 
 4. **Confirmar el esquema:**
 
@@ -231,8 +237,8 @@ otros escritores de la base durante la ventana.
      packages/backend/dist/db/status.js
    ```
 
-   Debe salir con código 0 e imprimir `verdict: current` en la revisión 9. **No arrancar la API hasta que lo
-   haga.**
+   Debe salir con código 0 e imprimir `verdict: current` en la revisión 10 con **20 tablas**. **No arrancar la API
+   hasta que lo haga.**
 
 5. Si la migración o la validación fallan, mantener la API detenida y usar el rollback de la sección 9,
    escenario B, con la copia final. No arrancar un binario viejo contra una base migrada.
@@ -259,9 +265,10 @@ otros escritores de la base durante la ventana.
    docker logs trindade-api-1 | grep "database schema notice"
    ```
 
-   Para una base migrada debe verse `level=30` (info), `verdict=current`, `revision=9`. Un `level=40` (warn) con
+   Para una base migrada debe verse `level=30` (info), `verdict=current`, `revision=10`. Un `level=40` (warn) con
    `verdict=outdated` o `newer` significa que el rollout corre contra el esquema equivocado: detener la API e
-   investigar.
+   investigar. En producción la API además exige `AERO_VAULT_KEY` válida para arrancar: si falta o no decodifica a
+   32 bytes, el contenedor no levanta y no arranca en modo degradado.
 
 4. **Healthcheck:**
 
@@ -271,10 +278,21 @@ otros escritores de la base durante la ventana.
 
    HTTP 200 con `{"status":"ok","timestamp":"..."}`.
 
-5. **Sesiones:** la migración 8 → 9 es aditiva y **no** invalida sesiones. Una base que venía de revisión 2 o
+5. **Sesiones:** la migración 9 → 10 es aditiva y **no** invalida sesiones. Una base que venía de revisión 2 o
    anterior sí pasó por `2 → 3`, que revoca todas las sesiones; en ese caso los usuarios deben iniciar sesión de
    nuevo. Verificar un login real por HTTPS sin poner credenciales ni tokens en el historial de shell, la salida
    de terminal o los logs.
+
+6. **Cofre del ERP:**
+
+   ```bash
+   curl -sS -o /dev/null -w '%{http_code}\n' \
+     https://trindademasas.duckdns.org/api/integration/aero/settings
+   ```
+
+   Debe responder `401` sin token. Entrar con `wilkin` (Administrador), abrir el panel de integración y comprobar
+   que `GET /api/integration/aero/settings` responde `configured: false` la primera vez. La contraseña real del ERP
+   la carga el usuario desde el iPhone: el operador del despliegue no la pide, no la carga y no la imprime.
 
 ## 8. Checklist posterior al despliegue
 
@@ -283,7 +301,8 @@ otros escritores de la base durante la ventana.
 - [ ] `curl -sS https://trindademasas.duckdns.org/api/health` devuelve 200 con `status: "ok"`.
 - [ ] La SPA responde y contiene la marca Trindade.
 - [ ] Un login real funciona y devuelve `refreshToken`.
-- [ ] `make db-status` (o el comando equivalente en el contenedor) sale 0 con `current`.
+- [ ] `GET /api/integration/aero/settings` sin token devuelve `401`.
+- [ ] `make db-status` (o el comando equivalente en el contenedor) sale 0 con `current` en la revisión 10.
 - [ ] `docker logs --tail 30 trindade-api-1` no muestra errores ni rechazos no manejados.
 - [ ] La descarga del APK responde (`GET /api/app/download-apk`) y la versión publicada es la esperada.
 
@@ -313,8 +332,9 @@ migración de esta release.
    curl -sS https://trindademasas.duckdns.org/api/health
    ```
 
-Si la migración ya se ejecutó, no usar este escenario: la imagen vieja reporta `newer` y se niega. Usar el
-escenario B con el código correspondiente.
+Si la migración ya se ejecutó, no usar este escenario. Una base en revisión **10** es `newer` para la imagen
+anterior, que se niega a abrirla en escritura, y ningún *downgrade* de esquema está soportado: el único camino de
+vuelta es el escenario B, restaurando el backup aprobado previo al cutover y levantando la imagen anterior.
 
 ### Escenario B: rollback completo de datos
 
@@ -421,11 +441,15 @@ cd Trindade
 cp .env.example .env
 # Editar .env:
 #   JWT_SECRET=<secreto-fuerte-de-32-caracteres-o-más>
+#   AERO_VAULT_KEY=$(openssl rand -base64 32)
 #   PUBLIC_APP_URL=https://trindademasas.duckdns.org
 #   WEB_BIND=127.0.0.1
 #   WEB_PORT=8080
 #   REFRESH_TOKEN_TTL_DAYS=30
 ```
+
+`AERO_VAULT_KEY` no es opcional en producción: sin ella la API no arranca. El procedimiento completo está en la
+sección 14.
 
 Variables opcionales que lee `docker-compose.yml`: `API_PORT`, `DATABASE_PATH`, `PHOTOS_DIR`, `LOG_LEVEL` y
 `AERO_LOG_DIR`.
@@ -453,6 +477,8 @@ Renovación diaria:
 | `db-backup.sh` falla porque el destino existe | El directorio ya estaba creado | Usar un `BACKUP_DIR` nuevo con timestamp |
 | `db-restore` no restaura y pide `--confirm` | Se pasó `CONFIRM=true` en lugar de `CONFIRM=--confirm` | Repetir con `CONFIRM=--confirm` |
 | La API no levanta tras migrar | Migración incompleta o esquema incompatible | Mantener detenida y ejecutar el escenario B |
+| La API no arranca en producción y el log nombra `AERO_VAULT_KEY` | La clave falta o no decodifica a 32 bytes | Generar una con `openssl rand -base64 32`, cargarla en el `.env` del host y reiniciar `api` (sección 14) |
+| `AERO_VAULT_KEY` cambió o se perdió | El ciphertext guardado ya no se descifra | Volver a guardar la contraseña del ERP desde el panel con `wilkin` |
 | El healthcheck devuelve error | Contenedor no iniciado o base inaccesible | `docker compose ps` y `docker logs trindade-api-1` |
 | El APK no descarga | El archivo no está en `packages/backend/apk/` o la imagen no se reconstruyó | Verificar el artefacto y reconstruir `api` |
 
@@ -462,9 +488,60 @@ Renovación diaria:
 - [ ] Copia preliminar aprobada.
 - [ ] API detenida antes de la copia final.
 - [ ] Copia final aprobada y con `setId` registrado.
-- [ ] Imagen nueva construida y compatible con la revisión 9.
-- [ ] Migración ejecutada y `verdict: current` en revisión 9.
+- [ ] `AERO_VAULT_KEY` presente en el entorno de la API, sin haberse impreso ni commiteado.
+- [ ] Imagen nueva construida y compatible con la revisión 10.
+- [ ] Migración ejecutada y `verdict: current` en revisión 10 con 20 tablas.
 - [ ] API y web levantadas y saludables.
 - [ ] Login real verificado.
+- [ ] `GET /api/integration/aero/settings` sin token responde `401`.
+- [ ] Cofre del ERP visible en el panel; la contraseña la carga el usuario, no el operador.
 - [ ] Healthcheck, SPA y descarga de APK verificados.
 - [ ] Logs sin errores.
+
+## 14. Clave del cofre del ERP (`AERO_VAULT_KEY`)
+
+La contraseña del WebService de la fábrica ya no se guarda en el navegador. El servidor la cifra con
+**AES-256-GCM** (IV aleatorio de 12 bytes, auth tag y `key_version = 1`) y la deja en la tabla
+`aero_integration_settings`. `AERO_VAULT_KEY` es la clave simétrica de 32 bytes, codificada en **base64**, que
+permite descifrarla.
+
+### 14.1 Generación
+
+```bash
+openssl rand -base64 32
+```
+
+El resultado tiene 44 caracteres; cualquier otra longitud que no decodifique a 32 bytes se rechaza. Generar la
+clave directamente sobre el host de producción y **no imprimir el valor** en la salida de terminal compartida, el
+historial de shell ni el canal de CI.
+
+### 14.2 Dónde vive
+
+| Dónde | Estado |
+| --- | --- |
+| `.env` de producción, junto al compose | **Sí.** Está gitignored y no se versiona. |
+| `docker-compose.yml` | **Sí**, como variable de entorno del servicio `api`. |
+| `.env.example` | Vacía, con la instrucción `openssl rand -base64 32`. |
+| Base de datos, repositorio, logs, auditoría, respuestas HTTP | **Nunca.** En SQLite quedan solo ciphertext, IV y tag. |
+
+Si la clave ya existe en el `.env` de producción, **no se rota** en un despliegue normal. Rotarla sin volver a
+guardar la contraseña deja el cofre ilegible.
+
+### 14.3 Arranque y verificación
+
+- En producción la API valida la clave al arrancar: si falta o no decodifica a 32 bytes, **falla con un mensaje
+  claro y no arranca**. No hay modo degradado.
+- En pruebas se inyecta una clave fija de test; la de producción nunca viaja al entorno de pruebas.
+- Verificación posterior al despliegue: `GET /api/integration/aero/settings` sin token responde `401` y el mismo
+  endpoint con sesión de `wilkin` responde `configured`, `wsUrl`, `username`, `hasPassword` y `updatedAt`, jamás la
+  contraseña ni el ciphertext.
+
+### 14.4 Backups, pérdida y deuda declarada
+
+- El ciphertext de los backups **no sirve sin la clave**: restaurar una base sin el `AERO_VAULT_KEY` que la cifró
+  deja la contraseña ilegible. Guardar la clave en el gestor de secretos del operador, separada del backup de la
+  base, es parte de la copia de recuperación.
+- Si la clave se pierde, la contraseña del ERP se vuelve a cargar una vez desde el panel con `wilkin`
+  (Administrador). No se pierde ningún otro dato: la contraseña no se reutiliza en Trindade.
+- **Deuda declarada:** no hay rotación multi-clave. `key_version = 1` está preparado para una rotación futura por
+  generaciones, que esta entrega no implementa.

@@ -10,6 +10,49 @@ verificaciones está en [docs/release-android-historial.md](docs/release-android
 
 ---
 
+## [Unreleased]
+
+La contraseña del ERP deja de vivir en el navegador. El servidor la guarda cifrada y entrega al iPhone un ticket de
+un solo uso que el Atajo canjea por el sobre del pedido.
+
+### Añadido
+
+- **Cofre del ERP en el servidor.** La contraseña del WebService se guarda en `aero_integration_settings` cifrada
+  con AES-256-GCM (IV de 12 bytes, auth tag y `key_version = 1`); la clave `AERO_VAULT_KEY` de 32 bytes en base64
+  vive en el entorno de la API y en producción el servicio no arranca sin ella. Ninguna respuesta devuelve la
+  contraseña ni el ciphertext.
+- **Ticket de un solo uso para el Atajo.** `POST /api/integration/aero/bridge-tickets` emite un token de 32 bytes
+  con 120 s de vida del que la base guarda solo el SHA-256; el Atajo lo canjea en
+  `POST /api/integration/aero/bridge-tickets/redeem` leyendo `X-Trindade-Ticket` y recibe el sobre
+  `{ url, method, headers, body|bodies, callback }`. El canje es unauthenticated por diseño: el ticket es la
+  credencial.
+- **API del cofre:** `GET`, `PUT` y `DELETE /api/integration/aero/settings`, solo para `wilkin` con rol
+  Administrador, y los esquemas Zod y las respuestas del contrato OpenAPI de los tres paths nuevos.
+- **Esquema revisión 10**, aditiva: `aero_integration_settings` y `aero_bridge_tickets` con sus índices. El
+  inventario pasa de 18 a 20 tablas y la migración `9 → 10` se aplica solo con `db:migrate`, nunca al arrancar.
+
+### Cambiado
+
+- **La web ya no guarda la contraseña del ERP.** El panel escribe la contraseña una sola vez, el campo vuelve a
+  aparecer vacío y la tarjeta muestra «Senha guardada no servidor». Guardar con la contraseña vacía conserva la
+  existente. Una pestaña nueva —el callback del Atajo, una pestaña duplicada u otro dispositivo del mismo owner—
+  consulta, lanza y lee sin volver a pedirla.
+- **La prueba de conexión va por ticket** (`test` → `/usuarios`) en lugar del sondeo desde el navegador.
+- **La receta del Atajo recibe `{ ticket, ticketUrl }`**: la página ya no arma el sobre y el `Authorization` lo
+  construye el servidor. El enlace iCloud del Atajo viejo de 20 acciones queda marcado como legacy.
+- **Android sin cambios:** no hay cambios de comportamiento ni de UI en la app, y esta entrega no publica APK, tag
+  ni GitHub Release.
+
+### Notas
+
+- Perder `AERO_VAULT_KEY` obliga a volver a cargar la contraseña del ERP: el ciphertext de los backups queda
+  ilegible. La rotación multi-clave no está implementada; `key_version` queda preparado y la deuda documentada.
+- El rollback de una base en revisión 10 es restaurar el backup aprobado previo al cutover: la imagen anterior la
+  clasifica como `newer` y se niega a abrirla.
+- `v0.7.5` no se mueve.
+
+---
+
 ## [0.7.5] — 2026-11-07
 
 El repositorio oficial del proyecto pasa a `github.com/wilkin-barban/Trindade`, y la versión pública se mueve
