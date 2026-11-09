@@ -31,12 +31,68 @@ export async function loginAsAeroOwner(page: Page): Promise<void> {
 }
 
 /**
- * Types the ERP password into this tab, which is the only place it lives now.
+ * The owner's bearer token, for the API calls the helpers make outside the page's own session.
  *
- * It used to be seeded into `localStorage` by a couple of specs, and that is exactly what stopped being
- * possible -- and what must not come back as a test-only path, because a test that writes the secret to disk
- * would keep passing while the phone did something else. The panel writes it to the session's memory; the
- * trip back is the app's own link, so the document is never reloaded and the memory survives.
+ * `page.request` does not inherit the `localStorage` that `loginViaApi` seeds, so a helper that has to talk to
+ * the API asks for a token of its own. It is the owner's and only the owner's: every vault route is guarded by
+ * `requireUsername('wilkin')` plus `requireRole('Administrador')`, and a second account would get a 403.
+ */
+export async function loginAeroOwnerForApi(page: Page): Promise<string> {
+  const login = await page.request.post(`${API}/auth/login`, { data: AERO_OWNER });
+  expect(login.status()).toBe(200);
+  return ((await login.json()) as { token: string }).token;
+}
+
+/**
+ * Empties the vault of the owner, so a spec that reads it starts from «not configured».
+ *
+ * The vault used to be `sessionStorage`: every test threw it away with its browser context. It is now one row
+ * per owner in the server's database, shared by every spec of the run, and a spec that saved a plant address or
+ * a password leaves it for the next one. A spec that depends on the vault says what it expects to find instead
+ * of inheriting whatever the previous file wrote.
+ *
+ * It runs as the owner through the API, not through the panel: clearing a spec's precondition is not the
+ * behaviour under test, and the panel's own clear button is exercised by the spec that tests the form.
+ */
+export async function resetAeroVault(page: Page): Promise<void> {
+  await loginAsAeroOwner(page);
+  const token = await loginAeroOwnerForApi(page);
+  const removed = await page.request.delete(`${API}/integration/aero/settings`, {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  expect(removed.status()).toBe(204);
+}
+
+/**
+ * Writes the vault of the owner, for the specs that need the state and not the form.
+ *
+ * The panel's save is a behaviour of its own and stays covered by the specs that test it. Everything else
+ * only needs the server to hold a known address, user and secret before the screen opens.
+ */
+export async function saveAeroVault(
+  page: Page,
+  input: { wsUrl: string; username: string; password: string },
+): Promise<void> {
+  await loginAsAeroOwner(page);
+  const token = await loginAeroOwnerForApi(page);
+  const saved = await page.request.put(`${API}/integration/aero/settings`, {
+    headers: { authorization: `Bearer ${token}` },
+    data: input,
+  });
+  expect(saved.status()).toBe(200);
+  // The server answers with the fact and never with the secret (I1): the helper proves the password landed
+  // without ever reading it back.
+  const body = (await saved.json()) as { hasPassword?: boolean; password?: unknown };
+  expect(body.hasPassword).toBe(true);
+  expect(body.password).toBeUndefined();
+}
+
+/**
+ * Saves the ERP credential through the panel, the way an operator writes it once.
+ *
+ * It used to live in this tab's `sessionStorage`, and that is what the vault replaced: the secret now leaves
+ * the browser on save, encrypted, and never comes back. The path stays here because it is still the only
+ * screen that accepts a new password.
  */
 export async function openErpSession(page: Page, password = 'senha'): Promise<void> {
   await page.goto('/admin');
@@ -47,7 +103,7 @@ export async function openErpSession(page: Page, password = 'senha'): Promise<vo
   await expect(page.getByText(/Configuración guardada|Configuração salva/)).toBeVisible();
 }
 
-/** Leaves the current screen for another one of the app, without a reload: the session's secret survives. */
+/** Leaves the current screen for another one of the app, without a reload: the app's own navigation. */
 export async function navigateInApp(page: Page, href: string): Promise<void> {
   const openSidebar = page.getByRole('button', { name: /Abrir men/ });
   if (await openSidebar.isVisible().catch(() => false)) {
