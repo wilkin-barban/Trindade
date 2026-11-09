@@ -16,11 +16,13 @@ import type Database from 'better-sqlite3';
  * - 7: adds `aero_movements`, the company ERP's movement seats mirrored as a read-only snapshot.
  * - 8: rekeys `aero_movements` by seat and product, because one document carries several line items.
  * - 9: adds `massa_launches.ent_lan`, the ERP seat an imported launch came from, unique when present.
+ * - 10: adds `aero_integration_settings` (the erp password, encrypted, one row per owner) and
+ *   `aero_bridge_tickets` (one-use tickets the iOS shortcut redeems for the envelope).
  *
  * Databases created before versioning carry `user_version = 0` and are reported as
  * `unversioned`; nothing about them is assumed, and no startup path rewrites them.
  */
-export const SCHEMA_VERSION = 9;
+export const SCHEMA_VERSION = 10;
 
 /**
  * The tables a database created by revision 1 must contain: the baseline the
@@ -58,16 +60,32 @@ export const REVISION_SIX_TABLES = ['massa_launches'] as const;
 export const REVISION_SEVEN_TABLES = ['aero_movements'] as const;
 
 /**
- * The user tables the approved schema defines. Kept in code because the read-only
- * status report needs an expectation to compare against; the test suite ties this
- * list to the tables `schema.sql` actually creates.
+ * Tables introduced by revision 10: the encrypted ERP vault (one row per owner) and the one-use
+ * bridge tickets the iOS shortcut redeems for the envelope. Only the SHA-256 of a ticket lives in
+ * the table, so reading it does not let anyone redeem one.
  */
-export const SCHEMA_TABLES: readonly string[] = [
+export const REVISION_TEN_TABLES = ['aero_bridge_tickets', 'aero_integration_settings'] as const;
+
+/**
+ * The inventory as it stood before revision 10: revisions 3, 4, 8 and 9 widened existing tables
+ * and added none, so revisions 7, 8 and 9 are all required to contain exactly this.
+ */
+const TABLES_THROUGH_REVISION_NINE: readonly string[] = [
   ...BASELINE_TABLES,
   ...REVISION_TWO_TABLES,
   ...REVISION_FIVE_TABLES,
   ...REVISION_SIX_TABLES,
   ...REVISION_SEVEN_TABLES,
+].sort();
+
+/**
+ * The user tables the approved schema defines. Kept in code because the read-only
+ * status report needs an expectation to compare against; the test suite ties this
+ * list to the tables `schema.sql` actually creates.
+ */
+export const SCHEMA_TABLES: readonly string[] = [
+  ...TABLES_THROUGH_REVISION_NINE,
+  ...REVISION_TEN_TABLES,
 ].sort();
 
 /**
@@ -83,7 +101,15 @@ export const SCHEMA_TABLES: readonly string[] = [
  * further is known about it.
  */
 export function requiredTablesFor(version: number): readonly string[] {
-  if (version >= 7) return SCHEMA_TABLES;
+  if (version >= 10) return SCHEMA_TABLES;
+  // A revision 9 database predates the ERP vault. Asking it for `aero_integration_settings` or
+  // `aero_bridge_tickets` would classify it `incompatible`, and the migrate command refuses that
+  // verdict without ever opening the file for writing, so the very migration that adds the two
+  // tables could never run. Revision 9 is therefore held to the inventory it actually has.
+  if (version >= 9) return TABLES_THROUGH_REVISION_NINE;
+  // Revisions 7 and 8 are held to the same inventory, because revisions 8 and 9 widened existing
+  // tables and added none: the two branches differ in intent, not in list.
+  if (version >= 7) return TABLES_THROUGH_REVISION_NINE;
   if (version >= 6) {
     return [...BASELINE_TABLES, ...REVISION_TWO_TABLES, ...REVISION_FIVE_TABLES, ...REVISION_SIX_TABLES].sort();
   }

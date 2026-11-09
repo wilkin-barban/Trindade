@@ -7,6 +7,7 @@ import { migrateSecurityVersion } from './security-version-migration.js';
 import { migrateMassaLaunches } from './massa-launches-migration.js';
 import { migrateAeroMovements } from './aero-movements-migration.js';
 import { migrateAeroMovementSeats } from './aero-movement-seats-migration.js';
+import { migrateAeroVault } from './aero-vault-migration.js';
 import { migrateMassaLaunchSeats } from './massa-launches-seat-migration.js';
 import { SCHEMA_VERSION, readSchemaReport, stampSchemaVersion, type SchemaReport } from './schema-version.js';
 
@@ -79,6 +80,7 @@ export function migrateDatabase(db: Database.Database): MigrateResult {
     { to: 7, apply: () => migrateAeroMovements(db) },
     { to: 8, apply: () => migrateAeroMovementSeats(db) },
     { to: 9, apply: () => migrateMassaLaunchSeats(db) },
+    { to: 10, apply: () => migrateAeroVault(db) },
   ];
 
   for (const step of steps) {

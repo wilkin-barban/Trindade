@@ -1,9 +1,12 @@
 -- ============================================================
 -- Trindade Massas Operações — Database Schema
--- 15 user tables: the approved schema after the admin-refactor-loading-rules change
--- dropped report_products and report_quantities, whose data report_items carries in
--- selected_products as JSON, and schema revision 2 added auth_sessions. The PRD listed
--- 17 tables; the refactor superseded two, revision 2 added one, and revision 6 added massa_launches.
+-- 20 user tables at schema revision 10. History: the approved schema after the
+-- admin-refactor-loading-rules change dropped report_products and report_quantities,
+-- whose data report_items carries in selected_products as JSON, and left 15 user tables
+-- (the PRD listed 17; the refactor superseded two). Revision 2 added auth_sessions,
+-- revision 5 stock_counts, revision 6 massa_launches, revision 7 aero_movements, and
+-- revision 10 the ERP vault and its one-use bridge tickets: aero_integration_settings
+-- and aero_bridge_tickets.
 -- Changing this file needs a matching SCHEMA_VERSION bump in schema-version.ts and an
 -- approved migration path: a fresh installation stamps PRAGMA user_version, and an
 -- existing database is never migrated, reset, seeded, or stamped by startup.
@@ -280,4 +283,43 @@ CREATE TABLE IF NOT EXISTS aero_movements (
   UNIQUE(movement_date, ent_lan, product_code)
 );
 CREATE INDEX IF NOT EXISTS idx_aero_movements_date ON aero_movements(movement_date);
+
+-- Revision 10: the ERP vault and the one-use tickets the iOS shortcut redeems for the envelope.
+-- The vault keeps the erp password encrypted (AES-256-GCM): ciphertext, iv and tag live here, the key
+-- lives in the environment and never in the database. One row per owner, because the secret is the
+-- plant's and not each session's, so a new tab or another device of the same owner reads the same row
+-- instead of asking for the password again.
+CREATE TABLE IF NOT EXISTS aero_integration_settings (
+  id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id             INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  ws_url              TEXT    NOT NULL,
+  erp_username        TEXT    NOT NULL,
+  password_ciphertext TEXT    NOT NULL,
+  password_iv         TEXT    NOT NULL,
+  password_tag        TEXT    NOT NULL,
+  key_version         INTEGER NOT NULL DEFAULT 1,
+  created_at          TEXT    NOT NULL,
+  updated_at          TEXT    NOT NULL
+);
+
+-- A bridge ticket is a bearer credential with one use and 120 s of life: the page hands the shortcut
+-- the token, the shortcut redeems it for an envelope already built here. Only the sha256 of the token
+-- is stored, so reading this table does not let anyone redeem a ticket. `body` and `bodies` hold JSON
+-- the server serialized, never payloads the shortcut has to rebuild, and both timestamps are ISO UTC,
+-- a format whose text order matches time order.
+CREATE TABLE IF NOT EXISTS aero_bridge_tickets (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  token_hash   TEXT    NOT NULL UNIQUE,
+  user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  action       TEXT    NOT NULL CHECK (action IN ('entrada','entrada_lote','movimentos','test')),
+  endpoint     TEXT    NOT NULL,
+  body         TEXT    NOT NULL,
+  bodies       TEXT,
+  callback_url TEXT    NOT NULL,
+  expires_at   TEXT    NOT NULL,
+  used_at      TEXT,
+  created_at   TEXT    NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_aero_bridge_tickets_user ON aero_bridge_tickets(user_id);
+CREATE INDEX IF NOT EXISTS idx_aero_bridge_tickets_expires ON aero_bridge_tickets(expires_at);
 
