@@ -14,9 +14,14 @@ import {
   sessionStoreExists,
 } from './modules/auth/auth.sessions.service.js';
 import { cleanupExpiredPhotos } from './modules/reports/reports.lifecycle.service.js';
+import { assertVaultKeyAtStartup } from './modules/integration/vault.crypto.js';
 import { registerApiRoutes } from './routes.js';
 
 const config = loadRuntimeConfig();
+// The ERP vault key is a startup gate in production, exactly like JWT_SECRET: a deployment that cannot decrypt the
+// stored password must not come up serving 503s to the plant. It is read here, before the database is opened, so a
+// missing key never leaves a database handle behind.
+const aeroVaultKeyConfigured = assertVaultKeyAtStartup() !== null;
 const db = openDatabase(config.databasePath);
 
 // Photo storage directory
@@ -30,6 +35,12 @@ const server = Fastify({
     level: process.env.LOG_LEVEL || 'info',
   },
 });
+
+if (!aeroVaultKeyConfigured) {
+  // Development only: in production the call above already refused to boot. Saying it once beats a 503 that looks
+  // like a broken route when the panel is opened for the first time.
+  server.log.warn('AERO_VAULT_KEY is not set: the ERP vault is disabled until it is configured');
+}
 
 // Report the schema revision the database was found in, and nothing else: startup never
 // migrates, stamps, or refuses. This is a log notice for operators (`db:status` answers
