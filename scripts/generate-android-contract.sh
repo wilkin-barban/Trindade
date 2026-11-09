@@ -95,6 +95,28 @@ java -jar "$jar" generate \
 # entire job is to hold DTOs should not carry a second Gradle wrapper, a README and a .gitignore that
 # compete with the module's own. Filtering here also means a future generator version cannot quietly
 # add a file nobody reviews.
+# One generated type needs a correction the generator cannot express. `AeroBridgeTicketRequest.payloads` is a
+# free-form JSON object (`array of object`), so the Kotlin client receives `List<Map<String, Any?>>`; the
+# generator places `@Contextual` on the Map, but kotlinx.serialization resolves the serializer for the type
+# argument, refuses a bare `Any?`, and the whole Android build stops on an endpoint that client never calls.
+# Moving the annotation onto the `Any?` itself is what compiles, and doing it here keeps the committed types
+# and the freshness check identical: both run this script, so neither can disagree with the other.
+free_form_model="$work_dir/src/main/kotlin/com/trindade/app/contract/models/AeroBridgeTicketRequest.kt"
+if [[ -f "$free_form_model" ]]; then
+  python3 - "$free_form_model" <<'PATCH'
+import sys
+path = sys.argv[1]
+source = open(path, encoding='utf-8').read()
+before = 'kotlin.collections.List<@Contextual kotlin.collections.Map<kotlin.String, kotlin.Any?>>'
+after = 'kotlin.collections.List<kotlin.collections.Map<kotlin.String, @Contextual kotlin.Any?>>'
+if before in source:
+    open(path, 'w', encoding='utf-8').write(source.replace(before, after))
+elif after not in source:
+    sys.exit('AeroBridgeTicketRequest no longer has the free-form payload type this script patches; '
+             'inspect the generated file instead of assuming the patch is unnecessary')
+PATCH
+fi
+
 generated_count="$(find "$work_dir/src/main/kotlin" -name '*.kt' 2>/dev/null | wc -l | tr -d ' ')"
 if [[ "$generated_count" -eq 0 ]]; then
   # The guard that matters most. Without it, a generator that exits 0 having produced nothing would
