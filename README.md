@@ -15,7 +15,7 @@ Plataforma operativa de **Trindade Massas** para registrar la producción de mas
 | --- | --- |
 | Última versión publicada | `v0.7.5` (GitHub Release `v0.7.5`); `/api/app/latest-release` la anuncia al desplegarse la API |
 | Aplicación Android | APK firmado, `com.trindade.app`, Android 8.0 o superior |
-| Base de datos | SQLite, esquema **revisión 9** (18 tablas) |
+| Base de datos | SQLite, esquema **revisión 10** (20 tablas) |
 | Producción web | <https://trindademasas.duckdns.org> |
 | Integración ERP | Aero32 por WebService local, con espejo de movimientos en Trindade |
 | Documentación | [Índice completo](docs/README.md) |
@@ -66,10 +66,15 @@ make install
 # 3. Configurar variables de entorno
 cp .env.example .env
 # Editar .env y definir un JWT_SECRET seguro (mínimo 32 caracteres)
+# y una AERO_VAULT_KEY de 32 bytes en base64: openssl rand -base64 32
 
 # 4. Iniciar el entorno de desarrollo
 make dev
 ```
+
+`AERO_VAULT_KEY` cifra la contraseña del ERP guardada en el servidor (AES-256-GCM). En producción el API no arranca
+sin ella; nunca se versiona, no se imprime y perderla obliga a cargar la contraseña una vez más. El detalle está en
+[docs/despliegue.md](docs/despliegue.md), sección 14.
 
 - **Web**: `http://localhost:5173`
 - **API**: `http://localhost:3000`

@@ -21,7 +21,9 @@ flowchart LR
 - **API:** Fastify sobre Node 24, con SQLite en modo WAL y migraciones explícitas.
 - **Android:** cliente nativo Kotlin/Compose que consume la misma API y, en la red de la fábrica, llama
   directamente al WebService Aero32.
-- **ERP:** Aero32 se alcanza por HTTP local. La web usa un atajo de iOS como puente; Android llama directo.
+- **ERP:** Aero32 se alcanza por HTTP local. La web usa un atajo de iOS como puente; Android llama directo. La
+  contraseña del WebService vive cifrada en el servidor y la web solo recibe un ticket de un solo uso que el atajo
+  canjea por el sobre del pedido: la página nunca ve la credencial.
 - **Persistencia:** un volumen Docker externo guarda la base y las fotos de reportes.
 
 ## 2. Monorepo
@@ -53,7 +55,7 @@ Directorios de apoyo:
 | `loading` | `/api/loading` | Cronogramas, conductores, vehículos, horarios e historial |
 | `stock` | `/api/stock` | Conteo diario, historial y resumen colectivo |
 | `massas` | `/api/massas-launch` | Lanzamientos, reporte del día e historial |
-| `integration` | `/api/integration/aero` | Bitácora y espejo de movimientos del ERP |
+| `integration` | `/api/integration/aero` | Cofre del ERP, tickets del Atajo, bitácora y espejo de movimientos del ERP |
 | `admin` | `/api/admin` | Usuarios, catálogos, vehículos, horarios y auditoría |
 | `audit` | `/api/admin/audit` | Consulta paginada de auditoría |
 | `app` | `/api/app` | Última release y descarga del APK |
@@ -82,6 +84,9 @@ Directorios de apoyo:
 | `/api/massas-launch/:id` | `PUT`, `DELETE` | Edición y borrado sujetos a autoría y fecha |
 | `/api/integration/aero/log` | `POST` | Bitácora de integración |
 | `/api/integration/aero/movements` | `GET`, `POST` | Espejo de movimientos del ERP |
+| `/api/integration/aero/settings` | `GET`, `PUT`, `DELETE` | Cofre del ERP; solo `wilkin` con rol Administrador |
+| `/api/integration/aero/bridge-tickets` | `POST` | Emite un ticket de un solo uso para el Atajo |
+| `/api/integration/aero/bridge-tickets/redeem` | `POST` | Canje del ticket; sin JWT por diseño, la credencial es el ticket |
 | `/api/admin/*` | `GET`, `POST`, `PATCH`, `DELETE` | Catálogos, usuarios, vehículos y horarios |
 | `/api/admin/audit` | `GET` | Auditoría |
 | `/api/app/latest-release` | `GET` | Versión publicada del APK |
@@ -147,7 +152,7 @@ El cliente release solo permite tráfico HTTP hacia la IP del WebService de la f
 
 ## 6. Modelo de datos
 
-SQLite con `PRAGMA user_version`. La revisión vigente es la **9** y el esquema tiene **18 tablas**.
+SQLite con `PRAGMA user_version`. La revisión vigente es la **10** y el esquema tiene **20 tablas**.
 
 | Dominio | Tablas |
 | --- | --- |
@@ -156,7 +161,7 @@ SQLite con `PRAGMA user_version`. La revisión vigente es la **9** y el esquema 
 | Carga | `drivers`, `vehicles`, `loading_schedules` |
 | Stock | `stock_counts` |
 | Masas | `massa_launches` |
-| Integración | `aero_movements` |
+| Integración | `aero_movements`, `aero_integration_settings`, `aero_bridge_tickets` |
 | Auditoría y ajustes | `audit_logs`, `settings` |
 
 Revisiones:
@@ -172,9 +177,12 @@ Revisiones:
 | 7 | `aero_movements` |
 | 8 | Clave de `aero_movements` por asiento y producto |
 | 9 | `massa_launches.ent_lan` |
+| 10 | Cofre del ERP y tickets de un solo uso |
 
-El servidor no migra al arrancar. La migración es un paso explícito del operador; el procedimiento está en
-[despliegue.md](despliegue.md).
+El servidor no migra al arrancar. La migración es un paso explícito del operador, solo por `db:migrate`; el
+procedimiento está en [despliegue.md](despliegue.md). `aero_integration_settings` guarda una fila por owner con la
+contraseña del ERP cifrada (ciphertext, IV y tag) y `aero_bridge_tickets` guarda solo el **SHA-256** del ticket, su
+acción, el sobre ya serializado y su vencimiento.
 
 ## 7. Flujos
 
@@ -204,6 +212,8 @@ sequenceDiagram
 ```
 
 - Si el ERP no responde, el lanzamiento ya está guardado en Trindade.
+- En la web el envío no lleva credenciales: la página pide un ticket y el Atajo canjea el sobre con el
+  `Authorization: Basic` ya armado por el servidor (7.5).
 - El reporte de masas lee el snapshot del ERP, no `massa_launches`.
 - Un asiento conciliado queda inmutable desde Trindade.
 
@@ -222,9 +232,56 @@ sequenceDiagram
 3. Un reset conserva el registro histórico del producto.
 4. El historial muestra solo los productos contados y su resumen colectivo.
 
+### 7.5 Cofre del ERP y ticket de un solo uso
+
+```mermaid
+sequenceDiagram
+    actor Admin as wilkin (Administrador)
+    participant UI as Web
+    participant API as Trindade API
+    participant DB as SQLite
+    participant Atajo as Atajo iOS
+    participant ERP as Aero32
+
+    Admin->>UI: Escribe la contraseña del ERP una vez
+    UI->>API: PUT /api/integration/aero/settings
+    API->>DB: ciphertext + IV + tag (AES-256-GCM)
+    UI->>API: POST /api/integration/aero/bridge-tickets
+    API-->>UI: { ticket, ticketUrl, expiresAt }
+    UI->>Atajo: { ticket, ticketUrl }
+    Atajo->>API: POST /redeem + X-Trindade-Ticket
+    API->>DB: marca used_at y descifra
+    API-->>Atajo: { url, method, headers, body, callback }
+    Atajo->>ERP: POST con Authorization: Basic
+    ERP-->>Atajo: Respuesta
+    Atajo-->>UI: Callback
+```
+
+- **Qué protege el cofre.** La contraseña del ERP frente a scripts de la página, al almacenamiento del navegador,
+  a otra pestaña, a otro dispositivo del mismo owner y a la base en claro: en SQLite quedan solo ciphertext, IV y
+  tag, y sin `AERO_VAULT_KEY` no se descifra. El token del ticket tampoco se guarda en claro: solo su SHA-256.
+- **Qué sigue expuesto.** El ticket viaja en claro al Atajo y puede quedar en el historial de Shortcuts; vive
+  120 s, sirve una sola vez y no entrega la contraseña sino un sobre ya armado para una acción concreta. El
+  `Authorization: Basic` sigue viajando al ERP porque el ERP no ofrece otro mecanismo, y el Atajo sigue siendo el
+  único proceso que habla con la LAN de la fábrica: la web no gana alcance de red, solo deja de guardar el secreto.
+  Quien tenga el proceso API y la clave del entorno puede descifrar el cofre: es el mismo nivel de acceso que ya
+  permite leer la base.
+- **Quién administra.** `GET`, `PUT` y `DELETE /api/integration/aero/settings` exigen `authenticate`,
+  `requireUsername('wilkin')` y `requireRole('Administrador')`. Ninguna respuesta devuelve la contraseña, el
+  ciphertext, el IV ni el tag. Cerrar sesión no borra el cofre; solo `DELETE /settings` lo elimina.
+- **El canje es sin JWT, por diseño.** `POST /api/integration/aero/bridge-tickets/redeem` lee el ticket del header
+  `X-Trindade-Ticket`, nunca de la URL ni de la query. Pide un JWT rompería el caso que este diseño resuelve: el
+  Atajo no tiene sesión. La credencial es el ticket bearer de un solo uso, y por eso la respuesta lleva
+  `Cache-Control: no-store` y no se registra el header, el token ni el cuerpo en ningún log.
+- **Qué no cambia.** La cola local, los reintentos, la auditoría de pares `requested`/`result`, el callback, el
+  espejo del día y la conciliación conservan su comportamiento; Android no cambia y sigue llamando al WebService
+  con Basic Auth desde su almacén cifrado.
+
 ## 8. Seguridad y operación
 
 - Contraseñas con bcrypt y tokens JWT con refresh rotativo.
+- Secretos del ERP cifrados en reposo con AES-256-GCM; la clave (`AERO_VAULT_KEY`) vive en el entorno, nunca en la
+  base, el repositorio, los logs ni una respuesta.
 - Rate limiting y control de admisión en login y refresh.
 - Revocación de sesiones ante cambios de credenciales.
 - Auditoría de eventos sensibles.

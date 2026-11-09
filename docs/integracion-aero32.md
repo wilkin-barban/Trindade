@@ -18,12 +18,107 @@ El host Windows de producción no se modificó: los binarios se copiaron, se des
 
 | Pieza | Dónde vive | Qué hace |
 | --- | --- | --- |
-| Panel web de integración | `packages/frontend/src/pages/massas/AeroIntegrationPanel.tsx` y `lib/aero-*.ts` | Configura URL, usuario y contraseña; prueba la conexión; encola lanzamientos y lee el espejo |
-| Atajo de iOS | Apple Shortcuts, receta `Aero32 Bridge` | Transporta el sobre `{ url, auth, body, callback }` fuera de Safari para alcanzar HTTP local desde una página HTTPS |
+| Panel web de integración | `packages/frontend/src/pages/massas/AeroIntegrationPanel.tsx` y `lib/aero-*.ts` | Guarda URL y usuario, escribe la contraseña una sola vez en el cofre del servidor, prueba la conexión por ticket, encola lanzamientos y lee el espejo |
+| Cofre del ERP | `packages/backend/src/modules/integration/vault.crypto.ts` y `aero.settings.service.ts` sobre `aero_integration_settings` | Cifra la contraseña del WebService con AES-256-GCM; la clave vive en el entorno, no en la base |
+| Tickets del Atajo | `packages/backend/src/modules/integration/aero.tickets.service.ts` sobre `aero_bridge_tickets` | Emite y canjea tickets de un solo uso de 120 s; guarda solo el SHA-256 del token |
+| Atajo de iOS | Apple Shortcuts, receta `Aero32 Bridge` | Recibe `{ ticket, ticketUrl }`, canjea el ticket por el sobre `{ url, method, headers, body, callback }` y hace el `POST` fuera de Safari para alcanzar HTTP local desde una página HTTPS |
 | Cliente Android | `packages/android/app/src/main/java/com/trindade/app/aero/` | Llama al WebService directamente desde la red de la planta, con Basic Auth y ajustes cifrados |
-| Backend de integración | `packages/backend/src/modules/integration/` | Bitácora, validación y snapshot de movimientos del día |
+| Backend de integración | `packages/backend/src/modules/integration/` | Cofre, tickets, bitácora, validación y snapshot de movimientos del día |
 | Espejo persistido | Tabla `aero_movements` (revisiones 7–9) | Snapshot del día compartido por toda la planta |
 | Reporte del día | `GET /api/massas-launch/report` | Clasifica masas vs insumos a partir del espejo del ERP |
+
+### 0.1 Cofre del servidor y ticket de un solo uso
+
+Desde la revisión **10** del esquema, la contraseña del WebService no vive en el navegador. El reparto es:
+
+| Pieza | Qué guarda | Dónde |
+| --- | --- | --- |
+| `aero_integration_settings` | Una fila por owner con `ws_url`, `erp_username`, `password_ciphertext`, `password_iv`, `password_tag`, `key_version` | SQLite |
+| `AERO_VAULT_KEY` | Clave de 32 bytes en base64 para AES-256-GCM, inyectada por el entorno | `.env` de producción, gitignored, y `docker-compose.yml` |
+| `aero_bridge_tickets` | `token_hash` (SHA-256), `user_id`, `action`, `endpoint`, `body`, `bodies`, `callback_url`, `expires_at`, `used_at` | SQLite |
+
+Contratos del servidor:
+
+| Método y ruta | Guard | Qué hace |
+| --- | --- | --- |
+| `GET /api/integration/aero/settings` | `authenticate` + `requireUsername('wilkin')` + `requireRole('Administrador')` | Devuelve `{ configured, wsUrl, username, hasPassword, updatedAt }`; nunca la contraseña ni el ciphertext |
+| `PUT /api/integration/aero/settings` | ídem | `{ wsUrl, username, password? }`; una contraseña no vacía reemplaza, vacía o ausente conserva |
+| `DELETE /api/integration/aero/settings` | ídem | Borra el cofre y los tickets pendientes del owner (`204`) |
+| `POST /api/integration/aero/bridge-tickets` | ídem | `{ action, payloads, callbackPath? }` → `{ ticket, ticketUrl, expiresAt }` |
+| `POST /api/integration/aero/bridge-tickets/redeem` | Ticket bearer (`X-Trindade-Ticket`) | Devuelve el sobre `{ url, method, headers, body, bodies?, callback }` |
+
+`redeem` es **unauthenticated por diseño**: la credencial es el ticket bearer de un solo uso y el llamador es el
+Atajo, que no tiene sesión. Exigir JWT rompería el caso que el diseño resuelve. El token se lee del header
+`X-Trindade-Ticket`, nunca de la URL, y la respuesta lleva `Cache-Control: no-store`.
+
+El flujo completo:
+
+1. La página pide el ticket con la acción (`entrada`, `entrada_lote`, `movimentos` o `test`) y los payloads ya
+   armados por el código existente.
+2. El API mapea el endpoint (`entradasitem`, `movimentoitem?_method=PATCH`, `usuarios`), serializa `body` y
+   `bodies`, valida el callback contra el origen de `PUBLIC_APP_URL`, guarda el hash del token y responde.
+3. La página abre el Atajo con `{ ticket, ticketUrl }`.
+4. El Atajo hace `POST` a `ticketUrl` con `X-Trindade-Ticket` y sin cuerpo.
+5. El API busca por hash, marca `used_at` en la misma transacción, descifra la contraseña y devuelve el sobre.
+6. El Atajo ejecuta contra el ERP exactamente lo que ejecutaba antes y vuelve al `callback`.
+
+El sobre conserva `body` y `bodies` como **texto JSON**, no como objetos: las acciones del Atajo insertan ese texto
+tal cual en el cuerpo del `POST`, así que el único cambio de la receta es la entrada.
+
+### 0.2 Atajo iOS: delta exacto de la receta
+
+La página ya no entrega un sobre armado. Entrega un diccionario de dos claves:
+
+```json
+{ "ticket": "<token>", "ticketUrl": "https://trindademasas.duckdns.org/api/integration/aero/bridge-tickets/redeem" }
+```
+
+Acciones nuevas (la receta vigente tiene 20 acciones y pasa a 23):
+
+| Nueva | Acción en Shortcuts | Texto y parámetros | Posición |
+| --- | --- | --- | --- |
+| 2 | Obtener valor del diccionario | Clave `ticket`, del diccionario de la entrada | Después de la actual acción 1 («Obtener diccionario de la entrada») |
+| 3 | Obtener valor del diccionario | Clave `ticketUrl`, del diccionario de la entrada | Después de la nueva acción 2 |
+| 4 | Obtener contenido de URL | `POST` a la variable de la acción 3; encabezado `X-Trindade-Ticket` = variable de la acción 2; `Accept: application/json`; sin cuerpo | Después de la nueva acción 3, antes de la actual acción 2 |
+
+Renumeración: las acciones 2–20 actuales pasan a 5–23 y conservan su contenido.
+
+| Actual | Nueva | Acción | Cambio de origen de datos |
+| --- | --- | --- | --- |
+| 1 | 1 | Obtener diccionario de la entrada | ninguno (sigue leyendo lo que la página entrega) |
+| — | **2** | Obtener valor del diccionario `ticket` | nueva |
+| — | **3** | Obtener valor del diccionario `ticketUrl` | nueva |
+| — | **4** | Obtener contenido de URL · POST · cabecera `X-Trindade-Ticket` | nueva: la respuesta es el sobre |
+| 2 | 5 | Obtener valor del diccionario `url` | pasa a leer la **respuesta de la 4** |
+| 3 | 6 | Obtener valor del diccionario `headers` | pasa a leer la **respuesta de la 4** |
+| 4 | 7 | Obtener valor del diccionario `Authorization` (del diccionario de cabeceras) | igual, pero el diccionario viene de la 6 |
+| 5 | 8 | Obtener valor del diccionario `callback` | pasa a leer la **respuesta de la 4** |
+| 6 | 9 | Si · el diccionario de la entrada tiene valor para `bodies` | pasa a leer la **respuesta de la 4** |
+| 7 | 10 | Establecer variable `respostas` como lista vacía | igual |
+| 8 | 11 | Repetir con cada elemento de `bodies` | pasa a leer la **respuesta de la 4** |
+| 9 | 12 | Obtener contenido de URL dentro de la repetición | igual |
+| 10 | 13 | Añadir a variable `respostas` | igual |
+| 11 | 14 | Fin de la repetición | igual |
+| 12 | 15 | Combinar texto `respostas` con coma | igual |
+| 13 | 16 | Texto `[` + resultado + `]` | igual |
+| 14 | 17 | Codificar URL | igual |
+| 15 | 18 | Si no | igual |
+| 16 | 19 | Obtener valor del diccionario `body` como `body_item` | pasa a leer la **respuesta de la 4** |
+| 17 | 20 | Obtener contenido de URL individual | igual |
+| 18 | 21 | Codificar URL | igual |
+| 19 | 22 | Fin del Si | igual |
+| 20 | 23 | Abrir URLs con `callback` + resultado | igual |
+
+Regla única: toda lectura que hoy apunta al «diccionario de la entrada» (acciones 2, 3, 5, 6, 8 y 16 actuales) pasa
+a apuntar a la **respuesta de la nueva acción 4**. El `POST` al ERP, el lote, el `body_item` y el callback no
+cambian.
+
+Caso tolerado: si Shortcuts devuelve la respuesta de la acción 4 como texto y no como diccionario, se agrega una
+acción «Obtener diccionario de la entrada» sobre esa respuesta, inmediatamente después de la acción 4, y las
+lecturas apuntan a esa acción. El contrato del servidor no cambia.
+
+El enlace iCloud existente apunta al Atajo viejo de 20 acciones: queda marcado como **legacy** y no se presenta como
+«listo para instalar». El usuario actualiza su Atajo con este delta una sola vez.
 
 El resto de este documento explica **cómo funciona el ERP por dentro** y por qué se eligió el WebService como
 camino de integración. Para operar la integración no hace falta leerlo completo; para diagnosticar un endpoint o
@@ -478,6 +573,10 @@ que probablemente se hace hoy a mano. Se resuelve con una captura de pantalla de
 | **C** | Usar `Aeromobile` (MySQL + endpoint del proveedor) como bus de datos | ya existe | es del proveedor, orientado a pedidos/catálogo; sin garantía de stock ni de producción; API key de terceros; protocolo móvil propietario (§13) | descartada para escritura |
 | **D** | Importación por archivo/planilla (el ERP lee Excel/CSV en varios módulos) | cero riesgo de esquema | manual, no idempotente, depende del operador | solo como contingencia |
 | **E** | RPA sobre la UI del cliente (automatizar `Estoque Avulso`) | respeta toda la lógica | frágil, requiere sesión Windows, no auditable | última ratio |
+
+> El cofre de la §0.1 **no** es el puente on-prem de la opción B: guarda y cifra la contraseña, pero sigue siendo el
+> Atajo del teléfono el único proceso que alcanza la LAN de la fábrica. La opción B continúa pendiente como servicio
+> en la LAN que hable Firebird por transacción.
 
 **Fase 1 (lectura)**: cualquiera de A/B en modo `SELECT`. **Fase 2 (escritura)**: B, con estas reglas:
 

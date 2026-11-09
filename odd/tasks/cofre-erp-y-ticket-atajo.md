@@ -610,7 +610,7 @@ objetos: si devolviera objetos, el delta dejaría de ser solo la entrada. `probe
 `aero-integration.ts` sino en `lib/aero-connection.ts:61`, y su único consumidor es `AeroIntegrationPanel:200`: al
 retirarlo se elimina el módulo y su prueba, junto con `aero-probe-copy.test.ts`. `requireUsername` existe
 (`auth.middleware.ts:139`) pero no tiene ningún llamador de producción todavía; este módulo es el primero.
-`EXPECTED_PATHS` tiene 66 entradas y pasará a 69 con tres paths nuevos (GET/PUT/DELETE comparten `/settings`).
+`EXPECTED_PATHS` tiene 62 entradas y pasó a 65 con tres paths nuevos (GET/PUT/DELETE comparten `/settings`); medido contra `packages/contracts/openapi.json`, no contado a ojo.
 `db-init.test.ts:32-51` lleva la lista de 18 nombres escrita a mano y hay que extenderla; `schema-version.test.ts:90-96`
 suma las listas por revisión y tiene que incluir `REVISION_TEN_TABLES`. `docs/despliegue.md` usa el literal 9 en el
 título de la sección 6, en la tabla de pasos, en el checklist y en la nota de sesiones.

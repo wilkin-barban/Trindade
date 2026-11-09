@@ -11,6 +11,9 @@ reglas se aplican al importar un asiento. Los contratos exactos de los endpoints
 - La integración es **exclusiva del usuario `wilkin` con rol Administrador**. Para cualquier otro usuario el panel
   no se renderiza, el interruptor no aparece y el backend rechaza la bitácora con `403`. La autoridad es la base
   de datos, no el cuerpo de la petición ni el estado del navegador.
+- **La contraseña del ERP vive en el servidor.** Se escribe una vez en el panel, se guarda cifrada con
+  AES-256-GCM en `aero_integration_settings` y no vuelve nunca al navegador. La web recibe un ticket de un solo
+  uso y el Atajo lo canjea por el sobre del pedido. Cerrar sesión no borra el cofre: solo **Limpiar** lo elimina.
 - **Trindade guarda primero.** El lanzamiento se persiste en Trindade antes de intentar el ERP. Si la empresa no
   responde, la producción no se pierde.
 - **La empresa manda en lo que ya registró.** Un asiento del ERP es de solo lectura en Trindade. Importarlo crea un
@@ -29,7 +32,8 @@ emitir el paquete.
 
 Un atajo de iOS corre como proceso nativo, sin origen de página. Puede hablar HTTP plano contra la IP interna
 cuando el teléfono está en el Wi-Fi de la fábrica. Por eso la web delega el `POST` en el atajo y recibe la respuesta
-por un callback.
+por un callback. Lo que la página le entrega al atajo es un **ticket de un solo uso**, no la credencial: el sobre
+con el `Authorization: Basic` lo arma el servidor, que es el único que puede descifrar la contraseña guardada.
 
 Android no tiene ese problema: la app corre en la red de la planta y llama al WebService directamente, con
 `OkHttp` y Basic Auth leída del almacén cifrado. La configuración release solo permite HTTP hacia
@@ -50,8 +54,12 @@ sequenceDiagram
     UI->>API: POST /api/massas-launch
     API-->>UI: Lanzamiento guardado
     alt Web
+        UI->>API: POST /api/integration/aero/bridge-tickets
+        API-->>UI: { ticket, ticketUrl, expiresAt }
         UI->>Cola: Encola una entrada por producto
         Cola->>Atajo: shortcuts://run-shortcut?name=Aero32 Bridge
+        Atajo->>API: POST /bridge-tickets/redeem + X-Trindade-Ticket
+        API-->>Atajo: Sobre { url, method, headers, body, callback }
         Atajo->>ERP: POST /entradasitem
         ERP-->>Atajo: Respuesta
         Atajo-->>UI: Callback con aero_action=aero_data
@@ -127,17 +135,16 @@ mismo texto para el mismo día.
 ## 4. Configuración en la web
 
 Dentro de **Lanzamiento de Masas**, debajo de la grilla, hay una tarjeta colapsable. Arranca abierta solo cuando
-todavía no hay nada configurado. El panel pide **tres datos obligatorios**:
+todavía no hay nada configurado. El panel pide **tres datos**:
 
-| Campo | Qué es | Validación |
-| --- | --- | --- |
-| URL del WebService | Base del WebService, por ejemplo `http://192.168.25.250:1453/api` | Debe empezar con `http://` o `https://`; se normaliza sin barra final duplicada |
-| Usuario de la empresa | Usuario del WebService | No vacío |
-| Contraseña de la empresa | Contraseña del WebService | No vacía; se muestra enmascarada |
+| Campo | Qué es | Dónde se guarda | Validación |
+| --- | --- | --- | --- |
+| URL del WebService | Base del WebService, por ejemplo `http://192.168.25.250:1453/api` | Servidor (cofre) | Debe empezar con `http://` o `https://` y tener host; máximo 2048 caracteres |
+| Usuario de la empresa | Usuario del WebService | Servidor (cofre) | No vacío; máximo 64 caracteres |
+| Contraseña de la empresa | Contraseña del WebService | Servidor, **cifrada** | No vacía la primera vez; una vacía conserva la guardada |
 
 No hay campo de código de usuario: `ENT_USU` viaja con el **usuario en mayúsculas**, que es lo que manda el binario
-Delphi de `base.apk`. El `CODIGO` numérico que devuelve el ERP se muestra al probar la conexión y queda en la
-bitácora, pero no se pide ni se guarda.
+Delphi de `base.apk`. El `CODIGO` numérico que devuelve el ERP no se pide ni se guarda.
 
 Datos que resuelve el sistema:
 
@@ -148,106 +155,113 @@ Datos que resuelve el sistema:
 | Serie del asiento (`ENT_SER`, `PED_SER`) | Fija en `APL`, la que trae el binario Delphi |
 | Situación tributaria (`PRO_CST`) | `000` (tributada integralmente de fabricación propia) |
 
-Los ajustes viven en el `localStorage` de **ese** iPhone, no en el servidor. Hay que configurar una vez por
-teléfono, y borrar los datos de Safari equivale a borrar la configuración. El botón **Limpiar** hace lo mismo de
-forma explícita, con confirmación.
+El servidor es la autoridad de la configuración. El panel lee `GET /api/integration/aero/settings` al montar y
+muestra **Configurado** cuando `hasPassword` es verdadero. El campo de contraseña arranca **siempre vacío**: nunca se
+rellena desde el servidor, porque el servidor nunca la devuelve ni la devolverá. La frase **«Senha guardada no
+servidor»** es la confirmación de que está ahí.
 
-**La contraseña es la excepción.** No va a `localStorage`, ni a una cookie, ni al servidor: vive en el
-`sessionStorage` de la pestaña que la escribió. Se guarda ahí —y no sólo en memoria— porque cada viaje por el
-atajo vuelve en un documento nuevo, y la lectura del día que sigue a un lanzamiento tiene que salir de ese
-documento. `sessionStorage` es por pestaña y por sesión:
+- Guardar con la contraseña **vacía** conserva la existente: se puede cambiar URL o usuario sin reescribir el
+  secreto. Si no hay contraseña previa y no viene una nueva, el servidor responde `400` con un código accionable
+  (`AERO_VAULT_PASSWORD_REQUIRED`).
+- Guardar con una contraseña **nueva** la reemplaza, cifrada de nuevo.
+- **Limpiar** llama `DELETE /api/integration/aero/settings` y solo entonces limpia el estado local; si falla, la
+  pantalla no miente. Ese borrado elimina también los tickets pendientes del owner.
+- En `localStorage` quedan solo preferencias no secretas: el nombre del atajo, el interruptor de sincronización y
+  la fecha de la última sincronización. La URL y el usuario vienen del servidor.
 
-- sobrevive a una recarga y a la vuelta del atajo **en la misma pestaña**, que es el camino normal;
-- muere cuando se cierra la pestaña;
-- se borra al cerrar sesión en Trindade y con **Limpiar**;
-- una pestaña abierta sin relación con la que lanzó arranca sin ella, y entonces la página pide la contraseña
-  otra vez en vez de fallar en silencio.
+**La contraseña nunca vuelve al navegador.** Ninguna respuesta del API devuelve la contraseña, el ciphertext, el IV
+ni el tag; tampoco se escribe en `localStorage`, en `sessionStorage`, en una cookie, en la bitácora, en un log ni en
+una URL. Lo que la web puede pedir es un **ticket**: 32 bytes aleatorios con 120 s de vida, un solo uso, del que la
+base guarda solo el SHA-256. El Atajo canjea el ticket por el sobre ya armado.
 
-El riesgo que queda es el de cualquier secreto en el navegador: un script que se ejecute en la página puede
-leerlo mientras la pestaña viva. Por eso no se registra en logs, ni en la bitácora, ni en los avisos, y por eso
-el alcance es la pestaña y no el dispositivo. Un cofre del lado del servidor exigiría el puente on-prem, que
-todavía no existe.
+Consecuencia práctica: una pestaña nueva —el callback del Atajo, una pestaña duplicada, otro dispositivo del mismo
+owner— consulta, lanza y lee **sin volver a pedir la contraseña**. El cofre no se borra al cerrar sesión; solo
+**Limpiar** lo elimina.
 
 ## 5. Prueba de conexión
 
 La prueba hace `POST {URL}/usuarios` con Basic Auth y traduce el resultado a una frase útil. La ruta no lleva barra
 final: la barra provocaba un `301` que convertía el `POST` en `GET` y devolvía `405`.
 
-El botón elige solo entre dos caminos:
-
-| Camino | Cuándo | Qué hace |
-| --- | --- | --- |
-| Navegador | La página y el WebService comparten esquema (desarrollo local o WebService HTTPS) | El `fetch` responde en el acto |
-| Atajo | La página es HTTPS y el WebService es HTTP | Abre `Aero32 Bridge` con el sobre de `/usuarios` y vuelve con la respuesta |
-
-En la fábrica el camino real es el atajo: probar "desde el navegador" sería probar una cosa distinta de la que va a
-hacer el lanzamiento.
-
-Resultados del camino navegador:
-
-| Resultado | Significado |
-| --- | --- |
-| `Conectado como …` | Credenciales válidas; muestra el `CODIGO` del ERP |
-| `O WebService respondeu 401: …` | El servidor respondió y rechazó el login |
-| `A rede respondeu, mas o WebService não libera CORS` | La IP es correcta; falta CORS (el atajo no lo necesita) |
-| `Não foi possível alcançar o WebService` | Red, IP o puerto equivocados |
-| `O WebService não respondeu em 8 segundos` | Host alcanzable, sin respuesta |
-
-Resultados del camino atajo:
+El panel no puede armar ese `POST`: no tiene la contraseña ni la alcanza la red de la fábrica. Por eso **Probar
+conexión** pide un ticket de acción `test`; el servidor lo mapea a `/usuarios` y arma el sobre con el
+`Authorization: Basic` descifrado en memoria, y el Atajo hace el `POST` como en cualquier lanzamiento.
 
 | Veredicto | Significado |
 | --- | --- |
 | `success = true` | La empresa respondió y aceptó las credenciales |
-| `success = false` | El endpoint respondió y rechazó el login |
-| Sin veredicto | El operario volvió sin ejecutar el atajo o el atajo se cortó |
+| `success = false` | El endpoint respondió y rechazó el login (`401`) |
+| Sin veredicto | El operario volvió sin ejecutar el atajo, el atajo se cortó o el ticket venció a los 120 s |
 
 Cada intento se registra en la bitácora del backend en dos líneas: `requested` antes de que el teléfono salga y
-`result` cuando vuelve. Una línea `requested` sin `result` significa que el pedido nunca salió del teléfono.
+`result` cuando vuelve. Una línea `requested` sin `result` significa que el pedido nunca salió del teléfono. Ni el
+ticket ni la contraseña aparecen en esas líneas: el ticket viaja solo en el header `X-Trindade-Ticket` del canje.
+
+Si el cofre todavía no tiene contraseña, el panel lo dice con una frase accionable
+(`AERO_VAULT_NOT_CONFIGURED` la primera vez) en vez de fallar en silencio.
 
 ## 6. Atajo `Aero32 Bridge`
 
 Un archivo `.shortcut` tiene que estar firmado por el dispositivo que lo instala, e iOS solo acepta enlaces
 oficiales de iCloud. Por eso el panel entrega los valores copiables y el enlace profundo a la app, no un archivo.
 
-Es **un solo atajo**, con ocho acciones. El nombre debe coincidir exactamente con el que invoca la página; se puede
-cambiar en el panel, campo «nombre del atajo».
+Es **un solo atajo**. El nombre debe coincidir exactamente con el que invoca la página; se puede cambiar en el
+panel, campo «nombre del atajo».
 
-El atajo no sabe de masas ni de stock: recibe un sobre, hace el `POST` y devuelve la respuesta.
+El atajo no sabe de masas ni de stock: recibe un **ticket**, lo canjea por un sobre, hace el `POST` y devuelve la
+respuesta. El diccionario que entrega la página tiene solo dos claves:
+
+```json
+{
+  "ticket": "<token de un solo uso>",
+  "ticketUrl": "https://trindademasas.duckdns.org/api/integration/aero/bridge-tickets/redeem"
+}
+```
+
+El sobre que devuelve el canje es el mismo de siempre, armado por el servidor y con `body` y `bodies` como **texto
+JSON**:
 
 ```json
 {
   "url": "http://192.168.25.250:1453/api/entradasitem",
-  "auth": "Basic d2lsa2luOnNlbmhh",
+  "method": "POST",
+  "headers": { "Authorization": "Basic …", "Content-Type": "application/json", "Accept": "application/json" },
   "body": "{\"PRO_COD\":\"001192\",\"PRO_DES\":\"MASSA QUADRADA\",\"PRO_QTD\":1500,\"PRO_CST\":\"000\",\"ENT_DTA\":\"2026-10-28\",\"ENT_USU\":\"WILKIN\",\"ENT_SER\":\"APL\",\"ENT_OBS\":\"\"}",
   "callback": "https://trindademasas.duckdns.org/massas-launch?aero_action=entrada&aero_data="
 }
 ```
 
-| Clave | Qué es | Dónde se usa |
+| Clave del sobre | Qué es | Dónde se usa |
 | --- | --- | --- |
-| `url` | Endpoint completo, credenciales aparte | Campo URL del `POST` |
-| `auth` | `Authorization: Basic …` en base64, armado en el momento | Encabezado `Authorization` |
+| `url` | Endpoint completo del ERP | Campo URL del `POST` |
+| `method` | Siempre `POST` | Método del pedido |
+| `headers` | `Authorization: Basic …`, `Content-Type` y `Accept` | Encabezados del pedido |
 | `body` | JSON del pedido serializado como texto | Cuerpo de la petición → Texto |
+| `bodies` | Lista de textos JSON, solo en el lote | Cuerpo de cada repetición |
 | `callback` | Vuelta a la página, con la acción ya puesta | Acción Abrir URLs al final |
 
-Receta:
+Receta — la entrada cambia, el resto se conserva:
 
 1. Abrir **Atajos** → `+` y nombrarlo `Aero32 Bridge`.
-2. **Obtener diccionario de la entrada**.
-3. **Obtener valor del diccionario**, clave `url`.
-4. **Obtener valor del diccionario**, clave `auth`.
-5. **Obtener valor del diccionario**, clave `body`.
-6. **Obtener valor del diccionario**, clave `callback`.
-7. **Obtener contenido de URL**: URL = valor `url`; método `POST`; encabezados `Authorization` = valor `auth`,
-   `Content-Type` = `application/json`, `Accept` = `application/json`; cuerpo = `Texto` con el valor `body`.
-8. **Codificar URL** sobre la respuesta.
-9. **Abrir URLs**: valor `callback` + el resultado codificado.
+2. **Obtener diccionario de la entrada** (la página entrega `{ ticket, ticketUrl }`).
+3. **Obtener valor del diccionario**, clave `ticket`.
+4. **Obtener valor del diccionario**, clave `ticketUrl`.
+5. **Obtener contenido de URL**: URL = valor `ticketUrl`; método `POST`; encabezado `X-Trindade-Ticket` = valor
+   `ticket`; `Accept: application/json`; **sin cuerpo**. La respuesta es el sobre.
+6. Desde aquí siguen las acciones del ERP —`url`, `headers`, `Authorization`, `callback`, `bodies`, el `POST` y el
+   callback—, pero leyendo el **sobre devuelto por el canje** en lugar del diccionario de entrada.
+
+El delta numerado completo, con cada acción y su nueva posición, está en
+[integracion-aero32.md §0.2](integracion-aero32.md).
 
 Detalles que importan:
 
-- **El `body` va como texto, no como diccionario.** Si el sobre trajera un objeto y el teléfono lo insertara en el
-  cuerpo, iOS lo convertiría en una lista de propiedades y el ERP recibiría algo que no es JSON.
-- **La credencial viaja en el sobre.** Cambiar la contraseña en la web no obliga a volver a tocar el iPhone.
+- **El `body` del sobre va como texto, no como diccionario.** Si llegara como objeto y el teléfono lo insertara en
+  el cuerpo, iOS lo convertiría en una lista de propiedades y el ERP recibiría algo que no es JSON.
+- **La credencial ya no viaja al teléfono desde la página.** Cambiar la contraseña en el panel no obliga a volver a
+  tocar el iPhone, y el ticket — que sí viaja — vive 120 s, sirve una sola vez y no entrega la contraseña.
+- **El ticket va en el header, no en la URL.** El canje lee `X-Trindade-Ticket`; un ticket en la query quedaría en
+  los logs del proxy, en el historial de Shortcuts y en cualquier captura de red.
 - **La respuesta vuelve por el callback.** La página separa el prefijo, decodifica y lee el cuerpo real. La acción
   viaja en `aero_action`: `entrada`, `saida`, `movimentos` o `test`. Los parámetros se leen y se borran de la URL
   con `replaceState`, así que un *pull-to-refresh* no vuelve a procesar el mismo resultado.
@@ -341,20 +355,39 @@ el operario puede leer. El código decide antes que la frase, porque una frase s
 El resto de los códigos (`MASSAS_INVALID_DATE_FORMAT`, `MASSAS_INVALID_LAUNCH_DATA`, `MASSAS_EMPTY_ITEMS`,
 `MASSAS_INVALID_ID`) siguen la misma regla y tienen su frase en la tabla de i18n de la web.
 
+El cofre y los tickets usan su propia familia, con la misma forma (`code` + frase accionable):
+
+| `code` | HTTP | Cuándo |
+| --- | --- | --- |
+| `AERO_VAULT_NOT_CONFIGURED` | 503 | Falta `AERO_VAULT_KEY` o no hay contraseña usable guardada |
+| `AERO_VAULT_INVALID_SETTINGS` | 400 | URL sin `http://`/`https://` o sin host, o usuario vacío |
+| `AERO_VAULT_PASSWORD_REQUIRED` | 400 | Primera vez, sin contraseña previa y sin una nueva |
+| `AERO_BRIDGE_INVALID_ACTION` | 400 | Acción fuera de `entrada`, `entrada_lote`, `movimentos`, `test` |
+| `AERO_BRIDGE_INVALID_PAYLOADS` | 400 | Cantidad o tamaño de payloads fuera de rango |
+| `AERO_BRIDGE_INVALID_CALLBACK` | 400 | El callback no comparte origen con `PUBLIC_APP_URL` |
+| `AERO_TICKET_MISSING` | 401 | Falta `X-Trindade-Ticket` en el canje |
+| `AERO_TICKET_NOT_FOUND` | 404 | El hash del ticket no existe |
+| `AERO_TICKET_UNUSABLE` | 410 | Ticket ya usado o vencido; la respuesta no distingue cuál de los dos fue |
+
 ## 10. Procedimiento de prueba en fábrica
 
 Antes de ir:
 
 - [ ] `docker compose ps` con `api` y `web` sanos, y `https://trindademasas.duckdns.org` respondiendo 200.
-- [ ] El iPhone tiene el atajo `Aero32 Bridge` creado y **probado a mano** con un sobre de ejemplo.
+- [ ] El iPhone tiene el atajo `Aero32 Bridge` creado y actualizado al delta del ticket (`{ ticket, ticketUrl }`).
+      El enlace iCloud viejo apunta al atajo de 20 acciones y queda marcado como legacy: no sirve como «listo para
+      instalar».
 - [ ] El iPhone está en el Wi-Fi de la fábrica; el atajo no funciona por datos móviles porque la IP es interna.
 
 En la fábrica:
 
 1. Abrir la web en Safari e iniciar sesión como `wilkin`.
-2. **Lanzamiento de Masas → Configuración Integración Empresa**: URL, usuario y contraseña.
-3. **Probar conexión**. El botón abre el atajo con el sobre de `/usuarios`; al volver, la tarjeta dice si la
-   empresa respondió y con qué `CODIGO`. Lo que importa es que no quede en «sin veredicto».
+2. **Lanzamiento de Masas → Configuración Integración Empresa**: URL y usuario; la contraseña se escribe una sola
+   vez y queda cifrada en el servidor. El campo vuelve a aparecer vacío y la tarjeta dice «Senha guardada no
+   servidor».
+3. **Probar conexión**. El botón pide un ticket `test` y abre el atajo, que canjea el ticket por el sobre de
+   `/usuarios`; al volver, la tarjeta dice si la empresa respondió. Lo que importa es que no quede en «sin
+   veredicto».
 4. Cargar **un** producto, una caja, y confirmar con el interruptor **Sincronizar con ERP** activo.
 5. iOS abre el atajo; al volver, la tarjeta de confirmación debe desaparecer y aparecer el resultado.
 6. Cerrar el veredicto y esperar el segundo viaje: iOS abre el atajo de `movimentos`, la página guarda el día y
@@ -368,22 +401,25 @@ En la fábrica:
 
 - El atajo necesita el teléfono en la red de la fábrica; no hay acceso remoto al WebService.
 - Sin retorno del atajo (el operario lo cancela), la página no puede adivinar el resultado: lo pregunta.
-- La configuración es por dispositivo, no por usuario del sistema.
-- La prueba de conexión desde la página HTTPS siempre fallará por diseño; sirve para distinguir «red mal» de
-  «bloqueo del navegador», no para validar credenciales en producción. En ese despliegue la prueba va por el
-  puente.
+- La URL, el usuario y la contraseña viven en el servidor, una vez por instalación. El nombre del atajo, el
+  interruptor de sincronización y la fecha de la última sincronización siguen siendo preferencias del dispositivo.
+- El ticket vive **120 s** y sirve una sola vez. Si el teléfono tarda en volver o el operario repite el canje, el
+  API responde `410` y la página pide un ticket nuevo; el lanzamiento ya está guardado en Trindade y no se pierde.
+- La prueba de conexión ya no sale del navegador: pide un ticket `test` y va por el atajo, igual que un lanzamiento.
 - La respuesta vuelve por la URL del callback: un rango de movimientos muy grande puede superar lo que iOS está
   dispuesto a abrir. Es un motivo más para no pedir historiales largos desde el teléfono.
-- El `sessionStorage` es de la pestaña, no del navegador: si Safari abre la vuelta del atajo en una pestaña
-  distinta de la que lanzó, la contraseña no viaja y la lectura automática no puede salir. La página lo dice y
-  el operario la escribe una vez más; el lanzamiento no se pierde.
+- El `Authorization: Basic` sigue viajando al ERP porque el ERP no ofrece otro mecanismo, y el atajo es el único
+  proceso que habla con la red de la fábrica. Lo que se eliminó es la contraseña del navegador, no el Basic Auth
+  del pedido.
 - La integración no escribe en las tablas fiscales del ERP ni reemplaza la operación de la empresa.
 
 ## 12. Estado de las piezas
 
 | Pieza | Estado |
 | --- | --- |
-| Prueba de conexión `/usuarios` | Implementada |
+| Cofre cifrado del ERP en el servidor (AES-256-GCM) | Implementada |
+| Ticket de un solo uso para el Atajo | Implementada |
+| Prueba de conexión `/usuarios` | Implementada por ticket `test` |
 | Lanzamiento de masas `/entradasitem` | Implementada |
 | Espejo `/movimentoitem` | Implementada |
 | Reporte del día desde el ERP | Implementada |

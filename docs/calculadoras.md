@@ -95,7 +95,7 @@ Ruta web: `/stock-history`. Android: `StockHistoryScreen`.
 - Cada fila conserva el nombre y las unidades por caja **del momento en que se contó**, para que un cambio
   futuro del catálogo no reescriba una contabilidad pasada.
 - `massa_launches` guarda el lanzamiento local y su vínculo con el asiento del ERP (`ent_lan`) cuando existe.
-- El esquema vigente es la **revisión 9**. Las migraciones son explícitas y se ejecutan con la API detenida; ver
+- El esquema vigente es la **revisión 10**. Las migraciones son explícitas y se ejecutan con la API detenida; ver
   [despliegue.md](despliegue.md).
 
 ## 7. Verificación en Android
