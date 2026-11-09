@@ -291,20 +291,20 @@ contenedores ajenos.
 
 ## 6. Tasks
 
-| ID | RED (test que falla primero) | GREEN (cambio mínimo) | Archivos | Aceptación | Riesgo | Rollback |
+| ID | RED (test que falla primero) | GREEN (cambio mínimo) | Archivos | Aceptación | Riesgo | Rollback | Commit |
 | --- | --- | --- | --- | --- | --- | --- |
-| T1 | — (documento) | Este ODD, solo docs | `odd/tasks/cofre-erp-y-ticket-atajo.md` | Existe antes de todo código; commit solo docs | Ninguno | `git revert` del commit |
-| T2 | `vault.crypto.test.ts`: roundtrip, IV/tag distintos, clave de 31/33 bytes rechazada, tampering rechazado, sin plaintext en DB | `vault.crypto.ts` + `resolveVaultKey` y validación de arranque | `modules/integration/vault.crypto.ts`, `server.ts`, tests | Clave inválida no arranca en producción; ciphertext no contiene el plaintext | 3 (contrato de entorno nuevo) | Revertir el commit; sin datos |
-| T3 | `schema-version.test.ts`/`migrations.test.ts`: fresh 10, 9→10, `requiredTablesFor(9)` sin tablas nuevas, 10 no baja, status current | `SCHEMA_VERSION`, tablas, `schema.sql`, `aero-vault-migration.ts`, paso 10 | `db/schema-version.ts`, `db/schema.sql`, `db/migrations.ts`, `db/aero-vault-migration.ts`, tests | Base 9 migra a 10; base 10 se niega a abrir con build 9 | 1 (cambia forma persistida) | Restaurar backup previo |
-| T4 | `aero.settings.routes.test.ts`: 401/403/200, GET sin senha, PUT conserva/reemplaza, 400 sin previa, DELETE 204 | Servicio y rutas de settings | `modules/integration/aero.settings.service.ts`, `aero.vault.schema.ts`, `aero.vault.routes.ts` | Matriz de permisos completa; GET no filtra | 3 (permisos) | Revertir commit; migración queda inofensiva |
-| T5 | `aero.tickets.routes.test.ts`: emisión, TTL, hash, canje, one-time, expirado, header faltante, otro owner, callback inválido, payloads, logs | Servicio y rutas de tickets | `aero.tickets.service.ts`, `aero.vault.routes.ts`, tests | Ningún token ni senha en logs/URL; one-time bajo concurrencia | 4 (concurrencia del canje) | Revertir commit |
-| T6 | `openapi.test.ts` `EXPECTED_PATHS` + route-coverage | Esquemas y registro OpenAPI, artifact | `contracts/openapi.ts`, `contracts/openapi.json`, tests | Gate de contrato en verde | 3 (contrato público) | Revertir artifact y esquemas |
-| T7 | `aero-vault.test.ts`: settings sin senha, GET, PUT vacío, DELETE, purga legacy | `aero-vault.ts` y `aero-integration.ts` sin `password` | `lib/aero-vault.ts`, `lib/aero-integration.ts`, `lib/aero-integration.test.ts` | Ningún secreto en storage; purga verificada; las pruebas que afirmaban la senha en `sessionStorage` se reescriben | 3 (cambio de contrato interno) | Revertir commit |
-| T8 | `AeroIntegrationPanel`/`MassasLaunchPage` tests: campo vacío, trigger por ticket, launch/lote/movimientos/auto-read | Panel, página y diálogo sobre tickets; se retira `probeAeroConnection` del navegador | `pages/massas/AeroIntegrationPanel.tsx`, `pages/MassasLaunchPage.tsx`, `pages/massas/AeroShortcutDialog.tsx`, `lib/aero-connection.ts` (se elimina), `lib/aero-batch.ts`, `lib/aero-mirror.ts`, `pages/massas/aero-bridge-wiring.test.ts`, `aero-probe-copy.test.ts` | Cada camino pide ticket; ningún `Authorization` en cliente; ninguna prueba exige ya el sondeo o el sobre armado en la página | 3 (flujo compartido) | Revertir commit |
-| T9 | E2E dos pestañas + tests i18n | i18n ES/PT y spec de pestaña nueva | `i18n/locales/es.json`, `pt-BR.json`, `__e2e__/aero-vault-new-tab.spec.ts` | Segunda pestaña no pide senha | Ninguno | Revertir commit |
-| T10 | — (docs) | Docs, CHANGELOG y delta del Atajo | `docs/despliegue.md`, `docs/integracion-aero32.md`, `README.md`, `CHANGELOG.md` | Revisión 10 y 20 tablas contadas; delta exacto | Ninguno | Revertir commit |
-| T11 | — | Suites, typecheck, build, CI | — | Todo verde; sin rojos ni pendientes ejecutables | Ninguno | — |
-| T12 | — | Backup, migración y deploy verificados | producción | `db/status` current 10; health; 401 sin token | 1 (datos) | Restaurar backup |
+| T1 | — (documento) | Este ODD, solo docs | `odd/tasks/cofre-erp-y-ticket-atajo.md` | Existe antes de todo código; commit solo docs | Ninguno | `git revert` del commit | 2b6954fd |
+| T2 | `vault.crypto.test.ts`: roundtrip, IV/tag distintos, clave de 31/33 bytes rechazada, tampering rechazado, sin plaintext en DB | `vault.crypto.ts` + `resolveVaultKey` y validación de arranque | `modules/integration/vault.crypto.ts`, `server.ts`, tests | Clave inválida no arranca en producción; ciphertext no contiene el plaintext | 3 (contrato de entorno nuevo) | Revertir el commit; sin datos | 6245617a |
+| T3 | `schema-version.test.ts`/`migrations.test.ts`: fresh 10, 9→10, `requiredTablesFor(9)` sin tablas nuevas, 10 no baja, status current | `SCHEMA_VERSION`, tablas, `schema.sql`, `aero-vault-migration.ts`, paso 10 | `db/schema-version.ts`, `db/schema.sql`, `db/migrations.ts`, `db/aero-vault-migration.ts`, tests | Base 9 migra a 10; base 10 se niega a abrir con build 9 | 1 (cambia forma persistida) | Restaurar backup previo | 9dbe96ad |
+| T4 | `aero.settings.routes.test.ts`: 401/403/200, GET sin senha, PUT conserva/reemplaza, 400 sin previa, DELETE 204 | Servicio y rutas de settings | `modules/integration/aero.settings.service.ts`, `aero.vault.schema.ts`, `aero.vault.routes.ts` | Matriz de permisos completa; GET no filtra | 3 (permisos) | Revertir commit; migración queda inofensiva | 7267723f |
+| T5 | `aero.tickets.routes.test.ts`: emisión, TTL, hash, canje, one-time, expirado, header faltante, otro owner, callback inválido, payloads, logs | Servicio y rutas de tickets | `aero.tickets.service.ts`, `aero.vault.routes.ts`, tests | Ningún token ni senha en logs/URL; one-time bajo concurrencia | 4 (concurrencia del canje) | Revertir commit | 7267723f |
+| T6 | `openapi.test.ts` `EXPECTED_PATHS` + route-coverage | Esquemas y registro OpenAPI, artifact | `contracts/openapi.ts`, `contracts/openapi.json`, tests | Gate de contrato en verde | 3 (contrato público) | Revertir artifact y esquemas | dc475931 |
+| T7 | `aero-vault.test.ts`: settings sin senha, GET, PUT vacío, DELETE, purga legacy | `aero-vault.ts` y `aero-integration.ts` sin `password` | `lib/aero-vault.ts`, `lib/aero-integration.ts`, `lib/aero-integration.test.ts` | Ningún secreto en storage; purga verificada; las pruebas que afirmaban la senha en `sessionStorage` se reescriben | 3 (cambio de contrato interno) | Revertir commit | fd220adb |
+| T8 | `AeroIntegrationPanel`/`MassasLaunchPage` tests: campo vacío, trigger por ticket, launch/lote/movimientos/auto-read | Panel, página y diálogo sobre tickets; se retira `probeAeroConnection` del navegador | `pages/massas/AeroIntegrationPanel.tsx`, `pages/MassasLaunchPage.tsx`, `pages/massas/AeroShortcutDialog.tsx`, `lib/aero-connection.ts` (se elimina), `lib/aero-batch.ts`, `lib/aero-mirror.ts`, `pages/massas/aero-bridge-wiring.test.ts`, `aero-probe-copy.test.ts` | Cada camino pide ticket; ningún `Authorization` en cliente; ninguna prueba exige ya el sondeo o el sobre armado en la página | 3 (flujo compartido) | Revertir commit | fd220adb |
+| T9 | E2E dos pestañas + tests i18n | i18n ES/PT y spec de pestaña nueva | `i18n/locales/es.json`, `pt-BR.json`, `__e2e__/aero-vault-new-tab.spec.ts` | Segunda pestaña no pide senha | Ninguno | Revertir commit | 8414b2b9 |
+| T10 | — (docs) | Docs, CHANGELOG y delta del Atajo | `docs/despliegue.md`, `docs/integracion-aero32.md`, `README.md`, `CHANGELOG.md` | Revisión 10 y 20 tablas contadas; delta exacto | Ninguno | Revertir commit | 75c9f1cf |
+| T11 | — | Suites, typecheck, build, CI | — | Todo verde; sin rojos ni pendientes ejecutables | Ninguno | — pendiente | pendiente |
+| T12 | — | Backup, migración y deploy verificados | producción | `db/status` current 10; health; 401 sin token | 1 (datos) | Restaurar backup pendiente | pendiente |
 
 ## 7. Migración a revisión 10, backup, rollback y verificación de producción
 
@@ -618,3 +618,27 @@ título de la sección 6, en la tabla de pasos, en el checklist y en la nota de 
 L7 — Bloqueo del host, no del diseño: el guard de seguridad de esta sesión rechaza leer o escribir `.env` y
 `.env.example`. Los pasos que dependen de esos dos archivos (S17) quedan como los únicos que pueden requerir una
 autorización explícita del usuario; no se intenta rodear el guard. Todo lo demás del ODD avanza sin ese acceso.
+
+L8 — Correcciones de prueba encontradas al ejecutar, todas del andamiaje y no del producto: el token del invitado se
+firmaba con `sub: 9999`, que no existe, y `authenticate` respondía 401 donde la prueba pedía 403; el conteo de
+auditoría comparaba un objeto de `better-sqlite3` (prototipo nulo) contra un literal con `assert/strict`. El caso
+«migrar dos veces» armaba la base desde `schema.sql` sin estampar y ejecutaba los diez pasos: eso choca con los
+`ALTER TABLE` de los pasos 3 y 4, que no son re-ejecutables sobre columnas ya presentes; acotarlo a la forma de
+revisión 9 deja el caso probando lo que dice probar. Dos pruebas fuera de superficie (`aero-observation.test.ts`,
+`aero-result-dialogs.test.ts`) seguían escaneando símbolos eliminados y se adaptaron al contrato nuevo; ninguna
+afirma ya el sondeo ni el sobre armado en la página.
+
+L9 — Producción, con evidencia y no con supuestos. Backup aprobado
+`backups/recovery-rev10-20261109T164016Z` (snapshot 823296 bytes, SHA-256 `9d61ef2f…0442fc`, set id
+`dd45bde1…f655cc`, `Status: APPROVED FOR ROLLBACK BASELINE`, verificación aislada con `integrity: ok` y los 18
+conteos de fila). Ensayo previo sobre una copia del snapshot con la imagen nueva: 9 `outdated` → `migrate: stamped
+user_version = 10` → 10 `current`, 20 tablas. Ventana real: API detenida, `status.js` → revisión 9/18 tablas,
+`migrate.js` → revisión 10/20 tablas `current` con integridad ok, `docker compose up -d`, API y web `healthy`.
+`GET /api/health` público responde `{"status":"ok"}`; la SPA sirve `Trindade Massas — Operations`; `GET
+/api/integration/aero/settings` sin token → 401; `POST /bridge-tickets/redeem` sin cabecera → 401
+`AERO_TICKET_MISSING` con la frase accionable, y con `GET` → 404. El API arrancó en `NODE_ENV=production` con la
+clave de 44 caracteres, así que la validación de arranque de S4 pasó de verdad: sin ella el proceso no habría
+levantado. Las dos tablas nuevas están en 0 filas: la senha real del ERP no se cargó ni se pidió. Los conteos de
+fila se compararon contra el backup y difieren en `aero_movements` +1 y `massa_launches` +1, con marcas de tiempo
+16:41:02 y 16:41:07, posteriores al backup de 16:40:17 y anteriores a la detención: es tráfico real, no efecto de
+la migración.

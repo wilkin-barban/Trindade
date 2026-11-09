@@ -1069,8 +1069,8 @@ export interface AeroBridgeShortcutRecipe {
   /** The one shortcut the phone must have installed. */
   name: string;
   /**
-   * How many actions the recipe really takes on the phone: five new ones at the head (the input dictionary,
-   * the two reads and the redemption) plus the twenty the certified shortcut already had.
+   * How many actions the recipe really takes on the phone: the input dictionary plus three new ones (the two
+   * reads and the redemption), then the twenty the certified shortcut already had, renumbered from 2–20 to 5–23.
    */
   actionCount: number;
   /**
