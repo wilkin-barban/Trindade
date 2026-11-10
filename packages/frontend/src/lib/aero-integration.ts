@@ -993,11 +993,18 @@ export type AeroBridgeAction = 'entrada' | 'entrada_lote' | 'saida' | 'movimento
  * address, the headers, the body, the callback -- is now the server's answer to that one POST, so nothing
  * about the factory can be read from this page's memory or from the shortcut's input.
  */
-export function buildAeroBridgeTriggerUrl(args: { name: string; ticket: string; ticketUrl: string }): string {
-  return aeroShortcutTriggerUrl({
-    name: args.name,
-    payload: { ticket: args.ticket, ticketUrl: args.ticketUrl },
-  });
+export const AERO_SCRIPTABLE_NAME = 'Aero32Bridge';
+
+/**
+ * The deep link that hands the ticket to Scriptable.
+ *
+ * The name is fixed because the URL scheme addresses the script by it: a script the operator renamed stops
+ * being reachable. Both parameters are encoded, not interpolated, because the ticket is base64url and the
+ * ticket URL carries its own `?` and `&`.
+ */
+export function buildAeroBridgeTriggerUrl(args: { ticket: string; ticketUrl: string }): string {
+  const query = `ticket=${encodeURIComponent(args.ticket)}&ticketUrl=${encodeURIComponent(args.ticketUrl)}`;
+  return `scriptable:///run/${AERO_SCRIPTABLE_NAME}?${query}`;
 }
 
 /**

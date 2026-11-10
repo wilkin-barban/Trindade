@@ -83,14 +83,13 @@ describe('triggering the ERP movements sync', () => {
       callbackPath: '/reports?aero_action=movimentos&aero_data=',
     });
 
-    // What the phone receives: the token and nowhere to redeem it but the API.
-    const url = new URL(launched[0]!.replace('shortcuts://', 'https://shortcut.invalid/'));
-    assert.equal(url.searchParams.get('name'), 'Aero32 Bridge');
-    assert.deepEqual(JSON.parse(url.searchParams.get('text')!), {
-      ticket: 'token',
-      ticketUrl: ticket.ticketUrl,
-    });
+    // Lo que recibe el teléfono: el ticket y la URL del canje, en los dos parámetros del deep link.
+    assert.ok(launched[0]!.startsWith('scriptable:///run/Aero32Bridge?'), launched[0]);
+    const query = new URLSearchParams(launched[0]!.slice(launched[0]!.indexOf('?') + 1));
+    assert.equal(query.get('ticket'), 'token');
+    assert.equal(query.get('ticketUrl'), ticket.ticketUrl);
     assert.equal(launched[0]!.includes('Authorization'), false, 'no credential travels in the deep link');
+    assert.equal(launched[0]!.includes('shortcuts://'), false);
   });
 
   it('answers false and launches nothing when the device has no company access', async () => {

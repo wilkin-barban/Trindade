@@ -89,7 +89,6 @@ export async function triggerAeroMovementsSync(
   }
 
   const url = buildAeroBridgeTriggerUrl({
-    name: settings.shortcutName,
     ticket: ticket.ticket,
     ticketUrl: ticket.ticketUrl,
   });

@@ -514,7 +514,6 @@ export function MassasLaunchPage() {
       });
 
       window.location.href = buildAeroBridgeTriggerUrl({
-        name: aeroSettings.shortcutName,
         ticket: ticket.ticket,
         ticketUrl: ticket.ticketUrl,
       });
@@ -610,7 +609,6 @@ export function MassasLaunchPage() {
     });
 
     window.location.href = buildAeroBridgeTriggerUrl({
-      name: aeroSettings.shortcutName,
       ticket: ticket.ticket,
       ticketUrl: ticket.ticketUrl,
     });

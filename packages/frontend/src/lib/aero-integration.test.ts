@@ -867,24 +867,18 @@ describe('aero-integration: movimento payload for the bridge', () => {
   });
 });
 
-describe('aero-integration: the ticket the shortcut receives', () => {
-  it('hands the shortcut exactly the token and the redeem endpoint, and nothing else', () => {
-    const url = buildAeroBridgeTriggerUrl({
-      name: 'Aero32 Bridge',
-      ticket: 'token-de-un-solo-uso',
-      ticketUrl: 'https://trindademasas.duckdns.org/api/integration/aero/bridge-tickets/redeem',
-    });
-    const parsed = new URL(url);
+describe('aero-integration: the ticket Scriptable receives', () => {
+  it('hands the script exactly the token and the redeem endpoint, and nothing else', () => {
+    const ticketUrl = 'https://trindademasas.duckdns.org/api/integration/aero/bridge-tickets/redeem';
+    const url = buildAeroBridgeTriggerUrl({ ticket: 'token-de-un-solo-uso', ticketUrl });
 
-    assert.equal(parsed.protocol, 'shortcuts:');
-    assert.equal(parsed.searchParams.get('name'), 'Aero32 Bridge');
-    assert.equal(parsed.searchParams.get('input'), 'text');
-    // El diccionario es exactamente dos claves: no hay Authorization, ni body, ni callback que el teléfono
-    // pueda leer de acá, porque el servidor los escribe al canjear el ticket.
-    assert.deepEqual(JSON.parse(parsed.searchParams.get('text') ?? '{}'), {
-      ticket: 'token-de-un-solo-uso',
-      ticketUrl: 'https://trindademasas.duckdns.org/api/integration/aero/bridge-tickets/redeem',
-    });
+    assert.ok(url.startsWith('scriptable:///run/Aero32Bridge?'), url);
+    // El deep link lleva exactamente dos parámetros: no hay Authorization, ni body, ni callback que el
+    // teléfono pueda leer de acá, porque el servidor los escribe al canjear el ticket.
+    const query = new URLSearchParams(url.slice(url.indexOf('?') + 1));
+    assert.deepEqual([...query.keys()], ['ticket', 'ticketUrl']);
+    assert.equal(query.get('ticket'), 'token-de-un-solo-uso');
+    assert.equal(query.get('ticketUrl'), ticketUrl);
   });
 
   it('leaves the data slot open in the callback path, for every action', () => {
