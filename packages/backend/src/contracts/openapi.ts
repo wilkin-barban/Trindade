@@ -1753,14 +1753,14 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
     summary: "Read the ERP vault's configuration without the password",
     description:
       'The ERP password is stored encrypted in SQLite and never leaves the server; this endpoint answers only ' +
-      'whether a password is stored. Exclusive to the `wilkin` owner with the `Administrador` role: the guard ' +
-      'is the server, not the panel. Answers 503 `AERO_VAULT_NOT_CONFIGURED` until `AERO_VAULT_KEY` is present ' +
-      'and a password has been saved.',
+      'whether a password is stored. Per authenticated operator (`Administrador` or `Trabalhador`): each account ' +
+      'reads only its own row. The address remains owner-only in the panel. Answers 503 ' +
+      '`AERO_VAULT_NOT_CONFIGURED` until `AERO_VAULT_KEY` is present and a password has been saved.',
     tags: ['integration'],
     responses: {
       200: jsonResponse('The stored configuration, never the secret', AeroVaultSettingsResponseSchema),
       401: UNAUTHORIZED,
-      403: errorResponse('The caller is not the owner with the administrator role'),
+      403: errorResponse('The caller is not an authenticated plant operator'),
       503: jsonResponse('The vault is not configured on this deployment', ErrorEnvelopeSchema),
     },
   });
@@ -1772,7 +1772,7 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
     description:
       'A non-empty `password` is encrypted with AES-256-GCM and replaces the stored one. An absent or empty ' +
       '`password` keeps the stored secret untouched, so the URL and the user can be changed without retyping ' +
-      'it; a first save with no password is refused. Owner-only, like the read.',
+      'it; a first save with no password is refused. Per authenticated operator, like the read.',
     tags: ['integration'],
     request: jsonRequest(AeroVaultSettingsRequestSchema),
     responses: {
@@ -1782,7 +1782,7 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
         ErrorEnvelopeSchema,
       ),
       401: UNAUTHORIZED,
-      403: errorResponse('The caller is not the owner with the administrator role'),
+      403: errorResponse('The caller is not an authenticated plant operator'),
       503: jsonResponse('The vault is not configured on this deployment', ErrorEnvelopeSchema),
     },
   });
@@ -1790,15 +1790,15 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
   registry.registerPath({
     method: 'delete',
     path: '/api/integration/aero/settings',
-    summary: 'Delete the stored ERP credentials and the pending tickets of the owner',
+    summary: 'Delete the stored ERP credentials and the pending tickets of the authenticated operator',
     description:
-      'Removes the vault row and the owner\'s unused bridge tickets. Signing out does NOT do this: the whole ' +
-      'point of the vault is that the next session and the next tab reuse it. Owner-only.',
+      'Removes the caller\'s vault row and unused bridge tickets. Signing out does NOT do this: the whole ' +
+      'point of the vault is that the next session and the next tab reuse it. Per authenticated operator.',
     tags: ['integration'],
     responses: {
       204: { description: 'Deleted' },
       401: UNAUTHORIZED,
-      403: errorResponse('The caller is not the owner with the administrator role'),
+      403: errorResponse('The caller is not an authenticated plant operator'),
     },
   });
 
@@ -1809,7 +1809,7 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
     description:
       'The server, not the browser, decides the ERP endpoint and serialises the bodies. The token is 32 random ' +
       'bytes, stored only as its SHA-256, valid for 120 seconds and usable once; it never travels in a URL. ' +
-      '`callbackPath` must stay on the origin of `PUBLIC_APP_URL`. Owner-only.',
+      '`callbackPath` must stay on the origin of `PUBLIC_APP_URL`. Per authenticated operator.',
     tags: ['integration'],
     request: jsonRequest(AeroBridgeTicketRequestSchema),
     responses: {
@@ -1819,7 +1819,7 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
         ErrorEnvelopeSchema,
       ),
       401: UNAUTHORIZED,
-      403: errorResponse('The caller is not the owner with the administrator role'),
+      403: errorResponse('The caller is not an authenticated plant operator'),
       503: jsonResponse('The vault is not configured on this deployment', ErrorEnvelopeSchema),
     },
   });

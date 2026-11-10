@@ -8,7 +8,7 @@ import {
 import type { AeroVaultSettingsResponse } from './aero.vault.contract.js';
 
 /**
- * The ERP vault: one row per owner, holding the WebService URL, the ERP user and the password encrypted at rest.
+ * The ERP vault: one row per operator, holding the WebService URL, the ERP user and the password encrypted at rest.
  *
  * The row is never returned as it is stored. Every read path goes through `aeroVaultSettingsResponse`, which
  * reports whether there is a password without ever exposing the ciphertext, the IV or the tag, let alone the
@@ -38,7 +38,7 @@ export interface AeroVaultCredentials {
 
 const TABLE = 'aero_integration_settings';
 
-/** The answer for an owner who never configured the vault. A fresh object each time: callers serialise it. */
+/** The answer for an operator who never configured the vault. A fresh object each time: callers serialise it. */
 function emptySettings(): AeroVaultSettingsResponse {
   return { configured: false, wsUrl: null, username: null, hasPassword: false, updatedAt: null };
 }
@@ -59,7 +59,7 @@ export function isErpWebServiceUrl(value: string): boolean {
   return (parsed.protocol === 'http:' || parsed.protocol === 'https:') && parsed.hostname !== '';
 }
 
-/** The stored row of one owner, or `null` when that owner has not configured the vault yet. */
+/** The stored row of one operator, or `null` when that operator has not configured the vault yet. */
 export function aeroVaultSettingsRow(db: Database.Database, userId: number): AeroVaultSettingsRow | null {
   const row = db.prepare(`SELECT * FROM ${TABLE} WHERE user_id = ?`).get(userId) as AeroVaultSettingsRow | undefined;
   return row ?? null;
@@ -99,7 +99,7 @@ function passwordFromInput(input: AeroVaultSettingsBody): string | null {
 }
 
 /**
- * Save the owner's vault row.
+ * Save the operator's vault row.
  *
  * A non-empty password is encrypted with a fresh IV and replaces all three stored parts, so an old ciphertext
  * cannot survive next to a new tag. An absent password keeps the stored ciphertext byte for byte: the URL or the
@@ -167,10 +167,10 @@ export function saveAeroVaultSettings(
 }
 
 /**
- * Remove the vault row and every bridge ticket of that owner.
+ * Remove the vault row and every bridge ticket of that operator.
  *
  * The tickets go with the vault because a ticket that outlives its settings would redeem into an envelope with
- * no credentials. Other owners' rows are untouched: the cleanup is scoped by `user_id`, never global.
+ * no credentials. Other operators' rows are untouched: the cleanup is scoped by `user_id`, never global.
  */
 export function deleteAeroVaultSettings(db: Database.Database, userId: number): void {
   db.transaction(() => {

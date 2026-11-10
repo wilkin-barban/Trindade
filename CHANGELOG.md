@@ -32,8 +32,10 @@ un solo uso que el script de Scriptable canjea por el sobre del pedido.
   operador toca **Copiar código para Scriptable**, abre Scriptable, toca **+**, pega y renombra el script a
   `Aero32Bridge`. Scriptable se instala desde la App Store (`https://apps.apple.com/app/scriptable/id1405459188`).
   El panel ofrece **Instalar Scriptable no iPhone** y **Copiar código para Scriptable**.
-- **API del cofre:** `GET`, `PUT` y `DELETE /api/integration/aero/settings`, solo para `wilkin` con rol
-  Administrador, y los esquemas Zod y las respuestas del contrato OpenAPI de los tres paths nuevos.
+- **API del cofre:** `GET`, `PUT` y `DELETE /api/integration/aero/settings` para cualquier operador autenticado
+  (`Administrador` o `Trabalhador`), siempre sobre su propia fila por `user_id`; el panel limita la dirección al
+  owner, pero las credenciales las guarda cada trabajador. Incluye los esquemas Zod y las respuestas del contrato
+  OpenAPI de los tres paths nuevos.
 - **Esquema revisión 10**, aditiva: `aero_integration_settings` y `aero_bridge_tickets` con sus índices. El
   inventario pasa de 18 a 20 tablas y la migración `9 → 10` se aplica solo con `db:migrate`, nunca al arrancar.
 
@@ -59,6 +61,9 @@ un solo uso que el script de Scriptable canjea por el sobre del pedido.
 
 ### Corregido
 
+- **La web deja que un trabajador guarde su ERP.** El backend del cofre y de los tickets ya no exige
+  `wilkin` + `Administrador`: cada cuenta usa su propia fila. Masas muestra los controles de lanzamiento y
+  consulta al trabajador, igual que Android. La dirección sigue bloqueada para quien no sea `wilkin`.
 - **La instalación del puente Scriptable es por copia de código, no por descarga.** El `.scriptable` que se servía
   para importar es un JSON; al pegarlo en el editor de Scriptable se ejecutaba el objeto entero y fallaba en el
   primer `:` de `"name"` con `SyntaxError: Unexpected token ':'`. Ahora la página sirve el JavaScript crudo en

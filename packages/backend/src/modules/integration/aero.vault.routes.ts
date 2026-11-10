@@ -1,12 +1,11 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerHookHandler } from 'fastify';
 import { apiError } from '../../utils/api-error.js';
-import { requireRole, requireUsername } from '../auth/auth.middleware.js';
+import { requireRole } from '../auth/auth.middleware.js';
 import { optionalVaultKey } from './vault.crypto.js';
 import {
   AERO_BRIDGE_ERROR_CODES,
   AERO_TICKET_ERROR_CODES,
   AERO_VAULT_ERROR_CODES,
-  AERO_VAULT_OWNER_USERNAME,
   parseAeroBridgeTicketRequest,
 } from './aero.vault.schema.js';
 import {
@@ -27,11 +26,14 @@ import {
 /**
  * The ERP vault and the one-use bridge tickets, mounted inside the plugin registered at /api/integration/aero.
  *
- * Three of the five endpoints are the vault owner's alone: the server, not the panel, decides who may store or
- * read the configuration. Redemption is the exception and it is unauthenticated by design — the ticket is the
- * credential, because the caller is the iPhone shortcut, which has no session. That is also why nothing here
- * audits, logs or echoes a token, a password, an `Authorization` header or a request body: the audit log is
- * readable, and a credential written to a readable place is a leaked credential.
+ * The vault is per operator: each signed-in account reads, writes and clears only the row keyed by its own
+ * `user_id`, so a worker can keep the credentials of the phone in his hand without seeing anyone else's. The
+ * address still belongs to the plant, but the server cannot know which field the UI locked; the panel enforces
+ * that split, while the API guarantees the isolation that matters: one account never reaches another's secret.
+ * Redemption is the exception and it is unauthenticated by design — the ticket is the credential, because the
+ * caller is the iPhone shortcut, which has no session. That is also why nothing here audits, logs or echoes a
+ * token, a password, an `Authorization` header or a request body: the audit log is readable, and a credential
+ * written to a readable place is a leaked credential.
  */
 
 const VAULT_NOT_CONFIGURED_MESSAGE =
@@ -104,15 +106,15 @@ function bridgeTicketFromHeaders(headers: Record<string, string | string[] | und
 
 export async function aeroVaultRoutes(fastify: FastifyInstance) {
   /**
-   * The owner guard, in this order: prove the token, prove the account, prove the role.
+   * Every operator may use the vault of their own phone.
    *
-   * `requireUsername` runs before `requireRole` on purpose: an administrator who is not the owner and a worker
-   * who is neither both get the same 403, so the answer never describes which half was missing.
+   * The guard proves the token and the role; the identity itself comes from `request.user.sub`, never from the
+   * body. `Trabalhador` is included on purpose: Android already lets a worker keep credentials on the device,
+   * and the web cannot ask a worker to hand their ERP password to the administrator's account.
    */
-  const ownerGuard: preHandlerHookHandler[] = [
+  const operatorGuard: preHandlerHookHandler[] = [
     fastify.authenticate,
-    requireUsername(AERO_VAULT_OWNER_USERNAME),
-    requireRole('Administrador'),
+    requireRole('Administrador', 'Trabalhador'),
   ];
 
   /**
@@ -123,7 +125,7 @@ export async function aeroVaultRoutes(fastify: FastifyInstance) {
    */
   fastify.get(
     '/settings',
-    { preHandler: ownerGuard },
+    { preHandler: operatorGuard },
     async (request: FastifyRequest, reply: FastifyReply) => {
       if (vaultKeyForRequest() === null) return vaultNotConfigured(reply);
       return reply.send(readAeroVaultSettings(fastify.db, request.user!.sub));
@@ -138,7 +140,7 @@ export async function aeroVaultRoutes(fastify: FastifyInstance) {
    */
   fastify.put(
     '/settings',
-    { preHandler: ownerGuard },
+    { preHandler: operatorGuard },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const key = vaultKeyForRequest();
       if (key === null) return vaultNotConfigured(reply);
@@ -158,12 +160,13 @@ export async function aeroVaultRoutes(fastify: FastifyInstance) {
   /**
    * DELETE /settings
    *
-   * Clears the vault and this owner's tickets. Deliberately not gated on the vault key: cleaning up after a lost
-   * key must stay possible, and removing a secret never needs to read one. Other owners' tickets are untouched.
+   * Clears this operator's vault and pending tickets. Deliberately not gated on the vault key: cleaning up after
+   * a lost key must stay possible, and removing a secret never needs to read one. Other operators' rows and
+   * tickets are untouched.
    */
   fastify.delete(
     '/settings',
-    { preHandler: ownerGuard },
+    { preHandler: operatorGuard },
     async (request: FastifyRequest, reply: FastifyReply) => {
       deleteAeroVaultSettings(fastify.db, request.user!.sub);
       return reply.status(204).send();
@@ -179,7 +182,7 @@ export async function aeroVaultRoutes(fastify: FastifyInstance) {
    */
   fastify.post(
     '/bridge-tickets',
-    { preHandler: ownerGuard },
+    { preHandler: operatorGuard },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const parsed = parseAeroBridgeTicketRequest(request.body);
       if (!parsed.ok) {

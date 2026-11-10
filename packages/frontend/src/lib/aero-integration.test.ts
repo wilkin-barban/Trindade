@@ -6,7 +6,6 @@ import {
   AERO_SCRIPTABLE_ASSET_PATH,
   AERO_SCRIPTABLE_CODE_PATH,
   AERO_DEFAULT_CST,
-  AERO_INTEGRATION_USERNAME,
   AERO_PENDING_SYNC_STORAGE_KEY,
   AERO_SESSION_PASSWORD_KEY,
   AERO_SETTINGS_STORAGE_KEY,
@@ -34,7 +33,6 @@ import {
   formatAeroProductCode,
   formatAeroQuantity,
   isAeroAllowed,
-  isAeroIntegrationOwner,
   loadAeroPendingSync,
   loadAeroSettings,
   normalizeAeroWsUrl,
@@ -120,7 +118,6 @@ describe('aero-integration: constants & types', () => {
   it('defines expected storage keys, usernames, defaults and timeouts', () => {
     assert.equal(AERO_SETTINGS_STORAGE_KEY, 'trindade.aero.integration.v1');
     assert.equal(AERO_PENDING_SYNC_STORAGE_KEY, 'trindade.aero.pending-sync.v1');
-    assert.equal(AERO_INTEGRATION_USERNAME, 'wilkin');
     assert.equal(AERO_TEST_TIMEOUT_MS, 8000);
     assert.deepEqual(DEFAULT_AERO_SETTINGS, {
       // La dirección de la planta viaja escrita: un teléfono nuevo sólo pregunta quién lanza (S12).
@@ -136,17 +133,13 @@ describe('aero-integration: constants & types', () => {
 });
 
 describe('aero-integration: access control', () => {
-  it('allows only wilkin with Administrador role', () => {
+  it('lets both plant roles use the integration, and nobody else', () => {
     assert.equal(isAeroAllowed({ username: 'wilkin', role: 'Administrador' }), true);
-    assert.equal(isAeroIntegrationOwner({ username: 'wilkin', role: 'Administrador' }), true);
+    assert.equal(isAeroAllowed({ username: 'maria', role: 'Administrador' }), true);
+    assert.equal(isAeroAllowed({ username: 'alice', role: 'Trabalhador' }), true);
+    assert.equal(isAeroAllowed({ username: '', role: 'Trabalhador' }), true);
 
-    // Another admin
-    assert.equal(isAeroAllowed({ username: 'maria', role: 'Administrador' }), false);
-    // Case sensitivity on username
-    assert.equal(isAeroAllowed({ username: 'Wilkin', role: 'Administrador' }), false);
-    // A worker
     assert.equal(isAeroAllowed({ username: 'wilkin', role: 'Operador' }), false);
-    // Null / undefined inputs
     assert.equal(isAeroAllowed(null), false);
     assert.equal(isAeroAllowed(undefined), false);
     assert.equal(isAeroAllowed({ username: '', role: '' }), false);

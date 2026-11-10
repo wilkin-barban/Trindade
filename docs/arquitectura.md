@@ -84,7 +84,7 @@ Directorios de apoyo:
 | `/api/massas-launch/:id` | `PUT`, `DELETE` | Edición y borrado sujetos a autoría y fecha |
 | `/api/integration/aero/log` | `POST` | Bitácora de integración |
 | `/api/integration/aero/movements` | `GET`, `POST` | Espejo de movimientos del ERP |
-| `/api/integration/aero/settings` | `GET`, `PUT`, `DELETE` | Cofre del ERP; solo `wilkin` con rol Administrador |
+| `/api/integration/aero/settings` | `GET`, `PUT`, `DELETE` | Cofre del ERP por operador; la dirección es editable solo por `wilkin` |
 | `/api/integration/aero/bridge-tickets` | `POST` | Emite un ticket de un solo uso para el puente Scriptable |
 | `/api/integration/aero/bridge-tickets/redeem` | `POST` | Canje del ticket; sin JWT por diseño, la credencial es el ticket |
 | `/api/admin/*` | `GET`, `POST`, `PATCH`, `DELETE` | Catálogos, usuarios, vehículos y horarios |
@@ -180,7 +180,7 @@ Revisiones:
 | 10 | Cofre del ERP y tickets de un solo uso |
 
 El servidor no migra al arrancar. La migración es un paso explícito del operador, solo por `db:migrate`; el
-procedimiento está en [despliegue.md](despliegue.md). `aero_integration_settings` guarda una fila por owner con la
+procedimiento está en [despliegue.md](despliegue.md). `aero_integration_settings` guarda una fila por operador con la
 contraseña del ERP cifrada (ciphertext, IV y tag) y `aero_bridge_tickets` guarda solo el **SHA-256** del ticket, su
 acción, el sobre ya serializado y su vencimiento.
 
@@ -258,7 +258,7 @@ sequenceDiagram
 ```
 
 - **Qué protege el cofre.** La contraseña del ERP frente a scripts de la página, al almacenamiento del navegador,
-  a otra pestaña, a otro dispositivo del mismo owner y a la base en claro: en SQLite quedan solo ciphertext, IV y
+  a otra pestaña, a otro dispositivo de la misma cuenta y a la base en claro: en SQLite quedan solo ciphertext, IV y
   tag, y sin `AERO_VAULT_KEY` no se descifra. El token del ticket tampoco se guarda en claro: solo su SHA-256.
 - **Qué sigue expuesto.** El ticket viaja en claro al teléfono —en el deep link que abre Scriptable— y vive
   120 s, sirve una sola vez y no entrega la contraseña sino un sobre ya armado para una acción concreta. El
@@ -267,9 +267,12 @@ sequenceDiagram
   guardar el secreto. El script no registra ni muestra el ticket, el `Authorization` ni ninguna contraseña, y no
   guarda estado. Quien tenga el proceso API y la clave del entorno puede descifrar el cofre: es el mismo nivel de
   acceso que ya permite leer la base.
-- **Quién administra.** `GET`, `PUT` y `DELETE /api/integration/aero/settings` exigen `authenticate`,
-  `requireUsername('wilkin')` y `requireRole('Administrador')`. Ninguna respuesta devuelve la contraseña, el
-  ciphertext, el IV ni el tag. Cerrar sesión no borra el cofre; solo `DELETE /settings` lo elimina.
+- **Quién administra.** `GET`, `PUT` y `DELETE /api/integration/aero/settings`, y `POST
+  /api/integration/aero/bridge-tickets`, exigen `authenticate` + `requireRole('Administrador', 'Trabalhador')`.
+  Cada operador opera solo sobre su propia fila (`user_id`): un trabajador guarda sus credenciales sin ver las del
+  administrador. La dirección de la planta sigue siendo editable solo por `wilkin` en el panel. Ninguna respuesta
+  devuelve la contraseña, el ciphertext, el IV ni el tag. Cerrar sesión no borra el cofre; solo `DELETE /settings`
+  lo elimina.
 - **El canje es sin JWT, por diseño.** `POST /api/integration/aero/bridge-tickets/redeem` lee el ticket del header
   `X-Trindade-Ticket`, nunca de la URL ni de la query. Pide un JWT rompería el caso que este diseño resuelve:
   Scriptable no tiene sesión. La credencial es el ticket bearer de un solo uso, y por eso la respuesta lleva

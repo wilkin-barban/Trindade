@@ -10,7 +10,6 @@ import { aeroTestVerdictFromToken, type AeroTestVerdict } from './aero-test';
 
 export const AERO_SETTINGS_STORAGE_KEY = 'trindade.aero.integration.v1';
 export const AERO_PENDING_SYNC_STORAGE_KEY = 'trindade.aero.pending-sync.v1';
-export const AERO_INTEGRATION_USERNAME = 'wilkin';
 
 export const AERO_TEST_TIMEOUT_MS = 8000;
 
@@ -127,16 +126,17 @@ export function clearAeroSessionPassword(store?: StorageLike | null): void {
 }
 
 /**
- * Access control flag for the Aero32 integration.
- * Strict business rule: exclusive to user 'wilkin' with 'Administrador' role.
+ * Whether this signed-in operator may use the company integration.
+ *
+ * Both roles may: Android already gives a worker the settings screen and the launch controls, and the web's
+ * vault is per user, so a worker saves their own credentials without seeing the administrator's. The address
+ * remains an owner-only field (`aeroSettingsEditable`), which is a different question from access.
  */
 export function isAeroAllowed(
   user: { username?: string | null; role?: string | null } | null | undefined,
 ): boolean {
-  return Boolean(user && user.username === AERO_INTEGRATION_USERNAME && user.role === 'Administrador');
+  return Boolean(user && (user.role === 'Administrador' || user.role === 'Trabalhador'));
 }
-
-export const isAeroIntegrationOwner = isAeroAllowed;
 
 /**
  * Loads the local half of the integration: where the plant is, who launches and how this phone behaves.

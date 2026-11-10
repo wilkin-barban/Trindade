@@ -3,17 +3,15 @@ import { z } from 'zod';
 /**
  * The shapes and the reason codes of the ERP vault and of its one-use bridge tickets.
  *
- * Two literals live here because several layers have to agree on them: the owner whose vault this is, and the
- * header the iPhone shortcut presents. The codes are semantic on purpose — the page branches on the code and
- * shows its own sentence, so a refusal can be explained without the server having to guess at the UI.
+ * The header the iPhone shortcut presents is the only literal that several layers have to agree on. The vault
+ * is per operator: the account comes from the session, never from a username written here. The codes are
+ * semantic on purpose — the page branches on the code and shows its own sentence, so a refusal can be explained
+ * without the server having to guess at the UI.
  *
  * The Zod schemas describe only what the wire must look like. What makes a URL an ERP URL, or how many payloads
  * one action accepts, is decided by the service that owns the rule: that way a refusal carries a code the page
  * can act on instead of a flattened field error.
  */
-
-/** The one account that may administer the vault. The server decides this, never the panel. */
-export const AERO_VAULT_OWNER_USERNAME = 'wilkin';
 
 /** Codes the settings endpoints answer with. */
 export const AERO_VAULT_ERROR_CODES = {

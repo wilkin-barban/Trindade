@@ -6,9 +6,9 @@ const API = 'http://localhost:3099/api';
 /**
  * The one account the company integration belongs to.
  *
- * `isAeroAllowed` asks for `wilkin`, role Administrador: the panel and the sync switch do not exist for
- * anyone else. Every spec that needs them shares this account, because a second spec creating `wilkin` with
- * another password would lock the first one out -- and that is a test collision, not a product defect.
+ * `isAeroAllowed` opens the panel and the sync switch to both plant roles, and the vault is per account. This
+ * helper keeps using the owner because the URL field is owner-only, and a second spec creating `wilkin` with
+ * another password would lock the first one out -- a test collision, not a product defect.
  */
 export const AERO_OWNER = { username: 'wilkin', password: 'wilkin-result-dialogs-2026' } as const;
 
@@ -34,8 +34,8 @@ export async function loginAsAeroOwner(page: Page): Promise<void> {
  * The owner's bearer token, for the API calls the helpers make outside the page's own session.
  *
  * `page.request` does not inherit the `localStorage` that `loginViaApi` seeds, so a helper that has to talk to
- * the API asks for a token of its own. It is the owner's and only the owner's: every vault route is guarded by
- * `requireUsername('wilkin')` plus `requireRole('Administrador')`, and a second account would get a 403.
+ * the API asks for a token of its own. It is the owner's, because the address is owner-only; the vault itself is
+ * per authenticated operator.
  */
 export async function loginAeroOwnerForApi(page: Page): Promise<string> {
   const login = await page.request.post(`${API}/auth/login`, { data: AERO_OWNER });
