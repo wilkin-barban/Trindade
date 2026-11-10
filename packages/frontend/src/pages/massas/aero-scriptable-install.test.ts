@@ -3,13 +3,15 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 /**
- * La pantalla que instala el puente, sin receta.
+ * La pantalla que instala el puente, sin receta y sin descarga.
  *
- * El teléfono ya no arma veintitrés acciones a mano: importa un archivo una vez y desde ahí los botones de
- * Trindade abren Scriptable. Esta prueba lee el diálogo y los dos catálogos, porque lo que hay que sostener es
- * justamente lo que no está escrito: ni una receta numerada, ni un enlace de iCloud, ni una credencial.
+ * Importar el `.scriptable` no funcionó en el iPhone: el archivo se abrió en el editor y Scriptable lo rechazó
+ * por ser JSON. El camino que queda es copiar el JavaScript crudo y pegarlo en un script nuevo; esta prueba
+ * lee el diálogo y el panel para sostener justamente eso -- ni una descarga, ni un enlace al `.scriptable`, ni
+ * una receta numerada, ni una credencial -- y para exigir las dos puertas de la copia.
  */
 const dialog = readFileSync(new URL('./AeroScriptableDialog.tsx', import.meta.url), 'utf8');
+const panel = readFileSync(new URL('./AeroIntegrationPanel.tsx', import.meta.url), 'utf8');
 
 const catalogues = ['es', 'pt-BR'].map((lang) => {
   const json = JSON.parse(
@@ -23,24 +25,60 @@ const usedKeys = new Set(
   [...dialog.matchAll(/t\('massas\.aero\.([A-Za-z0-9_]+)'/g)].map((match) => match[1]),
 );
 
+/** El nombre del bundle, partido para que esta prueba no se delate a sí misma al leer las claves `*.scriptable*`. */
+const BUNDLE_FILE = ['Aero32Bridge', 'scriptable'].join('.');
+
 /** Los controles que abren otra app, que son los que tienen que ser un dedo de alto. */
 const links = [...dialog.matchAll(/<a\b[\s\S]*?className="([^"]*)"/g)].map((match) => match[1]);
 
-describe('aero-scriptable dialog: install Scriptable and import the bridge', () => {
-  it('links to the App Store page and to the importable script, through the shared constants', () => {
-    // Ni una URL escrita a mano: la App Store y el asset son constantes de integración, y una prueba de
-    // `aero-integration.test.ts` fija su valor.
+describe('aero-scriptable dialog: install Scriptable and copy the code', () => {
+  it('no longer downloads the bundle nor points at it', () => {
+    for (const [name, source] of [
+      ['the dialog', dialog],
+      ['the panel', panel],
+    ] as const) {
+      // Una sola puerta de entrada al script: el código copiado. Ni `download`, ni el asset JSON, ni su enlace.
+      assert.equal(/download/i.test(source), false, `${name} still offers a download`);
+      assert.equal(source.includes('AERO_SCRIPTABLE_ASSET_PATH'), false, `${name} still links the bundle`);
+      assert.equal(source.includes(BUNDLE_FILE), false, `${name} still names the bundle file`);
+      assert.equal(source.includes('aero-scriptable-asset'), false, `${name} still carries the bundle control`);
+    }
+  });
+
+  it('links to the App Store page through the shared constant', () => {
+    // Ni una URL escrita a mano: la App Store es una constante de integración, y `aero-integration.test.ts`
+    // fija su valor.
     assert.ok(dialog.includes('href={AERO_SCRIPTABLE_APP_URL}'), 'the App Store link comes from the constant');
     assert.equal(dialog.includes('apps.apple.com'), false, 'the App Store URL is not written inline');
     assert.ok(dialog.includes('data-testid="aero-scriptable-app-store"'));
     assert.ok(dialog.includes('target="_blank"'));
     assert.ok(dialog.includes('rel="noopener noreferrer"'));
+    assert.ok(panel.includes('href={AERO_SCRIPTABLE_APP_URL}'), 'the panel keeps the App Store link');
+    assert.ok(panel.includes('data-testid="aero-scriptable-app-store"'));
+  });
 
-    assert.ok(dialog.includes('href={AERO_SCRIPTABLE_ASSET_PATH}'), 'the asset link comes from the constant');
-    // `download` es lo que hace que el toque baje el archivo en vez de abrirlo como texto plano en Safari.
-    assert.ok(/download=\{?/.test(dialog), 'the asset link downloads the file');
-    assert.ok(dialog.includes('data-testid="aero-scriptable-asset"'));
-    assert.equal(dialog.includes('Aero32Bridge.scriptable"'), false, 'the path is not written inline');
+  it('copies the raw script from state, with the clipboard API and a textarea fallback', () => {
+    // El código se carga al abrir el diálogo: el click no espera un `fetch`.
+    assert.ok(dialog.includes('AERO_SCRIPTABLE_CODE_PATH'), 'the dialog fetches the raw script path');
+    assert.ok(/fetch\(/.test(dialog), 'the dialog loads the code when it opens');
+    assert.ok(/\.then\(/.test(dialog) && /\.text\(\)/.test(dialog), 'the dialog reads the response as text');
+    // Primera puerta: la API del portapapeles, con el texto que ya está en memoria.
+    assert.ok(dialog.includes('navigator.clipboard'), 'the copy uses the clipboard API');
+    assert.ok(/clipboard[\s\S]{0,80}writeText/.test(dialog), 'the copy writes through `writeText`');
+    // Segunda puerta: Safari, con un `textarea` fuera de pantalla y `execCommand`.
+    assert.ok(dialog.includes("document.execCommand('copy')"), 'the fallback uses `execCommand`');
+    assert.ok(dialog.includes('textarea'), 'the fallback builds its own textarea');
+    assert.ok(dialog.includes('data-testid="aero-scriptable-copy"'), 'the copy button has its selector');
+    // Y los dos desenlaces del click se pintan: el éxito y el error accionable.
+    assert.ok(dialog.includes("t('massas.aero.scriptableCopied')"), 'the dialog shows the copied state');
+    assert.ok(dialog.includes("t('massas.aero.scriptableCopyFailed')"), 'the dialog reports a failed copy');
+  });
+
+  it('opens the dialog from the panel instead of downloading anything', () => {
+    // El panel no copia: abre el diálogo, que es el dueño del código y del estado de la copia.
+    assert.ok(panel.includes('data-testid="aero-scriptable-copy-open"'), 'the panel has its own copy entry point');
+    assert.ok(panel.includes("t('massas.aero.scriptableCopyButton')"), 'the entry point offers the copy path');
+    assert.ok(panel.includes('setScriptableOpen(true)'), 'the entry point opens the dialog');
   });
 
   it('keeps the dialog conventions and its own test id', () => {
@@ -53,22 +91,29 @@ describe('aero-scriptable dialog: install Scriptable and import the bridge', () 
 
   it('presents the three steps in the order the phone needs them', () => {
     const install = dialog.indexOf("t('massas.aero.scriptableInstallTitle')");
-    const importStep = dialog.indexOf("t('massas.aero.scriptableImportTitle')");
+    const copy = dialog.indexOf("t('massas.aero.scriptableCopyButton')");
     const back = dialog.indexOf("t('massas.aero.scriptableReturnTitle')");
 
     assert.ok(install > 0, 'the App Store step is rendered');
-    assert.ok(importStep > install, 'importing the file comes after installing the app');
-    assert.ok(back > importStep, 'coming back to Trindade is the last step');
+    assert.ok(copy > install, 'copying the code comes after installing the app');
+    assert.ok(back > copy, 'coming back to Trindade is the last step');
   });
 
-  it('explains the share sheet and the fixed name the deep link addresses', () => {
+  it('teaches the five steps of the copy path, with the fixed name the deep link addresses', () => {
     const scriptName = ['Aero32', 'Bridge'].join('');
     for (const { lang, aero } of catalogues) {
-      const hint = aero.scriptableImportHint ?? '';
-      // El archivo se descarga, se toca y se comparte con Scriptable: no se escribe nada a mano.
-      assert.match(hint, /Compartir|Compartilhar/, `scriptableImportHint in ${lang} names the share step`);
-      assert.match(hint, /Scriptable/, `scriptableImportHint in ${lang} names the app`);
-      assert.ok(hint.includes(scriptName), `scriptableImportHint in ${lang} names the script`);
+      const hint = aero.scriptableCopyHint ?? '';
+      // Copiar, abrir la app, crear el script nuevo, pegar y renombrarlo: el camino que sí funcionó.
+      assert.match(hint, /Copiar|Copie/, `scriptableCopyHint in ${lang} names the copy step`);
+      assert.match(hint, /Scriptable/, `scriptableCopyHint in ${lang} names the app`);
+      assert.ok(hint.includes('+'), `scriptableCopyHint in ${lang} names the new-script button`);
+      assert.match(hint, /peg|col[ae]/i, `scriptableCopyHint in ${lang} names the paste step`);
+      assert.ok(hint.includes(scriptName), `scriptableCopyHint in ${lang} names the script`);
+      assert.match(hint, /renombr|renome/i, `scriptableCopyHint in ${lang} names the rename step`);
+      // Y ninguna de las dos frases que llevaron al editor con el JSON.
+      assert.equal(/[Dd]escarg|[Bb]aixe/.test(hint), false, `scriptableCopyHint in ${lang} still says download`);
+      assert.equal(/Compartir|Compartilhar/.test(hint), false, `scriptableCopyHint in ${lang} still says share`);
+      assert.equal(hint.includes('.scriptable'), false, `scriptableCopyHint in ${lang} still names the bundle`);
     }
   });
 
@@ -81,19 +126,23 @@ describe('aero-scriptable dialog: install Scriptable and import the bridge', () 
   });
 
   it('fits a 375px phone: one column, no sideways scroll and thumb-sized controls', () => {
-    // Cuatro controles tocables: los dos enlaces, «Abrir Scriptable» y «Cerrar».
-    assert.ok(links.length >= 3, `expected the links to be real anchors, saw ${links.length}`);
+    // Tres controles tocables: el enlace a la App Store, «Abrir Scriptable» y «Cerrar»; y el botón de copiar.
+    assert.ok(links.length >= 2, `expected the links to be real anchors, saw ${links.length}`);
     for (const className of links) {
       assert.ok(className.includes('min-h-[44px]'), `a link lost its 44px floor: ${className}`);
       assert.ok(className.includes('w-full'), `a link does not fill the column: ${className}`);
     }
+    // El botón de copiar es el control central del paso 2: también un dedo de alto y todo el ancho.
+    const copyButton = dialog.slice(dialog.indexOf('data-testid="aero-scriptable-copy"'));
+    assert.ok(copyButton.slice(0, 400).includes('min-h-[44px]'), 'the copy button keeps its 44px floor');
+    assert.ok(copyButton.slice(0, 400).includes('w-full'), 'the copy button fills the column');
     assert.equal(/w-\[\d+px\]/.test(dialog), false, 'no fixed pixel width that could overflow at 375px');
     assert.equal(/overflow-x/.test(dialog), false, 'no horizontal scroller');
     // Un solo scroll: la cabecera y los botones quedan quietos y el cuerpo se desplaza.
     assert.ok(dialog.includes('overflow-y-auto'));
   });
 
-  it('carries no action recipe, no copy buttons and no credential', () => {
+  it('carries no action recipe, no share sheet and no credential', () => {
     for (const retired of [
       'shortcutStep',
       'StepItem',
@@ -101,7 +150,6 @@ describe('aero-scriptable dialog: install Scriptable and import the bridge', () 
       'shortcutIcloud',
       'iCloud',
       'shortcutCopy',
-      'navigator.clipboard',
       'Authorization',
       'password',
       'acceso directo',
@@ -182,6 +230,10 @@ describe('aero-scriptable dialog: install Scriptable and import the bridge', () 
       'shortcutStepSingleEncode',
       'shortcutStepEndIf',
       'shortcutStepBack',
+      // Y las tres frases que describían la descarga y el uso compartido del `.scriptable`.
+      'scriptableImportTitle',
+      'scriptableImportHint',
+      'scriptableImportButton',
     ];
     for (const { lang, aero } of catalogues) {
       for (const key of retired) {
@@ -195,11 +247,16 @@ describe('aero-scriptable dialog: install Scriptable and import the bridge', () 
       for (const [key, value] of Object.entries({ ...aero, ...device })) {
         assert.equal(/Atajo|Atalho/i.test(value), false, `massas.aero.${key} in ${lang} still names the old app`);
         assert.equal(/iCloud/i.test(value), false, `massas.aero.${key} in ${lang} still points at iCloud`);
+        // Ninguna frase del catálogo vuelve a ofrecer la descarga del bundle.
+        assert.equal(/\.scriptable/i.test(value), false, `massas.aero.${key} in ${lang} still names the bundle`);
       }
       // Las tres frases que la persona ve al instalar, probar y sincronizar nombran la app que corre el script.
       for (const key of ['shortcutTitle', 'shortcutIntro', 'shortcutOpenApp', 'testShortcutOpening', 'syncSent']) {
         assert.match(aero[key] ?? '', /Scriptable/, `massas.aero.${key} in ${lang} must name Scriptable`);
       }
+      // Y la ayuda del panel explica el camino de copiar, con la contraseña en el cofre del servidor.
+      assert.match(aero.scriptablePanelHint ?? '', /copi/i, `scriptablePanelHint in ${lang} names the copy path`);
+      assert.match(aero.scriptablePanelHint ?? '', /servidor/i, `scriptablePanelHint in ${lang} says where the password lives`);
     }
   });
 });

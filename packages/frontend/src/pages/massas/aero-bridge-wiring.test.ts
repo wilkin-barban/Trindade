@@ -147,14 +147,18 @@ describe('aero bridge wiring: every door opens Scriptable', () => {
     assert.ok(panel.includes("from './AeroScriptableDialog'"));
     assert.ok(panel.includes('<AeroScriptableDialog'));
     assert.equal(panel.includes('AeroShortcutDialog'), false);
+    // El diálogo es el único lugar que copia: el panel no toca el portapapeles.
+    assert.equal(panel.includes('clipboard'), false, 'the panel must not own the copy');
   });
 
-  it('offers the App Store, the importable file and the instructions in the panel', () => {
-    // Los tres controles del camino nuevo, y ninguno de ellos pide armar acciones a mano.
+  it('offers the App Store, the copy entry point and the instructions in the panel', () => {
+    // Los tres controles del camino nuevo, y ninguno de ellos descarga un archivo ni pide armar acciones.
     assert.ok(panel.includes('AERO_SCRIPTABLE_APP_URL'));
-    assert.ok(panel.includes('AERO_SCRIPTABLE_ASSET_PATH'));
     assert.ok(panel.includes('data-testid="aero-scriptable-app-store"'));
-    assert.ok(panel.includes('data-testid="aero-scriptable-asset"'));
+    // La copia la hace el diálogo: el panel sólo lo abre, así que el asset JSON ya no aparece por acá.
+    assert.ok(panel.includes('data-testid="aero-scriptable-copy-open"'));
+    assert.equal(panel.includes('AERO_SCRIPTABLE_ASSET_PATH'), false, 'the panel no longer links the bundle');
+    assert.equal(panel.includes('data-testid="aero-scriptable-asset"'), false, 'the download control is gone');
     // El botón de instrucciones conserva su selector -- otras vistas lo consultan -- y abre el diálogo nuevo.
     assert.ok(panel.includes('data-testid="aero-shortcut-open"'));
     assert.ok(panel.includes('setScriptableOpen(true)'));
