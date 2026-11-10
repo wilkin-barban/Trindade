@@ -38,6 +38,9 @@ test.describe('Admin Edit & Export (Phase 4)', () => {
     await cleanTodayReports(page);
   });
   test('4.1 admin creates a category, edits a report, and sees export buttons', async ({ page }) => {
+    // This one walks the whole chain -- category, report builder, edit, export -- through the UI, and takes
+    // ~27 s on a quiet machine. The default 30 s made it fail only when the rest of the suite was running.
+    test.setTimeout(90_000);
     // --- Step 1: Login as admin and create a new category via API ---
     await goToProtected(page, '/');
 
