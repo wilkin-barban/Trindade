@@ -104,7 +104,7 @@ release.
 | T8 | paridad ES/PT | i18n | `i18n/locales/es.json`, `pt-BR.json` | Mismas claves, textos nuevos | Ninguno | Revertir commit | pendiente | 2041cacf |
 | T9 | e2e: diálogo nuevo y aviso de error a 375 px | specs | `__e2e__/aero-scriptable-dialog.spec.ts`, aviso de error | Copia, sin descarga, aviso visible | Ninguno | Revertir commit | pendiente | 7efbc53d |
 | T10 | — | Docs y CHANGELOG | `docs/…`, `README.md`, `AGENTS.md`, `CHANGELOG.md` | Instalación por copia y red documentadas | Ninguno | Revertir commit | pendiente | d14d8909 |
-| T11 | — | Suites, typecheck, build, contrato, E2E | — | Todo verde | Ninguno | — | pendiente | pendiente |
+| T11 | — | Suites, typecheck, build, contrato, E2E | — | Todo verde | Ninguno | — | d32f0dc3 | pendiente |
 | T12 | — | Imagen `web` y verificación en producción | producción | `web` healthy, `/Aero32Bridge.js` con hash, UI nueva | 5 (despliegue) | Volver a la imagen anterior | pendiente | pendiente |
 
 ## Log
@@ -255,3 +255,12 @@ L4 — Riesgo. El nuevo callback de error debe limpiarse igual que los demás: s
 refresh reabre el aviso; si borra la cola, se pierde trabajo del operador. Las pruebas fijan las dos cosas. El resto
 del riesgo es de entrega: el asset crudo tiene que ser byte a byte el mismo texto que el `.scriptable` embebe, y el
 build lo verifica.
+
+L5 — Cierre medido. `test:node` 623/623, `test:unit` 139/139, `tsc --noEmit` limpio, `npm run build` con
+`dist/Aero32Bridge.js` y `dist/Aero32Bridge.scriptable` idénticos a los de `public/`. E2E **117/117**. Costó tres
+corridas completas: las dos primeras fallaron por carreras del propio arnés, no del producto. `triggerAeroSync` ahora
+espera la respuesta del ticket antes de escribir la cola, así que un test que leía la cola en el click veía cero en
+vuelo; y el lanzamiento deja `window.location` apuntando a `scriptable:///run/…`, que Chromium cancela, de modo que
+el `goto` del callback competía con ese aborto. El arnés espera la cola y carga la pantalla limpia antes de entregar
+la respuesta. `admin-edit-export` recibió 90 s porque su recorrido completo por UI tarda ~27 s y el límite de 30 s
+lo hacía fallar solo con la suite cargada.
