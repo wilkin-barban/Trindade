@@ -1,7 +1,7 @@
 /**
  * How many products travel in one ticket to the company ERP.
  *
- * The trip still rides inside a `shortcuts://x-callback-url` deep link, which is a URL, not a channel: the
+ * The trip still rides inside a `scriptable:///run/Aero32Bridge` deep link, which is a URL, not a channel: the
  * ticket itself is small, but the audit line and the shortcut's own batch branch read the payloads in order,
  * and a whole day of twenty products in one trip is a link iOS opens as a bet. Eight has been the ceiling the
  * factory certified and it stays.

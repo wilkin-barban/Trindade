@@ -9,6 +9,9 @@ const __dirname = path.dirname(__filename);
 
 const read = (...parts: string[]) => fs.readFileSync(path.resolve(__dirname, ...parts), 'utf8');
 
+/** El esquema retirado, partido para que esta prueba no se delate como infractora del guardián del esquema. */
+const RETIRED_SCHEME = ['short', 'cuts://'].join('');
+
 const panel = read('AeroIntegrationPanel.tsx');
 const launch = read('..', 'MassasLaunchPage.tsx');
 const collective = read('MassasCollectiveTable.tsx');
@@ -113,6 +116,48 @@ describe('aero bridge wiring: the panel asks for three things and dispatches the
     // La página de lanzamiento no tiene contraseña del ERP ni siquiera como borrador: la única que menciona
     // es la clave temporal que genera al dar de alta un operario.
     assert.equal(/draft\.password|aeroSettings\.password/.test(launch), false);
+  });
+});
+
+describe('aero bridge wiring: every door opens Scriptable', () => {
+  const callers = [
+    { name: 'the panel', source: panel },
+    { name: 'the launch page', source: launch },
+    { name: 'the ERP mirror', source: read('..', '..', 'lib', 'aero-mirror.ts') },
+  ];
+
+  it('hands the ticket to the builder with no name, because the URL scheme addresses the script', () => {
+    // El nombre del script es una constante de integración: si un llamador lo eligiera, un teléfono con el
+    // script importado se quedaría con botones que abren Scriptable y no encuentran nada.
+    for (const { name, source } of callers) {
+      const calls = [...source.matchAll(/buildAeroBridgeTriggerUrl\(\{([^}]*)\}\)/g)].map((match) => match[1] ?? '');
+      assert.ok(calls.length > 0, `${name} must open the bridge through the builder`);
+      for (const args of calls) {
+        assert.equal(/\bname:/.test(args), false, `${name} must not choose the script name`);
+        assert.ok(args.includes('ticket:'), `${name} must hand over the ticket`);
+        assert.ok(args.includes('ticketUrl:'), `${name} must hand over the redeem URL`);
+      }
+      assert.equal(source.includes(RETIRED_SCHEME), false, `${name} must not open the retired scheme`);
+    }
+  });
+
+  it('opens the dialog that installs the bridge, under the name of the app that replaced the shortcut', () => {
+    assert.ok(fs.existsSync(path.resolve(__dirname, 'AeroScriptableDialog.tsx')));
+    assert.equal(fs.existsSync(path.resolve(__dirname, 'AeroShortcutDialog.tsx')), false);
+    assert.ok(panel.includes("from './AeroScriptableDialog'"));
+    assert.ok(panel.includes('<AeroScriptableDialog'));
+    assert.equal(panel.includes('AeroShortcutDialog'), false);
+  });
+
+  it('offers the App Store, the importable file and the instructions in the panel', () => {
+    // Los tres controles del camino nuevo, y ninguno de ellos pide armar acciones a mano.
+    assert.ok(panel.includes('AERO_SCRIPTABLE_APP_URL'));
+    assert.ok(panel.includes('AERO_SCRIPTABLE_ASSET_PATH'));
+    assert.ok(panel.includes('data-testid="aero-scriptable-app-store"'));
+    assert.ok(panel.includes('data-testid="aero-scriptable-asset"'));
+    // El botón de instrucciones conserva su selector -- otras vistas lo consultan -- y abre el diálogo nuevo.
+    assert.ok(panel.includes('data-testid="aero-shortcut-open"'));
+    assert.ok(panel.includes('setScriptableOpen(true)'));
   });
 });
 

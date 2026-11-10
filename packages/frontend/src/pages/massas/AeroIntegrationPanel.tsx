@@ -9,6 +9,9 @@ import {
   aeroEndpoint,
   aeroMissingSetup,
   aeroSettingsReady,
+  AERO_SCRIPTABLE_APP_URL,
+  AERO_SCRIPTABLE_ASSET_PATH,
+  AERO_SCRIPTABLE_NAME,
   buildAeroBridgeTriggerUrl,
   clearAeroSettings,
   DEFAULT_AERO_SETTINGS,
@@ -36,7 +39,7 @@ import {
   loadAeroTestOutcome,
   type AeroTestOutcome,
 } from '../../lib/aero-test';
-import { AeroShortcutDialog } from './AeroShortcutDialog';
+import { AeroScriptableDialog } from './AeroScriptableDialog';
 import { AeroDeviceBanner } from '../../components/aero/AeroDeviceBanner';
 import { useDevice } from '../../contexts/DeviceContext';
 import { canControlAero } from '../../lib/device-detection';
@@ -83,7 +86,7 @@ const EMPTY_VAULT: AeroVaultSettings = {
  *
  * The panel owns three operations and each one is a round trip: read the vault, write it, delete it. The
  * connection test is no longer a request from the browser -- Safari cannot reach the plant's LAN from an HTTPS
- * page -- so it asks for a `test` ticket and lets the shortcut prove the credentials server side.
+ * page -- so it asks for a `test` ticket and lets Scriptable prove the credentials server side.
  */
 export function AeroIntegrationPanel({
   settings,
@@ -99,7 +102,7 @@ export function AeroIntegrationPanel({
   // sí la tiene. Los permisos por rol siguen aplicando encima de esto.
   const device = useDevice();
   const deviceLimited = !canControlAero(device);
-  // El atajo vuelve siempre a la pantalla de lanzamiento; cuando el panel vive en el Panel Admin, el veredicto
+  // El puente vuelve siempre a la pantalla de lanzamiento; cuando el panel vive en el Panel Admin, el veredicto
   // llega por almacenamiento y no por props.
   const [storedOutcome, setStoredOutcome] = useState<AeroTestOutcome | null>(() =>
     testOutcome === undefined ? loadAeroTestOutcome() : null,
@@ -123,7 +126,7 @@ export function AeroIntegrationPanel({
   const noticeRef = useRef<HTMLParagraphElement | null>(null);
   /** Un veredicto que llegó del teléfono pide scroll: el aviso nace fuera de la pantalla. */
   const scrollToNotice = useRef(false);
-  const [shortcutOpen, setShortcutOpen] = useState(false);
+  const [scriptableOpen, setScriptableOpen] = useState(false);
 
   /**
    * The integration as the server sees it, merged over what this phone remembers locally.
@@ -236,7 +239,7 @@ export function AeroIntegrationPanel({
    * The connection test, in the only channel that can reach the WebService.
    *
    * The browser cannot: it never has the password and Safari refuses a plain-HTTP target from an HTTPS page.
-   * The shortcut redeems a `test` ticket, rings `/usuarios/`, reads the `success` field and comes back with it.
+   * Scriptable redeems a `test` ticket, rings `/usuarios/`, reads the `success` field and comes back with it.
    * The attempt is written before the phone leaves, because a test that never reports is still a fact.
    */
   const handleTest = async () => {
@@ -573,13 +576,13 @@ export function AeroIntegrationPanel({
           </Button>
           <Button
             type="button"
-            onClick={() => setShortcutOpen(true)}
+            onClick={() => setScriptableOpen(true)}
             disabled={deviceLimited}
             variant="outline"
             className="min-h-[44px] w-full sm:w-auto font-semibold"
             data-testid="aero-shortcut-open"
           >
-            {t('massas.aero.shortcut')}
+            {t('massas.aero.scriptableHelpButton')}
           </Button>
           <Button
             type="button"
@@ -590,6 +593,35 @@ export function AeroIntegrationPanel({
           >
             {t('massas.aero.clear')}
           </Button>
+        </div>
+
+        {/* El proceso nativo se instala una vez, en dos pasos: la app y el archivo. Se explica debajo de las
+            acciones porque es lo primero que hay que resolver cuando un botón abre una app sin el script. */}
+        <div
+          className="space-y-2 rounded-lg border border-gray-200 bg-gray-50 p-3"
+          data-testid="aero-scriptable-card"
+        >
+          <p className="text-xs leading-relaxed text-gray-600">{t('massas.aero.scriptablePanelHint')}</p>
+          <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
+            <a
+              href={AERO_SCRIPTABLE_APP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="aero-scriptable-app-store"
+              className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-center text-sm font-semibold text-gray-700 hover:bg-gray-100 sm:w-auto"
+            >
+              {t('massas.aero.shortcut')}
+            </a>
+            {/* `download` baja el archivo al teléfono: se toca en Archivos y se comparte con Scriptable. */}
+            <a
+              href={AERO_SCRIPTABLE_ASSET_PATH}
+              download={`${AERO_SCRIPTABLE_NAME}.scriptable`}
+              data-testid="aero-scriptable-asset"
+              className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-center text-sm font-semibold text-gray-700 hover:bg-gray-100 sm:w-auto"
+            >
+              {t('massas.aero.scriptableImportButton')}
+            </a>
+          </div>
         </div>
       </div>
 
@@ -602,7 +634,7 @@ export function AeroIntegrationPanel({
         testId="aero-test-result-modal"
       />
 
-      <AeroShortcutDialog open={shortcutOpen} onClose={() => setShortcutOpen(false)} settings={effective} />
+      <AeroScriptableDialog open={scriptableOpen} onClose={() => setScriptableOpen(false)} />
     </Card>
   );
 }

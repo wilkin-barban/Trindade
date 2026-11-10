@@ -1,8 +1,8 @@
 /**
  * Pure client module for Aero32 company WebService integration.
  *
- * Keeps device-local settings, request envelopes, payload builders, and iOS shortcut triggers
- * separate from React and UI layers.
+ * Keeps device-local settings, request envelopes, payload builders, and the iOS Scriptable trigger separate
+ * from React and UI layers.
  */
 
 import { clearAeroAutoRead } from './aero-auto-read';
@@ -12,32 +12,6 @@ export const AERO_SETTINGS_STORAGE_KEY = 'trindade.aero.integration.v1';
 export const AERO_PENDING_SYNC_STORAGE_KEY = 'trindade.aero.pending-sync.v1';
 export const AERO_INTEGRATION_USERNAME = 'wilkin';
 
-/**
- * The one shortcut: a bridge that redeems a one-time ticket and performs the ERP call the server described.
- *
- * The factory's phone never installs a credential. The page asks the server for a ticket, the shortcut trades
- * it for the request the ERP expects, and the password stays encrypted in the vault -- so the browser cannot
- * reach the plant's LAN, cannot read the secret and cannot mint a request of its own.
- */
-export const AERO_DEFAULT_BRIDGE_SHORTCUT_NAME = 'Aero32 Bridge';
-
-/**
- * The shortcut Wilkin built and certified on his own iPhone, for the twenty-action bridge.
- *
- * It is legacy: the ticket flow needs three actions at the head of the recipe that this link does not have,
- * so installing it as is produces a shortcut that never redeems a ticket. It stays here because it documents
- * the twenty actions the delta builds on, and the dialog presents it as the old version, not as an install.
- */
-export const AERO_SHORTCUT_ICLOUD_URL =
-  'https://www.icloud.com/shortcuts/3216695a428f42539fec7abbd5419f34';
-
-/**
- * The name the split design used for the launch shortcut, kept only as the key of the settings migration.
- *
- * A phone that stored it gets {`Aero32 Bridge` instead, because that shortcut no
- * longer exists in the factory's phone.
- */
-export const AERO_DEFAULT_SHORTCUT_NAME = 'Aero32 Estoque';
 export const AERO_TEST_TIMEOUT_MS = 8000;
 
 /**
@@ -91,7 +65,6 @@ export interface AeroSettings {
   username: string;
   /** What `GET /integration/aero/settings` said about the vault of this owner. */
   hasPassword: boolean;
-  shortcutName: string;
   syncEnabled: boolean;
   lastSyncAt: string | null;
 }
@@ -103,7 +76,6 @@ export const DEFAULT_AERO_SETTINGS: AeroSettings = {
   wsUrl: AERO_DEFAULT_WS_URL,
   username: '',
   hasPassword: false,
-  shortcutName: AERO_DEFAULT_BRIDGE_SHORTCUT_NAME,
   syncEnabled: false,
   lastSyncAt: null,
 };
@@ -167,24 +139,12 @@ export function isAeroAllowed(
 export const isAeroIntegrationOwner = isAeroAllowed;
 
 /**
- * Resolves a stored shortcut name, migrating the ones the split design wrote.
- *
- * The page used to trigger two shortcuts that the factory no longer has on its phone. A stored name that is
- * exactly one of those legacy defaults is not a choice the operator made, so it becomes the bridge; any other
- * name was typed on purpose and survives verbatim.
- */
-function aeroShortcutName(parsed: unknown, legacyDefault: string): string {
-  const name = typeof parsed === 'string' && parsed.trim() ? parsed.trim() : '';
-  if (!name || name === legacyDefault) return AERO_DEFAULT_BRIDGE_SHORTCUT_NAME;
-  return name;
-}
-
-/**
  * Loads the local half of the integration: where the plant is, who launches and how this phone behaves.
  *
  * The secret is not part of it and cannot be: `hasPassword` starts false and only the vault read raises it.
  * A legacy `password` key found in the payload is dropped on the way through, and the old `sessionStorage`
- * entry is deleted without ever being read.
+ * entry is deleted without ever being read. A legacy `shortcutName` is not migrated either: it is simply not
+ * part of the shape any more, because the script's name is fixed by the URL scheme that addresses it.
  */
 export function loadAeroSettings(
   storage?: Pick<Storage, 'getItem'> | StorageLike | null,
@@ -216,7 +176,6 @@ export function loadAeroSettings(
       username: typeof parsed.username === 'string' ? parsed.username : DEFAULT_AERO_SETTINGS.username,
       // Never read from the payload: the vault is the only authority on whether a password exists.
       hasPassword: false,
-      shortcutName: aeroShortcutName(parsed.shortcutName, AERO_DEFAULT_SHORTCUT_NAME),
       syncEnabled:
         typeof parsed.syncEnabled === 'boolean' ? parsed.syncEnabled : DEFAULT_AERO_SETTINGS.syncEnabled,
       lastSyncAt: typeof parsed.lastSyncAt === 'string' ? parsed.lastSyncAt : null,
@@ -239,7 +198,6 @@ export function saveAeroSettings(
   const persisted = {
     wsUrl: settings.wsUrl,
     username: settings.username,
-    shortcutName: settings.shortcutName,
     syncEnabled: settings.syncEnabled,
     lastSyncAt: settings.lastSyncAt,
   };
@@ -991,9 +949,25 @@ export type AeroBridgeAction = 'entrada' | 'entrada_lote' | 'saida' | 'movimento
  * The dictionary is exactly `{ ticket, ticketUrl }`: the token lives 120 s, burns on the first redemption and
  * carries no credential of its own. Everything the phone used to read out of an envelope built here -- the
  * address, the headers, the body, the callback -- is now the server's answer to that one POST, so nothing
- * about the factory can be read from this page's memory or from the shortcut's input.
+ * about the factory can be read from this page's memory or from the script's arguments.
  */
 export const AERO_SCRIPTABLE_NAME = 'Aero32Bridge';
+
+/**
+ * The App Store page of Scriptable, the app that runs the bridge on the phone.
+ *
+ * It is Scriptable and not Atajos because the bridge is a file the phone imports once, not twenty-three
+ * actions somebody builds by hand. The web only offers the door; the app is Apple's.
+ */
+export const AERO_SCRIPTABLE_APP_URL = 'https://apps.apple.com/app/scriptable/id1405459188';
+
+/**
+ * The importable script, served from this app's own `public/` so the build copies it to `dist/`.
+ *
+ * A root-relative path, not an absolute URL: the same page can be served under whatever `VITE_APP_BASE` the
+ * deployment chose, and the asset travels with it.
+ */
+export const AERO_SCRIPTABLE_ASSET_PATH = '/Aero32Bridge.scriptable';
 
 /**
  * The deep link that hands the ticket to Scriptable.
@@ -1064,7 +1038,7 @@ function aeroInternalRoute(path: string | undefined): { path: string; query: str
 /**
  * The callback the running page has to come back to, for one action.
  *
- * The panel's test, the dialog's recipe and every launch build the same path from the page they are on, so the
+ * The panel's test, the dialog and every launch build the same path from the page they are on, so the
  * derivation lives here instead of being retyped in three places. It answers with a path: the owner of the
  * absolute URL is the server, which is the only side that knows `PUBLIC_APP_URL`.
  */
@@ -1072,86 +1046,11 @@ export function aeroBridgeCallbackFor(action: AeroBridgeAction, path?: string): 
   return aeroBridgeCallbackPath({ action, path });
 }
 
-export interface AeroBridgeShortcutRecipe {
-  /** The one shortcut the phone must have installed. */
-  name: string;
-  /**
-   * How many actions the recipe really takes on the phone: the input dictionary plus three new ones (the two
-   * reads and the redemption), then the twenty the certified shortcut already had, renumbered from 2–20 to 5–23.
-   */
-  actionCount: number;
-  /**
-   * The dictionary keys the ERP answer carries, in the order the actions read them.
-   *
-   * `authorization` is not a key of the answer: it is read from inside `headers`, which is the shape the
-   * server returns. The recipe used to name an `auth` key the answer never carried, and an operator following
-   * it to the letter read a key that was not there.
-   */
-  keys: {
-    url: string;
-    headers: string;
-    authorization: string;
-    body: string;
-    /** Only present in a batch answer: the phone repeats this list instead of posting one body. */
-    bodies: string;
-    callback: string;
-  };
-  /** The key of the input dictionary that carries the one-time token. */
-  ticketKey: string;
-  /** The key of the input dictionary that carries the redeem endpoint. */
-  ticketUrlKey: string;
-  /** The endpoints the one bridge can reach, so the dialog never understates what it covers. */
-  endpoints: Record<AeroBridgeAction, string>;
-}
-
-/**
- * The bridge recipe, in the shape the dialog copies it.
- *
- * Secret-free by construction: there is no password to show, no `Authorization` value to quote and no sample
- * envelope to paste, because the page no longer assembles one. The recipe describes the phone's twenty-three
- * actions and the dictionary keys each of them reads, which is everything an operator has to type.
- */
-export function aeroBridgeShortcutRecipe(args: { wsUrl: string }): AeroBridgeShortcutRecipe {
-  return {
-    name: AERO_DEFAULT_BRIDGE_SHORTCUT_NAME,
-    actionCount: 23,
-    keys: {
-      url: 'url',
-      headers: 'headers',
-      authorization: 'Authorization',
-      body: 'body',
-      bodies: 'bodies',
-      callback: 'callback',
-    },
-    ticketKey: 'ticket',
-    ticketUrlKey: 'ticketUrl',
-    endpoints: {
-      entrada: aeroEndpoint(args.wsUrl, 'entradasitem'),
-      // El lote va al mismo endpoint, una vez por producto: el atajo repite la petición.
-      entrada_lote: aeroEndpoint(args.wsUrl, 'entradasitem'),
-      saida: aeroEndpoint(args.wsUrl, 'saidasitem'),
-      movimentos: aeroEndpoint(args.wsUrl, 'movimentoitem'),
-      test: aeroEndpoint(args.wsUrl, 'usuarios'),
-    },
-  };
-}
-
-/**
- * Builds the deep link that runs a shortcut with one text as its input.
- *
- * The primitive under {@link buildAeroBridgeTriggerUrl}: `x-callback-url` hands the phone a string and the
- * shortcut decides what it means. Nothing else about the phone is assumed here.
- */
-export function aeroShortcutTriggerUrl(args: { name: string; payload: unknown }): string {
-  const body = JSON.stringify(args.payload);
-  return `shortcuts://x-callback-url/run-shortcut?name=${encodeURIComponent(args.name)}&input=text&text=${encodeURIComponent(body)}`;
-}
-
 /**
  * What the phone brought back, in the shapes this integration produces.
  *
  * `bridge` is the unified one; `test` and `sync` are the two the split design produced and are still read so a
- * phone that has not rebuilt its shortcut keeps working for a while.
+ * phone that has not rebuilt its bridge keeps working for a while.
  */
 export type AeroCallbackResult =
   | { kind: 'bridge'; action: AeroBridgeAction; data: unknown; raw: string }
