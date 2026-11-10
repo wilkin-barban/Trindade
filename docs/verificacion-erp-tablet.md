@@ -13,9 +13,12 @@ pulse «Sincronizar com ERP».
 
 - Un día **abierto** (hoy en São Paulo), con al menos una caja pendiente de lanzar en Masas.
 - La tablet con el build `0.7.4` instalado y la integración configurada: URL `http://192.168.25.250:1453/api`,
-  usuario y contraseña del WebService, y el atajo `Aero32 Bridge` en la app Atajos. La ejecución del
-  2026-11-05 usó `7017` para los primeros envíos y `7018` para `#116`; el actualizador pasa de un build al
-  siguiente por `buildNumber`.
+  usuario y contraseña del WebService, y —si el envío se hace desde un iPhone— el script `Aero32Bridge` importado
+  en la app Scriptable. La ejecución del 2026-11-05 usó `7017` para los primeros envíos y `7018` para `#116`; el
+  actualizador pasa de un build al siguiente por `buildNumber`.
+- Si la prueba se hace desde el iPhone, el panel abre Scriptable con
+  `scriptable:///run/Aero32Bridge?ticket=<token>&ticketUrl=<url codificada>`; ahí se ejecuta el script, que canjea el
+  ticket y vuelve al callback. No se usa la app Atajos ni un enlace de iCloud.
 - La tablet en la Wi-Fi de la planta. Sin esa red, el ERP no es alcanzable y todo lo que sigue falla con
   `AERO_NO_PLANT_WIFI` o `AERO_ERP_UNREACHABLE`.
 - Acceso SSH al servidor de Trindade para leer el log y la base.
@@ -103,7 +106,7 @@ persistida porque no existe.
 | --- | --- | --- |
 | El diálogo no aparece o queda en «enviando» | El envío no terminó: la app espera la respuesta del ERP | `launch_sync` en el log, y la conexión de la tablet a la Wi-Fi de la planta |
 | El veredicto dice error de red | La tablet no alcanza el ERP | Código `AERO_*` en el log; probar **Probar conexión** en Administración |
-| El lote se envió y no hubo lectura | La marca de lectura no se consumió o el atajo no volvió | `read_history` en el log; si no hay línea, revisar que el atajo `Aero32 Bridge` esté instalado |
+| El lote se envió y no hubo lectura | La marca de lectura no se consumió o el script no volvió | `read_history` en el log; si no hay línea, revisar que `Aero32Bridge` esté importado en Scriptable |
 | `seats=N saved=0` | El ERP sí contestó; Trindade no guardó | `error` de la línea `read_history`, y estado de la API |
 | Filas pendientes después de la lectura | El asiento no coincide con lo lanzado | Comparar `ent_lan` del log con el asiento del ERP; no editar la base |
 

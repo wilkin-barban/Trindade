@@ -17,7 +17,7 @@ Plataforma operativa de **Trindade Massas** para registrar la producción de mas
 | Aplicación Android | APK firmado, `com.trindade.app`, Android 8.0 o superior |
 | Base de datos | SQLite, esquema **revisión 10** (20 tablas) |
 | Producción web | <https://trindademasas.duckdns.org> |
-| Integración ERP | Aero32 por WebService local, con espejo de movimientos en Trindade |
+| Integración ERP | Aero32 por WebService local, con espejo de movimientos en Trindade; en iPhone el puente es el script `Aero32Bridge.scriptable` de Scriptable |
 | Documentación | [Índice completo](docs/README.md) |
 
 El detalle de cada entrega está en [CHANGELOG.md](CHANGELOG.md). El histórico de APKs, hashes y verificaciones está en [docs/release-android-historial.md](docs/release-android-historial.md).
@@ -29,6 +29,8 @@ El detalle de cada entrega está en [CHANGELOG.md](CHANGELOG.md). El histórico 
 - **Cronograma de cargas**: horarios, fleteros, vehículos propios, control de cupos y envío directo por WhatsApp.
 - **Stock y calculadoras**: pedido de Assaí en cajas enteras, conteo diario de stock e historial de solo lectura.
 - **Administración**: usuarios, roles, catálogos, auditoría y configuración de la integración con el ERP.
+- **Puente iOS con Scriptable**: la web no puede alcanzar la IP de la fábrica desde HTTPS, así que el lanzamiento se
+  envía desde el script `Aero32Bridge` de Scriptable; la contraseña del ERP nunca sale del cofre del servidor.
 - **App Android**: paridad funcional con la web para el trabajo en planta, con actualización firmada y verificación de versión.
 
 ## Módulos principales

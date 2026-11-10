@@ -84,8 +84,10 @@ desactualizado es un fallo, no un aviso.
 
 ## 7. Integración ERP Aero32
 
-- Web: no puede llamar HTTP privado desde HTTPS por *mixed content*/*Private Network Access*; usa el atajo iOS
-  `Aero32 Bridge` y callback.
+- Web: no puede llamar HTTP privado desde HTTPS por *mixed content*/*Private Network Access*; en el iPhone usa
+  **Scriptable** (`scriptable:///run/Aero32Bridge?ticket=…&ticketUrl=…`) y callback. El script `Aero32Bridge.scriptable`
+  se sirve en `/Aero32Bridge.scriptable` y se importa una sola vez con **Compartir → Scriptable**; no hay receta de
+  acciones, botones de copiar ni enlace de iCloud.
 - Android: llama directo al WebService con OkHttp y Basic Auth desde el almacén cifrado del dispositivo.
 - Host de producción: `http://192.168.25.250:1453/api`. No habilitar cleartext global; la excepción release es solo
   ese host.

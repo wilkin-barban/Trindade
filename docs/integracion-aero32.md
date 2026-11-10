@@ -20,8 +20,8 @@ El host Windows de producción no se modificó: los binarios se copiaron, se des
 | --- | --- | --- |
 | Panel web de integración | `packages/frontend/src/pages/massas/AeroIntegrationPanel.tsx` y `lib/aero-*.ts` | Guarda URL y usuario, escribe la contraseña una sola vez en el cofre del servidor, prueba la conexión por ticket, encola lanzamientos y lee el espejo |
 | Cofre del ERP | `packages/backend/src/modules/integration/vault.crypto.ts` y `aero.settings.service.ts` sobre `aero_integration_settings` | Cifra la contraseña del WebService con AES-256-GCM; la clave vive en el entorno, no en la base |
-| Tickets del Atajo | `packages/backend/src/modules/integration/aero.tickets.service.ts` sobre `aero_bridge_tickets` | Emite y canjea tickets de un solo uso de 120 s; guarda solo el SHA-256 del token |
-| Atajo de iOS | Apple Shortcuts, receta `Aero32 Bridge` | Recibe `{ ticket, ticketUrl }`, canjea el ticket por el sobre `{ url, method, headers, body, callback }` y hace el `POST` fuera de Safari para alcanzar HTTP local desde una página HTTPS |
+| Tickets del puente | `packages/backend/src/modules/integration/aero.tickets.service.ts` sobre `aero_bridge_tickets` | Emite y canjea tickets de un solo uso de 120 s; guarda solo el SHA-256 del token |
+| Puente iOS | Scriptable, script `Aero32Bridge` (`packages/frontend/public/Aero32Bridge.scriptable`) | Recibe `{ ticket, ticketUrl }` por deep link, canjea el ticket por el sobre `{ url, method, headers, body, callback }` y hace el `POST` fuera de Safari para alcanzar HTTP local desde una página HTTPS |
 | Cliente Android | `packages/android/app/src/main/java/com/trindade/app/aero/` | Llama al WebService directamente desde la red de la planta, con Basic Auth y ajustes cifrados |
 | Backend de integración | `packages/backend/src/modules/integration/` | Cofre, tickets, bitácora, validación y snapshot de movimientos del día |
 | Espejo persistido | Tabla `aero_movements` (revisiones 7–9) | Snapshot del día compartido por toda la planta |
@@ -47,8 +47,8 @@ Contratos del servidor:
 | `POST /api/integration/aero/bridge-tickets` | ídem | `{ action, payloads, callbackPath? }` → `{ ticket, ticketUrl, expiresAt }` |
 | `POST /api/integration/aero/bridge-tickets/redeem` | Ticket bearer (`X-Trindade-Ticket`) | Devuelve el sobre `{ url, method, headers, body, bodies?, callback }` |
 
-`redeem` es **unauthenticated por diseño**: la credencial es el ticket bearer de un solo uso y el llamador es el
-Atajo, que no tiene sesión. Exigir JWT rompería el caso que el diseño resuelve. El token se lee del header
+`redeem` es **unauthenticated por diseño**: la credencial es el ticket bearer de un solo uso y el llamador es
+Scriptable, que no tiene sesión. Exigir JWT rompería el caso que el diseño resuelve. El token se lee del header
 `X-Trindade-Ticket`, nunca de la URL, y la respuesta lleva `Cache-Control: no-store`.
 
 El flujo completo:
@@ -57,68 +57,51 @@ El flujo completo:
    armados por el código existente.
 2. El API mapea el endpoint (`entradasitem`, `movimentoitem?_method=PATCH`, `usuarios`), serializa `body` y
    `bodies`, valida el callback contra el origen de `PUBLIC_APP_URL`, guarda el hash del token y responde.
-3. La página abre el Atajo con `{ ticket, ticketUrl }`.
-4. El Atajo hace `POST` a `ticketUrl` con `X-Trindade-Ticket` y sin cuerpo.
+3. La página abre Scriptable con el deep link
+   `scriptable:///run/Aero32Bridge?ticket=<token>&ticketUrl=<url codificada>`.
+4. El script hace `POST` a `ticketUrl` con `X-Trindade-Ticket` y sin cuerpo.
 5. El API busca por hash, marca `used_at` en la misma transacción, descifra la contraseña y devuelve el sobre.
-6. El Atajo ejecuta contra el ERP exactamente lo que ejecutaba antes y vuelve al `callback`.
+6. El script envía contra el ERP exactamente lo que enviaba antes y vuelve al `callback`.
 
-El sobre conserva `body` y `bodies` como **texto JSON**, no como objetos: las acciones del Atajo insertan ese texto
-tal cual en el cuerpo del `POST`, así que el único cambio de la receta es la entrada.
+El sobre conserva `body` y `bodies` como **texto JSON**, no como objetos: el script manda ese texto tal cual en el
+cuerpo del `POST`, así que la página no arma el pedido y el servidor sigue siendo el único que conoce la credencial.
 
-### 0.2 Atajo iOS: delta exacto de la receta
+### 0.2 Puente iOS: Scriptable en lugar del Atajo
 
-La página ya no entrega un sobre armado. Entrega un diccionario de dos claves:
+El proceso nativo que habla con la red de la fábrica es un script de **Scriptable**, no un Atajo. La página sigue
+pidiendo el ticket a `POST /api/integration/aero/bridge-tickets` exactamente como antes; lo único que cambia es el
+enlace profundo que abre ese proceso:
 
-```json
-{ "ticket": "<token>", "ticketUrl": "https://trindademasas.duckdns.org/api/integration/aero/bridge-tickets/redeem" }
+```text
+scriptable:///run/Aero32Bridge?ticket=<token>&ticketUrl=<url codificada>
 ```
 
-Acciones nuevas (la receta vigente tiene 20 acciones y pasa a 23):
+| Pieza | Dónde vive | Qué hace |
+| --- | --- | --- |
+| Script | `packages/frontend/public/Aero32Bridge.scriptable` | JSON con `name`, `script`, icono y `always_run_in_app`; Vite lo copia al build |
+| Entrega | `/Aero32Bridge.scriptable` | Asset público que el usuario descarga una sola vez |
+| Nombre | `Aero32Bridge` | Constante de integración; el URL scheme lo usa y el usuario no lo configura |
+| Importación | Scriptable → **Compartir → Scriptable** | Instala el script en la app; aparece como `Aero32Bridge` |
 
-| Nueva | Acción en Shortcuts | Texto y parámetros | Posición |
-| --- | --- | --- | --- |
-| 2 | Obtener valor del diccionario | Clave `ticket`, del diccionario de la entrada | Después de la actual acción 1 («Obtener diccionario de la entrada») |
-| 3 | Obtener valor del diccionario | Clave `ticketUrl`, del diccionario de la entrada | Después de la nueva acción 2 |
-| 4 | Obtener contenido de URL | `POST` a la variable de la acción 3; encabezado `X-Trindade-Ticket` = variable de la acción 2; `Accept: application/json`; sin cuerpo | Después de la nueva acción 3, antes de la actual acción 2 |
+Instalación, una sola vez por teléfono: Scriptable se instala desde la App Store
+(<https://apps.apple.com/app/scriptable/id1405459188>), el archivo se descarga desde `/Aero32Bridge.scriptable` y se
+abre con **Compartir → Scriptable**. No se arman acciones a mano.
 
-Renumeración: las acciones 2–20 actuales pasan a 5–23 y conservan su contenido.
+Qué hace el script en cada ejecución:
 
-| Actual | Nueva | Acción | Cambio de origen de datos |
-| --- | --- | --- | --- |
-| 1 | 1 | Obtener diccionario de la entrada | ninguno (sigue leyendo lo que la página entrega) |
-| — | **2** | Obtener valor del diccionario `ticket` | nueva |
-| — | **3** | Obtener valor del diccionario `ticketUrl` | nueva |
-| — | **4** | Obtener contenido de URL · POST · cabecera `X-Trindade-Ticket` | nueva: la respuesta es el sobre |
-| 2 | 5 | Obtener valor del diccionario `url` | pasa a leer la **respuesta de la 4** |
-| 3 | 6 | Obtener valor del diccionario `headers` | pasa a leer la **respuesta de la 4** |
-| 4 | 7 | Obtener valor del diccionario `Authorization` (del diccionario de cabeceras) | igual, pero el diccionario viene de la 6 |
-| 5 | 8 | Obtener valor del diccionario `callback` | pasa a leer la **respuesta de la 4** |
-| 6 | 9 | Si · el diccionario de la entrada tiene valor para `bodies` | pasa a leer la **respuesta de la 4** |
-| 7 | 10 | Establecer variable `respostas` como lista vacía | igual |
-| 8 | 11 | Repetir con cada elemento de `bodies` | pasa a leer la **respuesta de la 4** |
-| 9 | 12 | Obtener contenido de URL dentro de la repetición | igual |
-| 10 | 13 | Añadir a variable `respostas` | igual |
-| 11 | 14 | Fin de la repetición | igual |
-| 12 | 15 | Combinar texto `respostas` con coma | igual |
-| 13 | 16 | Texto `[` + resultado + `]` | igual |
-| 14 | 17 | Codificar URL | igual |
-| 15 | 18 | Si no | igual |
-| 16 | 19 | Obtener valor del diccionario `body` como `body_item` | pasa a leer la **respuesta de la 4** |
-| 17 | 20 | Obtener contenido de URL individual | igual |
-| 18 | 21 | Codificar URL | igual |
-| 19 | 22 | Fin del Si | igual |
-| 20 | 23 | Abrir URLs con `callback` + resultado | igual |
+1. Lee `args.queryParameters.ticket` y `args.queryParameters.ticketUrl`; si falta alguno, avisa y termina sin
+   inventar callback.
+2. Canjea el ticket con `POST` a `ticketUrl`, header `X-Trindade-Ticket`, `Accept: application/json`, sin cuerpo y
+   `allowInsecureRequest = true`. La respuesta es el sobre `{ url, method, headers, body, bodies?, callback }`.
+3. Envía cada payload —`bodies` si es una lista no vacía, `body` si no— como texto JSON a `url` con los `headers`
+   del sobre y `allowInsecureRequest = true`.
+4. Devuelve el texto de la respuesta, o `[r1,r2,…]` cuando el sobre traía lote, y abre
+   `callback + encodeURIComponent(resultado)` en Safari. Termina con `Script.complete()`.
 
-Regla única: toda lectura que hoy apunta al «diccionario de la entrada» (acciones 2, 3, 5, 6, 8 y 16 actuales) pasa
-a apuntar a la **respuesta de la nueva acción 4**. El `POST` al ERP, el lote, el `body_item` y el callback no
-cambian.
-
-Caso tolerado: si Shortcuts devuelve la respuesta de la acción 4 como texto y no como diccionario, se agrega una
-acción «Obtener diccionario de la entrada» sobre esa respuesta, inmediatamente después de la acción 4, y las
-lecturas apuntan a esa acción. El contrato del servidor no cambia.
-
-El enlace iCloud existente apunta al Atajo viejo de 20 acciones: queda marcado como **legacy** y no se presenta como
-«listo para instalar». El usuario actualiza su Atajo con este delta una sola vez.
+Límites del script: no registra ni muestra `Authorization`, el ticket ni contraseñas, y no guarda estado. En
+consecuencia, lo que se retira es la receta numerada de 23 acciones, los botones para copiar valores y el enlace de
+iCloud: no hay acciones que renumerar ni cuenta de acciones que mantener. El contrato del servidor no cambia y el
+backend no cambia.
 
 El resto de este documento explica **cómo funciona el ERP por dentro** y por qué se eligió el WebService como
 camino de integración. Para operar la integración no hace falta leerlo completo; para diagnosticar un endpoint o
@@ -575,8 +558,8 @@ que probablemente se hace hoy a mano. Se resuelve con una captura de pantalla de
 | **E** | RPA sobre la UI del cliente (automatizar `Estoque Avulso`) | respeta toda la lógica | frágil, requiere sesión Windows, no auditable | última ratio |
 
 > El cofre de la §0.1 **no** es el puente on-prem de la opción B: guarda y cifra la contraseña, pero sigue siendo el
-> Atajo del teléfono el único proceso que alcanza la LAN de la fábrica. La opción B continúa pendiente como servicio
-> en la LAN que hable Firebird por transacción.
+> script de Scriptable en el teléfono el único proceso que alcanza la LAN de la fábrica. La opción B continúa
+> pendiente como servicio en la LAN que hable Firebird por transacción.
 
 **Fase 1 (lectura)**: cualquiera de A/B en modo `SELECT`. **Fase 2 (escritura)**: B, con estas reglas:
 
