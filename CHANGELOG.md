@@ -26,11 +26,12 @@ un solo uso que el script de Scriptable canjea por el sobre del pedido.
   `POST /api/integration/aero/bridge-tickets/redeem` leyendo `X-Trindade-Ticket` y recibe el sobre
   `{ url, method, headers, body|bodies, callback }`. El canje es unauthenticated por diseño: el ticket es la
   credencial.
-- **Script importable para Scriptable.** `Aero32Bridge.scriptable` se sirve en `/Aero32Bridge.scriptable` (fuente
-  `packages/frontend/public/Aero32Bridge.scriptable`, copiada por Vite al build) y se importa una sola vez con
-  **Compartir → Scriptable**; aparece en la app como `Aero32Bridge`. Scriptable se instala desde la App Store
-  (`https://apps.apple.com/app/scriptable/id1405459188`). El panel ofrece **Instalar Scriptable no iPhone** e
-  **Importar Aero32Bridge.scriptable**.
+- **Script del puente para Scriptable.** `Aero32Bridge.js` se sirve en `/Aero32Bridge.js` como JavaScript crudo
+  (fuente `packages/frontend/scriptable/Aero32Bridge.js`, publicada por `scripts/build-scriptable.mjs` en
+  `packages/frontend/public/Aero32Bridge.js` y copiada por Vite al build) y se instala **copiando el código**: el
+  operador toca **Copiar código para Scriptable**, abre Scriptable, toca **+**, pega y renombra el script a
+  `Aero32Bridge`. Scriptable se instala desde la App Store (`https://apps.apple.com/app/scriptable/id1405459188`).
+  El panel ofrece **Instalar Scriptable no iPhone** y **Copiar código para Scriptable**.
 - **API del cofre:** `GET`, `PUT` y `DELETE /api/integration/aero/settings`, solo para `wilkin` con rol
   Administrador, y los esquemas Zod y las respuestas del contrato OpenAPI de los tres paths nuevos.
 - **Esquema revisión 10**, aditiva: `aero_integration_settings` y `aero_bridge_tickets` con sus índices. El
@@ -55,6 +56,23 @@ un solo uso que el script de Scriptable canjea por el sobre del pedido.
   la recibe.
 - **Backend, esquema y Android sin cambios:** el canje del ticket y la emisión no cambian, no hay migración y esta
   entrega no publica APK, tag ni GitHub Release.
+
+### Corregido
+
+- **La instalación del puente Scriptable es por copia de código, no por descarga.** El `.scriptable` que se servía
+  para importar es un JSON; al pegarlo en el editor de Scriptable se ejecutaba el objeto entero y fallaba en el
+  primer `:` de `"name"` con `SyntaxError: Unexpected token ':'`. Ahora la página sirve el JavaScript crudo en
+  `/Aero32Bridge.js` y el panel y el diálogo ofrecen **Copiar código para Scriptable**: el operador copia, abre
+  Scriptable, toca **+**, pega, renombra el script a `Aero32Bridge` y vuelve a Trindade. El `.scriptable` queda solo
+  como artefacto interno y ninguna pantalla ofrece su descarga ni el paso **Compartir → Scriptable**.
+- **El fallo de alcance del ERP se informa en vez de colgar la pantalla.** El script fija `timeoutInterval`
+  explícito en el canje del ticket y en cada `POST` al ERP; si el primer payload falla por red o timeout, corta el
+  lote y vuelve por el callback con `aero_error=wifi_required` y `aero_msg`, sin reintentar los demás payloads. Una
+  respuesta HTTP del ERP no se trata como error de red. La web parsea `aero_error` antes de `aero_action`, muestra el
+  mensaje —el SSID no se puede leer, así que el aviso dice que el iPhone puede no estar en la Wi-Fi *Trindade
+  Expedicao* o que el ERP puede no estar disponible—, conserva la cola y los lanzamientos pendientes, no actualiza el
+  espejo, libera el botón de prueba y cubre el caso sin retorno con un watchdog de ~150 s. Si el navegador está sin
+  conexión (`navigator.onLine === false`) muestra el aviso y no abre Scriptable.
 
 ### Notas
 

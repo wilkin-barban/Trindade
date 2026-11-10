@@ -182,8 +182,9 @@ mismo owner— consulta, lanza y lee **sin volver a pedir la contraseña**. El c
 **Limpiar** lo elimina.
 
 Debajo de los campos, el panel ofrece el camino del teléfono: **Instalar Scriptable no iPhone** abre la App Store,
-**Importar Aero32Bridge.scriptable** descarga el script y un tercer botón abre el diálogo con los pasos y con
-«Abrir Scriptable». No hay valores para copiar ni enlace de iCloud, porque no hay receta que armar.
+**Copiar código para Scriptable** deja el JavaScript del puente en el portapapeles y un tercer botón abre el mismo
+diálogo con los pasos y con «Abrir Scriptable». El puente se instala **una sola vez por teléfono** y no se descarga
+ningún archivo: el detalle está en la §6.1.
 
 ## 5. Prueba de conexión
 
@@ -223,26 +224,38 @@ scriptable:///run/Aero32Bridge?ticket=<token>&ticketUrl=<url codificada>
 `ticket` y `ticketUrl` viajan codificados con `encodeURIComponent`. El nombre `Aero32Bridge` es una constante de
 integración: el deep link lo necesita tal cual y no se configura en el panel.
 
-### 6.1 Instalación e importación
+### 6.1 Instalación por copia de código
 
-Una sola vez por teléfono:
+Una sola vez por teléfono. No hay archivo que descargar ni importar: la página sirve el JavaScript crudo del puente
+en `/Aero32Bridge.js` y el operador lo pega en Scriptable.
 
 1. Instalar **Scriptable** desde el App Store: <https://apps.apple.com/app/scriptable/id1405459188>. El botón
    **Instalar Scriptable no iPhone** del panel abre esa misma ficha.
-2. Tocar **Importar Aero32Bridge.scriptable** en el panel, o abrir
-   `https://trindademasas.duckdns.org/Aero32Bridge.scriptable`. El archivo se sirve en `/Aero32Bridge.scriptable`
-   y su fuente es `packages/frontend/public/Aero32Bridge.scriptable`, que Vite copia al build.
-3. Abrir el archivo descargado y elegir **Compartir → Scriptable**. Aparece en la app como `Aero32Bridge`.
+2. Tocar **Copiar código para Scriptable** en el panel o en el diálogo. La página copia el contenido de
+   `/Aero32Bridge.js`, que es JavaScript crudo: la fuente es `packages/frontend/scriptable/Aero32Bridge.js` y
+   `scripts/build-scriptable.mjs` publica una copia idéntica en `packages/frontend/public/Aero32Bridge.js`, que
+   Vite copia al build.
+3. Abrir Scriptable, tocar **+** y pegar el código en el editor del script nuevo.
+4. Renombrar el script a **`Aero32Bridge`**. Ese nombre es la constante que usa el deep link y no se configura en
+   el panel.
+5. Volver a Trindade. Desde ahí, los botones del módulo abren Scriptable directamente.
 
-Desde ahí, los botones de Trindade abren Scriptable directamente. No hay acciones que agregar ni orden que
-respetar: la receta vieja, los botones de copiar y el enlace de iCloud ya no existen, así que tampoco hay una cuenta
-de acciones que configurar.
+**Por qué no se descarga el `.scriptable`.** Ese archivo es un JSON —`{"name": …, "script": …}`— y al pegarlo en el
+editor de Scriptable se ejecuta el objeto entero: el parser muere en el primer `:` de `"name"` con
+`SyntaxError: Unexpected token ':'`. Lo que Scriptable corre es el texto de adentro de `script`, no el envoltorio, y
+por eso el camino correcto es copiar el código. El `.scriptable` sigue existiendo en `/Aero32Bridge.scriptable` como
+artefacto interno del build, pero ninguna pantalla ofrece su descarga ni su importación; el paso
+**Compartir → Scriptable** fue retirado.
+
+Tampoco hay receta de acciones, botones para copiar valores sueltos ni enlace de iCloud: el puente es un script y se
+instala como cualquier script de Scriptable.
 
 ### 6.2 Canje del ticket
 
 El script lee `args.queryParameters.ticket` y `args.queryParameters.ticketUrl`. Si falta alguno, muestra un aviso
 breve y termina sin inventar un callback. Con ambos, hace `POST` a `ticketUrl` con `X-Trindade-Ticket: <ticket>`,
-`Accept: application/json`, **sin cuerpo** y `allowInsecureRequest = true`.
+`Accept: application/json`, **sin cuerpo**, `allowInsecureRequest = true` y un `timeoutInterval` explícito (8–10 s).
+Si el canje no llega —sin internet, por ejemplo— muestra un `Alert` corto y termina: no hay callback que inventar.
 
 El sobre que devuelve el canje es el mismo de siempre, armado por el servidor y con `body` y `bodies` como **texto
 JSON**:
@@ -275,6 +288,9 @@ JSON**:
    corchetes alrededor, que es exactamente lo que la página ya sabe leer.
 4. Al final abre `callback + encodeURIComponent(resultado)` en Safari y termina la ejecución del script.
 
+Cada `POST` al ERP lleva su propio `timeoutInterval` (8–10 s). Sin timeout propio, una red que no responde deja la
+pantalla «enviando» el tiempo que iOS decida, y un lote de ocho payloads espera ese plazo ocho veces.
+
 Detalles que importan:
 
 - **El `body` del sobre va como texto, no como diccionario.** Si el script lo tratara como objeto, terminaría
@@ -289,6 +305,42 @@ Detalles que importan:
 - **La respuesta vuelve por el callback.** La página separa el prefijo, decodifica y lee el cuerpo real. La acción
   viaja en `aero_action`: `entrada`, `saida`, `movimentos` o `test`. Los parámetros se leen y se borran de la URL
   con `replaceState`, así que un *pull-to-refresh* no vuelve a procesar el mismo resultado.
+
+### 6.4 Cuando el ERP no responde
+
+**El SSID no se puede leer.** iOS entrega el nombre de la red Wi-Fi solo a apps nativas con permiso de ubicación
+precisa y el entitlement de Wi-Fi; Safari y Scriptable no exponen esa API. Por eso la app **no comprueba** que el
+teléfono esté en «Trindade Expedicao»: comprueba si el **host del ERP responde**. Si no responde, el mensaje dice
+que el iPhone puede no estar en la red de la empresa **o** que el ERP puede no estar disponible, que es lo único que
+se puede afirmar desde el teléfono.
+
+En el script:
+
+- Un fallo de **red o timeout en el primer `POST`** al ERP corta el lote: no tiene sentido esperar 8 × 10 s por los
+  demás payloads. Devuelve un callback de error explícito sobre `callback` y termina:
+
+  ```text
+  …&aero_error=wifi_required&aero_msg=<mensaje codificado>
+  ```
+
+- Una **respuesta HTTP** del ERP —incluido un `4xx` o un `5xx`— no es un error de red: el ERP contestó y su
+  respuesta vuelve por el callback como siempre.
+- `wifi_required` es un código estable. La web traduce el mensaje y el `aero_msg` queda como texto de respaldo.
+
+En la web:
+
+- El callback se parsea **antes** que `aero_action`: un `aero_error` nunca se interpreta como un puente válido. El
+  mensaje se muestra al operario con la frase de Wi-Fi/ERP, se limpia la query con `replaceState` y se borra el
+  intento pendiente para que un *refresh* no lo repita.
+- **La cola y los lanzamientos pendientes se conservan**; nada se marca como enviado y el **espejo no se actualiza**.
+  Un fallo de red no es un lanzamiento fallido ni un día vacío.
+- El botón de prueba de conexión vuelve a quedar habilitado: el error de red no se trata como credencial inválida.
+- **Watchdog.** Antes de abrir Scriptable se guarda una marca local `{ action, date, at }`. Se limpia al recibir
+  cualquier callback. Al volver a la pantalla, si la marca supera unos **150 s**, se muestra «Scriptable no volvió;
+  revisá la Wi-Fi de la empresa y reintentá», se resetea el estado de envío y la marca se borra. Una vuelta rápida no
+  dispara el aviso.
+- **Sin internet en el navegador.** Si `navigator.onLine === false`, la app muestra «Sin conexión a internet» y **no
+  abre** Scriptable: sin red el canje del ticket no puede funcionar.
 
 ## 7. Contratos del WebService
 
@@ -398,11 +450,11 @@ El cofre y los tickets usan su propia familia, con la misma forma (`code` + fras
 Antes de ir:
 
 - [ ] `docker compose ps` con `api` y `web` sanos, y `https://trindademasas.duckdns.org` respondiendo 200.
-- [ ] El iPhone tiene **Scriptable** instalado y el script `Aero32Bridge` importado una sola vez con
-      **Compartir → Scriptable**. No hay receta que actualizar, ni enlace de iCloud, ni cuenta de acciones: los
-      botones **Instalar Scriptable no iPhone** e **Importar Aero32Bridge.scriptable** del panel dejan el teléfono
-      listo.
-- [ ] El iPhone está en el Wi-Fi de la fábrica; el script no funciona por datos móviles porque la IP es interna.
+- [ ] El iPhone tiene **Scriptable** instalado y el script `Aero32Bridge` creado una sola vez: **Copiar código para
+      Scriptable** en el panel, abrir Scriptable, **+**, pegar, renombrar a `Aero32Bridge` y volver. No hay archivo que
+      descargar ni importar, ni receta de acciones que mantener.
+- [ ] El iPhone está en el Wi-Fi de la fábrica; el script no funciona por datos móviles porque la IP es interna. La
+      app no puede leer el SSID: la prueba es que el host del ERP responda.
 
 En la fábrica:
 
@@ -421,12 +473,21 @@ En la fábrica:
    `launch_sync` del envío y `read_history` de la lectura.
 7. Verificar en el ERP que la entrada existe y en el log del servidor las dos líneas (`requested` y `result`).
 8. Repetir con dos productos para comprobar que la cola envía el segundo después del retorno del primero.
-9. Probar el fallo: apagar el Wi-Fi, lanzar y confirmar que el lanzamiento **igual** quedó guardado en Trindade.
+9. Probar el fallo: apagar el Wi-Fi, lanzar y confirmar que el lanzamiento **igual** quedó guardado en Trindade y
+   que la página avisa de la Wi-Fi/ERP sin borrar la cola.
+10. Probar el retorno que no llega: abrir Scriptable al pedir el ticket y no ejecutar el script. A los ~150 s, al
+    volver a la página, el aviso dice que Scriptable no volvió y el estado de envío queda libre.
 
 ## 11. Límites conocidos
 
 - El script necesita el teléfono en la red de la fábrica; no hay acceso remoto al WebService.
-- Sin retorno del script (el operario lo cierra sin ejecutar), la página no puede adivinar el resultado: lo pregunta.
+- **El SSID no se comprueba.** Safari y Scriptable no pueden leer el nombre de la red Wi-Fi; lo que se mide es si el
+  host del ERP responde. Si no responde, el aviso dice que el iPhone puede no estar en la red de la empresa o que el
+  ERP puede no estar disponible, sin afirmar cuál de las dos cosas pasó.
+- Si el canje del ticket falla por falta de internet, el script no inventa un callback: muestra un `Alert` corto y
+  termina. La web lo cubre con el watchdog, no con un veredicto del ERP.
+- Sin retorno del script (el operario lo cierra sin ejecutar), la página no puede adivinar el resultado: el watchdog
+  avisa a los ~150 s y deja reintentar.
 - La URL, el usuario y la contraseña viven en el servidor, una vez por instalación. El interruptor de
   sincronización y la fecha de la última sincronización siguen siendo preferencias del dispositivo; el nombre del
   script no, porque es una constante de integración.

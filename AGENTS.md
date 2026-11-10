@@ -85,9 +85,11 @@ desactualizado es un fallo, no un aviso.
 ## 7. Integración ERP Aero32
 
 - Web: no puede llamar HTTP privado desde HTTPS por *mixed content*/*Private Network Access*; en el iPhone usa
-  **Scriptable** (`scriptable:///run/Aero32Bridge?ticket=…&ticketUrl=…`) y callback. El script `Aero32Bridge.scriptable`
-  se sirve en `/Aero32Bridge.scriptable` y se importa una sola vez con **Compartir → Scriptable**; no hay receta de
-  acciones, botones de copiar ni enlace de iCloud.
+  **Scriptable** (`scriptable:///run/Aero32Bridge?ticket=…&ticketUrl=…`) y callback. El script `Aero32Bridge` se
+  instala una sola vez **copiando el código** de `/Aero32Bridge.js` (JS crudo servido por la web), creando un script
+  nuevo en Scriptable con **+**, pegando y renombrando a `Aero32Bridge`. No se descarga el `.scriptable` (es JSON y
+  pegado en el editor falla con `SyntaxError: Unexpected token ':'`), no hay receta de acciones, botones de copiar ni
+  enlace de iCloud.
 - Android: llama directo al WebService con OkHttp y Basic Auth desde el almacén cifrado del dispositivo.
 - Host de producción: `http://192.168.25.250:1453/api`. No habilitar cleartext global; la excepción release es solo
   ese host.
