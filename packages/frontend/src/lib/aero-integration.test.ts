@@ -1,26 +1,24 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { beforeEach, describe, it } from 'node:test';
 import {
-  AERO_DEFAULT_BRIDGE_SHORTCUT_NAME,
-  AERO_DEFAULT_SHORTCUT_NAME,
+  AERO_SCRIPTABLE_APP_URL,
+  AERO_SCRIPTABLE_ASSET_PATH,
   AERO_DEFAULT_CST,
   AERO_INTEGRATION_USERNAME,
   AERO_PENDING_SYNC_STORAGE_KEY,
   AERO_SESSION_PASSWORD_KEY,
   AERO_SETTINGS_STORAGE_KEY,
-  AERO_SHORTCUT_ICLOUD_URL,
   AERO_ENTRY_SERIES,
   AERO_TEST_TIMEOUT_MS,
   DEFAULT_AERO_SETTINGS,
   aeroBridgeCallbackFor,
   aeroBridgeCallbackPath,
-  aeroBridgeShortcutRecipe,
   aeroConnectionBlocker,
   aeroEndpoint,
   aeroMissingSetup,
   aeroSettingsReady,
   clearAeroSessionPassword,
-  aeroShortcutTriggerUrl,
   buildAeroBridgeTriggerUrl,
   buildAeroEntryPayload,
   buildEntradaItemPayload,
@@ -122,17 +120,17 @@ describe('aero-integration: constants & types', () => {
     assert.equal(AERO_SETTINGS_STORAGE_KEY, 'trindade.aero.integration.v1');
     assert.equal(AERO_PENDING_SYNC_STORAGE_KEY, 'trindade.aero.pending-sync.v1');
     assert.equal(AERO_INTEGRATION_USERNAME, 'wilkin');
-    assert.equal(AERO_DEFAULT_SHORTCUT_NAME, 'Aero32 Estoque');
     assert.equal(AERO_TEST_TIMEOUT_MS, 8000);
     assert.deepEqual(DEFAULT_AERO_SETTINGS, {
       // La dirección de la planta viaja escrita: un teléfono nuevo sólo pregunta quién lanza (S12).
       wsUrl: 'http://192.168.25.250:1453/api',
       username: '',
       hasPassword: false,
-      shortcutName: 'Aero32 Bridge',
       syncEnabled: false,
       lastSyncAt: null,
     });
+    // El nombre del script no es un ajuste: lo fija el deep link y no se guarda en ninguna parte.
+    assert.equal('shortcutName' in DEFAULT_AERO_SETTINGS, false);
   });
 });
 
@@ -167,7 +165,6 @@ describe('aero-integration: settings persistence without a secret', () => {
       wsUrl: 'http://192.168.1.50:8000/api',
       username: 'wilkin',
       hasPassword: true,
-      shortcutName: 'Custom Shortcut',
       syncEnabled: true,
       lastSyncAt: '2026-10-27T10:00:00Z',
     };
@@ -179,13 +176,7 @@ describe('aero-integration: settings persistence without a secret', () => {
     // for a vault another device already deleted.
     assert.deepEqual(loaded, { ...custom, hasPassword: false });
     const payload = JSON.parse(storage.written[0] ?? '{}') as Record<string, unknown>;
-    assert.deepEqual(Object.keys(payload).sort(), [
-      'lastSyncAt',
-      'shortcutName',
-      'syncEnabled',
-      'username',
-      'wsUrl',
-    ]);
+    assert.deepEqual(Object.keys(payload).sort(), ['lastSyncAt', 'syncEnabled', 'username', 'wsUrl']);
   });
 
   /**
@@ -310,6 +301,8 @@ describe('aero-integration: settings persistence without a secret', () => {
     assert.equal('entrySeries' in loaded, false);
     assert.equal('userCode' in loaded, false);
     assert.equal('testShortcutName' in loaded, false);
+    // El nombre del atajo tampoco vuelve: el script tiene un nombre fijo y viejo no se migra.
+    assert.equal('shortcutName' in loaded, false);
     assert.equal('password' in loaded, false);
     assert.equal(loaded.username, 'wilkin');
   });
@@ -348,7 +341,6 @@ describe('aero-integration: aeroSettingsReady', () => {
     wsUrl: 'http://192.168.1.50:8000/api',
     username: 'wilkin',
     hasPassword: true,
-    shortcutName: 'Aero',
     syncEnabled: true,
     lastSyncAt: null,
   };
@@ -631,36 +623,6 @@ describe('aero-integration: readAeroTestResult', () => {
   });
 });
 
-describe('aero-integration: the two-action shortcut', () => {
-  // El atajo tiene que poder armarse con dos acciones nativas. Si el `text` del deep link llevara el
-  // sobre { url, authorization, body }, la persona que lo instala tendría que abrir un diccionario y
-  // leer tres claves antes de llegar al POST: siete pasos en un teléfono, que es exactamente lo que
-  // no ocurrió. El payload viaja como JSON plano y el atajo lo entrega tal cual como cuerpo.
-  it('sends the entry payload itself as the shortcut text, not a transport envelope', () => {
-    const payload = buildEntradaItemPayload({
-      productCode: '1001',
-      productName: 'MASSA TRADICIONAL 500G',
-      quantity: 50,
-      entryDate: '2026-10-27',
-      userCode: 12,
-    });
-    const url = aeroShortcutTriggerUrl({ name: 'Aero32 Estoque', payload });
-
-    const parsed = new URL(url);
-    assert.equal(parsed.protocol, 'shortcuts:');
-    assert.equal(parsed.searchParams.get('input'), 'text');
-    const text = parsed.searchParams.get('text');
-    assert.ok(text);
-
-    // Lo que llega al atajo es el cuerpo exacto del POST, sin envoltorio.
-    assert.equal(text, JSON.stringify(payload));
-    assert.deepEqual(JSON.parse(text), payload);
-    assert.equal('url' in JSON.parse(text), false);
-    assert.equal('authorization' in JSON.parse(text), false);
-  });
-
-});
-
 describe('aero-integration: callbacks', () => {
   it('parses the launch callback from a query string', () => {
     assert.deepEqual(parseAeroCallback('?aero_sync=ok'), { kind: 'sync', status: 'ok', message: null });
@@ -741,17 +703,16 @@ describe('aero-integration: pending sync storage', () => {
   });
 });
 
-describe('aero-integration: the unified Aero32 Bridge shortcut', () => {
-  it('names one bridge shortcut and points both settings defaults at it', () => {
-    assert.equal(AERO_DEFAULT_BRIDGE_SHORTCUT_NAME, 'Aero32 Bridge');
-    assert.equal(DEFAULT_AERO_SETTINGS.shortcutName, 'Aero32 Bridge');
+describe('aero-integration: the Scriptable the phone imports', () => {
+  it('pins the App Store page and the asset the page offers', () => {
+    assert.equal(AERO_SCRIPTABLE_APP_URL, 'https://apps.apple.com/app/scriptable/id1405459188');
+    assert.equal(AERO_SCRIPTABLE_ASSET_PATH, '/Aero32Bridge.scriptable');
+    // La ruta es absoluta desde la raíz del sitio: el mismo archivo que el build copia de `public/` a `dist/`.
+    assert.match(AERO_SCRIPTABLE_ASSET_PATH, /^\/[\w.-]+\.scriptable$/);
     assert.equal('testShortcutName' in DEFAULT_AERO_SETTINGS, false);
-
-    // El nombre viejo sigue exportado: es la llave de la migración de un teléfono que ya lo tenía.
-    assert.equal(AERO_DEFAULT_SHORTCUT_NAME, 'Aero32 Estoque');
   });
 
-  it('migrates a phone that still stores the shortcut names of the split design', () => {
+  it('ignores a shortcut name a phone still has stored instead of migrating it', () => {
     const storage = new FakeStorage();
     storage.setItem(
       AERO_SETTINGS_STORAGE_KEY,
@@ -759,20 +720,35 @@ describe('aero-integration: the unified Aero32 Bridge shortcut', () => {
         wsUrl: 'http://192.168.1.50:8000/api',
         username: 'wilkin',
         password: 'pwd',
-        shortcutName: 'Aero32 Estoque',
+        shortcutName: 'Aero32 Bridge',
         testShortcutName: 'Aero32 Prueba',
+        syncEnabled: true,
       }),
     );
 
     const loaded = loadAeroSettings(storage);
-    assert.equal(loaded.shortcutName, 'Aero32 Bridge');
+    // El nombre no se migra porque no es una elección: el script se llama `Aero32Bridge` y el deep link lo
+    // direcciona por ese nombre fijo. Un nombre viejo se descarta con el resto del payload.
+    assert.equal('shortcutName' in loaded, false);
+    assert.equal(loaded.username, 'wilkin');
+    assert.equal(loaded.syncEnabled, true);
 
-    // Un nombre elegido a propósito no es un default viejo y sobrevive tal cual.
-    storage.setItem(
-      AERO_SETTINGS_STORAGE_KEY,
-      JSON.stringify({ ...DEFAULT_AERO_SETTINGS, shortcutName: 'Minha Ponte' }),
-    );
-    assert.equal(loadAeroSettings(storage).shortcutName, 'Minha Ponte');
+    // Y no vuelve al disco: lo que se guarda es exactamente el modelo nuevo.
+    saveAeroSettings(loaded, storage);
+    const persisted = JSON.parse(storage.getItem(AERO_SETTINGS_STORAGE_KEY) ?? '{}') as Record<string, unknown>;
+    assert.equal('shortcutName' in persisted, false);
+  });
+
+  it('keeps no trace of the retired shortcut scheme in the module', () => {
+    // El guardián de la regla es `aero-no-shortcut-scheme.test.ts`; esta prueba lee el módulo que construía el
+    // deep link viejo, porque fue el que lo escribió durante más tiempo.
+    const source = readFileSync(new URL('./aero-integration.ts', import.meta.url), 'utf8');
+    const retiredScheme = ['short', 'cuts://'].join('');
+    const retiredAction = ['run', 'shortcut'].join('-');
+    const retiredBuilder = ['aero', 'Shortcut', 'TriggerUrl'].join('');
+    assert.equal(source.includes(retiredScheme), false);
+    assert.equal(source.includes(retiredAction), false);
+    assert.equal(source.includes(retiredBuilder), false);
   });
 });
 
@@ -1053,59 +1029,6 @@ describe('aero-integration: reading the bridge result', () => {
     assert.deepEqual(readAeroBridgeResult({ data: [] }), { status: 'error', message: null });
     // Un mensaje que no es texto no se inventa como texto.
     assert.deepEqual(readAeroBridgeResult({ success: false, message: 42 }), { status: 'error', message: null });
-  });
-});
-
-describe('aero-integration: the bridge shortcut recipe', () => {
-  const recipe = aeroBridgeShortcutRecipe({ wsUrl: 'http://192.168.25.250:1453/api' });
-
-  it('names the single shortcut and the dictionary keys its actions really read', () => {
-    assert.equal(recipe.name, 'Aero32 Bridge');
-    // Opción (a): la receta lee `headers` y de ahí saca `Authorization`. No existe una clave `auth` en la
-    // respuesta, y la receta no puede pedirle al operario que lea algo que nunca viaja.
-    assert.deepEqual(recipe.keys, {
-      url: 'url',
-      headers: 'headers',
-      authorization: 'Authorization',
-      body: 'body',
-      bodies: 'bodies',
-      callback: 'callback',
-    });
-    // Veintitrés contando las tres del ticket, las dos ramas -- un producto y el lote --, el renombre a
-    // `body_item` y el cierre del `Si`.
-    assert.equal(recipe.actionCount, 23);
-    assert.equal(recipe.ticketKey, 'ticket');
-    assert.equal(recipe.ticketUrlKey, 'ticketUrl');
-  });
-
-  it('carries no secret at all: no password, no Authorization value, no sample envelope', () => {
-    const fields = recipe as unknown as Record<string, unknown>;
-    for (const forbidden of ['password', 'authorization', 'sampleEnvelope', 'contentType', 'accept']) {
-      assert.equal(forbidden in fields, false, `the recipe still carries ${forbidden}`);
-    }
-    // La única aparición de «Authorization» es el nombre de la clave que se lee del diccionario `headers`.
-    assert.equal(JSON.stringify(recipe).match(/Basic /), null);
-  });
-
-  it('still points at the old iCloud shortcut, which is now legacy', () => {
-    // El enlace no se borra: documenta las veinte acciones sobre las que se construye el delta. Lo que cambia
-    // es cómo se presenta -- el diálogo lo marca como obsoleto y no como instalación.
-    assert.equal(AERO_SHORTCUT_ICLOUD_URL, 'https://www.icloud.com/shortcuts/3216695a428f42539fec7abbd5419f34');
-    const url = new URL(AERO_SHORTCUT_ICLOUD_URL);
-    assert.equal(url.protocol, 'https:');
-    assert.equal(url.host, 'www.icloud.com');
-    assert.match(url.pathname, /^\/shortcuts\/[0-9a-f]{32}$/);
-  });
-
-  it('lists the endpoints the one bridge can reach, so the dialog does not lie about them', () => {
-    assert.deepEqual(recipe.endpoints, {
-      entrada: 'http://192.168.25.250:1453/api/entradasitem',
-      // El lote repite la petición contra el mismo endpoint, una vez por producto.
-      entrada_lote: 'http://192.168.25.250:1453/api/entradasitem',
-      saida: 'http://192.168.25.250:1453/api/saidasitem',
-      movimentos: 'http://192.168.25.250:1453/api/movimentoitem',
-      test: 'http://192.168.25.250:1453/api/usuarios',
-    });
   });
 });
 

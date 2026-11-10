@@ -207,8 +207,39 @@ describe('AeroIntegrationPanel', () => {
       callbackPath: expect.stringContaining('aero_action=test'),
     });
     expect(vault.tickets[0]!.callbackPath).toContain('tab=integration');
-    // La prueba sale de la página, así que la ventana se despide con el aviso de que el atajo se está abriendo.
-    await waitFor(() => expect(screen.getByText(/Abriendo el atajo/)).toBeInTheDocument());
+    // La prueba sale de la página, así que la ventana se despide con el aviso de que Scriptable se está abriendo.
+    await waitFor(() => expect(screen.getByText(/Abriendo Scriptable/)).toBeInTheDocument());
+  });
+
+  it('offers the App Store, the importable script and the instructions as three separate controls', async () => {
+    vault.fetched = configuredVault();
+    renderPanel();
+    await waitFor(() => expect(screen.getByTestId('aero-state')).toHaveTextContent('Configurado'));
+
+    // Instalar la app y descargar el script son dos pasos distintos: cada uno tiene su enlace.
+    expect(screen.getByTestId('aero-scriptable-app-store')).toHaveAttribute(
+      'href',
+      'https://apps.apple.com/app/scriptable/id1405459188',
+    );
+    expect(screen.getByTestId('aero-scriptable-asset')).toHaveAttribute('href', '/Aero32Bridge.scriptable');
+    // Y el tercero abre la ayuda: la app ya viene con el script importado cuando se llega acá.
+    fireEvent.click(screen.getByTestId('aero-shortcut-open'));
+    await waitFor(() => expect(screen.getByTestId('aero-scriptable-dialog')).toBeInTheDocument());
+  });
+
+  it('says Scriptable is the app that talks to the plant network and keeps the password in the vault', async () => {
+    vault.fetched = configuredVault();
+    renderPanel();
+    await waitFor(() => expect(screen.getByTestId('aero-state')).toHaveTextContent('Configurado'));
+
+    // La frase que evita la pregunta «¿y la contraseña?»: vive en el cofre del servidor, no en el teléfono.
+    const card = screen.getByTestId('aero-scriptable-card');
+    expect(card).toHaveTextContent(/Scriptable/);
+    expect(card).toHaveTextContent(/red de la fábrica/);
+    expect(card).toHaveTextContent(/cofre del servidor/);
+    // Ni un rastro de la receta vieja en la tarjeta de instalación.
+    expect(card).not.toHaveTextContent(/iCloud/);
+    expect(card).not.toHaveTextContent(/Atajo/);
   });
 
   it('tells a configured vault apart from an unfinished setup', async () => {
