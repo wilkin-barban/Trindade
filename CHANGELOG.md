@@ -13,7 +13,7 @@ verificaciones está en [docs/release-android-historial.md](docs/release-android
 ## [Unreleased]
 
 La contraseña del ERP deja de vivir en el navegador. El servidor la guarda cifrada y entrega al iPhone un ticket de
-un solo uso que el Atajo canjea por el sobre del pedido.
+un solo uso que el script de Scriptable canjea por el sobre del pedido.
 
 ### Añadido
 
@@ -21,11 +21,16 @@ un solo uso que el Atajo canjea por el sobre del pedido.
   con AES-256-GCM (IV de 12 bytes, auth tag y `key_version = 1`); la clave `AERO_VAULT_KEY` de 32 bytes en base64
   vive en el entorno de la API y en producción el servicio no arranca sin ella. Ninguna respuesta devuelve la
   contraseña ni el ciphertext.
-- **Ticket de un solo uso para el Atajo.** `POST /api/integration/aero/bridge-tickets` emite un token de 32 bytes
-  con 120 s de vida del que la base guarda solo el SHA-256; el Atajo lo canjea en
+- **Ticket de un solo uso para el puente Scriptable.** `POST /api/integration/aero/bridge-tickets` emite un token de
+  32 bytes con 120 s de vida del que la base guarda solo el SHA-256; el script lo canjea en
   `POST /api/integration/aero/bridge-tickets/redeem` leyendo `X-Trindade-Ticket` y recibe el sobre
   `{ url, method, headers, body|bodies, callback }`. El canje es unauthenticated por diseño: el ticket es la
   credencial.
+- **Script importable para Scriptable.** `Aero32Bridge.scriptable` se sirve en `/Aero32Bridge.scriptable` (fuente
+  `packages/frontend/public/Aero32Bridge.scriptable`, copiada por Vite al build) y se importa una sola vez con
+  **Compartir → Scriptable**; aparece en la app como `Aero32Bridge`. Scriptable se instala desde la App Store
+  (`https://apps.apple.com/app/scriptable/id1405459188`). El panel ofrece **Instalar Scriptable no iPhone** e
+  **Importar Aero32Bridge.scriptable**.
 - **API del cofre:** `GET`, `PUT` y `DELETE /api/integration/aero/settings`, solo para `wilkin` con rol
   Administrador, y los esquemas Zod y las respuestas del contrato OpenAPI de los tres paths nuevos.
 - **Esquema revisión 10**, aditiva: `aero_integration_settings` y `aero_bridge_tickets` con sus índices. El
@@ -35,13 +40,21 @@ un solo uso que el Atajo canjea por el sobre del pedido.
 
 - **La web ya no guarda la contraseña del ERP.** El panel escribe la contraseña una sola vez, el campo vuelve a
   aparecer vacío y la tarjeta muestra «Senha guardada no servidor». Guardar con la contraseña vacía conserva la
-  existente. Una pestaña nueva —el callback del Atajo, una pestaña duplicada u otro dispositivo del mismo owner—
-  consulta, lanza y lee sin volver a pedirla.
+  existente. Una pestaña nueva —el callback de Scriptable, una pestaña duplicada u otro dispositivo del mismo
+  owner— consulta, lanza y lee sin volver a pedirla.
 - **La prueba de conexión va por ticket** (`test` → `/usuarios`) en lugar del sondeo desde el navegador.
-- **La receta del Atajo recibe `{ ticket, ticketUrl }`**: la página ya no arma el sobre y el `Authorization` lo
-  construye el servidor. El enlace iCloud del Atajo viejo de 20 acciones queda marcado como legacy.
-- **Android sin cambios:** no hay cambios de comportamiento ni de UI en la app, y esta entrega no publica APK, tag
-  ni GitHub Release.
+- **Scriptable reemplaza al Atajo de iOS.** La web sigue pidiendo el ticket con
+  `POST /api/integration/aero/bridge-tickets` exactamente como antes; solo cambia el enlace profundo que abre el
+  proceso nativo, que pasa a `scriptable:///run/Aero32Bridge?ticket=<token>&ticketUrl=<url codificada>`. El script
+  canjea el ticket con `POST` a `ticketUrl` y header `X-Trindade-Ticket`, envía cada `body`/`bodies` al ERP con los
+  headers que devolvió el servidor y `allowInsecureRequest = true`, y vuelve por `callback`; no registra
+  `Authorization`, el ticket ni la contraseña, y no guarda estado.
+- **La receta de 23 acciones ya no existe.** Se retiraron las acciones numeradas de Shortcuts, los botones para
+  copiar valores y el enlace de iCloud, y con ellos el nombre del atajo como preferencia del dispositivo: no hay
+  cuenta de acciones que configurar. La contraseña del ERP sigue cifrada en el cofre del servidor y el iPhone nunca
+  la recibe.
+- **Backend, esquema y Android sin cambios:** el canje del ticket y la emisión no cambian, no hay migración y esta
+  entrega no publica APK, tag ni GitHub Release.
 
 ### Notas
 

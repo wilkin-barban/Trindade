@@ -13,7 +13,8 @@ reglas se aplican al importar un asiento. Los contratos exactos de los endpoints
   de datos, no el cuerpo de la petición ni el estado del navegador.
 - **La contraseña del ERP vive en el servidor.** Se escribe una vez en el panel, se guarda cifrada con
   AES-256-GCM en `aero_integration_settings` y no vuelve nunca al navegador. La web recibe un ticket de un solo
-  uso y el Atajo lo canjea por el sobre del pedido. Cerrar sesión no borra el cofre: solo **Limpiar** lo elimina.
+  uso y el script de Scriptable lo canjea por el sobre del pedido. Cerrar sesión no borra el cofre: solo **Limpiar**
+  lo elimina.
 - **Trindade guarda primero.** El lanzamiento se persiste en Trindade antes de intentar el ERP. Si la empresa no
   responde, la producción no se pierde.
 - **La empresa manda en lo que ya registró.** Un asiento del ERP es de solo lectura en Trindade. Importarlo crea un
@@ -22,7 +23,7 @@ reglas se aplican al importar un asiento. Los contratos exactos de los endpoints
 - **El espejo es de la planta.** El snapshot del día se guarda en Trindade y lo puede leer cualquier operario
   autenticado; es una copia de lo que la empresa ya registró.
 
-## 2. Por qué la web usa un atajo y Android no
+## 2. Por qué la web usa Scriptable y Android no
 
 La web corre en `https://trindademasas.duckdns.org`. El WebService de la fábrica escucha en HTTP plano sobre la red
 interna (`http://192.168.25.250:1453/api`). Safari bloquea ese salto por dos capas: *mixed content* (contenido
@@ -30,10 +31,11 @@ inseguro dentro de una página segura) y *Private Network Access* (una página p
 privadas). No es un error de configuración que se arregle con cabeceras: es una negativa del navegador antes de
 emitir el paquete.
 
-Un atajo de iOS corre como proceso nativo, sin origen de página. Puede hablar HTTP plano contra la IP interna
-cuando el teléfono está en el Wi-Fi de la fábrica. Por eso la web delega el `POST` en el atajo y recibe la respuesta
-por un callback. Lo que la página le entrega al atajo es un **ticket de un solo uso**, no la credencial: el sobre
-con el `Authorization: Basic` lo arma el servidor, que es el único que puede descifrar la contraseña guardada.
+Scriptable corre como proceso nativo en el iPhone, sin origen de página. Puede hablar HTTP plano contra la IP
+interna cuando el teléfono está en el Wi-Fi de la fábrica. Por eso la web delega el `POST` en el script y recibe la
+respuesta por un callback. Lo que la página le entrega al script es un **ticket de un solo uso**, no la credencial:
+el sobre con el `Authorization: Basic` lo arma el servidor, que es el único que puede descifrar la contraseña
+guardada.
 
 Android no tiene ese problema: la app corre en la red de la planta y llama al WebService directamente, con
 `OkHttp` y Basic Auth leída del almacén cifrado. La configuración release solo permite HTTP hacia
@@ -47,7 +49,7 @@ sequenceDiagram
     participant UI as Web o Android
     participant API as Trindade API
     participant Cola as Cola local
-    participant Atajo as Atajo iOS
+    participant App as Scriptable (Aero32Bridge)
     participant ERP as Aero32
 
     Operario->>UI: Carga cajas por producto
@@ -57,12 +59,12 @@ sequenceDiagram
         UI->>API: POST /api/integration/aero/bridge-tickets
         API-->>UI: { ticket, ticketUrl, expiresAt }
         UI->>Cola: Encola una entrada por producto
-        Cola->>Atajo: shortcuts://run-shortcut?name=Aero32 Bridge
-        Atajo->>API: POST /bridge-tickets/redeem + X-Trindade-Ticket
-        API-->>Atajo: Sobre { url, method, headers, body, callback }
-        Atajo->>ERP: POST /entradasitem
-        ERP-->>Atajo: Respuesta
-        Atajo-->>UI: Callback con aero_action=aero_data
+        Cola->>App: scriptable:///run/Aero32Bridge?ticket=…&ticketUrl=…
+        App->>API: POST /bridge-tickets/redeem + X-Trindade-Ticket
+        API-->>App: Sobre { url, method, headers, body, callback }
+        App->>ERP: POST /entradasitem
+        ERP-->>App: Respuesta
+        App-->>UI: Callback con aero_action=aero_data
     else Android
         UI->>ERP: POST /entradasitem directo
         ERP-->>UI: Respuesta
@@ -107,7 +109,7 @@ Guardas, todas verificadas en pruebas:
 - Sólo si **algo se envió**: un lote rechazado entero no deja lectura pendiente.
 - Un **lote parcial** no arma la lectura: lo que falló sigue en la cola y su reintento arma su propio veredicto.
 - **Una lectura a la vez.** Si el botón está leyendo, el camino automático no abre otra.
-- Un **viaje que no vuelve** (el operario cancela el atajo) no se reintenta solo; el botón sigue ahí.
+- Un **viaje que no vuelve** (el operario cierra Scriptable sin ejecutar) no se reintenta solo; el botón sigue ahí.
 
 Si la lectura falla, el veredicto del envío queda intacto, la fila sigue pendiente y el motivo se ve en el
 aviso. La lectura nunca deshace un lanzamiento.
@@ -166,17 +168,22 @@ servidor»** es la confirmación de que está ahí.
 - Guardar con una contraseña **nueva** la reemplaza, cifrada de nuevo.
 - **Limpiar** llama `DELETE /api/integration/aero/settings` y solo entonces limpia el estado local; si falla, la
   pantalla no miente. Ese borrado elimina también los tickets pendientes del owner.
-- En `localStorage` quedan solo preferencias no secretas: el nombre del atajo, el interruptor de sincronización y
-  la fecha de la última sincronización. La URL y el usuario vienen del servidor.
+- En `localStorage` quedan solo preferencias no secretas: el interruptor de sincronización y la fecha de la última
+  sincronización. La URL y el usuario vienen del servidor. El nombre del script no es una preferencia: es una
+  constante de integración (`Aero32Bridge`) que el deep link usa tal cual.
 
 **La contraseña nunca vuelve al navegador.** Ninguna respuesta del API devuelve la contraseña, el ciphertext, el IV
 ni el tag; tampoco se escribe en `localStorage`, en `sessionStorage`, en una cookie, en la bitácora, en un log ni en
 una URL. Lo que la web puede pedir es un **ticket**: 32 bytes aleatorios con 120 s de vida, un solo uso, del que la
-base guarda solo el SHA-256. El Atajo canjea el ticket por el sobre ya armado.
+base guarda solo el SHA-256. Scriptable canjea el ticket por el sobre ya armado.
 
-Consecuencia práctica: una pestaña nueva —el callback del Atajo, una pestaña duplicada, otro dispositivo del mismo
-owner— consulta, lanza y lee **sin volver a pedir la contraseña**. El cofre no se borra al cerrar sesión; solo
+Consecuencia práctica: una pestaña nueva —el callback de Scriptable, una pestaña duplicada, otro dispositivo del
+mismo owner— consulta, lanza y lee **sin volver a pedir la contraseña**. El cofre no se borra al cerrar sesión; solo
 **Limpiar** lo elimina.
+
+Debajo de los campos, el panel ofrece el camino del teléfono: **Instalar Scriptable no iPhone** abre la App Store,
+**Importar Aero32Bridge.scriptable** descarga el script y un tercer botón abre el diálogo con los pasos y con
+«Abrir Scriptable». No hay valores para copiar ni enlace de iCloud, porque no hay receta que armar.
 
 ## 5. Prueba de conexión
 
@@ -185,13 +192,13 @@ final: la barra provocaba un `301` que convertía el `POST` en `GET` y devolvía
 
 El panel no puede armar ese `POST`: no tiene la contraseña ni la alcanza la red de la fábrica. Por eso **Probar
 conexión** pide un ticket de acción `test`; el servidor lo mapea a `/usuarios` y arma el sobre con el
-`Authorization: Basic` descifrado en memoria, y el Atajo hace el `POST` como en cualquier lanzamiento.
+`Authorization: Basic` descifrado en memoria, y Scriptable hace el `POST` como en cualquier lanzamiento.
 
 | Veredicto | Significado |
 | --- | --- |
 | `success = true` | La empresa respondió y aceptó las credenciales |
 | `success = false` | El endpoint respondió y rechazó el login (`401`) |
-| Sin veredicto | El operario volvió sin ejecutar el atajo, el atajo se cortó o el ticket venció a los 120 s |
+| Sin veredicto | El operario volvió sin ejecutar el script, el script se cortó o el ticket venció a los 120 s |
 
 Cada intento se registra en la bitácora del backend en dos líneas: `requested` antes de que el teléfono salga y
 `result` cuando vuelve. Una línea `requested` sin `result` significa que el pedido nunca salió del teléfono. Ni el
@@ -200,23 +207,42 @@ ticket ni la contraseña aparecen en esas líneas: el ticket viaja solo en el he
 Si el cofre todavía no tiene contraseña, el panel lo dice con una frase accionable
 (`AERO_VAULT_NOT_CONFIGURED` la primera vez) en vez de fallar en silencio.
 
-## 6. Atajo `Aero32 Bridge`
+## 6. Scriptable `Aero32Bridge`
 
-Un archivo `.shortcut` tiene que estar firmado por el dispositivo que lo instala, e iOS solo acepta enlaces
-oficiales de iCloud. Por eso el panel entrega los valores copiables y el enlace profundo a la app, no un archivo.
+Scriptable es la app de iPhone que ejecuta JavaScript como proceso nativo. El script `Aero32Bridge` no sabe de masas
+ni de stock: recibe un **ticket**, lo canjea por un sobre, hace el `POST` contra el ERP y devuelve la respuesta por
+el callback.
 
-Es **un solo atajo**. El nombre debe coincidir exactamente con el que invoca la página; se puede cambiar en el
-panel, campo «nombre del atajo».
+La web sigue pidiendo el ticket con `POST /api/integration/aero/bridge-tickets` **exactamente como antes**. Lo único
+que cambió es el enlace profundo que abre el proceso nativo: ya no es `shortcuts://` sino
 
-El atajo no sabe de masas ni de stock: recibe un **ticket**, lo canjea por un sobre, hace el `POST` y devuelve la
-respuesta. El diccionario que entrega la página tiene solo dos claves:
-
-```json
-{
-  "ticket": "<token de un solo uso>",
-  "ticketUrl": "https://trindademasas.duckdns.org/api/integration/aero/bridge-tickets/redeem"
-}
+```text
+scriptable:///run/Aero32Bridge?ticket=<token>&ticketUrl=<url codificada>
 ```
+
+`ticket` y `ticketUrl` viajan codificados con `encodeURIComponent`. El nombre `Aero32Bridge` es una constante de
+integración: el deep link lo necesita tal cual y no se configura en el panel.
+
+### 6.1 Instalación e importación
+
+Una sola vez por teléfono:
+
+1. Instalar **Scriptable** desde el App Store: <https://apps.apple.com/app/scriptable/id1405459188>. El botón
+   **Instalar Scriptable no iPhone** del panel abre esa misma ficha.
+2. Tocar **Importar Aero32Bridge.scriptable** en el panel, o abrir
+   `https://trindademasas.duckdns.org/Aero32Bridge.scriptable`. El archivo se sirve en `/Aero32Bridge.scriptable`
+   y su fuente es `packages/frontend/public/Aero32Bridge.scriptable`, que Vite copia al build.
+3. Abrir el archivo descargado y elegir **Compartir → Scriptable**. Aparece en la app como `Aero32Bridge`.
+
+Desde ahí, los botones de Trindade abren Scriptable directamente. No hay acciones que agregar ni orden que
+respetar: la receta vieja, los botones de copiar y el enlace de iCloud ya no existen, así que tampoco hay una cuenta
+de acciones que configurar.
+
+### 6.2 Canje del ticket
+
+El script lee `args.queryParameters.ticket` y `args.queryParameters.ticketUrl`. Si falta alguno, muestra un aviso
+breve y termina sin inventar un callback. Con ambos, hace `POST` a `ticketUrl` con `X-Trindade-Ticket: <ticket>`,
+`Accept: application/json`, **sin cuerpo** y `allowInsecureRequest = true`.
 
 El sobre que devuelve el canje es el mismo de siempre, armado por el servidor y con `body` y `bodies` como **texto
 JSON**:
@@ -231,37 +257,35 @@ JSON**:
 }
 ```
 
-| Clave del sobre | Qué es | Dónde se usa |
+| Clave del sobre | Qué es | Qué hace el script con ella |
 | --- | --- | --- |
-| `url` | Endpoint completo del ERP | Campo URL del `POST` |
+| `url` | Endpoint completo del ERP | Destino del `POST` al WebService |
 | `method` | Siempre `POST` | Método del pedido |
-| `headers` | `Authorization: Basic …`, `Content-Type` y `Accept` | Encabezados del pedido |
-| `body` | JSON del pedido serializado como texto | Cuerpo de la petición → Texto |
-| `bodies` | Lista de textos JSON, solo en el lote | Cuerpo de cada repetición |
-| `callback` | Vuelta a la página, con la acción ya puesta | Acción Abrir URLs al final |
+| `headers` | `Authorization: Basic …`, `Content-Type` y `Accept` | Encabezados del pedido, tal como llegan |
+| `body` | JSON del pedido serializado como texto | Cuerpo cuando hay un solo payload |
+| `bodies` | Lista de textos JSON, solo en el lote | Un pedido por elemento |
+| `callback` | Vuelta a la página, con la acción ya puesta | URL que se abre al final |
 
-Receta — la entrada cambia, el resto se conserva:
+### 6.3 Envío y retorno
 
-1. Abrir **Atajos** → `+` y nombrarlo `Aero32 Bridge`.
-2. **Obtener diccionario de la entrada** (la página entrega `{ ticket, ticketUrl }`).
-3. **Obtener valor del diccionario**, clave `ticket`.
-4. **Obtener valor del diccionario**, clave `ticketUrl`.
-5. **Obtener contenido de URL**: URL = valor `ticketUrl`; método `POST`; encabezado `X-Trindade-Ticket` = valor
-   `ticket`; `Accept: application/json`; **sin cuerpo**. La respuesta es el sobre.
-6. Desde aquí siguen las acciones del ERP —`url`, `headers`, `Authorization`, `callback`, `bodies`, el `POST` y el
-   callback—, pero leyendo el **sobre devuelto por el canje** en lugar del diccionario de entrada.
-
-El delta numerado completo, con cada acción y su nueva posición, está en
-[integracion-aero32.md §0.2](integracion-aero32.md).
+1. Si el sobre trae `bodies` como lista no vacía, el script recorre esos elementos; si no, usa `[body]`.
+2. Cada payload se envía como texto JSON a `url` con los `headers` del sobre y `allowInsecureRequest = true`,
+   porque el WebService es HTTP plano en la LAN.
+3. Un payload devuelve el texto tal cual; un lote devuelve `[respuesta1,respuesta2,…]`, con coma entre respuestas y
+   corchetes alrededor, que es exactamente lo que la página ya sabe leer.
+4. Al final abre `callback + encodeURIComponent(resultado)` en Safari y termina la ejecución del script.
 
 Detalles que importan:
 
-- **El `body` del sobre va como texto, no como diccionario.** Si llegara como objeto y el teléfono lo insertara en
-  el cuerpo, iOS lo convertiría en una lista de propiedades y el ERP recibiría algo que no es JSON.
-- **La credencial ya no viaja al teléfono desde la página.** Cambiar la contraseña en el panel no obliga a volver a
-  tocar el iPhone, y el ticket — que sí viaja — vive 120 s, sirve una sola vez y no entrega la contraseña.
-- **El ticket va en el header, no en la URL.** El canje lee `X-Trindade-Ticket`; un ticket en la query quedaría en
-  los logs del proxy, en el historial de Shortcuts y en cualquier captura de red.
+- **El `body` del sobre va como texto, no como diccionario.** Si el script lo tratara como objeto, terminaría
+  enviando una lista de propiedades en vez de JSON y el ERP recibiría algo que no puede leer.
+- **La contraseña del ERP no cambia ni viaja al iPhone.** Sigue cifrada en el cofre del servidor, y el teléfono
+  nunca la recibe: el script entrega el ticket y el servidor devuelve el sobre con el `Authorization` ya armado.
+  Cambiar la contraseña en el panel no obliga a volver a tocar el iPhone.
+- **El ticket se canjea en el header, no en la URL del pedido.** El deep link lleva el ticket a la app local, pero
+  el `POST` de canje lo manda en `X-Trindade-Ticket`: así no queda en los logs del proxy ni en una captura de red.
+- **El script no registra ni muestra secretos.** No escribe `Authorization`, el ticket ni ninguna contraseña en
+  pantalla, en un archivo ni en un log, y no guarda estado entre ejecuciones.
 - **La respuesta vuelve por el callback.** La página separa el prefijo, decodifica y lee el cuerpo real. La acción
   viaja en `aero_action`: `entrada`, `saida`, `movimentos` o `test`. Los parámetros se leen y se borran de la URL
   con `replaceState`, así que un *pull-to-refresh* no vuelve a procesar el mismo resultado.
@@ -297,8 +321,8 @@ Los JSON completos, los campos de `/saidasitem` y el mapeo de `/movimentoitem` e
 
 ## 8. Espejo del día y conciliación
 
-El atajo corre en un solo teléfono, pero el espejo lo lee toda la planta. La respuesta del ERP se guarda como
-snapshot del día en `aero_movements` para que cualquier dispositivo la vea sin volver a ejecutar el atajo.
+El script corre en un solo teléfono, pero el espejo lo lee toda la planta. La respuesta del ERP se guarda como
+snapshot del día en `aero_movements` para que cualquier dispositivo la vea sin volver a ejecutar el script.
 
 - `POST /api/integration/aero/movements` — cuerpo `{ date, movements }`, un elemento por asiento con `ent_lan`,
   `product_code`, `product_desc`, `quantity`, `entry_date`, `operator_name` y `movement_type` (`"E"` o `"S"`).
@@ -374,10 +398,11 @@ El cofre y los tickets usan su propia familia, con la misma forma (`code` + fras
 Antes de ir:
 
 - [ ] `docker compose ps` con `api` y `web` sanos, y `https://trindademasas.duckdns.org` respondiendo 200.
-- [ ] El iPhone tiene el atajo `Aero32 Bridge` creado y actualizado al delta del ticket (`{ ticket, ticketUrl }`).
-      El enlace iCloud viejo apunta al atajo de 20 acciones y queda marcado como legacy: no sirve como «listo para
-      instalar».
-- [ ] El iPhone está en el Wi-Fi de la fábrica; el atajo no funciona por datos móviles porque la IP es interna.
+- [ ] El iPhone tiene **Scriptable** instalado y el script `Aero32Bridge` importado una sola vez con
+      **Compartir → Scriptable**. No hay receta que actualizar, ni enlace de iCloud, ni cuenta de acciones: los
+      botones **Instalar Scriptable no iPhone** e **Importar Aero32Bridge.scriptable** del panel dejan el teléfono
+      listo.
+- [ ] El iPhone está en el Wi-Fi de la fábrica; el script no funciona por datos móviles porque la IP es interna.
 
 En la fábrica:
 
@@ -385,32 +410,34 @@ En la fábrica:
 2. **Lanzamiento de Masas → Configuración Integración Empresa**: URL y usuario; la contraseña se escribe una sola
    vez y queda cifrada en el servidor. El campo vuelve a aparecer vacío y la tarjeta dice «Senha guardada no
    servidor».
-3. **Probar conexión**. El botón pide un ticket `test` y abre el atajo, que canjea el ticket por el sobre de
-   `/usuarios`; al volver, la tarjeta dice si la empresa respondió. Lo que importa es que no quede en «sin
-   veredicto».
+3. **Probar conexión**. El botón pide un ticket `test` y abre Scriptable con
+   `scriptable:///run/Aero32Bridge?ticket=…&ticketUrl=…`, que canjea el ticket por el sobre de `/usuarios`; al
+   volver, la tarjeta dice si la empresa respondió. Lo que importa es que no quede en «sin veredicto».
 4. Cargar **un** producto, una caja, y confirmar con el interruptor **Sincronizar con ERP** activo.
-5. iOS abre el atajo; al volver, la tarjeta de confirmación debe desaparecer y aparecer el resultado.
-6. Cerrar el veredicto y esperar el segundo viaje: iOS abre el atajo de `movimentos`, la página guarda el día y
-   la fila pasa a **conciliada** sin tocar **Sincronizar com ERP**. En el log quedan dos pares: `launch_sync`
-   del envío y `read_history` de la lectura.
+5. iOS abre Scriptable con el script `Aero32Bridge`; al volver, la tarjeta de confirmación debe desaparecer y
+   aparecer el resultado.
+6. Cerrar el veredicto y esperar el segundo viaje: iOS vuelve a abrir el script para `movimentos`, la página guarda
+   el día y la fila pasa a **conciliada** sin tocar **Sincronizar com ERP**. En el log quedan dos pares:
+   `launch_sync` del envío y `read_history` de la lectura.
 7. Verificar en el ERP que la entrada existe y en el log del servidor las dos líneas (`requested` y `result`).
 8. Repetir con dos productos para comprobar que la cola envía el segundo después del retorno del primero.
 9. Probar el fallo: apagar el Wi-Fi, lanzar y confirmar que el lanzamiento **igual** quedó guardado en Trindade.
 
 ## 11. Límites conocidos
 
-- El atajo necesita el teléfono en la red de la fábrica; no hay acceso remoto al WebService.
-- Sin retorno del atajo (el operario lo cancela), la página no puede adivinar el resultado: lo pregunta.
-- La URL, el usuario y la contraseña viven en el servidor, una vez por instalación. El nombre del atajo, el
-  interruptor de sincronización y la fecha de la última sincronización siguen siendo preferencias del dispositivo.
+- El script necesita el teléfono en la red de la fábrica; no hay acceso remoto al WebService.
+- Sin retorno del script (el operario lo cierra sin ejecutar), la página no puede adivinar el resultado: lo pregunta.
+- La URL, el usuario y la contraseña viven en el servidor, una vez por instalación. El interruptor de
+  sincronización y la fecha de la última sincronización siguen siendo preferencias del dispositivo; el nombre del
+  script no, porque es una constante de integración.
 - El ticket vive **120 s** y sirve una sola vez. Si el teléfono tarda en volver o el operario repite el canje, el
   API responde `410` y la página pide un ticket nuevo; el lanzamiento ya está guardado en Trindade y no se pierde.
-- La prueba de conexión ya no sale del navegador: pide un ticket `test` y va por el atajo, igual que un lanzamiento.
+- La prueba de conexión ya no sale del navegador: pide un ticket `test` y va por Scriptable, igual que un lanzamiento.
 - La respuesta vuelve por la URL del callback: un rango de movimientos muy grande puede superar lo que iOS está
   dispuesto a abrir. Es un motivo más para no pedir historiales largos desde el teléfono.
-- El `Authorization: Basic` sigue viajando al ERP porque el ERP no ofrece otro mecanismo, y el atajo es el único
-  proceso que habla con la red de la fábrica. Lo que se eliminó es la contraseña del navegador, no el Basic Auth
-  del pedido.
+- El `Authorization: Basic` sigue viajando al ERP porque el ERP no ofrece otro mecanismo, y el script de Scriptable
+  es el único proceso que habla con la red de la fábrica. Lo que se eliminó es la contraseña del navegador, no el
+  Basic Auth del pedido.
 - La integración no escribe en las tablas fiscales del ERP ni reemplaza la operación de la empresa.
 
 ## 12. Estado de las piezas
@@ -418,7 +445,7 @@ En la fábrica:
 | Pieza | Estado |
 | --- | --- |
 | Cofre cifrado del ERP en el servidor (AES-256-GCM) | Implementada |
-| Ticket de un solo uso para el Atajo | Implementada |
+| Ticket de un solo uso para el puente Scriptable | Implementada |
 | Prueba de conexión `/usuarios` | Implementada por ticket `test` |
 | Lanzamiento de masas `/entradasitem` | Implementada |
 | Espejo `/movimentoitem` | Implementada |

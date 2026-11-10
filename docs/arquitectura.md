@@ -10,7 +10,7 @@ flowchart LR
     W[Web React] -->|HTTPS /api| API[API Fastify]
     A[Android Kotlin] -->|HTTPS /api| API
     A -->|HTTP LAN| ERP[Aero32 WebService]
-    W -->|Atajo iOS| ERP
+    W -->|Scriptable en iPhone| ERP
     API -->|SQLite WAL| DB[(trindade.db)]
     API -->|Snapshot del día| DB
     API -->|Nginx| PUB[trindademasas.duckdns.org]
@@ -21,9 +21,9 @@ flowchart LR
 - **API:** Fastify sobre Node 24, con SQLite en modo WAL y migraciones explícitas.
 - **Android:** cliente nativo Kotlin/Compose que consume la misma API y, en la red de la fábrica, llama
   directamente al WebService Aero32.
-- **ERP:** Aero32 se alcanza por HTTP local. La web usa un atajo de iOS como puente; Android llama directo. La
-  contraseña del WebService vive cifrada en el servidor y la web solo recibe un ticket de un solo uso que el atajo
-  canjea por el sobre del pedido: la página nunca ve la credencial.
+- **ERP:** Aero32 se alcanza por HTTP local. La web usa **Scriptable** en el iPhone como puente; Android llama
+  directo. La contraseña del WebService vive cifrada en el servidor y la web solo recibe un ticket de un solo uso
+  que el script canjea por el sobre del pedido: la página nunca ve la credencial.
 - **Persistencia:** un volumen Docker externo guarda la base y las fotos de reportes.
 
 ## 2. Monorepo
@@ -55,7 +55,7 @@ Directorios de apoyo:
 | `loading` | `/api/loading` | Cronogramas, conductores, vehículos, horarios e historial |
 | `stock` | `/api/stock` | Conteo diario, historial y resumen colectivo |
 | `massas` | `/api/massas-launch` | Lanzamientos, reporte del día e historial |
-| `integration` | `/api/integration/aero` | Cofre del ERP, tickets del Atajo, bitácora y espejo de movimientos del ERP |
+| `integration` | `/api/integration/aero` | Cofre del ERP, tickets del puente Scriptable, bitácora y espejo de movimientos del ERP |
 | `admin` | `/api/admin` | Usuarios, catálogos, vehículos, horarios y auditoría |
 | `audit` | `/api/admin/audit` | Consulta paginada de auditoría |
 | `app` | `/api/app` | Última release y descarga del APK |
@@ -85,7 +85,7 @@ Directorios de apoyo:
 | `/api/integration/aero/log` | `POST` | Bitácora de integración |
 | `/api/integration/aero/movements` | `GET`, `POST` | Espejo de movimientos del ERP |
 | `/api/integration/aero/settings` | `GET`, `PUT`, `DELETE` | Cofre del ERP; solo `wilkin` con rol Administrador |
-| `/api/integration/aero/bridge-tickets` | `POST` | Emite un ticket de un solo uso para el Atajo |
+| `/api/integration/aero/bridge-tickets` | `POST` | Emite un ticket de un solo uso para el puente Scriptable |
 | `/api/integration/aero/bridge-tickets/redeem` | `POST` | Canje del ticket; sin JWT por diseño, la credencial es el ticket |
 | `/api/admin/*` | `GET`, `POST`, `PATCH`, `DELETE` | Catálogos, usuarios, vehículos y horarios |
 | `/api/admin/audit` | `GET` | Auditoría |
@@ -205,15 +205,15 @@ sequenceDiagram
     Operario->>UI: Carga cajas por producto
     UI->>API: POST /api/massas-launch
     API-->>UI: Lanzamiento guardado
-    UI->>ERP: Envío por atajo o llamada nativa
+    UI->>ERP: Envío por Scriptable o llamada nativa
     ERP-->>UI: Asiento ENT_LAN
     UI->>API: POST /api/integration/aero/movements
     API-->>UI: Snapshot del día actualizado
 ```
 
 - Si el ERP no responde, el lanzamiento ya está guardado en Trindade.
-- En la web el envío no lleva credenciales: la página pide un ticket y el Atajo canjea el sobre con el
-  `Authorization: Basic` ya armado por el servidor (7.5).
+- En la web el envío no lleva credenciales: la página pide un ticket y el script de Scriptable canjea el sobre
+  con el `Authorization: Basic` ya armado por el servidor (7.5).
 - El reporte de masas lee el snapshot del ERP, no `massa_launches`.
 - Un asiento conciliado queda inmutable desde Trindade.
 
@@ -240,7 +240,7 @@ sequenceDiagram
     participant UI as Web
     participant API as Trindade API
     participant DB as SQLite
-    participant Atajo as Atajo iOS
+    participant App as Scriptable (Aero32Bridge)
     participant ERP as Aero32
 
     Admin->>UI: Escribe la contraseña del ERP una vez
@@ -248,30 +248,31 @@ sequenceDiagram
     API->>DB: ciphertext + IV + tag (AES-256-GCM)
     UI->>API: POST /api/integration/aero/bridge-tickets
     API-->>UI: { ticket, ticketUrl, expiresAt }
-    UI->>Atajo: { ticket, ticketUrl }
-    Atajo->>API: POST /redeem + X-Trindade-Ticket
+    UI->>App: scriptable:///run/Aero32Bridge?ticket=…&ticketUrl=…
+    App->>API: POST /redeem + X-Trindade-Ticket
     API->>DB: marca used_at y descifra
-    API-->>Atajo: { url, method, headers, body, callback }
-    Atajo->>ERP: POST con Authorization: Basic
-    ERP-->>Atajo: Respuesta
-    Atajo-->>UI: Callback
+    API-->>App: { url, method, headers, body, callback }
+    App->>ERP: POST con Authorization: Basic
+    ERP-->>App: Respuesta
+    App-->>UI: Callback
 ```
 
 - **Qué protege el cofre.** La contraseña del ERP frente a scripts de la página, al almacenamiento del navegador,
   a otra pestaña, a otro dispositivo del mismo owner y a la base en claro: en SQLite quedan solo ciphertext, IV y
   tag, y sin `AERO_VAULT_KEY` no se descifra. El token del ticket tampoco se guarda en claro: solo su SHA-256.
-- **Qué sigue expuesto.** El ticket viaja en claro al Atajo y puede quedar en el historial de Shortcuts; vive
+- **Qué sigue expuesto.** El ticket viaja en claro al teléfono —en el deep link que abre Scriptable— y vive
   120 s, sirve una sola vez y no entrega la contraseña sino un sobre ya armado para una acción concreta. El
-  `Authorization: Basic` sigue viajando al ERP porque el ERP no ofrece otro mecanismo, y el Atajo sigue siendo el
-  único proceso que habla con la LAN de la fábrica: la web no gana alcance de red, solo deja de guardar el secreto.
-  Quien tenga el proceso API y la clave del entorno puede descifrar el cofre: es el mismo nivel de acceso que ya
-  permite leer la base.
+  `Authorization: Basic` sigue viajando al ERP porque el ERP no ofrece otro mecanismo, y el script de Scriptable
+  sigue siendo el único proceso que habla con la LAN de la fábrica: la web no gana alcance de red, solo deja de
+  guardar el secreto. El script no registra ni muestra el ticket, el `Authorization` ni ninguna contraseña, y no
+  guarda estado. Quien tenga el proceso API y la clave del entorno puede descifrar el cofre: es el mismo nivel de
+  acceso que ya permite leer la base.
 - **Quién administra.** `GET`, `PUT` y `DELETE /api/integration/aero/settings` exigen `authenticate`,
   `requireUsername('wilkin')` y `requireRole('Administrador')`. Ninguna respuesta devuelve la contraseña, el
   ciphertext, el IV ni el tag. Cerrar sesión no borra el cofre; solo `DELETE /settings` lo elimina.
 - **El canje es sin JWT, por diseño.** `POST /api/integration/aero/bridge-tickets/redeem` lee el ticket del header
-  `X-Trindade-Ticket`, nunca de la URL ni de la query. Pide un JWT rompería el caso que este diseño resuelve: el
-  Atajo no tiene sesión. La credencial es el ticket bearer de un solo uso, y por eso la respuesta lleva
+  `X-Trindade-Ticket`, nunca de la URL ni de la query. Pide un JWT rompería el caso que este diseño resuelve:
+  Scriptable no tiene sesión. La credencial es el ticket bearer de un solo uso, y por eso la respuesta lleva
   `Cache-Control: no-store` y no se registra el header, el token ni el cuerpo en ningún log.
 - **Qué no cambia.** La cola local, los reintentos, la auditoría de pares `requested`/`result`, el callback, el
   espejo del día y la conciliación conservan su comportamiento; Android no cambia y sigue llamando al WebService
