@@ -7,6 +7,7 @@ import {
   type AeroSettings,
 } from './aero-integration';
 import { requestAeroBridgeTicket, type AeroVaultClient } from './aero-vault';
+import { clearAeroBridgePending, markAeroBridgePending } from './aero-watchdog';
 
 /**
  * The mirror, end to end: what to ask the company for, and how to read what came back.
@@ -74,6 +75,10 @@ export async function triggerAeroMovementsSync(
 ): Promise<boolean> {
   if (!aeroSettingsReady(settings)) return false;
 
+  // Sin red el viaje no tiene sentido: el teléfono no puede canjear el ticket y la pantalla se queda esperando
+  // una respuesta que nadie va a poder dar. Se dice en el llamador, que es quien tiene dónde mostrarlo.
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
+
   let ticket: { ticket: string; ticketUrl: string };
   try {
     ticket = await requestAeroBridgeTicket(
@@ -92,10 +97,20 @@ export async function triggerAeroMovementsSync(
     ticket: ticket.ticket,
     ticketUrl: ticket.ticketUrl,
   });
-  if (options.navigate) {
-    options.navigate(url);
-  } else {
-    window.location.href = url;
+  // La marca describe el viaje que está por empezar, así que se escribe antes de salir: si Scriptable no
+  // vuelve, la pantalla tiene con qué decirlo en vez de quedar «enviando» para siempre.
+  markAeroBridgePending({ action: 'movimentos', date: options.date });
+  try {
+    if (options.navigate) {
+      options.navigate(url);
+    } else {
+      window.location.href = url;
+    }
+  } catch {
+    // La navegación no llegó a ocurrir: una marca sin viaje dispararía «Scriptable no volvió» sobre algo que
+    // nunca salió, y el llamador se entera de que no hubo lanzamiento.
+    clearAeroBridgePending();
+    return false;
   }
   return true;
 }

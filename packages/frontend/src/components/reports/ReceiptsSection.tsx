@@ -15,6 +15,7 @@ import {
   readAeroMovements,
 } from '../../lib/aero-integration';
 import { triggerAeroMovementsSync } from '../../lib/aero-mirror';
+import { clearAeroBridgePending } from '../../lib/aero-watchdog';
 import { fetchAeroVaultSettings } from '../../lib/aero-vault';
 import { aeroReceiptsAuditEvent, postAeroAuditEvent } from '../../lib/aero-audit';
 import { aeroEndpoint } from '../../lib/aero-integration';
@@ -59,6 +60,13 @@ export function ReceiptsSection({
   // The callback is consumed once: a re-render must not store the same day again, and a pull-to-refresh in
   // the factory must not replay a result the operator already read.
   const callbackHandled = useRef(false);
+  /**
+   * Why the bridge came back without the plant.
+   *
+   * A phone off the factory Wi-Fi answers with `aero_error`, not with a day: saying it here keeps the section
+   * honest -- there is nothing to store and nothing to count -- and leaves the sync button where it was.
+   */
+  const [bridgeError, setBridgeError] = useState<{ message: string; hint: string | null } | null>(null);
 
   const [settings, setSettings] = useState(() => loadAeroSettings());
   const canSync = !readOnly && aeroSettingsReady(settings);
@@ -164,15 +172,31 @@ export function ReceiptsSection({
   useEffect(() => {
     if (callbackHandled.current) return;
     const parsed = parseAeroCallback(window.location.search);
-    if (!parsed || parsed.kind !== 'bridge' || parsed.action !== 'movimentos') return;
+    if (!parsed) return;
+    if (parsed.kind === 'error') {
+      // El teléfono volvió sin la planta: no hubo asientos, así que no hay espejo que tocar ni día vacío que
+      // mostrar. El aviso dice qué revisar y el botón queda libre para el próximo intento.
+      callbackHandled.current = true;
+      window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`);
+      clearAeroBridgePending();
+      setBridgeError({ message: t('massas.aero.wifiRequired'), hint: parsed.message });
+      return;
+    }
+    if (parsed.kind !== 'bridge' || parsed.action !== 'movimentos') return;
     callbackHandled.current = true;
     window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`);
+    clearAeroBridgePending();
     void finishSync(parsed.data);
-  }, [finishSync]);
+  }, [finishSync, t]);
 
   const handleSync = useCallback(() => {
+    // Sin red no se puede canjear el ticket: se dice acá y no se abre Scriptable para nada.
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      setBridgeError({ message: t('massas.aero.offline'), hint: null });
+      return;
+    }
     void triggerAeroMovementsSync(settings, { date, callbackPath: location.pathname });
-  }, [date, location.pathname, settings]);
+  }, [date, location.pathname, settings, t]);
 
   const syncedAtLabel = useMemo(() => {
     if (!day?.syncedAt) return null;
@@ -323,6 +347,16 @@ export function ReceiptsSection({
           ))}
         </ul>
       )}
+
+      <AeroResultDialog
+        open={bridgeError !== null}
+        tone="error"
+        title={t('massas.aero.wifiRequiredTitle')}
+        message={bridgeError?.message ?? t('massas.aero.wifiRequired')}
+        hint={bridgeError?.hint ?? null}
+        onClose={() => setBridgeError(null)}
+        testId="receipts-bridge-error-modal"
+      />
 
       <AeroResultDialog
         open={syncResult !== null}
