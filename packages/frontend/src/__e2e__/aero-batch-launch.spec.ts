@@ -8,7 +8,7 @@ import { loginAsAeroOwner, navigateInApp, openErpSession } from './aero-owner';
  * The shortcut cannot run inside a browser, so the spec seeds exactly what the page writes before leaving
  * and feeds back exactly what the phone returns. What it can prove, and what the operator actually felt
  * broken, is the count: three products must leave as one envelope and come back as one dialog, instead of
- * three trips through Safari and Atajos that the plant had no way to follow.
+ * three trips through Safari and Scriptable that the plant had no way to follow.
  */
 const AERO_SETTINGS_KEY = 'trindade.aero.integration.v1';
 const AERO_QUEUE_KEY = 'trindade.aero.queue.v1';
@@ -24,7 +24,6 @@ const DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).
 const SETTINGS = JSON.stringify({
   wsUrl: 'http://192.168.25.250:1453/api',
   username: 'wilkin',
-  shortcutName: 'Aero32 Bridge',
   syncEnabled: true,
 });
 
