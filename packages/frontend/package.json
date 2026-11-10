@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "test": "npm run test:node && npm run test:unit",
+    "prebuild": "node scripts/build-scriptable.mjs",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test:e2e": "env -u NO_COLOR npx playwright test",
