@@ -106,8 +106,8 @@ archivo con el mismo SHA-256 que el de `public/`, que la SPA muestra los dos bot
 | T8 | paridad ES/PT | i18n | `i18n/locales/es.json`, `pt-BR.json` | Mismas claves, sin receta vieja | Ninguno | Revertir commit | pendiente | 5436ab75 |
 | T9 | e2e del diálogo y del panel | specs actualizados | `__e2e__/aero-shortcut-dialog.spec.ts`, `admin-integration.spec.ts`, `erp-result-dialogs.spec.ts` | 375 px, links accesibles, sin receta | Ninguno | Revertir commit | pendiente | af2ec856 |
 | T10 | — | Docs y CHANGELOG | `docs/…`, `README.md`, `AGENTS.md`, `CHANGELOG.md` | Scriptable en toda la doc | Ninguno | Revertir commit | pendiente | aee06c68 |
-| T11 | — | Suites, typecheck, build, contrato, CI | — | Todo verde | Ninguno | — | pendiente | pendiente |
-| T12 | — | Imagen `web` y verificación en producción | producción | `web` healthy, asset con hash igual, sin `shortcuts://` | 5 (despliegue) | Volver a la imagen anterior | pendiente | pendiente |
+| T11 | — | Suites, typecheck, build, contrato, CI | — | Todo verde | Ninguno | — | 1d689895 | pendiente |
+| T12 | — | Imagen `web` y verificación en producción | producción | `web` healthy, asset con hash igual, sin `shortcuts://` | 5 (despliegue) | Volver a la imagen anterior | 1d689895 | pendiente |
 
 ## Log
 
@@ -289,3 +289,11 @@ publicar un asset que no se importe o un deep link mal formado dejaría a los bo
 pruebas fijan el nombre exacto, el encoding de los dos parámetros, la presencia del archivo en `dist/` y la
 ausencia de `shortcuts://` en el bundle servido. El rollback es la imagen anterior de `web`; el backend no se
 toca.
+
+L5 — Cierre medido. Frontend `test:node` 589/589, `test:unit` 132/132, `tsc --noEmit` limpio, `npm run build` con
+el asset copiado a `dist/` y **cero** `shortcuts://` en el bundle; E2E **116/116**. Producción: imagen `web`
+reconstruida y recreada, `web` healthy, `/api/health` 200, `https://trindademasas.duckdns.org/Aero32Bridge.scriptable`
+devuelve JSON válido con `name = Aero32Bridge` y el SHA-256 idéntico al de `public/`
+(`09244c98…b4c9`), el bundle servido contiene «Instalar Scriptable no iPhone», «Importar Aero32Bridge.scriptable» y
+`scriptable:///run/Aero32Bridge`, y no contiene `shortcuts://`. El API no se reinició ni se migró: el backend no
+cambió.
