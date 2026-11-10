@@ -26,7 +26,7 @@ test.describe('integration tab in the admin panel', () => {
     await expect(url).toBeEditable();
 
     // The shortcut recipe and the connection test live here too, at thumb size.
-    await expect(page.getByRole('button', { name: /Instalar Atalho no iPhone/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Cómo instalar Scriptable|Como instalar o Scriptable/ })).toBeVisible();
 
     // Nothing to create on this tab, and nothing to unfold: the panel is the page.
     await expect(page.getByRole('button', { name: '+ Novo' })).toHaveCount(0);

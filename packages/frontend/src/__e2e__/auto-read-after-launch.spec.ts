@@ -23,7 +23,6 @@ const DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).
 const SETTINGS = JSON.stringify({
   wsUrl: PLANT_URL,
   username: 'wilkin',
-  shortcutName: 'Aero32 Bridge',
   syncEnabled: true,
 });
 

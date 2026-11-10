@@ -7,7 +7,7 @@ import { IPHONE_UA, getE2EIdentities, loginViaApi } from './auth-helpers';
  * Both screens write the same boxes, so the screen has to answer three questions without a second tab: what is
  * already paired, what Delphi still owes, and what the company tablet recorded that Trindade never launched.
  * The snapshot is seeded through the public endpoint because that is exactly what the phone does when the
- * shortcut comes back -- the Atajos round trip cannot run in a browser.
+ * bridge comes back -- the Scriptable round trip cannot run in a browser.
  */
 const API = 'http://localhost:3099/api';
 

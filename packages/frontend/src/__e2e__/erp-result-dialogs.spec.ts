@@ -5,7 +5,7 @@ import { AERO_OWNER, ensureAeroOwner } from './aero-owner';
 /**
  * The verdicts of the two actions that leave the app.
  *
- * The phone runs the Atajos app, so both come back as a URL, not as a screen. What matters to the plant is
+ * The phone runs Scriptable, so both come back as a URL, not as a screen. What matters to the plant is
  * that returning to the page says what happened and that the window can be closed with a thumb.
  */
 const API = 'http://localhost:3099/api';
@@ -92,7 +92,7 @@ test.describe('result dialogs on a phone screen', () => {
     await expect(page.getByText(/guardada en el servidor|guardada no servidor/i).first()).toBeVisible();
 
     // The page cannot reach the plant's LAN, so it no longer probes: it asks for a `test` ticket and the
-    // shortcut is the one that calls `/usuarios`. Chromium cannot open a shortcuts:// URL, and that is fine:
+    // script is the one that calls `/usuarios`. Chromium cannot open a scriptable:// URL, and that is fine:
     // what is asserted is the ticket, which is the whole hand-off.
     const ticket = page.waitForResponse(
       (response) => response.url().includes('/bridge-tickets') && response.request().method() === 'POST',
@@ -105,7 +105,7 @@ test.describe('result dialogs on a phone screen', () => {
     // The verdict travels back in the return URL, exactly as the shortcut would deliver it.
     const answer = encodeURIComponent(JSON.stringify({ success: false, message: 'Firebird indisponível' }));
     const callbackUrl = `/admin?tab=integration&aero_action=test&aero_data=${answer}`;
-    // The click set `window.location` to `shortcuts://`, and Chromium cancels that navigation when the next one
+    // The click set `window.location` to `scriptable://`, and Chromium cancels that navigation when the next one
     // starts; the cancellation can surface as ERR_ABORTED on this goto. One retry, and only for that case.
     await page.goto(callbackUrl).catch(() => page.goto(callbackUrl));
 
