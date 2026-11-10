@@ -55,6 +55,13 @@ import {
 import { fetchAeroVaultSettings, requestAeroBridgeTicket } from '../lib/aero-vault';
 import { aeroAttemptHeaders, aeroImportAuditEvent, newAeroAttempt, postAeroAuditEvent } from '../lib/aero-audit';
 import {
+  aeroBridgeMarkExpired,
+  AERO_BRIDGE_MARK_TTL_MS,
+  clearAeroBridgePending,
+  markAeroBridgePending,
+  readAeroBridgePending,
+} from '../lib/aero-watchdog';
+import {
   aeroAttemptDate,
   clearAeroPendingAttempt,
   loadAeroPendingAttempt,
@@ -418,6 +425,20 @@ export function MassasLaunchPage() {
   };
 
   /**
+   * Whether the phone already knows the trip would fail.
+   *
+   * The bridge is a deep link to Scriptable: opening it without a network leaves the operator on a screen that
+   * says «enviando» while the phone has no way to ask the plant for anything. One sentence here is cheaper
+   * than a launch that never had a chance, and it is said in the same place the other refusals are.
+   */
+  const aeroCannotReachInternet = useCallback(() => {
+    const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+    if (!offline) return false;
+    setNotice({ type: 'error', message: t('massas.aero.offline') });
+    return true;
+  }, [t]);
+
+  /**
    * Hands the next batch of pending entries to the Atajos app.
    *
    * One ticket per trip, and one trip per trip: a launch of three products used to be three returns to
@@ -432,6 +453,7 @@ export function MassasLaunchPage() {
    */
   const triggerAeroSync = useCallback(
     async (queue: AeroQueue) => {
+      if (aeroCannotReachInternet()) return;
       const taken = takeAeroBatch(queue, AERO_BATCH_MAX);
       if (taken.batch.length === 0) {
         clearAeroQueue();
@@ -513,12 +535,15 @@ export function MassasLaunchPage() {
             : `batch ${payloads.length}${taken.rest.items.length > 0 ? ` · ${taken.rest.items.length} pending` : ''} · via=bridge`,
       });
 
+      // La marca dice qué acción quedó debiendo una respuesta y de qué día, y se escribe antes de salir: si
+      // Scriptable no vuelve, la pantalla podrá decirlo en vez de mentir «enviando» para siempre.
+      markAeroBridgePending({ action, date });
       window.location.href = buildAeroBridgeTriggerUrl({
         ticket: ticket.ticket,
         ticketUrl: ticket.ticketUrl,
       });
     },
-    [aeroSettings, date, t, user],
+    [aeroCannotReachInternet, aeroSettings, date, t, user],
   );
 
   /**
@@ -537,6 +562,8 @@ export function MassasLaunchPage() {
         setNotice({ type: 'error', message: erpNotReadyMessage(t, aeroSettings) });
         return;
       }
+      // Y sin red no hay viaje que ofrecer: se dice y el lanzamiento sigue en la fila.
+      if (aeroCannotReachInternet()) return;
       const item = pendingLaunchQueueItem({
         productCode: row.productCode,
         productName: row.productName,
@@ -549,7 +576,7 @@ export function MassasLaunchPage() {
       writeAeroQueue(queue);
       void triggerAeroSync(queue);
     },
-    [aeroSettings, date, t, triggerAeroSync],
+    [aeroCannotReachInternet, aeroSettings, date, t, triggerAeroSync],
   );
 
   /**
@@ -560,11 +587,12 @@ export function MassasLaunchPage() {
    * milestone exists to remove.
    */
   const retryFailedLaunches = useCallback(() => {
+    if (aeroCannotReachInternet()) return;
     setResultModal(null);
     const queue = readAeroQueue();
     if (!queue) return;
     void triggerAeroSync(queue);
-  }, [triggerAeroSync]);
+  }, [aeroCannotReachInternet, triggerAeroSync]);
 
   /**
    * Asks the company for the day's movements through the same ticket every launch uses.
@@ -578,6 +606,8 @@ export function MassasLaunchPage() {
       setNotice({ type: 'error', message: erpNotReadyMessage(t, aeroSettings) });
       return;
     }
+    // Sin red no hay ticket que canjear: se dice y no se abre Scriptable para nada.
+    if (aeroCannotReachInternet()) return;
 
     const payload = aeroMovementsPayload({ date, userName: null });
 
@@ -608,6 +638,8 @@ export function MassasLaunchPage() {
       ...attempt,
     });
 
+    // La consulta también es un viaje que se puede perder: la marca lleva su acción y su día.
+    markAeroBridgePending({ action: 'movimentos', date });
     window.location.href = buildAeroBridgeTriggerUrl({
       ticket: ticket.ticket,
       ticketUrl: ticket.ticketUrl,
@@ -875,6 +907,70 @@ export function MassasLaunchPage() {
   };
 
   /**
+   * The wait the page owes the trip it just handed to Scriptable.
+   *
+   * The bridge is a deep link: the phone leaves for another app and comes back through a URL. When it never
+   * comes back -- the iPhone is off the factory Wi-Fi, or the script died before it could answer -- nothing
+   * tells the operator, and the screen stays on «enviando» for as long as they are willing to believe it. The
+   * mark written on the way out is what turns that silence into a sentence, once, and only after a wait long
+   * enough that a slow ERP is not mistaken for a phone that never returned.
+   */
+  const bridgeWatchdog = useRef<number | null>(null);
+
+  const disarmBridgeWatchdog = useCallback(() => {
+    if (bridgeWatchdog.current === null) return;
+    window.clearTimeout(bridgeWatchdog.current);
+    bridgeWatchdog.current = null;
+  }, []);
+
+  /** Nothing came back and the wait is over: say it once, drop the sending state and forget the trip. */
+  const warnBridgeDidNotReturn = useCallback(() => {
+    setSyncAwaiting(null);
+    setNotice({ type: 'error', message: t('massas.aero.scriptableNoReturn') });
+    clearAeroBridgePending();
+    disarmBridgeWatchdog();
+  }, [disarmBridgeWatchdog, t]);
+
+  /**
+   * Reads the mark and waits exactly what it has left.
+   *
+   * A fresh mark is a trip that just left and says nothing; an expired one is a phone that did not return.
+   * Reading it also discards what is not a mark anymore -- another day's, malformed, already answered -- so the
+   * page never warns about a launch it is not waiting for.
+   */
+  const armBridgeWatchdog = useCallback(() => {
+    // A callback in the URL is the answer the mark was waiting for: the effect that consumes it clears both.
+    if (parseAeroCallback(window.location.search)) return;
+    const mark = readAeroBridgePending();
+    disarmBridgeWatchdog();
+    if (!mark) return;
+    if (aeroBridgeMarkExpired(mark, Date.now())) {
+      warnBridgeDidNotReturn();
+      return;
+    }
+    // The mark knows when the page left, so the wait ends when that wait is over and not before.
+    const remaining = mark.at + AERO_BRIDGE_MARK_TTL_MS - Date.now();
+    bridgeWatchdog.current = window.setTimeout(() => {
+      bridgeWatchdog.current = null;
+      if (!aeroBridgeMarkExpired(mark, Date.now())) return;
+      warnBridgeDidNotReturn();
+    }, Math.max(remaining, 0) + 250);
+  }, [disarmBridgeWatchdog, warnBridgeDidNotReturn]);
+
+  useEffect(() => {
+    armBridgeWatchdog();
+    const onVisibility = () => {
+      if (document.visibilityState !== 'visible') return;
+      armBridgeWatchdog();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      disarmBridgeWatchdog();
+    };
+  }, [armBridgeWatchdog, disarmBridgeWatchdog]);
+
+  /**
    * The shortcut's way back.
    *
    * The Atajos app finishes by opening this page with `aero_action` and `aero_data` -- the ERP answer, as it
@@ -888,6 +984,23 @@ export function MassasLaunchPage() {
     if (!parsed) return;
     aeroCallbackHandled.current = true;
     window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`);
+    // Cualquier respuesta termina la espera: la marca describe un viaje, y el viaje ya volvió. Se limpia acá,
+    // donde se limpia la query, para que ni el aviso ni un refresh puedan reabrir un resultado ya leído.
+    clearAeroBridgePending();
+    disarmBridgeWatchdog();
+
+    if (parsed.kind === 'error') {
+      // El teléfono volvió sin la planta: el script no pudo alcanzar el ERP, así que no hay asiento que leer y
+      // nada puede marcarse como enviado. La cola y los lanzamientos pendientes quedan intactos; sólo se cierra
+      // el intento para que un refresh en la fábrica no repita el mismo aviso sobre trabajo que sigue pendiente.
+      clearAeroPendingAttempt();
+      setResultModal({
+        type: 'error',
+        title: t('massas.aero.wifiRequiredTitle'),
+        message: t('massas.aero.wifiRequired'),
+      });
+      return;
+    }
 
     if (parsed.kind === 'test') {
       // The attempt was written before the phone left; this line closes it with what the endpoint said.
@@ -1080,7 +1193,7 @@ export function MassasLaunchPage() {
         ? { type: 'success', message: parsed.message ?? t('massas.aero.syncConfirmYes') }
         : { type: 'error', message: parsed.message ?? t('massas.aero.syncConfirmNo') },
     );
-  }, [aeroDestination, aeroSettings.wsUrl, date, handleMovementsCallback, t, triggerAeroSync]);
+  }, [aeroDestination, aeroSettings.wsUrl, date, disarmBridgeWatchdog, handleMovementsCallback, t, triggerAeroSync]);
 
   /**
    * The operator came back from the phone without a verdict.

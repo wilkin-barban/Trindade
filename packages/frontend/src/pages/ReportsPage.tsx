@@ -96,6 +96,11 @@ export function ReportsPage() {
 
   const handleSyncErpMovements = useCallback(() => {
     void (async () => {
+      // Sin red no hay ticket que canjear ni app que abrir: se dice en el reporte y no se lanza nada.
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        setError(t('massas.aero.offline'));
+        return;
+      }
       const fired = await triggerAeroMovementsSync(aeroSettings, {
         date: reportDate,
         callbackPath: location.pathname,
@@ -111,7 +116,7 @@ export function ReportsPage() {
       );
       setMovementsRefreshKey((key) => key + 1);
     })();
-  }, [aeroSettings, location.pathname, reportDate]);
+  }, [aeroSettings, location.pathname, reportDate, t]);
 
   const handleMovementsSynced = useCallback(() => {
     setMovementsRefreshKey((k) => k + 1);
