@@ -4,6 +4,7 @@ import { beforeEach, describe, it } from 'node:test';
 import {
   AERO_SCRIPTABLE_APP_URL,
   AERO_SCRIPTABLE_ASSET_PATH,
+  AERO_SCRIPTABLE_CODE_PATH,
   AERO_DEFAULT_CST,
   AERO_INTEGRATION_USERNAME,
   AERO_PENDING_SYNC_STORAGE_KEY,
@@ -1008,6 +1009,60 @@ describe('aero-integration: bridge callbacks', () => {
     // Retrocompatibilidad: un teléfono que todavía tiene los atajos viejos sigue funcionando igual.
     assert.deepEqual(parseAeroCallback('?aero_sync=ok'), { kind: 'sync', status: 'ok', message: null });
     assert.deepEqual(parseAeroCallback('?aero_test=true'), { kind: 'test', verdict: 'ok', raw: 'true' });
+  });
+});
+
+describe('aero-integration: bridge error callbacks', () => {
+  const erpMessage =
+    'No se pudo alcanzar el ERP. Verificá que el iPhone esté en la Wi-Fi Trindade Expedicao y que la red de la fábrica esté disponible.';
+
+  it('reads the network error the script appends over a callback that still carries an action', () => {
+    // El script cuelga `aero_error` de un callback que ya trae `aero_action` y `aero_data=` vacío: sin esta
+    // precedencia, un ERP inalcanzable se leería como un bridge válido sin datos.
+    const parsed = parseAeroCallback(
+      `?aero_action=entrada&aero_data=&aero_error=wifi_required&aero_msg=${encodeURIComponent(erpMessage)}`,
+    );
+
+    assert.deepEqual(parsed, { kind: 'error', code: 'wifi_required', message: erpMessage });
+    assert.equal(parsed?.kind, 'error');
+  });
+
+  it('keeps the message optional, because the code is what the page translates', () => {
+    assert.deepEqual(parseAeroCallback('?aero_action=entrada&aero_data=&aero_error=wifi_required'), {
+      kind: 'error',
+      code: 'wifi_required',
+      message: null,
+    });
+    assert.deepEqual(parseAeroCallback('?aero_error=wifi_required&aero_msg='), {
+      kind: 'error',
+      code: 'wifi_required',
+      message: null,
+    });
+  });
+
+  it('decodes the message exactly once, because the script already percent-encoded it', () => {
+    const parsed = parseAeroCallback('?aero_error=wifi_required&aero_msg=Wi-Fi%20Trindade%20Expedicao%20y%20red%20ca%C3%ADda');
+
+    assert.deepEqual(parsed, {
+      kind: 'error',
+      code: 'wifi_required',
+      message: 'Wi-Fi Trindade Expedicao y red caída',
+    });
+  });
+
+  it('lets an empty error parameter fall through, so a healthy callback still parses as a bridge', () => {
+    // Un `aero_error` vacío es la ausencia de error: la lectura del bridge tiene que seguir su camino.
+    assert.deepEqual(parseAeroCallback('?aero_action=entrada&aero_data=&aero_error='), {
+      kind: 'bridge',
+      action: 'entrada',
+      data: null,
+      raw: '',
+    });
+    assert.equal(parseAeroCallback('?aero_action=entrada&aero_data=&aero_msg=solo%20texto')?.kind, 'bridge');
+  });
+
+  it('publishes the raw JavaScript path the copy button reads', () => {
+    assert.equal(AERO_SCRIPTABLE_CODE_PATH, '/Aero32Bridge.js');
   });
 });
 

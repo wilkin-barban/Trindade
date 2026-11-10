@@ -970,6 +970,14 @@ export const AERO_SCRIPTABLE_APP_URL = 'https://apps.apple.com/app/scriptable/id
 export const AERO_SCRIPTABLE_ASSET_PATH = '/Aero32Bridge.scriptable';
 
 /**
+ * The same bridge as raw JavaScript, which is what the copy button puts on the clipboard.
+ *
+ * Scriptable's editor only accepts code: the `.scriptable` above is JSON, and pasting it produced
+ * `SyntaxError: Unexpected token ':'`. Both files are generated from one source, so this is the same script.
+ */
+export const AERO_SCRIPTABLE_CODE_PATH = '/Aero32Bridge.js';
+
+/**
  * The deep link that hands the ticket to Scriptable.
  *
  * The name is fixed because the URL scheme addresses the script by it: a script the operator renamed stops
@@ -1055,7 +1063,8 @@ export function aeroBridgeCallbackFor(action: AeroBridgeAction, path?: string): 
 export type AeroCallbackResult =
   | { kind: 'bridge'; action: AeroBridgeAction; data: unknown; raw: string }
   | { kind: 'test'; verdict: AeroTestVerdict; raw: string }
-  | { kind: 'sync'; status: 'ok' | 'error'; message: string | null };
+  | { kind: 'sync'; status: 'ok' | 'error'; message: string | null }
+  | { kind: 'error'; code: string; message: string | null };
 
 /** The words the bridge understands, and the only ones a callback may carry. */
 const AERO_BRIDGE_ACTIONS: readonly AeroBridgeAction[] = [
@@ -1092,12 +1101,23 @@ function readAeroBridgeData(raw: string): unknown {
  * test, which carries the `success` field of `/usuarios/` the phone read for us, either as the raw verdict it
  * used to pass or as the whole body the bridge now brings; and the legacy sync status. The raw token travels
  * with the verdict so the audit line can show what actually came back.
+ *
+ * `aero_error` is read before the action on purpose: the script hangs it off a callback that already carries
+ * `aero_action` and an empty `aero_data=`, so reading the action first would turn «could not reach the ERP»
+ * into a bridge that came back with nothing. An empty `aero_error` is no error and falls through.
  */
 export function parseAeroCallback(search: string): AeroCallbackResult | null {
   if (!search) return null;
   const queryString = search.startsWith('?') ? search.slice(1) : search;
   if (!queryString) return null;
   const params = new URLSearchParams(queryString);
+
+  const error = params.get('aero_error');
+  if (error) {
+    // `URLSearchParams` already percent-decoded both values; the script encodes the text once, so decoding
+    // again here would eat a legitimate `%` in a Portuguese message.
+    return { kind: 'error', code: error, message: params.get('aero_msg') || null };
+  }
 
   const action = params.get('aero_action');
   if (action !== null && isAeroBridgeAction(action)) {
