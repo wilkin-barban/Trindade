@@ -96,18 +96,18 @@ archivo con el mismo SHA-256 que el de `public/`, que la SPA muestra los dos bot
 
 | ID | RED (test que falla primero) | GREEN (cambio mínimo) | Archivos | Aceptación | Riesgo | Rollback | Commit |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| T1 | — | Este ODD, solo docs | `odd/tasks/scriptable-bridge-ios.md` | Existe antes de todo código; commit solo docs | Ninguno | `git revert` | pendiente |
-| T2 | `aero-integration.test.ts`: el builder devuelve `scriptable:///run/Aero32Bridge?` con ambos valores encoded | Builder nuevo y constante de nombre | `lib/aero-integration.ts`, tests | URL exacta, sin `name` | Ninguno | Revertir commit | pendiente |
-| T3 | `aero-scriptable-asset.test.ts`: asset válido, nombre, tokens y ausencia de secretos | Fuente JS legible, generador del `.scriptable`, asset en `public/` | `scriptable/Aero32Bridge.js`, `scripts/build-scriptable.mjs`, `public/Aero32Bridge.scriptable`, `package.json`, tests | JSON válido, `name` exacto, tokens presentes, sin secretos | 3 (artefacto nuevo publicado) | Revertir commit | pendiente |
-| T4 | tests de settings: `shortcutName` ya no existe | Modelo sin `shortcutName`; receta e iCloud eliminados | `lib/aero-integration.ts`, `lib/aero-integration.test.ts` | Datos viejos ignorados; sin receta | 3 (contrato interno) | Revertir commit | pendiente |
-| T5 | `aero-scriptable-dialog.test.ts`: enlaces de instalación/importación, sin receta | Diálogo renombrado y reescrito | `pages/massas/AeroScriptableDialog.tsx`, borrar `AeroShortcutDialog.tsx` | UI nueva, 375 px, ≥44 px | Ninguno | Revertir commit | pendiente |
-| T6 | tests de panel: botón Scriptable, importación, textos | Panel y banner | `pages/massas/AeroIntegrationPanel.tsx`, `AeroDeviceBanner.tsx`, tests | Dos botones y textos nuevos | Ninguno | Revertir commit | pendiente |
-| T7 | tests de llamadores: todos usan el builder nuevo | Ajuste de `MassasLaunchPage`, `aero-mirror`, `ReportsPage`, `ReceiptsSection` | esos archivos, tests | Todos los caminos abren Scriptable | 3 (flujo compartido) | Revertir commit | pendiente |
-| T8 | paridad ES/PT | i18n | `i18n/locales/es.json`, `pt-BR.json` | Mismas claves, sin receta vieja | Ninguno | Revertir commit | pendiente |
-| T9 | e2e del diálogo y del panel | specs actualizados | `__e2e__/aero-shortcut-dialog.spec.ts`, `admin-integration.spec.ts`, `erp-result-dialogs.spec.ts` | 375 px, links accesibles, sin receta | Ninguno | Revertir commit | pendiente |
-| T10 | — | Docs y CHANGELOG | `docs/…`, `README.md`, `AGENTS.md`, `CHANGELOG.md` | Scriptable en toda la doc | Ninguno | Revertir commit | pendiente |
-| T11 | — | Suites, typecheck, build, contrato, CI | — | Todo verde | Ninguno | — | pendiente |
-| T12 | — | Imagen `web` y verificación en producción | producción | `web` healthy, asset con hash igual, sin `shortcuts://` | 5 (despliegue) | Volver a la imagen anterior | pendiente |
+| T1 | — | Este ODD, solo docs | `odd/tasks/scriptable-bridge-ios.md` | Existe antes de todo código; commit solo docs | Ninguno | `git revert` | pendiente | 0c80a0fd |
+| T2 | `aero-integration.test.ts`: el builder devuelve `scriptable:///run/Aero32Bridge?` con ambos valores encoded | Builder nuevo y constante de nombre | `lib/aero-integration.ts`, tests | URL exacta, sin `name` | Ninguno | Revertir commit | pendiente | f020aeb1 |
+| T3 | `aero-scriptable-asset.test.ts`: asset válido, nombre, tokens y ausencia de secretos | Fuente JS legible, generador del `.scriptable`, asset en `public/` | `scriptable/Aero32Bridge.js`, `scripts/build-scriptable.mjs`, `public/Aero32Bridge.scriptable`, `package.json`, tests | JSON válido, `name` exacto, tokens presentes, sin secretos | 3 (artefacto nuevo publicado) | Revertir commit | pendiente | 4866ac02 |
+| T4 | tests de settings: `shortcutName` ya no existe | Modelo sin `shortcutName`; receta e iCloud eliminados | `lib/aero-integration.ts`, `lib/aero-integration.test.ts` | Datos viejos ignorados; sin receta | 3 (contrato interno) | Revertir commit | pendiente | 5436ab75 |
+| T5 | `aero-scriptable-dialog.test.ts`: enlaces de instalación/importación, sin receta | Diálogo renombrado y reescrito | `pages/massas/AeroScriptableDialog.tsx`, borrar `AeroShortcutDialog.tsx` | UI nueva, 375 px, ≥44 px | Ninguno | Revertir commit | pendiente | 5436ab75 |
+| T6 | tests de panel: botón Scriptable, importación, textos | Panel y banner | `pages/massas/AeroIntegrationPanel.tsx`, `AeroDeviceBanner.tsx`, tests | Dos botones y textos nuevos | Ninguno | Revertir commit | pendiente | 5436ab75 |
+| T7 | tests de llamadores: todos usan el builder nuevo | Ajuste de `MassasLaunchPage`, `aero-mirror`, `ReportsPage`, `ReceiptsSection` | esos archivos, tests | Todos los caminos abren Scriptable | 3 (flujo compartido) | Revertir commit | pendiente | 5436ab75 |
+| T8 | paridad ES/PT | i18n | `i18n/locales/es.json`, `pt-BR.json` | Mismas claves, sin receta vieja | Ninguno | Revertir commit | pendiente | 5436ab75 |
+| T9 | e2e del diálogo y del panel | specs actualizados | `__e2e__/aero-shortcut-dialog.spec.ts`, `admin-integration.spec.ts`, `erp-result-dialogs.spec.ts` | 375 px, links accesibles, sin receta | Ninguno | Revertir commit | pendiente | af2ec856 |
+| T10 | — | Docs y CHANGELOG | `docs/…`, `README.md`, `AGENTS.md`, `CHANGELOG.md` | Scriptable en toda la doc | Ninguno | Revertir commit | pendiente | aee06c68 |
+| T11 | — | Suites, typecheck, build, contrato, CI | — | Todo verde | Ninguno | — | pendiente | pendiente |
+| T12 | — | Imagen `web` y verificación en producción | producción | `web` healthy, asset con hash igual, sin `shortcuts://` | 5 (despliegue) | Volver a la imagen anterior | pendiente | pendiente |
 
 ## Log
 
