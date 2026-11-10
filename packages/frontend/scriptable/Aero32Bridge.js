@@ -12,6 +12,16 @@
 
 const TITULO = 'Trindade';
 
+// Scriptable mide `timeoutInterval` en SEGUNDOS, no en milisegundos: 10 son diez segundos. Sin límite propio,
+// una red de fábrica que no contesta deja la pantalla «enviando» hasta que iOS decide cortar, y un lote de
+// ocho cuerpos espera ese plazo ocho veces. Con el límite, el fallo llega en un plazo conocido y con veredicto.
+const TIEMPO_LIMITE = 10;
+
+// Mensaje de alcance: no se puede leer el SSID desde Scriptable, así que se prueba el host del ERP. Si no
+// responde, el iPhone no está en la red de la empresa o la red de la fábrica no está disponible.
+const MENSAJE_SIN_ERP =
+  'No se pudo alcanzar el ERP. Verificá que el iPhone esté en la Wi-Fi Trindade Expedicao y que la red de la fábrica esté disponible.';
+
 /** Aviso breve. Nunca incluye el ticket, los encabezados ni el cuerpo. */
 function avisar(mensaje) {
   const alerta = new Alert();
@@ -43,6 +53,7 @@ try {
   // habilita los dos, y es la razón por la que este script existe en lugar de un pedido del navegador:
   // iOS no aplica acá la política de contenido mixto de la web.
   canje.allowInsecureRequest = true;
+  canje.timeoutInterval = TIEMPO_LIMITE;
   sobre = await canje.loadJSON();
 } catch (error) {
   sobre = null;
@@ -67,9 +78,26 @@ for (let indice = 0; indice < cuerpos.length; indice += 1) {
     envio.headers = sobre.headers;
     envio.body = cuerpos[indice];
     envio.allowInsecureRequest = true;
+    envio.timeoutInterval = TIEMPO_LIMITE;
     respuestas.push(await envio.loadString());
   } catch (error) {
-    // Un producto que falla no cancela el lote: la web lee la respuesta de cada uno, en el mismo orden.
+    // Una excepción es red o timeout: el ERP no contestó. Una respuesta HTTP 4xx/5xx no pasa por acá,
+    // porque `loadString()` devuelve el cuerpo igual y ese es un veredicto del ERP, no un problema de red.
+    if (indice === 0) {
+      // El primer cuerpo es la prueba de alcance: si no hay respuesta, el resto del lote tampoco la va a
+      // tener. Se corta acá en lugar de esperar el límite una vez por producto y se vuelve por el callback
+      // que ya trae `aero_action`/`aero_data`, con un código estable que la web traduce.
+      Safari.open(
+        sobre.callback +
+          '&aero_error=wifi_required&aero_msg=' +
+          encodeURIComponent(MENSAJE_SIN_ERP),
+      );
+      Script.complete();
+      return;
+    }
+
+    // Un producto posterior que falla no cancela el lote: la web lee la respuesta de cada uno, en el mismo
+    // orden. El mensaje del error es lo único que se devuelve; nunca el ticket, los encabezados ni el cuerpo.
     respuestas.push(error && error.message ? String(error.message) : 'Error al enviar al ERP');
   }
 }
