@@ -273,7 +273,6 @@ export function AeroIntegrationPanel({
 
       setNotice({ tone: 'warn', text: t('massas.aero.testShortcutOpening') });
       window.location.href = buildAeroBridgeTriggerUrl({
-        name: effective.shortcutName,
         ticket: ticket.ticket,
         ticketUrl: ticket.ticketUrl,
       });
