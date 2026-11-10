@@ -55,6 +55,13 @@ async function openLaunchPage(page: Page) {
   await expect(page.locator('input[type="number"]').first()).toBeVisible({ timeout: 15000 });
 }
 
+/** La cola se escribe después de que el servidor emite el ticket, no en el click: se espera, no se asume. */
+async function waitForInFlight(page: Page, expected: number): Promise<void> {
+  await expect
+    .poll(async () => (await readQueue(page))?.inFlight.length ?? -1, { timeout: 15_000 })
+    .toBe(expected);
+}
+
 async function launchProducts(page: Page, count: number, boxes = '2') {
   const quantities = page.locator('input[type="number"]');
   for (let index = 0; index < count; index += 1) {
@@ -78,10 +85,12 @@ async function readQueue(page: Page): Promise<{ items: unknown[]; inFlight: unkn
 
 async function answer(page: Page, action: string, payload: unknown) {
   const url = `/massas-launch?aero_action=${action}&aero_data=${encodeURIComponent(JSON.stringify(payload))}`;
-  // La página puede abrir Scriptable al procesar la respuesta (la auto-lectura hace exactamente eso) y
-  // Chromium cancela esa navegación cuando empieza la del test: el síntoma es ERR_ABORTED en este goto.
-  // Un reintento, y sólo para ese caso.
-  await page.goto(url).catch(() => page.goto(url));
+  // El lanzamiento dejó `window.location` apuntando a `scriptable:///run/…`, que Chromium cancela. Cargar la
+  // pantalla limpia primero descarta esa navegación pendiente y deja el documento en un estado conocido; recién
+  // entonces se entrega la respuesta. Sin esto, el `goto` del callback competía con el aborto y la página podía
+  // quedar a medio montar, sin el diálogo.
+  await page.goto('/massas-launch').catch(() => page.goto('/massas-launch'));
+  await page.goto(url);
 }
 
 test.use({ viewport: { width: 375, height: 667 }, userAgent: IPHONE_UA });
@@ -94,6 +103,7 @@ test.describe('a launch of many products leaves once', () => {
 
     // The three products left together: one trip with three products in flight, nothing left behind for a
     // second trip the operator never asked for.
+    await waitForInFlight(page, 3);
     const queue = (await readQueue(page))!;
     expect(queue.inFlight).toHaveLength(3);
     expect(queue.items).toHaveLength(0);
@@ -145,6 +155,7 @@ test.describe('a launch of many products leaves once', () => {
     await launchProducts(page, 1);
 
     // Un producto solo viaja por `entrada`, sin `bodies`, igual que antes del lote.
+    await waitForInFlight(page, 1);
     const queue = (await readQueue(page))!;
     expect(queue.inFlight).toHaveLength(1);
 
