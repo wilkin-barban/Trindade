@@ -997,7 +997,9 @@ export function MassasLaunchPage() {
       setResultModal({
         type: 'error',
         title: t('massas.aero.wifiRequiredTitle'),
-        message: t('massas.aero.wifiRequired'),
+        // El código es estable: sólo `wifi_required` habla de la red de la empresa. Cualquier otro error del
+        // puente se cuenta como error, no como un problema de Wi-Fi que el operario no puede resolver.
+        message: parsed.code === 'wifi_required' ? t('massas.aero.wifiRequired') : t('massas.aero.bridgeError'),
       });
       return;
     }

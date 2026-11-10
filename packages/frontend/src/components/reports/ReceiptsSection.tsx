@@ -179,7 +179,10 @@ export function ReceiptsSection({
       callbackHandled.current = true;
       window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`);
       clearAeroBridgePending();
-      setBridgeError({ message: t('massas.aero.wifiRequired'), hint: parsed.message });
+      setBridgeError({
+        message: parsed.code === 'wifi_required' ? t('massas.aero.wifiRequired') : t('massas.aero.bridgeError'),
+        hint: parsed.message,
+      });
       return;
     }
     if (parsed.kind !== 'bridge' || parsed.action !== 'movimentos') return;
