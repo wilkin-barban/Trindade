@@ -34,6 +34,28 @@ describe('ERP vault and bridge tickets', () => {
     });
   }
 
+  async function configureAs(
+    token: string,
+    username: string,
+    password = 'senha-do-erp',
+    wsUrl = 'http://192.168.25.250:1453/api',
+  ) {
+    return app.inject({
+      method: 'PUT',
+      url: '/api/integration/aero/settings',
+      headers: auth(token),
+      payload: { wsUrl, username, password },
+    });
+  }
+
+  async function clearAs(token: string) {
+    return app.inject({
+      method: 'DELETE',
+      url: '/api/integration/aero/settings',
+      headers: auth(token),
+    });
+  }
+
   function insertExpiredTicket(action = 'test'): string {
     const token = randomBytes(32).toString('base64url');
     db.prepare(
@@ -98,19 +120,43 @@ describe('ERP vault and bridge tickets', () => {
       }
     });
 
-    it('refuses a worker, another administrator and the guest', async () => {
-      for (const token of [workerToken, otherAdminToken, guestToken]) {
-        const read = await app.inject({ method: 'GET', url: '/api/integration/aero/settings', headers: auth(token) });
-        assert.equal(read.statusCode, 403);
+    it('gives a worker their own vault and never another operator row', async () => {
+      const saved = await configureAs(workerToken, 'ALICE');
+      assert.equal(saved.statusCode, 200);
+      assert.equal(saved.json().username, 'ALICE');
 
-        const write = await app.inject({
-          method: 'PUT',
-          url: '/api/integration/aero/settings',
-          headers: auth(token),
-          payload: { wsUrl: 'http://10.0.0.1/api', username: 'X', password: 'y' },
-        });
-        assert.equal(write.statusCode, 403);
-      }
+      const own = await app.inject({
+        method: 'GET',
+        url: '/api/integration/aero/settings',
+        headers: auth(workerToken),
+      });
+      assert.equal(own.statusCode, 200);
+      assert.equal(own.json().configured, true);
+      assert.equal(own.json().username, 'ALICE');
+
+      const wilkin = await app.inject({
+        method: 'GET',
+        url: '/api/integration/aero/settings',
+        headers: auth(wilkinToken),
+      });
+      assert.equal(wilkin.statusCode, 200);
+      assert.equal(wilkin.json().configured, false, 'the worker vault is not the wilkin vault');
+
+      const guest = await app.inject({
+        method: 'PUT',
+        url: '/api/integration/aero/settings',
+        headers: auth(guestToken),
+        payload: { wsUrl: 'http://10.0.0.1/api', username: 'GUEST', password: 'y' },
+      });
+      assert.equal(guest.statusCode, 403, 'the guest remains read-only');
+
+      assert.equal((await clearAs(workerToken)).statusCode, 204);
+      const cleared = await app.inject({
+        method: 'GET',
+        url: '/api/integration/aero/settings',
+        headers: auth(workerToken),
+      });
+      assert.equal(cleared.json().configured, false);
     });
 
     it('answers an empty vault before anything is configured', async () => {
@@ -215,7 +261,7 @@ describe('ERP vault and bridge tickets', () => {
       await configure('senha-do-erp');
     });
 
-    it('issues only for the owner', async () => {
+    it('refuses anonymous and guest ticket requests, and asks for a vault when the caller has none', async () => {
       const anonymous = await app.inject({
         method: 'POST',
         url: '/api/integration/aero/bridge-tickets',
@@ -223,15 +269,40 @@ describe('ERP vault and bridge tickets', () => {
       });
       assert.equal(anonymous.statusCode, 401);
 
-      for (const token of [workerToken, otherAdminToken, guestToken]) {
+      const guest = await app.inject({
+        method: 'POST',
+        url: '/api/integration/aero/bridge-tickets',
+        headers: auth(guestToken),
+        payload: { action: 'test', payloads: [{}] },
+      });
+      assert.equal(guest.statusCode, 403);
+
+      for (const token of [workerToken, otherAdminToken]) {
         const response = await app.inject({
           method: 'POST',
           url: '/api/integration/aero/bridge-tickets',
           headers: auth(token),
           payload: { action: 'test', payloads: [{}] },
         });
-        assert.equal(response.statusCode, 403);
+        assert.equal(response.statusCode, 503, 'a caller without their own vault has nothing to redeem');
       }
+    });
+
+    it('issues a ticket for a worker who configured their own vault', async () => {
+      const saved = await configureAs(workerToken, 'ALICE');
+      assert.equal(saved.statusCode, 200);
+
+      const issued = await app.inject({
+        method: 'POST',
+        url: '/api/integration/aero/bridge-tickets',
+        headers: auth(workerToken),
+        payload: { action: 'test', payloads: [{}] },
+      });
+      assert.equal(issued.statusCode, 201);
+      assert.equal(ticketCount('WHERE used_at IS NULL'), 1, 'the worker ticket is not the admin one');
+
+      assert.equal((await clearAs(workerToken)).statusCode, 204);
+      assert.equal(ticketCount(), 0);
     });
 
     it('stores only the hash of a random one-time token with a short TTL', async () => {

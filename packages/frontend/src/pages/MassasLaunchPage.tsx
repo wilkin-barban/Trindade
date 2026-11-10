@@ -160,7 +160,7 @@ export function MassasLaunchPage() {
   const [phone, setPhone] = useState('');
   const [copyNote, setCopyNote] = useState('');
 
-  // Company integration: kept out of the tree entirely for anyone who is not the owner admin.
+  // Company integration: both plant roles use it, each with the vault of their own account.
   const aeroAllowed = isAeroAllowed(user ? { username: user.username, role: user.role } : null);
   const [aeroSettings, setAeroSettings] = useState<AeroSettings>(loadAeroSettings);
   const [aeroTestOutcome, setAeroTestOutcome] = useState<AeroTestOutcome | null>(null);

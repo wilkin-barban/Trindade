@@ -8,9 +8,10 @@ reglas se aplican al importar un asiento. Los contratos exactos de los endpoints
 
 ## 1. Alcance y principios
 
-- La integración es **exclusiva del usuario `wilkin` con rol Administrador**. Para cualquier otro usuario el panel
-  no se renderiza, el interruptor no aparece y el backend rechaza la bitácora con `403`. La autoridad es la base
-  de datos, no el cuerpo de la petición ni el estado del navegador.
+- La integración está disponible para **Administrador y Trabalhador**. Cada operador autenticado tiene su propio
+  cofre: guarda su usuario y contraseña del ERP sin ver los del resto. La dirección de la planta sigue siendo un
+  campo exclusivo de `wilkin`; las credenciales pertenecen a quien tiene el teléfono. La autoridad es la base de
+  datos, no el cuerpo de la petición ni el estado del navegador.
 - **La contraseña del ERP vive en el servidor.** Se escribe una vez en el panel, se guarda cifrada con
   AES-256-GCM en `aero_integration_settings` y no vuelve nunca al navegador. La web recibe un ticket de un solo
   uso y el script de Scriptable lo canjea por el sobre del pedido. Cerrar sesión no borra el cofre: solo **Limpiar**
@@ -167,7 +168,7 @@ servidor»** es la confirmación de que está ahí.
   (`AERO_VAULT_PASSWORD_REQUIRED`).
 - Guardar con una contraseña **nueva** la reemplaza, cifrada de nuevo.
 - **Limpiar** llama `DELETE /api/integration/aero/settings` y solo entonces limpia el estado local; si falla, la
-  pantalla no miente. Ese borrado elimina también los tickets pendientes del owner.
+  pantalla no miente. Ese borrado elimina también los tickets pendientes de ese operador.
 - En `localStorage` quedan solo preferencias no secretas: el interruptor de sincronización y la fecha de la última
   sincronización. La URL y el usuario vienen del servidor. El nombre del script no es una preferencia: es una
   constante de integración (`Aero32Bridge`) que el deep link usa tal cual.
@@ -178,7 +179,7 @@ una URL. Lo que la web puede pedir es un **ticket**: 32 bytes aleatorios con 120
 base guarda solo el SHA-256. Scriptable canjea el ticket por el sobre ya armado.
 
 Consecuencia práctica: una pestaña nueva —el callback de Scriptable, una pestaña duplicada, otro dispositivo del
-mismo owner— consulta, lanza y lee **sin volver a pedir la contraseña**. El cofre no se borra al cerrar sesión; solo
+misma cuenta— consulta, lanza y lee **sin volver a pedir la contraseña**. El cofre no se borra al cerrar sesión; solo
 **Limpiar** lo elimina.
 
 Debajo de los campos, el panel ofrece el camino del teléfono: **Instalar Scriptable no iPhone** abre la App Store,
@@ -458,7 +459,7 @@ Antes de ir:
 
 En la fábrica:
 
-1. Abrir la web en Safari e iniciar sesión como `wilkin`.
+1. Abrir la web en Safari e iniciar sesión con la cuenta del operador (`wilkin` para administrar la dirección; cualquier trabajador para sus propias credenciales).
 2. **Lanzamiento de Masas → Configuración Integración Empresa**: URL y usuario; la contraseña se escribe una sola
    vez y queda cifrada en el servidor. El campo vuelve a aparecer vacío y la tarjeta dice «Senha guardada no
    servidor».

@@ -33,7 +33,7 @@ Desde la revisión **10** del esquema, la contraseña del WebService no vive en 
 
 | Pieza | Qué guarda | Dónde |
 | --- | --- | --- |
-| `aero_integration_settings` | Una fila por owner con `ws_url`, `erp_username`, `password_ciphertext`, `password_iv`, `password_tag`, `key_version` | SQLite |
+| `aero_integration_settings` | Una fila por operador (`user_id`) con `ws_url`, `erp_username`, `password_ciphertext`, `password_iv`, `password_tag`, `key_version` | SQLite |
 | `AERO_VAULT_KEY` | Clave de 32 bytes en base64 para AES-256-GCM, inyectada por el entorno | `.env` de producción, gitignored, y `docker-compose.yml` |
 | `aero_bridge_tickets` | `token_hash` (SHA-256), `user_id`, `action`, `endpoint`, `body`, `bodies`, `callback_url`, `expires_at`, `used_at` | SQLite |
 
@@ -41,10 +41,10 @@ Contratos del servidor:
 
 | Método y ruta | Guard | Qué hace |
 | --- | --- | --- |
-| `GET /api/integration/aero/settings` | `authenticate` + `requireUsername('wilkin')` + `requireRole('Administrador')` | Devuelve `{ configured, wsUrl, username, hasPassword, updatedAt }`; nunca la contraseña ni el ciphertext |
+| `GET /api/integration/aero/settings` | `authenticate` + `requireRole('Administrador', 'Trabalhador')` | Devuelve el cofre del operador autenticado: `{ configured, wsUrl, username, hasPassword, updatedAt }`; nunca la contraseña ni el ciphertext |
 | `PUT /api/integration/aero/settings` | ídem | `{ wsUrl, username, password? }`; una contraseña no vacía reemplaza, vacía o ausente conserva |
-| `DELETE /api/integration/aero/settings` | ídem | Borra el cofre y los tickets pendientes del owner (`204`) |
-| `POST /api/integration/aero/bridge-tickets` | ídem | `{ action, payloads, callbackPath? }` → `{ ticket, ticketUrl, expiresAt }` |
+| `DELETE /api/integration/aero/settings` | ídem | Borra el cofre y los tickets pendientes del operador autenticado (`204`) |
+| `POST /api/integration/aero/bridge-tickets` | ídem | `{ action, payloads, callbackPath? }` → `{ ticket, ticketUrl, expiresAt }`, usando el cofre del operador autenticado |
 | `POST /api/integration/aero/bridge-tickets/redeem` | Ticket bearer (`X-Trindade-Ticket`) | Devuelve el sobre `{ url, method, headers, body, bodies?, callback }` |
 
 `redeem` es **unauthenticated por diseño**: la credencial es el ticket bearer de un solo uso y el llamador es
