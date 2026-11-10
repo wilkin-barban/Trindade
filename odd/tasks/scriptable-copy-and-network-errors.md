@@ -94,18 +94,18 @@ release.
 
 | ID | RED (test que falla primero) | GREEN (cambio mínimo) | Archivos | Aceptación | Riesgo | Rollback | Commit |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| T1 | — | Este ODD, solo docs | `odd/tasks/scriptable-copy-and-network-errors.md` | Existe antes de todo código | Ninguno | `git revert` | pendiente |
-| T2 | test del asset crudo: existe, empieza con `// Puente Aero32`, no es JSON, coincide con el `script` del `.scriptable` | generador copia `public/Aero32Bridge.js` | `scriptable/Aero32Bridge.js`, `scripts/build-scriptable.mjs`, `public/Aero32Bridge.js`, `src/lib/aero-scriptable-asset.test.ts` | Ambos assets deterministas y coherentes | Ninguno | Revertir commit | pendiente |
-| T3 | test del script: timeouts, `aero_error`, no sigue el lote tras fallo de red | timeouts y callback de error | `scriptable/Aero32Bridge.js`, `public/Aero32Bridge.js`, `public/Aero32Bridge.scriptable`, tests | Fallo de red devuelve `wifi_required` y no reintenta 8 veces | 3 (artefacto publicado) | Revertir commit | pendiente |
-| T4 | test de `parseAeroCallback`: `kind:'error'` antes de `aero_action` | parser y constante de ruta cruda | `lib/aero-integration.ts`, `lib/aero-integration.test.ts` | Error parseado con code/mensaje | 3 (contrato interno) | Revertir commit | pendiente |
-| T5 | test del watchdog: marca, expiración y limpieza | módulo de marca y temporizador | `lib/aero-watchdog.ts`, `lib/aero-watchdog.test.ts` | Expira a los 150 s y un callback la limpia | Ninguno | Revertir commit | pendiente |
-| T6 | test del diálogo: sin descarga, copia exacta y fallback | diálogo reescrito | `pages/massas/AeroScriptableDialog.tsx`, `aero-scriptable-install.test.ts` | Copia JS crudo, estado Copiado, error accionable | Ninguno | Revertir commit | pendiente |
-| T7 | tests de panel y llamadores: sin descarga, `onLine`, watchdog y error | panel, Masas, mirror, Reports, Receipts | `AeroIntegrationPanel.tsx`, `MassasLaunchPage.tsx`, `lib/aero-mirror.ts`, `ReportsPage.tsx`, `ReceiptsSection.tsx`, tests | Ningún camino queda bloqueado ni borra la cola | 3 (flujo compartido) | Revertir commit | pendiente |
-| T8 | paridad ES/PT | i18n | `i18n/locales/es.json`, `pt-BR.json` | Mismas claves, textos nuevos | Ninguno | Revertir commit | pendiente |
-| T9 | e2e: diálogo nuevo y aviso de error a 375 px | specs | `__e2e__/aero-scriptable-dialog.spec.ts`, aviso de error | Copia, sin descarga, aviso visible | Ninguno | Revertir commit | pendiente |
-| T10 | — | Docs y CHANGELOG | `docs/…`, `README.md`, `AGENTS.md`, `CHANGELOG.md` | Instalación por copia y red documentadas | Ninguno | Revertir commit | pendiente |
-| T11 | — | Suites, typecheck, build, contrato, E2E | — | Todo verde | Ninguno | — | pendiente |
-| T12 | — | Imagen `web` y verificación en producción | producción | `web` healthy, `/Aero32Bridge.js` con hash, UI nueva | 5 (despliegue) | Volver a la imagen anterior | pendiente |
+| T1 | — | Este ODD, solo docs | `odd/tasks/scriptable-copy-and-network-errors.md` | Existe antes de todo código | Ninguno | `git revert` | pendiente | 9adaab11 |
+| T2 | test del asset crudo: existe, empieza con `// Puente Aero32`, no es JSON, coincide con el `script` del `.scriptable` | generador copia `public/Aero32Bridge.js` | `scriptable/Aero32Bridge.js`, `scripts/build-scriptable.mjs`, `public/Aero32Bridge.js`, `src/lib/aero-scriptable-asset.test.ts` | Ambos assets deterministas y coherentes | Ninguno | Revertir commit | pendiente | f9d42e55 |
+| T3 | test del script: timeouts, `aero_error`, no sigue el lote tras fallo de red | timeouts y callback de error | `scriptable/Aero32Bridge.js`, `public/Aero32Bridge.js`, `public/Aero32Bridge.scriptable`, tests | Fallo de red devuelve `wifi_required` y no reintenta 8 veces | 3 (artefacto publicado) | Revertir commit | pendiente | f9d42e55 |
+| T4 | test de `parseAeroCallback`: `kind:'error'` antes de `aero_action` | parser y constante de ruta cruda | `lib/aero-integration.ts`, `lib/aero-integration.test.ts` | Error parseado con code/mensaje | 3 (contrato interno) | Revertir commit | pendiente | cca39ab2 |
+| T5 | test del watchdog: marca, expiración y limpieza | módulo de marca y temporizador | `lib/aero-watchdog.ts`, `lib/aero-watchdog.test.ts` | Expira a los 150 s y un callback la limpia | Ninguno | Revertir commit | pendiente | cca39ab2 |
+| T6 | test del diálogo: sin descarga, copia exacta y fallback | diálogo reescrito | `pages/massas/AeroScriptableDialog.tsx`, `aero-scriptable-install.test.ts` | Copia JS crudo, estado Copiado, error accionable | Ninguno | Revertir commit | pendiente | 2041cacf |
+| T7 | tests de panel y llamadores: sin descarga, `onLine`, watchdog y error | panel, Masas, mirror, Reports, Receipts | `AeroIntegrationPanel.tsx`, `MassasLaunchPage.tsx`, `lib/aero-mirror.ts`, `ReportsPage.tsx`, `ReceiptsSection.tsx`, tests | Ningún camino queda bloqueado ni borra la cola | 3 (flujo compartido) | Revertir commit | pendiente | 4a95bed8 |
+| T8 | paridad ES/PT | i18n | `i18n/locales/es.json`, `pt-BR.json` | Mismas claves, textos nuevos | Ninguno | Revertir commit | pendiente | 2041cacf |
+| T9 | e2e: diálogo nuevo y aviso de error a 375 px | specs | `__e2e__/aero-scriptable-dialog.spec.ts`, aviso de error | Copia, sin descarga, aviso visible | Ninguno | Revertir commit | pendiente | 7efbc53d |
+| T10 | — | Docs y CHANGELOG | `docs/…`, `README.md`, `AGENTS.md`, `CHANGELOG.md` | Instalación por copia y red documentadas | Ninguno | Revertir commit | pendiente | d14d8909 |
+| T11 | — | Suites, typecheck, build, contrato, E2E | — | Todo verde | Ninguno | — | pendiente | pendiente |
+| T12 | — | Imagen `web` y verificación en producción | producción | `web` healthy, `/Aero32Bridge.js` con hash, UI nueva | 5 (despliegue) | Volver a la imagen anterior | pendiente | pendiente |
 
 ## Log
 

@@ -77,7 +77,11 @@ async function readQueue(page: Page): Promise<{ items: unknown[]; inFlight: unkn
 }
 
 async function answer(page: Page, action: string, payload: unknown) {
-  await page.goto(`/massas-launch?aero_action=${action}&aero_data=${encodeURIComponent(JSON.stringify(payload))}`);
+  const url = `/massas-launch?aero_action=${action}&aero_data=${encodeURIComponent(JSON.stringify(payload))}`;
+  // La página puede abrir Scriptable al procesar la respuesta (la auto-lectura hace exactamente eso) y
+  // Chromium cancela esa navegación cuando empieza la del test: el síntoma es ERR_ABORTED en este goto.
+  // Un reintento, y sólo para ese caso.
+  await page.goto(url).catch(() => page.goto(url));
 }
 
 test.use({ viewport: { width: 375, height: 667 }, userAgent: IPHONE_UA });
