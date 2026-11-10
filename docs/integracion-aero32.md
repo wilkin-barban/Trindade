@@ -21,7 +21,7 @@ El host Windows de producción no se modificó: los binarios se copiaron, se des
 | Panel web de integración | `packages/frontend/src/pages/massas/AeroIntegrationPanel.tsx` y `lib/aero-*.ts` | Guarda URL y usuario, escribe la contraseña una sola vez en el cofre del servidor, prueba la conexión por ticket, encola lanzamientos y lee el espejo |
 | Cofre del ERP | `packages/backend/src/modules/integration/vault.crypto.ts` y `aero.settings.service.ts` sobre `aero_integration_settings` | Cifra la contraseña del WebService con AES-256-GCM; la clave vive en el entorno, no en la base |
 | Tickets del puente | `packages/backend/src/modules/integration/aero.tickets.service.ts` sobre `aero_bridge_tickets` | Emite y canjea tickets de un solo uso de 120 s; guarda solo el SHA-256 del token |
-| Puente iOS | Scriptable, script `Aero32Bridge` (`packages/frontend/public/Aero32Bridge.scriptable`) | Recibe `{ ticket, ticketUrl }` por deep link, canjea el ticket por el sobre `{ url, method, headers, body, callback }` y hace el `POST` fuera de Safari para alcanzar HTTP local desde una página HTTPS |
+| Puente iOS | Scriptable, script `Aero32Bridge` (`packages/frontend/scriptable/Aero32Bridge.js`, servido en `/Aero32Bridge.js`) | Recibe `{ ticket, ticketUrl }` por deep link, canjea el ticket por el sobre `{ url, method, headers, body, callback }` y hace el `POST` fuera de Safari para alcanzar HTTP local desde una página HTTPS |
 | Cliente Android | `packages/android/app/src/main/java/com/trindade/app/aero/` | Llama al WebService directamente desde la red de la planta, con Basic Auth y ajustes cifrados |
 | Backend de integración | `packages/backend/src/modules/integration/` | Cofre, tickets, bitácora, validación y snapshot de movimientos del día |
 | Espejo persistido | Tabla `aero_movements` (revisiones 7–9) | Snapshot del día compartido por toda la planta |
@@ -78,25 +78,41 @@ scriptable:///run/Aero32Bridge?ticket=<token>&ticketUrl=<url codificada>
 
 | Pieza | Dónde vive | Qué hace |
 | --- | --- | --- |
-| Script | `packages/frontend/public/Aero32Bridge.scriptable` | JSON con `name`, `script`, icono y `always_run_in_app`; Vite lo copia al build |
-| Entrega | `/Aero32Bridge.scriptable` | Asset público que el usuario descarga una sola vez |
+| Fuente del script | `packages/frontend/scriptable/Aero32Bridge.js` | JavaScript del puente, sin envoltorio ni escapado |
+| Asset que usa la UI | `/Aero32Bridge.js` | JS **crudo**, copia idéntica de la fuente que `scripts/build-scriptable.mjs` publica en `packages/frontend/public/Aero32Bridge.js`; Vite lo copia al build |
+| Artefacto interno | `/Aero32Bridge.scriptable` | El mismo texto envuelto en el JSON de Scriptable (`name`, `script`, icono). Ninguna pantalla ofrece su descarga |
 | Nombre | `Aero32Bridge` | Constante de integración; el URL scheme lo usa y el usuario no lo configura |
-| Importación | Scriptable → **Compartir → Scriptable** | Instala el script en la app; aparece como `Aero32Bridge` |
+| Instalación | **Copiar código para Scriptable** → Scriptable → **+** → pegar → renombrar | Deja el script en la app con el nombre que el deep link necesita |
 
 Instalación, una sola vez por teléfono: Scriptable se instala desde la App Store
-(<https://apps.apple.com/app/scriptable/id1405459188>), el archivo se descarga desde `/Aero32Bridge.scriptable` y se
-abre con **Compartir → Scriptable**. No se arman acciones a mano.
+(<https://apps.apple.com/app/scriptable/id1405459188>), el operador toca **Copiar código para Scriptable** en el panel
+o en el diálogo, abre Scriptable, toca **+**, pega el código y renombra el script a **`Aero32Bridge`**. No se arman
+acciones a mano y **no se descarga ningún archivo**.
+
+El `.scriptable` dejó de usarse para instalar porque es un JSON: al pegarlo en el editor de Scriptable se ejecuta el
+objeto entero y el parser falla en el primer `:` de `"name"` con `SyntaxError: Unexpected token ':'`. El texto que
+Scriptable ejecuta es el de adentro de `script`, así que el camino corto es copiar ese código. El paso
+**Compartir → Scriptable** y la descarga del `.scriptable` fueron retirados de la UI; el archivo queda como artefacto
+interno del build, no como instalación.
 
 Qué hace el script en cada ejecución:
 
 1. Lee `args.queryParameters.ticket` y `args.queryParameters.ticketUrl`; si falta alguno, avisa y termina sin
    inventar callback.
-2. Canjea el ticket con `POST` a `ticketUrl`, header `X-Trindade-Ticket`, `Accept: application/json`, sin cuerpo y
-   `allowInsecureRequest = true`. La respuesta es el sobre `{ url, method, headers, body, bodies?, callback }`.
+2. Canjea el ticket con `POST` a `ticketUrl`, header `X-Trindade-Ticket`, `Accept: application/json`, sin cuerpo,
+   `allowInsecureRequest = true` y `timeoutInterval` explícito (8–10 s). Si el canje no llega (sin internet), muestra
+   un `Alert` corto y termina sin callback. La respuesta es el sobre `{ url, method, headers, body, bodies?, callback }`.
 3. Envía cada payload —`bodies` si es una lista no vacía, `body` si no— como texto JSON a `url` con los `headers`
-   del sobre y `allowInsecureRequest = true`.
+   del sobre, `allowInsecureRequest = true` y `timeoutInterval` explícito en **cada** `POST`.
 4. Devuelve el texto de la respuesta, o `[r1,r2,…]` cuando el sobre traía lote, y abre
    `callback + encodeURIComponent(resultado)` en Safari. Termina con `Script.complete()`.
+
+Diagnóstico de red: **el SSID no se puede leer**. iOS entrega el nombre de la red Wi-Fi solo a apps nativas con
+permiso de ubicación precisa y el entitlement correspondiente; Safari y Scriptable no exponen esa API. Lo que el
+script mide es si **el host del ERP responde**: un error de red o un timeout en el primer `POST` corta el lote y
+devuelve `…&aero_error=wifi_required&aero_msg=<mensaje codificado>` sobre `callback`, porque no tiene sentido esperar
+los demás payloads. Una respuesta HTTP del ERP (incluido `4xx`/`5xx`) **no** es un error de red: vuelve tal cual como
+antes. El código `wifi_required` es estable y la web lo traduce a la frase de Wi-Fi/ERP; el `aero_msg` es respaldo.
 
 Límites del script: no registra ni muestra `Authorization`, el ticket ni contraseñas, y no guarda estado. En
 consecuencia, lo que se retira es la receta numerada de 23 acciones, los botones para copiar valores y el enlace de
