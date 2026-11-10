@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import i18n from '../../i18n/config';
 import { DEFAULT_AERO_SETTINGS } from '../../lib/aero-integration';
+import { AERO_PENDING_TEST_STORAGE_KEY, saveAeroPendingTest } from '../../lib/aero-test';
 import type { AeroVaultSettings } from '../../lib/aero-vault';
 
 /**
@@ -97,6 +98,12 @@ beforeEach(async () => {
   await i18n.changeLanguage('es');
   localStorage.clear();
   sessionStorage.clear();
+  // Cada prueba arranca en la ruta limpia: un callback de la anterior no puede decidir el veredicto de ésta.
+  window.history.replaceState({}, '', '/admin');
+  vi.restoreAllMocks();
+  // jsdom no implementa el desplazamiento: el aviso se pinta igual y la prueba mide el texto, no el scroll.
+  Element.prototype.scrollIntoView = vi.fn();
+  Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
   vault.fetched = { configured: false, wsUrl: null, username: null, hasPassword: false, updatedAt: null };
   vault.fetchError = null;
   vault.ticketError = null;
@@ -211,18 +218,28 @@ describe('AeroIntegrationPanel', () => {
     await waitFor(() => expect(screen.getByText(/Abriendo Scriptable/)).toBeInTheDocument());
   });
 
-  it('offers the App Store, the importable script and the instructions as three separate controls', async () => {
+  it('offers the App Store, the code copy and the instructions as separate controls', async () => {
     vault.fetched = configuredVault();
     renderPanel();
     await waitFor(() => expect(screen.getByTestId('aero-state')).toHaveTextContent('Configurado'));
 
-    // Instalar la app y descargar el script son dos pasos distintos: cada uno tiene su enlace.
+    // Instalar la app y pegar el script son dos pasos distintos: cada uno tiene su control.
     expect(screen.getByTestId('aero-scriptable-app-store')).toHaveAttribute(
       'href',
       'https://apps.apple.com/app/scriptable/id1405459188',
     );
-    expect(screen.getByTestId('aero-scriptable-asset')).toHaveAttribute('href', '/Aero32Bridge.scriptable');
-    // Y el tercero abre la ayuda: la app ya viene con el script importado cuando se llega acá.
+    // Ya no hay nada que descargar: el botón abre el diálogo, que es el dueño del código y de la copia.
+    expect(screen.queryByTestId('aero-scriptable-asset')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('aero-scriptable-copy-open'));
+    await waitFor(() => expect(screen.getByTestId('aero-scriptable-dialog')).toBeInTheDocument());
+    expect(screen.getByTestId('aero-scriptable-copy')).toBeInTheDocument();
+  });
+
+  it('keeps its own help button opening the same instructions', async () => {
+    vault.fetched = configuredVault();
+    renderPanel();
+    await waitFor(() => expect(screen.getByTestId('aero-state')).toHaveTextContent('Configurado'));
+
     fireEvent.click(screen.getByTestId('aero-shortcut-open'));
     await waitFor(() => expect(screen.getByTestId('aero-scriptable-dialog')).toBeInTheDocument());
   });
@@ -249,5 +266,48 @@ describe('AeroIntegrationPanel', () => {
     await waitFor(() =>
       expect(screen.getByTestId('aero-state')).toHaveTextContent('Falta la contraseña en el cofre'),
     );
+  });
+
+  it('reads the bridge network error as unreachable ERP, not as invalid credentials', async () => {
+    vault.fetched = configuredVault();
+    // El operario vuelve de Scriptable con el callback de error que dejó el script.
+    window.history.replaceState(
+      {},
+      '',
+      '/admin?aero_action=test&aero_data=&aero_error=wifi_required&aero_msg=sin%20red',
+    );
+    // Y el intento quedó registrado antes de salir: sin limpiarlo, el panel lo repetiría al recargar.
+    saveAeroPendingTest({ destinationUrl: 'http://192.168.25.250:1453/api', startedAt: '2026-10-30T10:00:00.000Z', reason: 'mixed_content' });
+
+    const { rerender, unmount } = renderPanel();
+    const props = { settings: { ...LOCAL }, onSettingsSaved: vi.fn() };
+
+    await waitFor(() => expect(screen.getByTestId('aero-notice')).toHaveTextContent(/Wi-Fi Trindade Expedicao/));
+    // El aviso lleva el título del error de red, no el de una credencial rechazada.
+    expect(screen.getByTestId('aero-test-result-modal')).toHaveTextContent('ERP no disponible');
+    // El panel no queda «probando»: los botones vuelven a estar disponibles.
+    expect(screen.getByTestId('aero-test')).not.toBeDisabled();
+    // El intento pendiente se limpió, y la consulta se consumió para que un refresco no repita el aviso.
+    expect(localStorage.getItem(AERO_PENDING_TEST_STORAGE_KEY)).toBeNull();
+    expect(window.location.search).toBe('');
+
+    // Y una segunda pasada no vuelve a pintarlo: el callback se reclamó una sola vez.
+    rerender(<AeroIntegrationPanel {...props} />);
+    expect(screen.getAllByTestId('aero-notice')).toHaveLength(1);
+    unmount();
+  });
+
+  it('does not open Scriptable for the test when the phone has no internet', async () => {
+    vault.fetched = configuredVault();
+    Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
+    renderPanel();
+    await waitFor(() => expect(screen.getByTestId('aero-state')).toHaveTextContent('Configurado'));
+
+    fireEvent.click(screen.getByTestId('aero-test'));
+
+    // Sin internet el ticket no se puede canjear: no se pide y la app no se abre.
+    await waitFor(() => expect(screen.getByTestId('aero-notice')).toHaveTextContent(/Sin conexión a internet/));
+    expect(vault.tickets).toHaveLength(0);
+    expect(screen.getByTestId('aero-test')).not.toBeDisabled();
   });
 });

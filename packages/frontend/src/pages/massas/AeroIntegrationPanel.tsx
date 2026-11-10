@@ -10,8 +10,6 @@ import {
   aeroMissingSetup,
   aeroSettingsReady,
   AERO_SCRIPTABLE_APP_URL,
-  AERO_SCRIPTABLE_ASSET_PATH,
-  AERO_SCRIPTABLE_NAME,
   buildAeroBridgeTriggerUrl,
   clearAeroSettings,
   DEFAULT_AERO_SETTINGS,
@@ -39,6 +37,7 @@ import {
   loadAeroTestOutcome,
   type AeroTestOutcome,
 } from '../../lib/aero-test';
+import { clearAeroBridgePending } from '../../lib/aero-watchdog';
 import { AeroScriptableDialog } from './AeroScriptableDialog';
 import { AeroDeviceBanner } from '../../components/aero/AeroDeviceBanner';
 import { useDevice } from '../../contexts/DeviceContext';
@@ -121,7 +120,9 @@ export function AeroIntegrationPanel({
   const [busy, setBusy] = useState<'save' | 'test' | 'clear' | null>(null);
   // El veredicto del test viaja desde otra app: sin esta ventana el operario vuelve a una pantalla idéntica
   // a la que dejó y no sabe si la conexión quedó probada.
-  const [testResult, setTestResult] = useState<{ tone: AeroResultTone; message: string } | null>(null);
+  const [testResult, setTestResult] = useState<{ tone: AeroResultTone; message: string; title?: string } | null>(
+    null,
+  );
   const [notice, setNotice] = useState<Notice | null>(null);
   const noticeRef = useRef<HTMLParagraphElement | null>(null);
   /** Un veredicto que llegó del teléfono pide scroll: el aviso nace fuera de la pantalla. */
@@ -245,6 +246,13 @@ export function AeroIntegrationPanel({
   const handleTest = async () => {
     setNotice(null);
 
+    // Sin internet el ticket no se canjea y Scriptable no llega a la fábrica: no se abre la app. La frase dice
+    // qué mirar en vez de dejar al operario con un botón que no hace nada.
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      setNotice({ tone: 'error', text: t('massas.aero.offline') });
+      return;
+    }
+
     if (!normalizedUrl || !draft.username.trim() || !hasPassword) {
       // A `requested` line carries no error: the attempt did not fail, it never became an attempt.
       void postAeroAuditEvent({
@@ -303,18 +311,39 @@ export function AeroIntegrationPanel({
   useEffect(() => {
     if (callbackHandled.current) return;
     const parsed = parseAeroCallback(window.location.search);
-    if (!parsed || parsed.kind !== 'test') return;
+    if (!parsed) return;
+
+    // Un error de red del puente no es una credencial inválida. Se reclama una sola vez -- la consulta se
+    // limpia antes de cualquier trabajo asíncrono -- y se responde con el aviso accionable: sin esto el panel
+    // se queda con `busy` en `test`, el intento pendiente sigue vivo y el operario no lee nada.
+    if (parsed.kind === 'error') {
+      callbackHandled.current = true;
+      window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`);
+      clearAeroPendingTest();
+      clearAeroBridgePending();
+      setBusy(null);
+      const text = t('massas.aero.wifiRequired');
+      const title = t('massas.aero.wifiRequiredTitle');
+      setNotice({ tone: 'error', text });
+      setTestResult({ tone: 'error', message: text, title });
+      scrollToNotice.current = true;
+      return;
+    }
+
+    if (parsed.kind !== 'test') return;
     callbackHandled.current = true;
     window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`);
 
     const pending = loadAeroPendingTest();
     const destinationUrl = pending?.destinationUrl ?? destination;
     clearAeroPendingTest();
+    // El puente volvió: la marca del viaje ya no tiene nada que vigilar.
+    clearAeroBridgePending();
     void postAeroAuditEvent(
       aeroTestResultEvent({ verdict: parsed.verdict, raw: parsed.raw, destinationUrl }),
     );
     setStoredOutcome({ verdict: parsed.verdict, raw: parsed.raw, destinationUrl });
-  }, [destination]);
+  }, [destination, t]);
 
   /**
    * The verdict the phone brought back.
@@ -595,7 +624,7 @@ export function AeroIntegrationPanel({
           </Button>
         </div>
 
-        {/* El proceso nativo se instala una vez, en dos pasos: la app y el archivo. Se explica debajo de las
+        {/* El proceso nativo se instala una vez, en dos pasos: la app y el código. Se explica debajo de las
             acciones porque es lo primero que hay que resolver cuando un botón abre una app sin el script. */}
         <div
           className="space-y-2 rounded-lg border border-gray-200 bg-gray-50 p-3"
@@ -612,15 +641,17 @@ export function AeroIntegrationPanel({
             >
               {t('massas.aero.shortcut')}
             </a>
-            {/* `download` baja el archivo al teléfono: se toca en Archivos y se comparte con Scriptable. */}
-            <a
-              href={AERO_SCRIPTABLE_ASSET_PATH}
-              download={`${AERO_SCRIPTABLE_NAME}.scriptable`}
-              data-testid="aero-scriptable-asset"
-              className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-center text-sm font-semibold text-gray-700 hover:bg-gray-100 sm:w-auto"
+            {/* Nada se descarga: este botón abre el diálogo, que carga el JavaScript crudo y lo copia. */}
+            <Button
+              type="button"
+              onClick={() => setScriptableOpen(true)}
+              disabled={deviceLimited}
+              variant="outline"
+              className="min-h-[44px] w-full font-semibold sm:w-auto"
+              data-testid="aero-scriptable-copy-open"
             >
-              {t('massas.aero.scriptableImportButton')}
-            </a>
+              {t('massas.aero.scriptableCopyButton')}
+            </Button>
           </div>
         </div>
       </div>
@@ -628,7 +659,16 @@ export function AeroIntegrationPanel({
       <AeroResultDialog
         open={testResult !== null}
         tone={testResult?.tone ?? 'ok'}
-        title={t(testResult?.tone === 'ok' ? 'massas.aero.resultTestOkTitle' : testResult?.tone === 'warn' ? 'massas.aero.resultTestWarnTitle' : 'massas.aero.resultTestErrorTitle')}
+        title={
+          testResult?.title ??
+          t(
+            testResult?.tone === 'ok'
+              ? 'massas.aero.resultTestOkTitle'
+              : testResult?.tone === 'warn'
+                ? 'massas.aero.resultTestWarnTitle'
+                : 'massas.aero.resultTestErrorTitle',
+          )
+        }
         message={testResult?.message ?? ''}
         onClose={() => setTestResult(null)}
         testId="aero-test-result-modal"
