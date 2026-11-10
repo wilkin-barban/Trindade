@@ -322,7 +322,7 @@ export function AeroIntegrationPanel({
       clearAeroPendingTest();
       clearAeroBridgePending();
       setBusy(null);
-      const text = t('massas.aero.wifiRequired');
+      const text = parsed.code === 'wifi_required' ? t('massas.aero.wifiRequired') : t('massas.aero.bridgeError');
       const title = t('massas.aero.wifiRequiredTitle');
       setNotice({ tone: 'error', text });
       setTestResult({ tone: 'error', message: text, title });

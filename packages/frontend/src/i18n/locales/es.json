@@ -648,7 +648,8 @@
       "passwordStored": "Contraseña guardada en el servidor",
       "passwordNotStored": "No hay contraseña guardada: escribila una vez y queda cifrada en el servidor.",
       "passwordKeepPlaceholder": "Dejá vacío para conservar la guardada",
-      "passwordNeeded": "La contraseña del ERP no está guardada en el servidor: abrí Admin → Integración y guardala para continuar."
+      "passwordNeeded": "La contraseña del ERP no está guardada en el servidor: abrí Admin → Integración y guardala para continuar.",
+      "bridgeError": "El puente devolvió un error. Revisá la conexión y reintentá."
     },
     "historyShort": "Historial",
     "todayShort": "Hoy",
