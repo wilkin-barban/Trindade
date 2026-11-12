@@ -35,6 +35,7 @@ import {
   activeWorkerCandidates,
   generateTemporaryPassword,
   needsPasswordSave,
+  passwordHasEdgeSpaces,
   patchWorkerPassword,
   type SavedPassword,
 } from '../lib/share-credentials';
@@ -236,7 +237,7 @@ export function ShareAppPage() {
     includeCredentials &&
     credentialMode === 'existing' &&
     Boolean(selectedUserId) &&
-    (password.trim() === '' || passwordIssue(password) !== null);
+    (password.trim() === '' || passwordHasEdgeSpaces(password) || passwordIssue(password) !== null);
 
   /** Un ref, y no el estado: dos clics en el mismo tick ven el mismo `savingPassword`. */
   const savingRef = useRef(false);
@@ -263,6 +264,10 @@ export function ShareAppPage() {
     if (savingRef.current) return false;
     // La política se valida acá para no hacer el viaje: el servidor sigue siendo la autoridad, pero un 400
     // anunciado se evita en origen.
+    if (passwordHasEdgeSpaces(password)) {
+      setPasswordNotice({ tone: 'error', text: t('share.passwordEdgeSpaces', 'La contraseña no puede empezar ni terminar con espacios: el trabajador recibiría una clave distinta de la guardada.') });
+      return false;
+    }
     if (passwordIssue(password) !== null) {
       setPasswordNotice({ tone: 'error', text: t('share.passwordPolicyError', 'A senha não cumpre a política: 15 caracteres no mínimo, até 72 bytes e sem senhas comuns.') });
       return false;
@@ -369,7 +374,9 @@ export function ShareAppPage() {
   };
 
   const handleOpenWhatsApp = async () => {
-    if (usersError) {
+    // El error de /admin/users solo cierra el flujo de credenciales existentes: crear un operario no depende
+    // de esa lista.
+    if (usersError && credentialMode === 'existing' && includeCredentials) {
       setPasswordNotice({ tone: 'error', text: t('share.passwordUsersUnavailable', 'Não foi possível carregar os trabalhadores. Atualize a página antes de compartilhar credenciais.') });
       return;
     }
@@ -393,7 +400,9 @@ export function ShareAppPage() {
   };
 
   const handleCopy = async () => {
-    if (usersError) {
+    // El error de /admin/users solo cierra el flujo de credenciales existentes: crear un operario no depende
+    // de esa lista.
+    if (usersError && credentialMode === 'existing' && includeCredentials) {
       setPasswordNotice({ tone: 'error', text: t('share.passwordUsersUnavailable', 'Não foi possível carregar os trabalhadores. Atualize a página antes de compartilhar credenciais.') });
       return;
     }
@@ -411,7 +420,9 @@ export function ShareAppPage() {
   };
 
   const handleShareApk = async () => {
-    if (usersError) {
+    // El error de /admin/users solo cierra el flujo de credenciales existentes: crear un operario no depende
+    // de esa lista.
+    if (usersError && credentialMode === 'existing' && includeCredentials) {
       setPasswordNotice({ tone: 'error', text: t('share.passwordUsersUnavailable', 'Não foi possível carregar os trabalhadores. Atualize a página antes de compartilhar credenciais.') });
       return;
     }

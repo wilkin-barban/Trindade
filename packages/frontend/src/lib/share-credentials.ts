@@ -121,3 +121,13 @@ export async function patchWorkerPassword(
 ): Promise<void> {
   await client.patch(`/admin/users/${userId}`, { password });
 }
+
+/**
+ * Leading or trailing spaces break the promise that the worker receives what the account stores.
+ *
+ * The message trims, the PATCH does not: `Trindade-abc ` would be saved with the space and printed without it, and
+ * the worker would type a password that does not exist. Rejecting the edge spaces keeps message and server equal.
+ */
+export function passwordHasEdgeSpaces(password: string): boolean {
+  return password !== password.trim();
+}
