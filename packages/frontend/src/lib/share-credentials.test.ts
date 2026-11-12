@@ -5,9 +5,11 @@ import {
   activeWorkerCandidates,
   generateTemporaryPassword,
   needsPasswordSave,
+  passwordHasEdgeSpaces,
   patchWorkerPassword,
   type ShareCandidate,
 } from './share-credentials.js';
+import { buildShareMessage } from './share-app.js';
 
 const users: ShareCandidate[] = [
   { id: 1, display_name: 'Wilkin', username: 'wilkin', role_name: 'Administrador', is_active: 1 },
@@ -126,5 +128,35 @@ describe('the PATCH that persists the password', () => {
     };
 
     await assert.rejects(() => patchWorkerPassword(client, '42', 'corta'), /400/);
+  });
+});
+
+describe('the password the worker reads is the password the account stores', () => {
+  it('rejects leading or trailing spaces, because the message trims and the PATCH does not', () => {
+    assert.equal(passwordHasEdgeSpaces(' Trindade-abcdefghijklm'), true);
+    assert.equal(passwordHasEdgeSpaces('Trindade-abcdefghijklm '), true);
+    assert.equal(passwordHasEdgeSpaces('Trindade-abcdefghijklm'), false);
+  });
+
+  it('prints and persists the same string when the password has no edge spaces', async () => {
+    const password = 'Trindade-abcdefghijklm';
+    const calls: Array<{ body: unknown }> = [];
+    const client = {
+      async patch<T>(_path: string, body: unknown): Promise<T> {
+        calls.push({ body });
+        return {} as T;
+      },
+    };
+
+    const message = buildShareMessage({
+      platform: 'android',
+      release: { version: '0.7.5', apkUrl: 'https://example.test/apk', webUrl: 'https://example.test' },
+      credentials: { enabled: true, displayName: 'Ana', username: 'ana', password },
+      locale: 'es',
+    });
+    await patchWorkerPassword(client, '2', password);
+
+    assert.ok(message.includes(`*${password}*`), 'the message carries the password verbatim');
+    assert.deepEqual(calls[0]!.body, { password });
   });
 });

@@ -83,6 +83,14 @@ describe('the Share screen and the existing worker password', () => {
 describe('the guards the approved change added', () => {
   const ensure = block('const ensurePasswordSaved = async (): Promise<boolean> => {', 'const handleOpenWhatsApp');
 
+  it('rejects edge spaces before the round trip, so message and account hold the same string', () => {
+    const spacesAt = ensure.indexOf('passwordHasEdgeSpaces(password)');
+    const patchAt = ensure.indexOf('patchWorkerPassword(');
+
+    assert.ok(spacesAt >= 0, 'edge spaces must be refused');
+    assert.ok(patchAt > spacesAt, 'no PATCH can happen before the edge-space check');
+  });
+
   it('checks the policy before the round trip, and the server remains the authority', () => {
     const policyAt = ensure.indexOf('passwordIssue(password)');
     const patchAt = ensure.indexOf('patchWorkerPassword(');
@@ -105,12 +113,19 @@ describe('the guards the approved change added', () => {
     );
     for (const name of ['handleOpenWhatsApp', 'handleCopy', 'handleShareApk']) {
       const source = block(`const ${name} = async () => {`, '};');
-      assert.ok(source.includes('if (usersError)'), `${name} must refuse while the worker list is unavailable`);
+      assert.ok(
+        source.includes("if (usersError && credentialMode === 'existing' && includeCredentials)"),
+        `${name} must refuse only the existing-credentials flow while the worker list is unavailable`,
+      );
     }
   });
 
   it('blocks the QR for an unusable password, not only for a pending pair', () => {
     assert.ok(page.includes('passwordPending || passwordUnusable'));
-    assert.ok(page.includes("password.trim() === '' || passwordIssue(password) !== null"));
+    assert.match(
+      page,
+      /password\.trim\(\) === ''[\s\S]{0,80}passwordIssue\(password\) !== null/,
+      'an empty, space-padded or policy-breaking password must block the QR',
+    );
   });
 });
