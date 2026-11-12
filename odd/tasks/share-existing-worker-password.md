@@ -54,16 +54,16 @@ sin credenciales en logs, commits ni archivos. `CHANGELOG.md` y este ODD con has
 
 | ID | RED (test que falla primero) | GREEN (cambio mínimo) | Archivos | Aceptación | Riesgo | Rollback | Commit |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| T1 | — | Este ODD, solo docs | `odd/tasks/share-existing-worker-password.md` | Existe antes de todo código | Ninguno | `git revert` | pendiente |
-| T2 | `share-credentials.test.ts`: la contraseña generada pasa `passwordIssue`, no es débil y no es la de antes | Generador de contraseña temporal | `lib/share-credentials.ts`, tests | Válida, aleatoria, ≥15 grafemas | Ninguno | Revertir commit | pendiente |
-| T3 | Decisión de guardado: pendiente/guardada por usuario+contraseña | Función pura de decisión | `lib/share-credentials.ts`, tests | Sin PATCH repetido; editar reabre | Ninguno | Revertir commit | pendiente |
-| T4 | Filtro de trabajadores activos | Filtro sobre `/admin/users` y fallo cerrado | `pages/ShareAppPage.tsx`, tests | Solo activos, nunca admin/invitado | 3 (permisos) | Revertir commit | pendiente |
-| T5 | PATCH antes de abrir/copiar/compartir; popup síncrono; QR bloqueado | Handlers y estado de guardado | `pages/ShareAppPage.tsx`, tests | Nada sale sin persistir; QR solo tras guardar | 3 (contraseñas) | Revertir commit | pendiente |
-| T6 | i18n ES/PT de estados y errores | Textos nuevos | `i18n/locales/es.json`, `pt-BR.json` | Paridad exacta | Ninguno | Revertir commit | pendiente |
-| T7 | — | CHANGELOG y ODD con evidencia | `CHANGELOG.md`, ODD | Registro completo | Ninguno | Revertir commit | pendiente |
-| T8 | — | Suites, typecheck, build, CI | — | Todo verde | Ninguno | — | pendiente |
-| T9 | — | Deploy `web` y verificación en producción | producción | `web` healthy, health 200, página nueva | 5 (despliegue) | Imagen anterior | pendiente |
-| T10 | — | Usuario temporal creado, validado y eliminado | producción | Contraseña vieja inválida, nueva válida; usuario ausente al final | 1 (datos) | Borrado administrativo | pendiente |
+| T1 | — | Este ODD, solo docs | `odd/tasks/share-existing-worker-password.md` | Existe antes de todo código | Ninguno | `git revert` | pendiente | 06ce4efd |
+| T2 | `share-credentials.test.ts`: la contraseña generada pasa `passwordIssue`, no es débil y no es la de antes | Generador de contraseña temporal | `lib/share-credentials.ts`, tests | Válida, aleatoria, ≥15 grafemas | Ninguno | Revertir commit | pendiente | bed0889f |
+| T3 | Decisión de guardado: pendiente/guardada por usuario+contraseña | Función pura de decisión | `lib/share-credentials.ts`, tests | Sin PATCH repetido; editar reabre | Ninguno | Revertir commit | pendiente | bed0889f |
+| T4 | Filtro de trabajadores activos | Filtro sobre `/admin/users` y fallo cerrado | `pages/ShareAppPage.tsx`, tests | Solo activos, nunca admin/invitado | 3 (permisos) | Revertir commit | pendiente | cdbddffd |
+| T5 | PATCH antes de abrir/copiar/compartir; popup síncrono; QR bloqueado | Handlers y estado de guardado | `pages/ShareAppPage.tsx`, tests | Nada sale sin persistir; QR solo tras guardar | 3 (contraseñas) | Revertir commit | pendiente | cdbddffd |
+| T6 | i18n ES/PT de estados y errores | Textos nuevos | `i18n/locales/es.json`, `pt-BR.json` | Paridad exacta | Ninguno | Revertir commit | pendiente | cdbddffd |
+| T7 | — | CHANGELOG y ODD con evidencia | `CHANGELOG.md`, ODD | Registro completo | Ninguno | Revertir commit | pendiente | 95c86bfb |
+| T8 | — | Suites, typecheck, build, CI | — | Todo verde | Ninguno | — | pendiente | pendiente |
+| T9 | — | Deploy `web` y verificación en producción | producción | `web` healthy, health 200, página nueva | 5 (despliegue) | Imagen anterior | pendiente | pendiente |
+| T10 | — | Usuario temporal creado, validado y eliminado | producción | Contraseña vieja inválida, nueva válida; usuario ausente al final | 1 (datos) | Borrado administrativo | pendiente | bloqueado |
 
 ## Log
 
@@ -127,3 +127,24 @@ botones quedan bloqueados con un aviso accionable.
 L6 — Riesgo. Cambiar la contraseña de un trabajador revoca sus sesiones: es el comportamiento pedido y la UI lo dice.
 El riesgo real es de orden: si se abriera WhatsApp antes del PATCH, el trabajador recibiría una clave falsa; si se
 repitiera el PATCH, se revocarían sesiones sin necesidad. Las pruebas fijan las dos cosas.
+
+L7 — Correcciones pedidas en revisión, todas del mismo día. El guard de `usersError` cerraba también el modo crear:
+ahora se limita a `credentialMode === 'existing' && includeCredentials`, porque crear un operario no depende de la
+lista de candidatos. La contraseña se rechaza si tiene espacios al principio o al final: el mensaje recorta y el
+PATCH no, así que `Trindade-abc ` habría quedado guardada con el espacio y entregada sin él; una prueba compara el
+texto del mensaje con el cuerpo del PATCH para el caso válido y otra fija el rechazo. El placeholder de ES estaba en
+portugués y se corrigió. El fallback de `/users/options` ahora marca `usersError` además de guardar la lista, así el
+modo existente no ofrece candidatos sin aviso.
+
+L8 — El CI de GitHub falló por el runner, no por el cambio: `ubuntu-latest` pasó a resolver a **Ubuntu 26.04** y
+Playwright 1.60 se niega a instalar Chromium ahí (`Playwright does not support chromium on ubuntu26.04-x64`), de modo
+que el paso E2E moría antes de correr un test. Se fijó `runs-on: ubuntu-24.04` en los dos jobs, con el motivo escrito
+en el archivo y en un commit aparte: es la misma clase de decisión deliberada que el digest de la imagen Android. El
+gate local `make ci-clone` ya había pasado entero (117 E2E) sobre el mismo árbol.
+
+L9 — Bloqueo declarado en producción. La validación con usuario temporal requiere una sesión `Administrador`; no
+existe una en este host y no se creó un administrador temporal (prohibido por el pedido) ni se inventaron
+credenciales. Queda pendiente de acceso: crear un único trabajador `tmp-share-*`, verificar que la contraseña vieja
+deja de servir y la nueva funciona, comprobar el flujo de copiar/abrir sin enviar WhatsApp y eliminarlo por la vía
+administrativa. El resto de la entrega (código, tests, backup, deploy web, verificación de salud y página) se
+completó sin ese acceso.
