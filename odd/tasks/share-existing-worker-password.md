@@ -52,18 +52,18 @@ sin credenciales en logs, commits ni archivos. `CHANGELOG.md` y este ODD con has
 
 ## Tasks
 
-| ID | RED (test que falla primero) | GREEN (cambio mínimo) | Archivos | Aceptación | Riesgo | Rollback | Commit |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| T1 | — | Este ODD, solo docs | `odd/tasks/share-existing-worker-password.md` | Existe antes de todo código | Ninguno | `git revert` | pendiente | 06ce4efd |
-| T2 | `share-credentials.test.ts`: la contraseña generada pasa `passwordIssue`, no es débil y no es la de antes | Generador de contraseña temporal | `lib/share-credentials.ts`, tests | Válida, aleatoria, ≥15 grafemas | Ninguno | Revertir commit | pendiente | bed0889f |
-| T3 | Decisión de guardado: pendiente/guardada por usuario+contraseña | Función pura de decisión | `lib/share-credentials.ts`, tests | Sin PATCH repetido; editar reabre | Ninguno | Revertir commit | pendiente | bed0889f |
-| T4 | Filtro de trabajadores activos | Filtro sobre `/admin/users` y fallo cerrado | `pages/ShareAppPage.tsx`, tests | Solo activos, nunca admin/invitado | 3 (permisos) | Revertir commit | pendiente | cdbddffd |
-| T5 | PATCH antes de abrir/copiar/compartir; popup síncrono; QR bloqueado | Handlers y estado de guardado | `pages/ShareAppPage.tsx`, tests | Nada sale sin persistir; QR solo tras guardar | 3 (contraseñas) | Revertir commit | pendiente | cdbddffd |
-| T6 | i18n ES/PT de estados y errores | Textos nuevos | `i18n/locales/es.json`, `pt-BR.json` | Paridad exacta | Ninguno | Revertir commit | pendiente | cdbddffd |
-| T7 | — | CHANGELOG y ODD con evidencia | `CHANGELOG.md`, ODD | Registro completo | Ninguno | Revertir commit | pendiente | 95c86bfb |
-| T8 | — | Suites, typecheck, build, CI | — | Todo verde | Ninguno | — | pendiente | b171c47b |
-| T9 | — | Deploy `web` y verificación en producción | producción | `web` healthy, health 200, página nueva | 5 (despliegue) | Imagen anterior | pendiente | b171c47b |
-| T10 | — | Usuario temporal creado, validado y eliminado | producción | Contraseña vieja inválida, nueva válida; usuario ausente al final | 1 (datos) | Borrado administrativo | pendiente | sin código |
+| ID | RED (test que falla primero) | GREEN (cambio mínimo) | Archivos | Aceptación | Riesgo | Rollback | Estado | Commit |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| T1 | — | Este ODD, solo docs | `odd/tasks/share-existing-worker-password.md` | Existe antes de todo código | Ninguno | `git revert` | hecha | 06ce4efd |
+| T2 | `share-credentials.test.ts`: la contraseña generada pasa `passwordIssue`, no es débil y no es la de antes | Generador de contraseña temporal | `lib/share-credentials.ts`, tests | Válida, aleatoria, ≥15 grafemas | Ninguno | Revertir commit | hecha | bed0889f |
+| T3 | Decisión de guardado: pendiente/guardada por usuario+contraseña | Función pura de decisión | `lib/share-credentials.ts`, tests | Sin PATCH repetido; editar reabre | Ninguno | Revertir commit | hecha | bed0889f |
+| T4 | Filtro de trabajadores activos | Filtro sobre `/admin/users` y fallo cerrado | `pages/ShareAppPage.tsx`, tests | Solo activos, nunca admin/invitado | 3 (permisos) | Revertir commit | hecha | cdbddffd |
+| T5 | PATCH antes de abrir/copiar/compartir; popup síncrono; QR bloqueado | Handlers y estado de guardado | `pages/ShareAppPage.tsx`, tests | Nada sale sin persistir; QR solo tras guardar | 3 (contraseñas) | Revertir commit | hecha | cdbddffd |
+| T6 | i18n ES/PT de estados y errores | Textos nuevos | `i18n/locales/es.json`, `pt-BR.json` | Paridad exacta | Ninguno | Revertir commit | hecha | cdbddffd |
+| T7 | — | CHANGELOG y ODD con evidencia | `CHANGELOG.md`, ODD | Registro completo | Ninguno | Revertir commit | hecha | 95c86bfb |
+| T8 | — | Suites, typecheck, build, CI | — | Todo verde | Ninguno | — | hecha | b171c47b |
+| T9 | — | Deploy `web` y verificación en producción | producción | `web` healthy, health 200, página nueva | 5 (despliegue) | Imagen anterior | hecha | b171c47b |
+| T10 | — | Usuario temporal creado, validado y eliminado | producción | Validada por API con el usuario id 25: vieja 200 → `PATCH` 200 → vieja 401 → nueva 200 → `DELETE` → ausente de `/api/admin/users` y login 401. | 1 (datos) | Borrado administrativo | hecha (API) | sin código (validación API) |
 
 ## Log
 
