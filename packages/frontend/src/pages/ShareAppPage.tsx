@@ -31,6 +31,13 @@ import {
   type SharePlatform,
   type ShareReleaseInfo,
 } from '../lib/share-app';
+import {
+  activeWorkerCandidates,
+  generateTemporaryPassword,
+  needsPasswordSave,
+  patchWorkerPassword,
+  type SavedPassword,
+} from '../lib/share-credentials';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 
@@ -38,6 +45,9 @@ interface UserOptionItem {
   id: number;
   display_name: string;
   username?: string;
+  /** Returned by `/api/admin/users`; the existing mode filters on these two. */
+  role_name?: string;
+  is_active?: number;
 }
 
 const DEFAULT_RELEASE: ShareReleaseInfo = {
@@ -66,7 +76,12 @@ export function ShareAppPage() {
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [displayName, setDisplayName] = useState<string>('');
   const [username, setUsername] = useState<string>('');
-  const [password, setPassword] = useState<string>('123456789');
+  // Sin valor por defecto: la contraseña del trabajador existente se genera al elegirlo y tiene que ser válida.
+  const [password, setPassword] = useState<string>('');
+  /** El par (trabajador, contraseña) que el servidor ya confirmó; evita revocar sesiones dos veces. */
+  const [savedPassword, setSavedPassword] = useState<SavedPassword | null>(null);
+  const [savingPassword, setSavingPassword] = useState<boolean>(false);
+  const [passwordNotice, setPasswordNotice] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
   const [includeCredentials, setIncludeCredentials] = useState<boolean>(true);
   /**
    * A worker is created from this screen by default: the admin already knows the person's name, and asking them
@@ -162,6 +177,9 @@ export function ShareAppPage() {
       setDisplayName(found.display_name);
       const derived = found.username || found.display_name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '.');
       setUsername(derived);
+      // Una contraseña temporal válida, visible y editable: la anterior por defecto no cumplía la política.
+      setPassword(generateTemporaryPassword());
+      setPasswordNotice(null);
     }
   };
 
@@ -174,7 +192,7 @@ export function ShareAppPage() {
       enabled: true,
       displayName: credentialMode === 'create' ? quickName : displayName,
       username: credentialMode === 'create' ? quickLogin : username,
-      password: credentialMode === 'create' ? quickPassword : password || '123456789',
+      password: credentialMode === 'create' ? quickPassword : password,
     } : { enabled: false },
     locale: currentLocale,
   }), [
@@ -192,11 +210,65 @@ export function ShareAppPage() {
     currentLocale,
   ]);
 
+  /** Solo trabajadores activos: ni administradores, ni inactivos, ni el invitado. */
+  const candidates = useMemo(() => activeWorkerCandidates(users), [users]);
+
+  /** El próximo abrir/copiar tiene que persistir esta contraseña antes de salir. */
+  const passwordPending =
+    isAdmin &&
+    needsPasswordSave({
+      mode: credentialMode,
+      includeCredentials,
+      selectedUserId,
+      password,
+      saved: savedPassword,
+    });
+
+  const describePasswordError = (err: unknown): string => {
+    if (isNetworkError(err)) return t('share.passwordNetworkError', 'Servidor inalcançável. Verifique sua conexão e tente novamente.');
+    if (err instanceof ApiClientError) {
+      if (err.status === 400) return t('share.passwordPolicyError', 'A senha não cumpre a política: 15 caracteres no mínimo, até 72 bytes e sem senhas comuns.');
+      if (err.status === 403) return t('share.passwordForbiddenError', 'Sem permissão para alterar a senha deste trabalhador.');
+      if (err.status === 404) return t('share.passwordNotFoundError', 'O trabalhador não existe mais. Atualize a lista.');
+    }
+    const detail = err instanceof Error && err.message ? `: ${err.message}` : '';
+    return t('share.passwordServerError', 'Não foi possível guardar a senha.') + detail;
+  };
+
+  /**
+   * Persiste la contraseña del trabajador existente antes de cualquier salida.
+   *
+   * Devuelve `false` cuando el servidor no la aceptó: quien llama tiene que abortar sin abrir WhatsApp ni copiar,
+   * porque un mensaje con una clave que la cuenta no tiene es peor que no enviar nada.
+   */
+  const ensurePasswordSaved = async (): Promise<boolean> => {
+    if (!passwordPending) return true;
+    setSavingPassword(true);
+    setPasswordNotice(null);
+    try {
+      await patchWorkerPassword(api, selectedUserId, password);
+      setSavedPassword({ userId: selectedUserId, password });
+      setPasswordNotice({ tone: 'ok', text: t('share.passwordUpdated', 'Senha atualizada. As sessões deste trabalhador foram encerradas.') });
+      return true;
+    } catch (err) {
+      setPasswordNotice({ tone: 'error', text: describePasswordError(err) });
+      return false;
+    } finally {
+      setSavingPassword(false);
+    }
+  };
+
   const rawDialDigits = toWhatsAppNumber(phone);
   const waLink = useMemo(() => rawDialDigits ? waMeLink(rawDialDigits, message) : null, [rawDialDigits, message]);
 
   useEffect(() => {
     let active = true;
+    // Con una contraseña pendiente el QR no puede entregar una clave que la cuenta todavía no tiene.
+    if (passwordPending) {
+      setQrError(false);
+      setQrDataUrl('');
+      return () => { active = false; };
+    }
     const qrTarget = waLink || (platform === 'android' ? release.apkUrl : release.webUrl);
     setQrError(false);
     setQrDataUrl('');
@@ -204,7 +276,7 @@ export function ShareAppPage() {
       .then((url) => { if (active) setQrDataUrl(url); })
       .catch(() => { if (active) setQrError(true); });
     return () => { active = false; };
-  }, [waLink, platform, release, reloadToken]);
+  }, [waLink, platform, release, reloadToken, passwordPending]);
 
   /**
    * Creates the worker explicitly when the administrator clicks "+ Cadastrar Operário".
@@ -273,11 +345,22 @@ export function ShareAppPage() {
   const handleOpenWhatsApp = async () => {
     if (!waLink) return;
     if (!checkWorkerCreatedBeforeAction()) return;
-    window.open(waLink, '_blank', 'noopener,noreferrer');
+    // La ventana se abre en el gesto, antes del `await`: el navegador bloquea un popup que llega tarde. Si el
+    // PATCH falla se cierra, y así nunca queda un chat abierto con una contraseña que la cuenta no tiene.
+    const popup = typeof window === 'undefined' ? null : window.open('', '_blank');
+    if (popup) popup.opener = null;
+    const saved = await ensurePasswordSaved();
+    if (!saved) {
+      popup?.close();
+      return;
+    }
+    if (popup) popup.location.href = waLink;
+    else window.open(waLink, '_blank', 'noopener,noreferrer');
   };
 
   const handleCopy = async () => {
     if (!checkWorkerCreatedBeforeAction()) return;
+    if (!(await ensurePasswordSaved())) return;
     const outcome = await shareOrCopy(message);
     if (outcome === 'copied' || outcome === 'shared') {
       setCopied(true);
@@ -287,6 +370,8 @@ export function ShareAppPage() {
 
   const handleShareApk = async () => {
     if (!checkWorkerCreatedBeforeAction()) return;
+    // Compartir el APK también lleva el mensaje con la contraseña: se guarda antes de descargar nada.
+    if (!(await ensurePasswordSaved())) return;
     setSharingApk(true);
     setDownloadedNotice(false);
     try {
@@ -592,7 +677,7 @@ export function ShareAppPage() {
                       className="w-full h-11 px-3 rounded-lg border border-gray-300 bg-white text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">{t('share.customOrNewUser', '-- Escolher da lista --')}</option>
-                      {users.map((u) => (
+                      {candidates.map((u) => (
                         <option key={u.id} value={u.id}>
                           {u.display_name} {u.username ? `(@${u.username})` : ''}
                         </option>
@@ -641,13 +726,30 @@ export function ShareAppPage() {
                       id={passwordInputId}
                       type="text"
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="123456789"
+                      onChange={(e) => { setPassword(e.target.value); setPasswordNotice(null); }}
+                      placeholder={t('share.passwordPlaceholder', 'Senha temporária')}
                       className="h-10 text-sm font-mono border-gray-300"
                     />
                     <p className="text-[11px] text-gray-500 mt-1">
-                      {t('share.adminPasswordHint', 'Você pode informar a senha atribuída a este usuário ou manter a sugerida (123456789).')}
+                      {t('share.adminPasswordHint', 'Geramos uma senha temporária válida ao escolher o trabalhador. Você pode editá-la antes de compartilhar; ela só entra na conta quando você abre o chat, copia ou compartilha o APK.')}
                     </p>
+                    <p className="text-[11px] text-amber-700 mt-1">
+                      {t('share.passwordRevokesSessions', 'Abrir ou copiar altera a senha deste trabalhador e encerra as sessões dele.')}
+                    </p>
+                    {savingPassword && (
+                      <p className="text-[11px] text-blue-700 mt-1" role="status">
+                        {t('share.passwordSaving', 'Guardando senha…')}
+                      </p>
+                    )}
+                    {!savingPassword && passwordNotice && (
+                      <p
+                        className={`text-[11px] mt-1 ${passwordNotice.tone === 'ok' ? 'text-green-700' : 'text-red-600'}`}
+                        role={passwordNotice.tone === 'ok' ? 'status' : 'alert'}
+                        data-testid="share-password-notice"
+                      >
+                        {passwordNotice.text}
+                      </p>
+                    )}
                   </div>
                   </>
                   )}
@@ -793,6 +895,14 @@ export function ShareAppPage() {
                   <Button variant="outline" size="sm" onClick={() => setReloadToken((n) => n + 1)}>
                     {t('ui.retry')}
                   </Button>
+                </div>
+              ) : passwordPending ? (
+                <div
+                  className="w-48 h-48 flex flex-col items-center justify-center gap-2 bg-amber-50 rounded-xl border border-dashed border-amber-300 text-xs text-amber-800 px-3 text-center"
+                  role="status"
+                  data-testid="share-qr-pending"
+                >
+                  {t('share.qrPendingPassword', 'O QR com a senha aparece depois de guardá-la: ele nunca entrega uma senha que a conta ainda não tem.')}
                 </div>
               ) : (
                 <div className="w-48 h-48 flex items-center justify-center bg-gray-50 rounded-xl border border-dashed border-gray-300 text-xs text-gray-400">

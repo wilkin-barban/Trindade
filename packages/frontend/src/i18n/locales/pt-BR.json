@@ -970,7 +970,7 @@
     "username": "Usuário de Login",
     "password": "Senha Temporária",
     "passwordHint": "Pré-carregada por padrão como 123456789. Pode ser alterada livremente.",
-    "adminPasswordHint": "Você pode informar a senha atribuída a este usuário ou manter a sugerida (123456789).",
+    "adminPasswordHint": "Geramos uma senha temporária válida ao escolher o trabalhador. Você pode editá-la antes de compartilhar; ela só entra na conta quando você abre o chat, copia ou compartilha o APK.",
     "readOnlyAdminHint": "Dados em modo somente leitura para administradores.",
     "sendApkFile": "Compartilhar Arquivo APK",
     "preparingApk": "Preparando arquivo APK...",
@@ -1005,7 +1005,17 @@
     "createRequiredBeforeSend": "Cadastre o operário antes de compartilhar o acesso.",
     "createUserAlreadyExists": "Este nome de usuário já está em uso. Escolha outro login.",
     "createNetworkError": "Servidor inalcançável. Verifique sua conexão e tente novamente.",
-    "createServerError": "Não foi possível cadastrar o operário."
+    "createServerError": "Não foi possível cadastrar o operário.",
+    "passwordPlaceholder": "Senha temporária",
+    "passwordRevokesSessions": "Abrir ou copiar altera a senha deste trabalhador e encerra as sessões dele.",
+    "passwordSaving": "Guardando senha…",
+    "passwordUpdated": "Senha atualizada. As sessões deste trabalhador foram encerradas.",
+    "passwordNetworkError": "Servidor inalcançável. Verifique sua conexão e tente novamente.",
+    "passwordPolicyError": "A senha não cumpre a política: 15 caracteres no mínimo, até 72 bytes e sem senhas comuns.",
+    "passwordForbiddenError": "Sem permissão para alterar a senha deste trabalhador.",
+    "passwordNotFoundError": "O trabalhador não existe mais. Atualize a lista.",
+    "passwordServerError": "Não foi possível guardar a senha.",
+    "qrPendingPassword": "O QR com a senha aparece depois de guardá-la: ele nunca entrega uma senha que a conta ainda não tem."
   },
   "aeroDevice": {
     "title": "Conexão com o Aero32 ERP indisponível no {{os}}",
