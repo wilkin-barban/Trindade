@@ -60,6 +60,14 @@ un solo uso que el script de Scriptable canjea por el sobre del pedido.
   entrega no publica APK, tag ni GitHub Release.
 
 ### Corregido
+- **Compartir guarda la contraseña del trabajador existente.** Elegir un trabajador activo genera una contraseña
+  temporal válida (≥15 grafemas, ≤72 bytes, fuera de la lista débil) y editable; `Abrir chat`, `Copiar mensaje` y
+  `Compartir APK` hacen `PATCH /api/admin/users/:id` y esperan la respuesta antes de abrir o copiar nada. El mensaje
+  y el QR usan exactamente esa contraseña, el QR queda bloqueado mientras está pendiente y el PATCH no se repite si
+  el par (trabajador, contraseña) ya se guardó. La lista se limita a trabajadores activos: nunca administradores,
+  invitados ni inactivos; si `/api/admin/users` falla, el modo existente falla cerrado. Se retira el valor por
+  defecto `123456789`, que la política del servidor rechaza. Cambiar la contraseña revoca las sesiones del
+  trabajador, y la UI lo advierte.
 
 - **La web deja que un trabajador guarde su ERP.** El backend del cofre y de los tickets ya no exige
   `wilkin` + `Administrador`: cada cuenta usa su propia fila. Masas muestra los controles de lanzamiento y
