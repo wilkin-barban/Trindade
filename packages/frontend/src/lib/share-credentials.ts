@@ -101,3 +101,23 @@ export function needsPasswordSave(input: ShareCredentialInput): boolean {
   }
   return true;
 }
+
+/** The one call the screen needs from the API client, injectable so the payload can be asserted. */
+export interface PasswordPatchClient {
+  patch<T = unknown>(path: string, body: unknown): Promise<T>;
+}
+
+/**
+ * Writes the temporary password to the worker who already has an account.
+ *
+ * The server validates the policy, hashes it, audits the change and revokes the worker's sessions; this function
+ * only guarantees the shape of the call: the id in the path, and `{ password }` as the whole body. A caller that
+ * builds that URL by hand is a caller that can drift into `?password=` or into an id from another field.
+ */
+export async function patchWorkerPassword(
+  client: PasswordPatchClient,
+  userId: string,
+  password: string,
+): Promise<void> {
+  await client.patch(`/admin/users/${userId}`, { password });
+}

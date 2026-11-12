@@ -970,7 +970,7 @@
     "username": "Usuario de Login",
     "password": "Contraseña Temporal",
     "passwordHint": "Precargada por defecto como 123456789. Puede modificarse libremente.",
-    "adminPasswordHint": "Puedes escribir la contraseña asignada a este usuario o mantener la sugerida (123456789).",
+    "adminPasswordHint": "Generamos una contraseña temporal válida al elegir al trabajador. Podés editarla antes de compartir; solo entra en la cuenta cuando abrís el chat, copiás o compartís el APK.",
     "readOnlyAdminHint": "Datos en modo solo lectura para administradores.",
     "sendApkFile": "Compartir Archivo APK",
     "preparingApk": "Preparando archivo APK...",
@@ -1005,7 +1005,17 @@
     "createRequiredBeforeSend": "Registre al operario antes de compartir el acceso.",
     "createUserAlreadyExists": "Este nombre de usuario ya está en uso. Elija otro login.",
     "createNetworkError": "Servidor inalcanzable. Verifique su conexión e intente nuevamente.",
-    "createServerError": "No fue posible registrar al operario."
+    "createServerError": "No fue posible registrar al operario.",
+    "passwordPlaceholder": "Senha temporária",
+    "passwordRevokesSessions": "Abrir o copiar cambia la contraseña de este trabajador y cierra sus sesiones.",
+    "passwordSaving": "Guardando contraseña…",
+    "passwordUpdated": "Contraseña actualizada. Las sesiones de este trabajador quedaron cerradas.",
+    "passwordNetworkError": "Servidor inalcanzable. Revisá tu conexión y reintentá.",
+    "passwordPolicyError": "La contraseña no cumple la política: 15 caracteres como mínimo, hasta 72 bytes y sin claves comunes.",
+    "passwordForbiddenError": "No tenés permiso para cambiar la contraseña de este trabajador.",
+    "passwordNotFoundError": "El trabajador ya no existe. Actualizá la lista.",
+    "passwordServerError": "No se pudo guardar la contraseña.",
+    "qrPendingPassword": "El QR con la contraseña aparece después de guardarla: nunca entrega una clave que la cuenta todavía no tiene."
   },
   "aeroDevice": {
     "title": "Conexión con Aero32 ERP no disponible en {{os}}",

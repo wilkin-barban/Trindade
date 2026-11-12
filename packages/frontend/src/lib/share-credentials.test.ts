@@ -5,6 +5,7 @@ import {
   activeWorkerCandidates,
   generateTemporaryPassword,
   needsPasswordSave,
+  patchWorkerPassword,
   type ShareCandidate,
 } from './share-credentials.js';
 
@@ -98,5 +99,31 @@ describe('when the password has to be saved', () => {
       needsPasswordSave({ ...base, saved: { userId: '2', password: 'Trindade-abcdefghijklm ' } }),
       true,
     );
+  });
+});
+
+describe('the PATCH that persists the password', () => {
+  it('addresses the selected worker and sends the password as the whole body', async () => {
+    const calls: Array<{ path: string; body: unknown }> = [];
+    const client = {
+      async patch<T>(path: string, body: unknown): Promise<T> {
+        calls.push({ path, body });
+        return {} as T;
+      },
+    };
+
+    await patchWorkerPassword(client, '42', 'Trindade-abcdefghijklm');
+
+    assert.deepEqual(calls, [{ path: '/admin/users/42', body: { password: 'Trindade-abcdefghijklm' } }]);
+  });
+
+  it('lets the refusal surface, so the caller can abort before opening WhatsApp', async () => {
+    const client = {
+      async patch(): Promise<never> {
+        throw new Error('400');
+      },
+    };
+
+    await assert.rejects(() => patchWorkerPassword(client, '42', 'corta'), /400/);
   });
 });
