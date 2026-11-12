@@ -9,7 +9,6 @@ import {
   aeroEndpoint,
   aeroMissingSetup,
   aeroSettingsReady,
-  AERO_SCRIPTABLE_APP_URL,
   buildAeroBridgeTriggerUrl,
   clearAeroSettings,
   DEFAULT_AERO_SETTINGS,
@@ -631,28 +630,6 @@ export function AeroIntegrationPanel({
           data-testid="aero-scriptable-card"
         >
           <p className="text-xs leading-relaxed text-gray-600">{t('massas.aero.scriptablePanelHint')}</p>
-          <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
-            <a
-              href={AERO_SCRIPTABLE_APP_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              data-testid="aero-scriptable-app-store"
-              className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-center text-sm font-semibold text-gray-700 hover:bg-gray-100 sm:w-auto"
-            >
-              {t('massas.aero.shortcut')}
-            </a>
-            {/* Nada se descarga: este botón abre el diálogo, que carga el JavaScript crudo y lo copia. */}
-            <Button
-              type="button"
-              onClick={() => setScriptableOpen(true)}
-              disabled={deviceLimited}
-              variant="outline"
-              className="min-h-[44px] w-full font-semibold sm:w-auto"
-              data-testid="aero-scriptable-copy-open"
-            >
-              {t('massas.aero.scriptableCopyButton')}
-            </Button>
-          </div>
         </div>
       </div>
 

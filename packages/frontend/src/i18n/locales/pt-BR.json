@@ -593,7 +593,7 @@
       "scriptableReturnTitle": "Voltar para a Trindade",
       "scriptableReturnHint": "Com o script colado no Scriptable, cada botão da Trindade abre o app e entrega o ticket. Trocar o endereço ou a senha continua sendo aqui: o iPhone não é mais tocado.",
       "scriptableOpenHint": "Abrir o Scriptable não executa nada: só confirma que o app está instalado.",
-      "scriptablePanelHint": "O Scriptable é o app nativo que fala com a rede da fábrica e a senha continua guardada no cofre do servidor. O script é instalado uma única vez copiando o código aqui e colando no Scriptable.",
+      "scriptablePanelHint": "Scriptable é o app nativo que fala com a rede da fábrica. A Trindade entrega um ticket por ação e a senha continua guardada no cofre do servidor. Para instalar o script, abra \"Como instalar o Scriptable\": ali estão o link da App Store e o botão para copiar o código.",
       "scriptableHelpButton": "Como instalar o Scriptable",
       "wifiRequired": "Não foi possível alcançar o ERP. Verifique se o iPhone está na Wi-Fi Trindade Expedicao e se a rede da fábrica está disponível.",
       "wifiRequiredTitle": "ERP indisponível",

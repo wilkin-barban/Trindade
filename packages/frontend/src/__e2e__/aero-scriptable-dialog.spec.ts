@@ -32,24 +32,25 @@ async function openDialog(page: import('@playwright/test').Page) {
 }
 
 test.describe('the Scriptable install screen on a phone', () => {
-  test('the panel offers the app and the copy flow, and nothing to download', async ({ page }) => {
+  test('the card explains the install and leaves both controls to the dialog', async ({ page }) => {
     await openIntegrationTab(page);
 
     const card = page.locator('[data-testid="aero-scriptable-card"]');
     await expect(card).toBeVisible();
+    await expect(card).toContainText(/Cómo instalar Scriptable|Como instalar o Scriptable/);
 
-    const store = card.locator('[data-testid="aero-scriptable-app-store"]');
-    await expect(store).toHaveAttribute('href', APP_STORE);
-    await expect(store).toContainText(/Instalar Scriptable no iPhone|Instalar o Scriptable no iPhone/);
-    expect((await store.boundingBox())!.height).toBeGreaterThanOrEqual(44);
-
-    const copy = card.locator('[data-testid="aero-scriptable-copy-open"]');
-    await expect(copy).toContainText(/Copiar código|Copiar código/);
-
-    // La descarga del `.scriptable` ya no existe en la UI: el JSON era justamente lo que rompía el pegado.
+    // La tarjeta ya no repite los dos botones del diálogo, y nada se descarga.
+    await expect(card.locator('[data-testid="aero-scriptable-app-store"]')).toHaveCount(0);
+    await expect(card.locator('[data-testid="aero-scriptable-copy-open"]')).toHaveCount(0);
     await expect(page.locator('[data-testid="aero-scriptable-asset"]')).toHaveCount(0);
     await expect(page.locator('a[download]')).toHaveCount(0);
-    await expect(page.getByText(/Importar Aero32Bridge\.scriptable/)).toHaveCount(0);
+
+    // Un solo control abre las instrucciones, que sí tienen la App Store y la copia.
+    await page.getByRole('button', { name: /Cómo instalar Scriptable|Como instalar o Scriptable/ }).click();
+    const dialog = page.locator('[data-testid="aero-scriptable-dialog"]');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator('[data-testid="aero-scriptable-app-store"]')).toBeVisible();
+    await expect(dialog.locator('[data-testid="aero-scriptable-copy"]')).toBeVisible();
   });
 
   test('the dialog copies the raw code and explains the script name, without the old recipe', async ({ page, context }) => {
