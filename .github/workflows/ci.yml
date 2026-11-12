@@ -6,7 +6,11 @@ on:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    # Pinned, not `ubuntu-latest`: on 2026-11-12 the label started resolving to Ubuntu 26.04 and Playwright 1.60
+    # refuses to install Chromium there ("Playwright does not support chromium on ubuntu26.04-x64"), so the E2E
+    # step failed before running a single test. The gate needs an OS the browser actually supports; moving this
+    # line is a deliberate act, the same way the Android image is pinned by digest.
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -51,7 +55,7 @@ jobs:
   # The image is also about 18 months old as of this pin, so it changes nothing about today's build and
   # everything about tomorrow's.
   android:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     container:
       image: ghcr.io/cirruslabs/android-sdk:35@sha256:c724009e305b4607157287624033ab97f319af44c244bfc9f73b6293f3bb01b9
     # A container job runs its steps with sh unless told otherwise, and the lane below is bash.
