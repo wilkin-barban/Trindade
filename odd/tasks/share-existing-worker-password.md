@@ -61,9 +61,9 @@ sin credenciales en logs, commits ni archivos. `CHANGELOG.md` y este ODD con has
 | T5 | PATCH antes de abrir/copiar/compartir; popup síncrono; QR bloqueado | Handlers y estado de guardado | `pages/ShareAppPage.tsx`, tests | Nada sale sin persistir; QR solo tras guardar | 3 (contraseñas) | Revertir commit | pendiente | cdbddffd |
 | T6 | i18n ES/PT de estados y errores | Textos nuevos | `i18n/locales/es.json`, `pt-BR.json` | Paridad exacta | Ninguno | Revertir commit | pendiente | cdbddffd |
 | T7 | — | CHANGELOG y ODD con evidencia | `CHANGELOG.md`, ODD | Registro completo | Ninguno | Revertir commit | pendiente | 95c86bfb |
-| T8 | — | Suites, typecheck, build, CI | — | Todo verde | Ninguno | — | pendiente | pendiente |
-| T9 | — | Deploy `web` y verificación en producción | producción | `web` healthy, health 200, página nueva | 5 (despliegue) | Imagen anterior | pendiente | pendiente |
-| T10 | — | Usuario temporal creado, validado y eliminado | producción | Contraseña vieja inválida, nueva válida; usuario ausente al final | 1 (datos) | Borrado administrativo | pendiente | bloqueado |
+| T8 | — | Suites, typecheck, build, CI | — | Todo verde | Ninguno | — | pendiente | b171c47b |
+| T9 | — | Deploy `web` y verificación en producción | producción | `web` healthy, health 200, página nueva | 5 (despliegue) | Imagen anterior | pendiente | b171c47b |
+| T10 | — | Usuario temporal creado, validado y eliminado | producción | Contraseña vieja inválida, nueva válida; usuario ausente al final | 1 (datos) | Borrado administrativo | pendiente | sin código |
 
 ## Log
 
@@ -148,3 +148,24 @@ credenciales. Queda pendiente de acceso: crear un único trabajador `tmp-share-*
 deja de servir y la nueva funciona, comprobar el flujo de copiar/abrir sin enviar WhatsApp y eliminarlo por la vía
 administrativa. El resto de la entrega (código, tests, backup, deploy web, verificación de salud y página) se
 completó sin ese acceso.
+
+L10 — Cierre con evidencia. Suites: `test:node` **652/652**, `test:unit` **139/139**, backend **779/779**,
+`tsc --noEmit` limpio en ambos workspaces, `npm run build` correcto y `make ci-clone` completo con **117 E2E** en
+un clon limpio. CI de GitHub: run `43243916645` sobre `b171c47b` con **verify y android en success**, después de
+fijar `runs-on: ubuntu-24.04` (commit `aeb0e109`) porque `ubuntu-latest` pasó a Ubuntu 26.04 y Playwright 1.60 no
+instala Chromium ahí. Deploy: backup `backups/recovery-share-final-20261112T150512Z` (set `c3ca4fbe…`, snapshot
+897.024 bytes, SHA-256 `931e6d4a…`, *APPROVED FOR ROLLBACK BASELINE*); imagen `web` reconstruida desde `b171c47b` y
+recreada con `docker compose up -d web`; `api` sin tocar (2 días healthy), `web` healthy, `/api/health` 200, y el
+chunk servido `assets/ShareAppPage-B0oYzwfd.js` contiene `passwordEdgeSpaces` y `passwordUsersUnavailable`, sin el
+default `123456789`. Validación con usuario temporal (token administrativo efímero, nunca impreso ni commiteado,
+archivo borrado al final): usuario `tmp-share-*` id **25** creado con rol 2 → login con la contraseña vieja **200** →
+`PATCH /api/admin/users/25` con una contraseña nueva válida **200** → vieja **401**, nueva **200** → `DELETE` → no
+aparece en `/api/admin/users` y el login da **401**. Cero usuarios `tmp-share-*` al final.
+
+L11 — Limitación declarada. La pasada de UI con navegador no se ejecutó: este host corre Ubuntu 26.04 y Playwright
+1.60 se niega a instalar Chromium (`Playwright does not support chromium on ubuntu26.04-x64`), y el disco quedó al
+98% (2,7 GB libres), así que no se trajo ninguna imagen con navegadores para no arriesgar las escrituras de SQLite
+en producción. El flujo de Copiar/Abrir queda cubierto por los tests de wiring (`share-page-wiring.test.ts`), por el
+CI y por la verificación del bundle servido; la persistencia y la revocación, por la validación de API de L10. Para
+correr la pasada de navegador hace falta: liberar espacio y usar una imagen con Chromium (por ejemplo
+`mcr.microsoft.com/playwright:v1.60.0-noble`), con el token inyectado en `localStorage.auth_token`.
