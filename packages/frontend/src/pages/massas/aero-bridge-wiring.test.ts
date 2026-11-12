@@ -13,6 +13,7 @@ const read = (...parts: string[]) => fs.readFileSync(path.resolve(__dirname, ...
 const RETIRED_SCHEME = ['short', 'cuts://'].join('');
 
 const panel = read('AeroIntegrationPanel.tsx');
+const dialog = read('AeroScriptableDialog.tsx');
 const launch = read('..', 'MassasLaunchPage.tsx');
 const collective = read('MassasCollectiveTable.tsx');
 const unified = read('MassasUnifiedTable.tsx');
@@ -151,17 +152,19 @@ describe('aero bridge wiring: every door opens Scriptable', () => {
     assert.equal(panel.includes('clipboard'), false, 'the panel must not own the copy');
   });
 
-  it('offers the App Store, the copy entry point and the instructions in the panel', () => {
-    // Los tres controles del camino nuevo, y ninguno de ellos descarga un archivo ni pide armar acciones.
-    assert.ok(panel.includes('AERO_SCRIPTABLE_APP_URL'));
-    assert.ok(panel.includes('data-testid="aero-scriptable-app-store"'));
-    // La copia la hace el diálogo: el panel sólo lo abre, así que el asset JSON ya no aparece por acá.
-    assert.ok(panel.includes('data-testid="aero-scriptable-copy-open"'));
-    assert.equal(panel.includes('AERO_SCRIPTABLE_ASSET_PATH'), false, 'the panel no longer links the bundle');
+  it('keeps a single instructions control on the card, and the install steps inside the dialog', () => {
+    // La tarjeta explica; no repite los dos botones del diálogo. Ninguno de los controles descarga un archivo.
+    assert.equal(panel.includes('AERO_SCRIPTABLE_APP_URL'), false, 'the panel no longer links the App Store itself');
+    assert.equal(panel.includes('data-testid="aero-scriptable-app-store"'), false, 'the store button left the card');
+    assert.equal(panel.includes('data-testid="aero-scriptable-copy-open"'), false, 'the copy button left the card');
+    assert.equal(panel.includes('AERO_SCRIPTABLE_ASSET_PATH'), false, 'the panel never links the bundle');
     assert.equal(panel.includes('data-testid="aero-scriptable-asset"'), false, 'the download control is gone');
     // El botón de instrucciones conserva su selector -- otras vistas lo consultan -- y abre el diálogo nuevo.
     assert.ok(panel.includes('data-testid="aero-shortcut-open"'));
     assert.ok(panel.includes('setScriptableOpen(true)'));
+    // Y el diálogo sigue siendo el que ofrece la App Store y la copia.
+    assert.ok(dialog.includes('data-testid="aero-scriptable-app-store"'));
+    assert.ok(dialog.includes('data-testid="aero-scriptable-copy"'));
   });
 });
 

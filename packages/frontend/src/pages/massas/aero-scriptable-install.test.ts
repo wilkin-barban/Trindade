@@ -53,8 +53,7 @@ describe('aero-scriptable dialog: install Scriptable and copy the code', () => {
     assert.ok(dialog.includes('data-testid="aero-scriptable-app-store"'));
     assert.ok(dialog.includes('target="_blank"'));
     assert.ok(dialog.includes('rel="noopener noreferrer"'));
-    assert.ok(panel.includes('href={AERO_SCRIPTABLE_APP_URL}'), 'the panel keeps the App Store link');
-    assert.ok(panel.includes('data-testid="aero-scriptable-app-store"'));
+    assert.equal(panel.includes('data-testid="aero-scriptable-app-store"'), false, 'the card no longer repeats the store link');
   });
 
   it('copies the raw script from state, with the clipboard API and a textarea fallback', () => {
@@ -74,11 +73,13 @@ describe('aero-scriptable dialog: install Scriptable and copy the code', () => {
     assert.ok(dialog.includes("t('massas.aero.scriptableCopyFailed')"), 'the dialog reports a failed copy');
   });
 
-  it('opens the dialog from the panel instead of downloading anything', () => {
-    // El panel no copia: abre el diálogo, que es el dueño del código y del estado de la copia.
-    assert.ok(panel.includes('data-testid="aero-scriptable-copy-open"'), 'the panel has its own copy entry point');
-    assert.ok(panel.includes("t('massas.aero.scriptableCopyButton')"), 'the entry point offers the copy path');
-    assert.ok(panel.includes('setScriptableOpen(true)'), 'the entry point opens the dialog');
+  it('opens the dialog from the panel instead of repeating the controls or downloading anything', () => {
+    // El panel no copia ni enlaza la tienda: abre el diálogo, que es el dueño del código y del estado de la copia.
+    assert.equal(panel.includes('data-testid="aero-scriptable-copy-open"'), false, 'the card has no copy button');
+    assert.equal(panel.includes('data-testid="aero-scriptable-app-store"'), false, 'the card has no store button');
+    assert.ok(panel.includes("t('massas.aero.scriptablePanelHint')"), 'the card keeps the explanation');
+    assert.ok(panel.includes('data-testid="aero-shortcut-open"'), 'the instructions button stays');
+    assert.ok(panel.includes('setScriptableOpen(true)'), 'the instructions button opens the dialog');
   });
 
   it('keeps the dialog conventions and its own test id', () => {

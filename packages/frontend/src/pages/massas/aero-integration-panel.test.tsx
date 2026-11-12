@@ -218,20 +218,20 @@ describe('AeroIntegrationPanel', () => {
     await waitFor(() => expect(screen.getByText(/Abriendo Scriptable/)).toBeInTheDocument());
   });
 
-  it('offers the App Store, the code copy and the instructions as separate controls', async () => {
+  it('leaves the install steps to the dialog instead of repeating two buttons on the card', async () => {
     vault.fetched = configuredVault();
     renderPanel();
     await waitFor(() => expect(screen.getByTestId('aero-state')).toHaveTextContent('Configurado'));
 
-    // Instalar la app y pegar el script son dos pasos distintos: cada uno tiene su control.
-    expect(screen.getByTestId('aero-scriptable-app-store')).toHaveAttribute(
-      'href',
-      'https://apps.apple.com/app/scriptable/id1405459188',
-    );
-    // Ya no hay nada que descargar: el botón abre el diálogo, que es el dueño del código y de la copia.
+    // La tarjeta sólo explica; los controles viven en el diálogo, que es el dueño del código y de la copia.
+    expect(screen.getByTestId('aero-scriptable-card')).toBeInTheDocument();
+    expect(screen.queryByTestId('aero-scriptable-app-store')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('aero-scriptable-copy-open')).not.toBeInTheDocument();
     expect(screen.queryByTestId('aero-scriptable-asset')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByTestId('aero-scriptable-copy-open'));
+
+    fireEvent.click(screen.getByTestId('aero-shortcut-open'));
     await waitFor(() => expect(screen.getByTestId('aero-scriptable-dialog')).toBeInTheDocument());
+    expect(screen.getByTestId('aero-scriptable-app-store')).toBeInTheDocument();
     expect(screen.getByTestId('aero-scriptable-copy')).toBeInTheDocument();
   });
 
