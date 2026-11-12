@@ -19,7 +19,7 @@ export interface ShareCandidate {
 
 const WORKER_ROLE = 'Trabalhador';
 /** The guest account is excluded by the server; the guard stays so a change there cannot hand it credentials. */
-const GUEST_USERNAME = 'Trindade';
+const GUEST_USERNAME = 'invitado';
 
 /**
  * Active workers only.

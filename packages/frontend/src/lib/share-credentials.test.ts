@@ -13,7 +13,7 @@ const users: ShareCandidate[] = [
   { id: 1, display_name: 'Wilkin', username: 'wilkin', role_name: 'Administrador', is_active: 1 },
   { id: 2, display_name: 'Ana', username: 'ana', role_name: 'Trabalhador', is_active: 1 },
   { id: 3, display_name: 'Beto', username: 'beto', role_name: 'Trabalhador', is_active: 0 },
-  { id: 4, display_name: 'Trindade', username: 'Trindade', role_name: 'Trabalhador', is_active: 1 },
+  { id: 4, display_name: 'Invitado', username: 'invitado', role_name: 'Trabalhador', is_active: 1 },
   { id: 5, display_name: 'Carla', username: 'carla', role_name: 'Trabalhador', is_active: 1 },
 ];
 
@@ -47,6 +47,7 @@ describe('the candidates for the existing mode', () => {
     const kept = activeWorkerCandidates(users);
 
     assert.deepEqual(kept.map((user) => user.username), ['ana', 'carla']);
+    assert.equal(kept.some((user) => user.username === 'invitado'), false, 'the guest is never a candidate');
   });
 
   it('treats a missing role or activity as not a candidate, so a partial answer cannot leak an admin', () => {
