@@ -65,8 +65,8 @@ describe('the Share screen and the existing worker password', () => {
   });
 
   it('keeps the QR blocked while the password is pending', () => {
-    const qr = block('if (passwordPending) {', 'const handleCreateWorker');
-    assert.ok(qr.includes('if (passwordPending)'), 'the QR effect must stop while the password is pending');
+    const qr = block('if (passwordPending || passwordUnusable) {', 'const handleCreateWorker');
+    assert.ok(qr.includes('if (passwordPending || passwordUnusable)'), 'the QR effect must stop while the password is pending or unusable');
     assert.ok(page.includes("data-testid=\"share-qr-pending\""));
   });
 
@@ -77,5 +77,40 @@ describe('the Share screen and the existing worker password', () => {
       false,
       'the page must not call the API directly',
     );
+  });
+});
+
+describe('the guards the approved change added', () => {
+  const ensure = block('const ensurePasswordSaved = async (): Promise<boolean> => {', 'const handleOpenWhatsApp');
+
+  it('checks the policy before the round trip, and the server remains the authority', () => {
+    const policyAt = ensure.indexOf('passwordIssue(password)');
+    const patchAt = ensure.indexOf('patchWorkerPassword(');
+
+    assert.ok(policyAt >= 0, 'the policy must be checked locally first');
+    assert.ok(patchAt > policyAt, 'no PATCH can happen before the local policy check');
+    assert.ok(ensure.includes("setPasswordNotice({ tone: 'error'"), 'a refused policy must be explained');
+  });
+
+  it('does not let two clicks fire two PATCHes', () => {
+    assert.ok(ensure.includes('savingRef.current'), 'a ref is what two clicks in the same tick can see');
+    assert.ok(ensure.indexOf('if (savingRef.current) return false;') < ensure.indexOf('patchWorkerPassword('));
+    assert.ok(ensure.includes('savingRef.current = false;'), 'the guard must be released on failure too');
+  });
+
+  it('closes the existing mode when the list came from the fallback', () => {
+    assert.ok(
+      /setUsers\(res\.users\);\s*\n\s*setUsersError\(true\);/.test(page),
+      'the role-less fallback must raise the error the existing mode shows',
+    );
+    for (const name of ['handleOpenWhatsApp', 'handleCopy', 'handleShareApk']) {
+      const source = block(`const ${name} = async () => {`, '};');
+      assert.ok(source.includes('if (usersError)'), `${name} must refuse while the worker list is unavailable`);
+    }
+  });
+
+  it('blocks the QR for an unusable password, not only for a pending pair', () => {
+    assert.ok(page.includes('passwordPending || passwordUnusable'));
+    assert.ok(page.includes("password.trim() === '' || passwordIssue(password) !== null"));
   });
 });

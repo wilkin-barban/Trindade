@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import QRCode from 'qrcode';
 import {
@@ -38,6 +38,7 @@ import {
   patchWorkerPassword,
   type SavedPassword,
 } from '../lib/share-credentials';
+import { passwordIssue } from '../lib/password-policy';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 
@@ -137,7 +138,12 @@ export function ShareAppPage() {
       } catch {}
       try {
         const res = await api.get<{ users: UserOptionItem[] }>('/users/options');
-        if (active && Array.isArray(res?.users)) setUsers(res.users);
+        if (active && Array.isArray(res?.users)) {
+          // El fallback no trae rol ni estado: no sirve para credenciales. Se conserva para no romper otras
+          // vistas, pero el modo existente queda cerrado y avisado.
+          setUsers(res.users);
+          setUsersError(true);
+        }
       } catch {
         if (active) {
           setUsers([]);
@@ -224,6 +230,17 @@ export function ShareAppPage() {
       saved: savedPassword,
     });
 
+  /** Una contraseña vacía o fuera de política no puede llegar al servidor ni al QR. */
+  const passwordUnusable =
+    isAdmin &&
+    includeCredentials &&
+    credentialMode === 'existing' &&
+    Boolean(selectedUserId) &&
+    (password.trim() === '' || passwordIssue(password) !== null);
+
+  /** Un ref, y no el estado: dos clics en el mismo tick ven el mismo `savingPassword`. */
+  const savingRef = useRef(false);
+
   const describePasswordError = (err: unknown): string => {
     if (isNetworkError(err)) return t('share.passwordNetworkError', 'Servidor inalcançável. Verifique sua conexão e tente novamente.');
     if (err instanceof ApiClientError) {
@@ -243,6 +260,14 @@ export function ShareAppPage() {
    */
   const ensurePasswordSaved = async (): Promise<boolean> => {
     if (!passwordPending) return true;
+    if (savingRef.current) return false;
+    // La política se valida acá para no hacer el viaje: el servidor sigue siendo la autoridad, pero un 400
+    // anunciado se evita en origen.
+    if (passwordIssue(password) !== null) {
+      setPasswordNotice({ tone: 'error', text: t('share.passwordPolicyError', 'A senha não cumpre a política: 15 caracteres no mínimo, até 72 bytes e sem senhas comuns.') });
+      return false;
+    }
+    savingRef.current = true;
     setSavingPassword(true);
     setPasswordNotice(null);
     try {
@@ -254,6 +279,7 @@ export function ShareAppPage() {
       setPasswordNotice({ tone: 'error', text: describePasswordError(err) });
       return false;
     } finally {
+      savingRef.current = false;
       setSavingPassword(false);
     }
   };
@@ -264,7 +290,7 @@ export function ShareAppPage() {
   useEffect(() => {
     let active = true;
     // Con una contraseña pendiente el QR no puede entregar una clave que la cuenta todavía no tiene.
-    if (passwordPending) {
+    if (passwordPending || passwordUnusable) {
       setQrError(false);
       setQrDataUrl('');
       return () => { active = false; };
@@ -276,7 +302,7 @@ export function ShareAppPage() {
       .then((url) => { if (active) setQrDataUrl(url); })
       .catch(() => { if (active) setQrError(true); });
     return () => { active = false; };
-  }, [waLink, platform, release, reloadToken, passwordPending]);
+  }, [waLink, platform, release, reloadToken, passwordPending, passwordUnusable]);
 
   /**
    * Creates the worker explicitly when the administrator clicks "+ Cadastrar Operário".
@@ -343,6 +369,14 @@ export function ShareAppPage() {
   };
 
   const handleOpenWhatsApp = async () => {
+    if (usersError) {
+      setPasswordNotice({ tone: 'error', text: t('share.passwordUsersUnavailable', 'Não foi possível carregar os trabalhadores. Atualize a página antes de compartilhar credenciais.') });
+      return;
+    }
+    if (passwordUnusable) {
+      setPasswordNotice({ tone: 'error', text: t('share.passwordPolicyError', 'A senha não cumpre a política: 15 caracteres no mínimo, até 72 bytes e sem senhas comuns.') });
+      return;
+    }
     if (!waLink) return;
     if (!checkWorkerCreatedBeforeAction()) return;
     // La ventana se abre en el gesto, antes del `await`: el navegador bloquea un popup que llega tarde. Si el
@@ -359,6 +393,14 @@ export function ShareAppPage() {
   };
 
   const handleCopy = async () => {
+    if (usersError) {
+      setPasswordNotice({ tone: 'error', text: t('share.passwordUsersUnavailable', 'Não foi possível carregar os trabalhadores. Atualize a página antes de compartilhar credenciais.') });
+      return;
+    }
+    if (passwordUnusable) {
+      setPasswordNotice({ tone: 'error', text: t('share.passwordPolicyError', 'A senha não cumpre a política: 15 caracteres no mínimo, até 72 bytes e sem senhas comuns.') });
+      return;
+    }
     if (!checkWorkerCreatedBeforeAction()) return;
     if (!(await ensurePasswordSaved())) return;
     const outcome = await shareOrCopy(message);
@@ -369,6 +411,14 @@ export function ShareAppPage() {
   };
 
   const handleShareApk = async () => {
+    if (usersError) {
+      setPasswordNotice({ tone: 'error', text: t('share.passwordUsersUnavailable', 'Não foi possível carregar os trabalhadores. Atualize a página antes de compartilhar credenciais.') });
+      return;
+    }
+    if (passwordUnusable) {
+      setPasswordNotice({ tone: 'error', text: t('share.passwordPolicyError', 'A senha não cumpre a política: 15 caracteres no mínimo, até 72 bytes e sem senhas comuns.') });
+      return;
+    }
     if (!checkWorkerCreatedBeforeAction()) return;
     // Compartir el APK también lleva el mensaje con la contraseña: se guarda antes de descargar nada.
     if (!(await ensurePasswordSaved())) return;
@@ -896,7 +946,7 @@ export function ShareAppPage() {
                     {t('ui.retry')}
                   </Button>
                 </div>
-              ) : passwordPending ? (
+              ) : passwordPending || passwordUnusable ? (
                 <div
                   className="w-48 h-48 flex flex-col items-center justify-center gap-2 bg-amber-50 rounded-xl border border-dashed border-amber-300 text-xs text-amber-800 px-3 text-center"
                   role="status"

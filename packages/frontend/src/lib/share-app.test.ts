@@ -134,3 +134,30 @@ describe('deriveUsername', () => {
     assert.equal(quickWorkerPassword(deriveUsername('JOAO H')), 'joaoh1234567890');
   });
 });
+
+describe('buildShareMessage and the credentials block', () => {
+  const base = {
+    platform: 'android' as const,
+    release: { version: '0.7.5', apkUrl: 'https://example.test/trindade.apk', webUrl: 'https://example.test' },
+    locale: 'es' as const,
+  };
+
+  it('does not invent the retired default when the password is empty', () => {
+    const message = buildShareMessage({
+      ...base,
+      credentials: { enabled: true, displayName: 'Ana', username: 'ana', password: '   ' },
+    });
+
+    assert.equal(message.includes('123456789'), false, 'an empty password must not become the old default');
+    assert.equal(message.includes('Contraseña'), false, 'without a password there is no credentials block');
+  });
+
+  it('prints the password it was given, trimmed, when there is one', () => {
+    const message = buildShareMessage({
+      ...base,
+      credentials: { enabled: true, displayName: 'Ana', username: 'ana', password: '  Trindade-abcdefghijklm  ' },
+    });
+
+    assert.ok(message.includes('Trindade-abcdefghijklm'));
+  });
+});

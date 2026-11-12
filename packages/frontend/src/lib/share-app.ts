@@ -102,9 +102,12 @@ export function buildShareMessage(params: ShareMessageParams): string {
     const credTitle = isEs ? '🔐 *Tus Credenciales:*' : '🔐 *Suas Credenciais:*';
     const userLabel = isEs ? 'Usuario' : 'Usuário';
     const passLabel = isEs ? 'Contraseña' : 'Senha';
-    const passValue = credentials.password?.trim() || '123456789';
-
-    parts.push(`${credTitle}\n${userLabel}: *${credentials.username.trim()}*\n${passLabel}: *${passValue}*`);
+    // Sin contraseña no hay bloque de credenciales: inventar `123456789` entregaría una clave que la cuenta no
+    // tiene y que la política del servidor rechaza.
+    const passValue = credentials.password?.trim();
+    if (passValue) {
+      parts.push(`${credTitle}\n${userLabel}: *${credentials.username.trim()}*\n${passLabel}: *${passValue}*`);
+    }
   }
 
   const footer = isEs

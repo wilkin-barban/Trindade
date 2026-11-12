@@ -1015,7 +1015,8 @@
     "passwordForbiddenError": "No tenés permiso para cambiar la contraseña de este trabajador.",
     "passwordNotFoundError": "El trabajador ya no existe. Actualizá la lista.",
     "passwordServerError": "No se pudo guardar la contraseña.",
-    "qrPendingPassword": "El QR con la contraseña aparece después de guardarla: nunca entrega una clave que la cuenta todavía no tiene."
+    "qrPendingPassword": "El QR con la contraseña aparece después de guardarla: nunca entrega una clave que la cuenta todavía no tiene.",
+    "passwordUsersUnavailable": "No se pudieron cargar los trabajadores. Actualizá la página antes de compartir credenciales."
   },
   "aeroDevice": {
     "title": "Conexión con Aero32 ERP no disponible en {{os}}",
