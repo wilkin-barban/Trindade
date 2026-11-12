@@ -31,7 +31,8 @@ un solo uso que el script de Scriptable canjea por el sobre del pedido.
   `packages/frontend/public/Aero32Bridge.js` y copiada por Vite al build) y se instala **copiando el código**: el
   operador toca **Copiar código para Scriptable**, abre Scriptable, toca **+**, pega y renombra el script a
   `Aero32Bridge`. Scriptable se instala desde la App Store (`https://apps.apple.com/app/scriptable/id1405459188`).
-  El panel ofrece **Instalar Scriptable no iPhone** y **Copiar código para Scriptable**.
+  El panel resume el camino en una tarjeta y un único botón, **Cómo instalar Scriptable**, que abre el diálogo
+  con el enlace a la App Store y la copia del código: la tarjeta ya no repite esos dos controles.
 - **API del cofre:** `GET`, `PUT` y `DELETE /api/integration/aero/settings` para cualquier operador autenticado
   (`Administrador` o `Trabalhador`), siempre sobre su propia fila por `user_id`; el panel limita la dirección al
   owner, pero las credenciales las guarda cada trabajador. Incluye los esquemas Zod y las respuestas del contrato
