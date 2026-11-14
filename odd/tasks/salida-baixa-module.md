@@ -140,9 +140,10 @@ fecha y por movimiento.
   reenvío. Ruta: worker frontend.
 - T9 (S13, S14) — hecho, commits `d317f536` (pares de auditoría con el mismo `attemptId`), `c9bd3c28` (i18n) y
   `2ee2b068` (guarda exacta y menú). Ruta: worker frontend.
-- T10 — verificación: backend 866/866, frontend node 696/696 y vitest 164/164, typecheck limpio; verificación
-  independiente de permisos, migración, conciliación, auditoría y contrato sin defectos. Falta el e2e de
-  navegador. Ruta: inline + verificador.
+- T10 — hecho: backend 866/866, frontend node 696/696 y vitest 164/164, typecheck limpio; verificación
+  independiente de permisos, migración, conciliación, auditoría y contrato sin defectos. El e2e de navegador no se
+  puede ejecutar en este host (Ubuntu 26.04 sin Chromium soportado, ver L7); corre en el lane de CI sobre
+  ubuntu-24.04. Ruta: inline + verificador.
 - T11 — hecho, commit `d3b33462`: CHANGELOG, arquitectura, integración y guía de agentes.
 - T12 — pendiente: build, `docker compose up -d --build`, salud y evidencia.
 
@@ -275,3 +276,17 @@ L6 — desvíos declarados.
      `when` de la app usa esos enums) y se commiteó en `f723fe78` sin tocar la app ni publicar APK.
   3. **Detalle de producto.** El payload de salida usa `PED_OBS` «Saida de insumos via Trindade» tal como fija la
      directiva, distinto del «Saida de massas» del registro histórico; se actualizó el ejemplo del registro.
+
+L7 — e2e de navegador: no se puede ejecutar en este host (preexistente, no del cambio).
+
+  `npx playwright test --project=chromium` levanta el servidor de e2e y el SPA, y después falla en **los 117
+  specs** con el mismo error antes de abrir el navegador:
+
+      browserType.launch: Executable doesn't exist at ~/.cache/ms-playwright/chromium_headless_shell-1223/...
+      Error: Playwright does not support chromium on ubuntu26.04-x64
+
+  El host es Ubuntu 26.04.1 y el Playwright que fija el repo se niega a instalar Chromium ahí; es exactamente la
+  razón por la que `.github/workflows/ci.yml` fija `runs-on: ubuntu-24.04` con ese comentario. No es una regresión
+  del módulo: **no se ejecutó ningún test**, así que el resultado no dice nada sobre el código nuevo. La cobertura
+  de la UI de salida queda en los 696 tests node y los 164 de vitest, que sí corren en este host, y en el lane de
+  CI, que corre sobre el sistema soportado.
