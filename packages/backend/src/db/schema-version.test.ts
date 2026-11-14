@@ -8,6 +8,7 @@ import Database from 'better-sqlite3';
 import { openDatabase } from './index.js';
 import {
   BASELINE_TABLES,
+  REVISION_ELEVEN_TABLES,
   REVISION_FIVE_TABLES,
   REVISION_SIX_TABLES,
   REVISION_SEVEN_TABLES,
@@ -97,6 +98,7 @@ describe('schema revision', () => {
         ...REVISION_SIX_TABLES,
         ...REVISION_SEVEN_TABLES,
         ...REVISION_TEN_TABLES,
+        ...REVISION_ELEVEN_TABLES,
       ].sort(),
     );
   });
