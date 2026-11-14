@@ -45,13 +45,14 @@ y se niega a tocarla; esa negativa es la compuerta funcionando.
 
 | Paso | Efecto |
 | --- | --- |
-| **9 → 10** (release actual) | **Ninguno.** Crea `aero_integration_settings` y `aero_bridge_tickets` con sus índices. Aditiva: conserva todas las sesiones, incluidas las de administradores. |
+| **9 → 10** | **Ninguno.** Crea `aero_integration_settings` y `aero_bridge_tickets` con sus índices. Aditiva: conserva todas las sesiones, incluidas las de administradores. |
+| **10 → 11** (release actual) | **Ninguno.** Crea `salida_movements`, `salida_movement_items` y `salida_photos` con sus índices, y reconstruye `aero_bridge_tickets` para que su `CHECK` admita `saida` conservando todas las filas y sus índices. Aditiva: no invalida sesiones. |
 | **8 → 9** | Ninguno. Agrega la columna opcional `massa_launches.ent_lan`. |
 | **3 → 4** | Ninguno. Agrega `drivers.phone`. |
 | **2 → 3** | **Invalida todas las sesiones y refresh tokens**: se sella `users.security_version` y se revocan las sesiones. Los operarios deben volver a iniciar sesión. |
 
 Una base que todavía está en la revisión 2 pasa por `2 → 3` y por todos los pasos siguientes hasta la 10. En ese
-caso sí hay que volver a iniciar sesión. Una base en revisión 9 solo ejecuta `9 → 10` y no lo requiere.
+caso sí hay que volver a iniciar sesión. Una base en revisión 9 ejecuta `9 → 10` y `10 → 11`, y no lo requiere.
 
 ## 2. Primer administrador
 
@@ -166,14 +167,14 @@ Construir mientras la API vieja sigue sirviendo:
 docker compose build
 ```
 
-No se redespliega nada todavía. Antes de continuar, confirmar que la imagen nueva soporta la revisión **10**.
+No se redespliega nada todavía. Antes de continuar, confirmar que la imagen nueva soporta la revisión **11**.
 El comando de clasificación de la sección 6 imprime `schema revision: <n> (this build supports <m>)`. Si `<m>`
 no es 10, la imagen está desactualizada y se negará a migrar.
 
 Si la imagen en ejecución o la nueva reportan `incompatible` o `newer`, **detenerse**. Ninguno de esos estados
 se arregla desplegando, y el comando de migración los rechaza.
 
-## 6. Cutover controlado a la revisión 10
+## 6. Cutover controlado a la revisión 11
 
 Agendar una ventana de mantenimiento. Detener la API **antes** de la copia final y de la migración. No permitir
 otros escritores de la base durante la ventana.
@@ -225,9 +226,10 @@ otros escritores de la base durante la ventana.
    | 7 → 8 | Re-clava `aero_movements` por asiento y producto. |
    | 8 → 9 | Agrega `massa_launches.ent_lan` y su índice único parcial. Aditivo. |
    | 9 → 10 | Crea `aero_integration_settings` y `aero_bridge_tickets` con sus dos índices. Aditivo: no reescribe filas existentes ni invalida sesiones. |
+   | 10 → 11 | Crea las tres tablas de Salida / Baixa y reconstruye `aero_bridge_tickets` con el `CHECK` que admite `saida`. Aditivo salvo la reconstrucción de esa tabla, que copia, cuenta y conserva todas las filas y sus dos índices. |
 
    Una base en revisión 3 ejecuta **todos** los pasos desde `3 → 4` hasta `9 → 10`; no solo `3 → 4`. Una base en
-   revisión 9 ejecuta únicamente `9 → 10`. La migración no crea ni descifra la contraseña del ERP: eso lo hace el
+   revisión 10 ejecuta únicamente `10 → 11`. La migración no crea ni descifra la contraseña del ERP: eso lo hace el
    panel después del despliegue, con la clave de la sección 14 presente en el entorno.
 
 4. **Confirmar el esquema:**
@@ -237,7 +239,7 @@ otros escritores de la base durante la ventana.
      packages/backend/dist/db/status.js
    ```
 
-   Debe salir con código 0 e imprimir `verdict: current` en la revisión 10 con **20 tablas**. **No arrancar la API
+   Debe salir con código 0 e imprimir `verdict: current` en la revisión 11 con **23 tablas**. **No arrancar la API
    hasta que lo haga.**
 
 5. Si la migración o la validación fallan, mantener la API detenida y usar el rollback de la sección 9,
@@ -278,7 +280,7 @@ otros escritores de la base durante la ventana.
 
    HTTP 200 con `{"status":"ok","timestamp":"..."}`.
 
-5. **Sesiones:** la migración 9 → 10 es aditiva y **no** invalida sesiones. Una base que venía de revisión 2 o
+5. **Sesiones:** la migración 10 → 11 es aditiva y **no** invalida sesiones. Una base que venía de revisión 2 o
    anterior sí pasó por `2 → 3`, que revoca todas las sesiones; en ese caso los usuarios deben iniciar sesión de
    nuevo. Verificar un login real por HTTPS sin poner credenciales ni tokens en el historial de shell, la salida
    de terminal o los logs.
@@ -302,7 +304,7 @@ otros escritores de la base durante la ventana.
 - [ ] La SPA responde y contiene la marca Trindade.
 - [ ] Un login real funciona y devuelve `refreshToken`.
 - [ ] `GET /api/integration/aero/settings` sin token devuelve `401`.
-- [ ] `make db-status` (o el comando equivalente en el contenedor) sale 0 con `current` en la revisión 10.
+- [ ] `make db-status` (o el comando equivalente en el contenedor) sale 0 con `current` en la revisión 11.
 - [ ] `docker logs --tail 30 trindade-api-1` no muestra errores ni rechazos no manejados.
 - [ ] La descarga del APK responde (`GET /api/app/download-apk`) y la versión publicada es la esperada.
 
@@ -489,8 +491,8 @@ Renovación diaria:
 - [ ] API detenida antes de la copia final.
 - [ ] Copia final aprobada y con `setId` registrado.
 - [ ] `AERO_VAULT_KEY` presente en el entorno de la API, sin haberse impreso ni commiteado.
-- [ ] Imagen nueva construida y compatible con la revisión 10.
-- [ ] Migración ejecutada y `verdict: current` en revisión 10 con 20 tablas.
+- [ ] Imagen nueva construida y compatible con la revisión 11.
+- [ ] Migración ejecutada y `verdict: current` en revisión 11 con 23 tablas.
 - [ ] API y web levantadas y saludables.
 - [ ] Login real verificado.
 - [ ] `GET /api/integration/aero/settings` sin token responde `401`.
