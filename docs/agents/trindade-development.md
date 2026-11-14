@@ -306,7 +306,8 @@ Content-Type: application/json
 - `POST /usuarios`: prueba de credenciales; **sin barra final** (una barra produce 301 → GET → 405).
 - `POST /entradasitem`: alta de producción. Un producto por petición; `PRO_COD` a 6 dígitos, `PRO_QTD`
   multiplicado por 100, `PRO_CST="000"`, `ENT_SER="APL"`, `ENT_USU` en mayúsculas, `LOTES=[]`.
-- `POST /saidasitem`: misma forma con prefijo `PED_*`; interfaz de Trindade pendiente.
+- `POST /saidasitem`: misma forma con prefijo `PED_*`, sin `PRO_CST` y sin `PED_DTMOVI`; lo usa el módulo
+  Salida / Baixa (beta privada de `wilkin`) a través de la acción `saida` del puente.
 - `POST /movimentoitem?_method=PATCH`: lectura del día.
 
 El cuerpo de `/movimentoitem` que usa la web certificada y que Android debe enviar es:
