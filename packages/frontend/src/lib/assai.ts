@@ -15,10 +15,15 @@ export interface AssaiProduct {
   unitsPerBox: number;
 }
 
-/** The nine products, as the plant counts them. */
+/**
+ * The eight products, as the plant counts them.
+ *
+ * The `Quadrada` used to be on this list. It is not an order the store takes, so it left the catalogue -- and it
+ * left only here: the report still offers it under "Cajas pequeñas" and the backend keeps its own list, which this
+ * screen never asked. Nothing else in the calculator names it.
+ */
 export const ASSAI_PRODUCTS: readonly AssaiProduct[] = [
   { name: 'Nhoque 1kg', unitsPerBox: 15 },
-  { name: 'Quadrada', unitsPerBox: 14 },
   { name: 'Disco 200g', unitsPerBox: 80 },
   { name: 'Disco 400g', unitsPerBox: 50 },
   { name: 'Disco 500g', unitsPerBox: 40 },

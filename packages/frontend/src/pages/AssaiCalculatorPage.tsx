@@ -18,6 +18,13 @@ import { shareOrCopy, waMeLink } from '../lib/whatsapp';
 import { ModuleHelpModal } from '../components/ui/ModuleHelpModal';
 
 /**
+ * The three columns of one order line, shared by the header and every row so the boxes line up under their own
+ * heading. It is a template and not four table columns: the units-per-box is a subline of the product's name, and
+ * the three remaining columns are the ones an operator reads -- what it is, how many units, how many boxes.
+ */
+const ASSAI_ROW_GRID = 'grid grid-cols-[minmax(0,1fr)_5.5rem_3.25rem] items-center gap-x-2';
+
+/**
  * The Assaí order calculator.
  *
  * The arithmetic lives in `src/lib/assai.ts` with its own tests, because the rule that matters is a
@@ -91,53 +98,70 @@ export function AssaiCalculatorPage() {
 
       <Card>
         <CardContent className="p-3">
-          <div className="overflow-x-auto">
-          <table className="w-full min-w-[320px] text-sm">
-            <thead>
-              <tr className="border-b text-left text-xs text-gray-500 uppercase">
-                <th className="py-2 pr-2">{t('assai.product')}</th>
-                <th className="py-2 pr-2">{t('assai.perBox')}</th>
-                <th className="py-2 pr-2">{t('assai.units')}</th>
-                <th className="py-2 pr-2">{t('assai.boxes')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lines.map((line) => (
-                <tr key={line.product} className="border-b last:border-0">
-                  <td className="py-2 pr-2">{line.product}</td>
-                  <td className="py-2 pr-2 text-gray-500">{line.unitsPerBox}</td>
-                  <td className="py-2 pr-2">
-                    <Input
-                      value={quantities[line.product] ?? ''}
-                      inputMode="numeric"
-                      placeholder="0"
-                      aria-label={line.product}
-                      data-testid={`assai-units-${line.product}`}
-                      onFocus={() => setFocused(line.product)}
-                      onChange={(e) => {
-                        setQuantities({ ...quantities, [line.product]: e.target.value });
-                        // Volver a escribir apaga el cartel del campo: la correccion esta en curso.
-                        setBlurred({ ...blurred, [line.product]: false });
-                      }}
-                      onBlur={() => {
-                        setBlurred({ ...blurred, [line.product]: true });
-                        setFocused(null);
-                      }}
-                    />
-                    {visibleErrors.includes(line.product) && (
-                      <span className="text-xs text-red-600" data-testid={`assai-error-${line.product}`}>
-                        {t('assai.errorUnits')}
-                      </span>
-                    )}
-                  </td>
-                  <td className="py-2 pr-2" data-testid={`assai-boxes-${line.product}`}>
-                    {line.filled && line.exact ? line.boxes : ''}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div
+            className={`${ASSAI_ROW_GRID} border-b pb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500`}
+            data-testid="assai-grid-header"
+          >
+            <span>{t('assai.product')}</span>
+            <span className="text-center">{t('assai.units')}</span>
+            <span className="text-right">{t('assai.boxes')}</span>
           </div>
+
+          <ul className="divide-y divide-gray-100" data-testid="assai-rows">
+            {lines.map((line) => (
+              <li
+                key={line.product}
+                className={`${ASSAI_ROW_GRID} py-2`}
+                data-testid={`assai-row-${line.product}`}
+              >
+                <div className="min-w-0">
+                  <span className="block break-words text-sm leading-snug text-gray-800">{line.product}</span>
+                  {/* As unidades por caixa sao uma sublinea do nome: eram uma coluna propria gastando a
+                      largura que o campo precisa a 390 px. */}
+                  <span
+                    className="block text-[10px] font-medium text-gray-500"
+                    data-testid={`assai-perbox-${line.product}`}
+                  >
+                    {line.unitsPerBox} un/cx
+                  </span>
+                </div>
+                <div className="min-w-0">
+                  <Input
+                    value={quantities[line.product] ?? ''}
+                    inputMode="numeric"
+                    placeholder="0"
+                    aria-label={line.product}
+                    onFocus={() => setFocused(line.product)}
+                    onChange={(e) => {
+                      setQuantities({ ...quantities, [line.product]: e.target.value });
+                      // Volver a escribir apaga el cartel del campo: la correccion esta en curso.
+                      setBlurred({ ...blurred, [line.product]: false });
+                    }}
+                    onBlur={() => {
+                      setBlurred({ ...blurred, [line.product]: true });
+                      setFocused(null);
+                    }}
+                    className="h-11 text-base w-full px-2 text-center font-semibold"
+                    data-testid={`assai-units-${line.product}`}
+                  />
+                  {visibleErrors.includes(line.product) && (
+                    <span
+                      className="block text-[11px] text-red-600"
+                      data-testid={`assai-error-${line.product}`}
+                    >
+                      {t('assai.errorUnits')}
+                    </span>
+                  )}
+                </div>
+                <div
+                  className="text-right text-sm font-semibold tabular-nums text-gray-900"
+                  data-testid={`assai-boxes-${line.product}`}
+                >
+                  {line.filled && line.exact ? line.boxes : ''}
+                </div>
+              </li>
+            ))}
+          </ul>
 
           <div className="flex items-center justify-between pt-3 border-t mt-2">
             <span className="text-sm text-gray-500">{t('assai.totalLabel')}</span>

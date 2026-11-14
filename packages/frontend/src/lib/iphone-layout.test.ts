@@ -43,8 +43,14 @@ describe('iPhone polish', () => {
     assert.equal((loading.match(/className="w-full sm:w-auto"/g) ?? []).length >= 2, true);
   });
 
-  it('scrolls the Assai table inside its card instead of stretching the page', () => {
+  it('lays the Assai calculator out in three columns instead of a table that scrolls', () => {
     const assai = page('pages/AssaiCalculatorPage.tsx');
-    assert.match(assai, /<div className="overflow-x-auto">\s*<table/);
+    // V3 replaced the four-column table (and its horizontal scroll) with a three-column grid whose name
+    // column may shrink, so the row fits a 390 px phone without scrolling.
+    assert.doesNotMatch(assai, /<table/);
+    assert.doesNotMatch(assai, /overflow-x-auto/);
+    assert.doesNotMatch(assai, /min-w-\[320px\]/);
+    assert.match(assai, /data-testid="assai-grid-header"/);
+    assert.match(assai, /grid-cols-\[minmax\(0,1fr\)_5\.5rem_3\.25rem\]/);
   });
 });
