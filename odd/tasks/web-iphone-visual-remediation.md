@@ -121,3 +121,38 @@ L2 — ejecución y evidencia.
   - La tabla densa de `/admin/audit` conserva su scroll horizontal; el foco era el header y los filtros.
   - Playwright no corre en este host (Ubuntu 26.04); los e2e de V4 y V5 quedaron como aserciones actualizadas, sin
     ejecución local, y el CI los corre en Ubuntu 24.04.
+
+L3 — seguimiento del usuario: B1, R1 y B2.
+
+  B1 — el botón «Lançar saída» del histórico usaba `flex-1` en la fila de acciones, así que en móvil se estiraba a
+  todo el ancho y se leía como la acción primaria de la pantalla. Pasó a ser un `Link` compacto con las mismas
+  clases que los históricos de Masas y Stock (`inline-flex h-11 shrink-0 … px-3 text-xs font-semibold … sm:h-10`),
+  etiqueta corta en móvil (`salida.launchShort`: «Lanzar» / «Lançar») y completa desde `sm`, conservando el
+  `data-testid="salida-history-launch"` y el destino `/salida`. Test de estructura actualizado: etiqueta `A`,
+  `href`, sin `flex-1`/`w-full`, target de 44 px y las dos etiquetas con `sm:hidden` / `hidden sm:inline`.
+
+  R1 — la causa del «Quadrada sigue en Cajas Assaí» no era la oferta de productos, que ya estaba filtrada, sino la
+  **tarea de checklist**: el seed trae `Quadrada` dos veces, la tarea 60 en *Caixas pequenas* (categoría 9) y la
+  tarea 66 en *Caixas Assai* (categoría 10), y el formulario la dibuja como tarea `check`. Solución web-only: nuevo
+  `lib/report-categories.ts` con `visibleReportCategories`, que quita solo esa tarea de la categoría Assaí
+  (reconocida por id 10 o por nombre en ambos idiomas, con acentos y mayúsculas normalizados) y devuelve todo lo
+  demás por referencia y en el mismo orden, sin mutar la entrada.
+    - `ReportsPage` filtra al recibir las categorías (un reporte nuevo no puede responder esa tarea).
+    - `ReportEditPage` filtra **solo para dibujar** y conserva la lista cruda para `reportItems` y el prellenado:
+    si un reporte ya respondió la tarea 66, al volver a guardarlo conserva su fila. Filtrar la lista que arma el
+    payload habría borrado esa respuesta en silencio, que es justo lo que `report-items.ts` evita al emitir una
+    fila por tarea marcada o no. Es una desviación deliberada y acotada de la letra del pedido («al setear
+    categories»), tomada para no perder datos.
+    - Backend, seed, DB, OpenAPI y Android intactos: el API sigue devolviendo ambas tareas. El filtro de
+    `readReportProducts` (oferta de productos) queda donde estaba; es otra capa y no hace daño.
+    - Tests: helper (Assaí pierde 66, pequeñas conserva 60, sin mutar y con match por nombre), `ReportsPage` y
+    `ReportEditPage` (66 ausente, 60 presente) y e2e `report-builder.spec.ts` (60 visible, 66 count 0).
+
+  B2 — WhatsApp y PDF del Horario de Cargamento pasan de columna a `grid grid-cols-2 gap-2 sm:flex sm:justify-end
+  sm:gap-3`, con botones `w-full whitespace-nowrap px-2 text-xs sm:w-auto sm:px-4 sm:text-sm`, target de 44 px y
+  los `data-testid` intactos. Mismo patrón en `LoadingEditPage`, que tenía el mismo par. El label completo
+  «Exportar PDF» entra en 390 px: no hizo falta una etiqueta corta y no se agregó una clave muerta.
+
+  Evidencia: RED observado en los tres frentes antes de implementar (Quadrada presente en las dos páginas, el
+  botón como `button` con `flex-1`, los exports apilados). Verde final: node **723/723**, vitest **188/188**,
+  typecheck sin errores. Pendiente de siempre: Playwright no corre en este host; el e2e nuevo se ejecuta en CI.

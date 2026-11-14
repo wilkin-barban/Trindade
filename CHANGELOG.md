@@ -50,6 +50,10 @@ después de la beta.
   reporte deja de ofrecer Quadrada mientras Cajas pequeñas la conserva (filtro de la web, catálogo del API
   intacto); Cargamento pasa a llamarse «Horario de Cargamento» / «Horário de Carregamento»; la auditoría estrena
   header y tarjeta de filtros; y el Dashboard suma la tarjeta de Salida para `wilkin`.
+- **Ajustes del iPhone en el histórico de Salidas, Reporte y Cargamento.** El enlace «Lanzar» del histórico vuelve
+  a ser compacto (etiqueta corta en móvil, 44 px de alto); Cajas Assaí deja de preguntar la tarea Quadrada
+  mientras Cajas pequeñas la conserva, sin tocar el catálogo del API ni perder la respuesta de un reporte ya
+  guardado; y WhatsApp y PDF de Cargamento comparten una fila en 390 px.
 - **Pulido de la vista iPhone en toda la web.** El audit a 390 px corrigió seis defectos de clases: el `Input`
   compartido pasa a 16 px en móvil (iOS ya no hace zoom al enfocar), las acciones del reporte recuperan 44 px de
   alto, las filas de título de Dashboard y Nuevo Reporte dejan de apretar su botón de ayuda, las acciones de
