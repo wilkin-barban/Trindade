@@ -109,16 +109,17 @@ export function AppShell({ children }: { children: ReactNode }) {
           {/* Cada calculadora queda pegada a su propio histórico: el menú sigue el orden en que se
               usa cada módulo, y el del lanzamiento deja de estar en medio. */}
           <NavItem href="/massas-launch" icon={<Layers className="h-4 w-4" />} label={t('nav.massasLaunch')} />
-          {/* Beta privada: los dos ítems existen solo para `wilkin`; el resto de los roles ve el menú de siempre. */}
+          {/* Beta privada: el lanzamiento vive junto al de masas, y su histórico junto al de masas. Los dos
+              ítems siguen existiendo solo para `wilkin`; el resto de los roles ve el menú de siempre. */}
           {isSalidaVisible(user) && (
-            <>
-              <NavItem href="/salida" icon={<PackageMinus className="h-4 w-4" />} label={t('nav.salida')} />
-              <NavItem href="/salida-history" icon={<ClipboardX className="h-4 w-4" />} label={t('nav.salidaHistory')} />
-            </>
+            <NavItem href="/salida" icon={<PackageMinus className="h-4 w-4" />} label={t('nav.salida')} />
           )}
           <NavItem href="/assai-calculator" icon={<Calculator className="h-4 w-4" />} label={t('nav.assai')} />
           <NavItem href="/stock-calculator" icon={<Boxes className="h-4 w-4" />} label={t('nav.stock')} />
           <NavItem href="/massas-history" icon={<CalendarDays className="h-4 w-4" />} label={t('nav.massasHistory')} />
+          {isSalidaVisible(user) && (
+            <NavItem href="/salida-history" icon={<ClipboardX className="h-4 w-4" />} label={t('nav.salidaHistory')} />
+          )}
           <NavItem href="/stock-history" icon={<Archive className="h-4 w-4" />} label={t('nav.stockHistory')} />
           <NavItem href="/loading/reports-history" icon={<FileClock className="h-4 w-4" />} label={t('nav.reportHistory')} />
           <NavItem href="/loading/history" icon={<History className="h-4 w-4" />} label={t('nav.loadingHistory')} />

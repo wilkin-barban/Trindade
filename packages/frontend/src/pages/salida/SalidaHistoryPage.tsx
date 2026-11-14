@@ -456,23 +456,27 @@ export function SalidaHistoryPage() {
           className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
         >
           <div className="min-w-0">
-            <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">{t('salida.historyTitle')}</h1>
+            <div className="flex items-center justify-between gap-2">
+              <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">{t('salida.historyTitle')}</h1>
+              <div className="shrink-0" data-testid="salida-history-help">
+                <ModuleHelpModal
+                  title={t('moduleHelp.salidaHistory.title')}
+                  subtitle={t('moduleHelp.salidaHistory.subtitle')}
+                  description={t('moduleHelp.salidaHistory.description')}
+                  sections={t('moduleHelp.salidaHistory.sections', { returnObjects: true }) as unknown as HelpSection[]}
+                />
+              </div>
+            </div>
             <p className="mt-1 text-sm text-gray-500">{t('salida.historySubtitle')}</p>
           </div>
           <div className="flex w-full items-center gap-2 sm:w-auto sm:shrink-0">
-            <ModuleHelpModal
-              className="flex-1 sm:flex-initial"
-              title={t('moduleHelp.salidaHistory.title')}
-              subtitle={t('moduleHelp.salidaHistory.subtitle')}
-              description={t('moduleHelp.salidaHistory.description')}
-              sections={t('moduleHelp.salidaHistory.sections', { returnObjects: true }) as unknown as HelpSection[]}
-            />
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={() => navigate('/salida')}
               className="min-h-[44px] flex-1 sm:flex-initial"
+              data-testid="salida-history-launch"
             >
               <ArrowLeft className="h-4 w-4" />
               {t('salida.launch')}

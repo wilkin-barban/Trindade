@@ -468,5 +468,6 @@ describe('SalidaLaunchPage — iPhone header', () => {
     const header = screen.getByTestId('salida-launch-header');
     expect(header.className).toContain('flex-col');
     expect(header.className).toContain('sm:flex-row');
+    expect(header.contains(screen.getByTestId('salida-launch-help'))).toBe(true);
   });
 });
