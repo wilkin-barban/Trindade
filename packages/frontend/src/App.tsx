@@ -11,6 +11,7 @@ import { GuestReadonlyNotice } from './components/ui/guest-readonly-notice';
 import { AssaiCalculatorPage } from './pages/AssaiCalculatorPage';
 import { LoginPage } from './pages/LoginPage';
 import { StockCalculatorPage } from './pages/StockCalculatorPage';
+import { SalidaRoute } from './pages/salida/SalidaRoute';
 import { StockHistoryPage } from './pages/StockHistoryPage';
 import { SetupPage } from './pages/SetupPage';
 import { api } from './api/client';
@@ -28,6 +29,8 @@ const AuditPage = lazy(() => import('./pages/admin/AuditPage').then(m => ({ defa
 const ShareAppPage = lazy(() => import('./pages/ShareAppPage').then(m => ({ default: m.ShareAppPage })));
 const MassasLaunchPage = lazy(() => import('./pages/MassasLaunchPage').then(m => ({ default: m.MassasLaunchPage })));
 const MassasHistoryPage = lazy(() => import('./pages/MassasHistoryPage').then(m => ({ default: m.MassasHistoryPage })));
+const SalidaLaunchPage = lazy(() => import('./pages/salida/SalidaLaunchPage').then(m => ({ default: m.SalidaLaunchPage })));
+const SalidaHistoryPage = lazy(() => import('./pages/salida/SalidaHistoryPage').then(m => ({ default: m.SalidaHistoryPage })));
 
 /**
  * The Android intercept, above the router because it is not about a page.
@@ -260,6 +263,27 @@ export function App() {
             element={
               <ProtectedRoute>
                 <MassasHistoryPage />
+              </ProtectedRoute>
+            }
+          />
+          {/* Beta privada: la ruta y su histórico existen para `wilkin`, y el servidor es quien lo decide. */}
+          <Route
+            path="/salida"
+            element={
+              <ProtectedRoute>
+                <SalidaRoute>
+                  <SalidaLaunchPage />
+                </SalidaRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/salida-history"
+            element={
+              <ProtectedRoute>
+                <SalidaRoute>
+                  <SalidaHistoryPage />
+                </SalidaRoute>
               </ProtectedRoute>
             }
           />

@@ -2,8 +2,9 @@ import { useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { DeveloperCredit } from '../ui/DeveloperCredit';
 import { useTranslation } from 'react-i18next';
-import { LucideMenu, LucideX, LayoutDashboard, ClipboardList, Truck, MessageCircle, ShieldCheck, History, Share2, Layers, Calculator, Boxes, CalendarDays, Archive, FileClock, FileSearch } from 'lucide-react';
+import { LucideMenu, LucideX, LayoutDashboard, ClipboardList, Truck, MessageCircle, ShieldCheck, History, Share2, Layers, Calculator, Boxes, CalendarDays, Archive, FileClock, FileSearch, PackageMinus, ClipboardX } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { isSalidaVisible } from '../../lib/salida';
 import { Button } from '../ui/button';
 
 
@@ -111,6 +112,13 @@ export function AppShell({ children }: { children: ReactNode }) {
           <NavItem href="/assai-calculator" icon={<Calculator className="h-4 w-4" />} label={t('nav.assai')} />
           <NavItem href="/stock-calculator" icon={<Boxes className="h-4 w-4" />} label={t('nav.stock')} />
           <NavItem href="/massas-history" icon={<CalendarDays className="h-4 w-4" />} label={t('nav.massasHistory')} />
+          {/* Beta privada: los dos ítems existen solo para `wilkin`; el resto de los roles ve el menú de siempre. */}
+          {isSalidaVisible(user) && (
+            <>
+              <NavItem href="/salida" icon={<PackageMinus className="h-4 w-4" />} label={t('nav.salida')} />
+              <NavItem href="/salida-history" icon={<ClipboardX className="h-4 w-4" />} label={t('nav.salidaHistory')} />
+            </>
+          )}
           <NavItem href="/stock-history" icon={<Archive className="h-4 w-4" />} label={t('nav.stockHistory')} />
           <NavItem href="/loading/reports-history" icon={<FileClock className="h-4 w-4" />} label={t('nav.reportHistory')} />
           <NavItem href="/loading/history" icon={<History className="h-4 w-4" />} label={t('nav.loadingHistory')} />
