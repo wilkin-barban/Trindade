@@ -74,6 +74,8 @@
     "operations": "Operações",
     "reportHistory": "Histórico de Relatórios",
     "reports": "Relatórios",
+    "salida": "Saída / Baixa",
+    "salidaHistory": "Histórico de Saídas",
     "share": "Compartilhar",
     "stock": "Calculador de Estoque",
     "stockHistory": "Histórico de Contagem",
@@ -893,7 +895,112 @@
           "description": "Administradores podem anexar usuário e senha para que o colaborador já receba os dados de acesso."
         }
       ]
+    },
+    "salida": {
+      "title": "Saída / Baixa",
+      "subtitle": "Baixa de insumos pela web",
+      "description": "Registre a saída de embalagens, bobinas e matéria-prima em unidades. A data e o operador vêm da sessão: não são escolhidos.",
+      "sections": [
+        {
+          "title": "Blocos",
+          "description": "Embalagens, Bobinas e Matéria-Prima são ligados separadamente. Desligar um bloco limpa suas quantidades."
+        },
+        {
+          "title": "Do registro ao ERP",
+          "steps": [
+            "Carregue apenas quantidades inteiras maiores que zero.",
+            "Lance a saída: primeiro ela é salva na Trindade.",
+            "Depois as fotos opcionais sobem e o ERP é avisado.",
+            "Se o ERP não responder, a saída fica Pendente no histórico."
+          ]
+        }
+      ]
+    },
+    "salidaHistory": {
+      "title": "Histórico de Saídas",
+      "subtitle": "Consulta de baixas e conciliação",
+      "description": "As saídas são um registro somente leitura. Escolha o dia, filtre por bloco e confira no ERP as que faltam.",
+      "sections": [
+        {
+          "title": "Estados",
+          "description": "ERP OK quando o lançamento do ERP coincide com a saída, Parcial quando coincide uma parte e Pendente quando ainda não foi encontrado."
+        },
+        {
+          "title": "Conferir no ERP",
+          "description": "Consulta as saídas do dia no ERP, guarda o resultado e atualiza o estado de cada cartão."
+        }
+      ]
     }
+  },
+  "salida": {
+    "title": "Saída / Baixa",
+    "subtitle": "Baixa de insumos, embalagens e bobinas com conciliação contra o ERP",
+    "betaBadge": "Beta privada",
+    "soloWilkin": "Somente wilkin",
+    "dateLabel": "Data",
+    "operatorLabel": "Operador",
+    "readOnly": "Somente leitura",
+    "blocksLabel": "Blocos",
+    "blocksHint": "Desligar um bloco limpa suas quantidades; ligá-lo de novo o deixa vazio.",
+    "blocks": {
+      "embalagens": "Embalagens",
+      "bobinas": "Bobinas",
+      "materia-prima": "Matéria-Prima"
+    },
+    "quantityHint": "Somente números inteiros maiores que zero, em unidades.",
+    "unitsShort": "un",
+    "summaryTitle": "Resumo da saída",
+    "summaryProducts": "Produtos",
+    "summaryUnits": "Total de unidades",
+    "launch": "Lançar saída",
+    "launching": "Lançando...",
+    "launchError": "Não foi possível registrar a saída. Tente de novo.",
+    "emptySelection": "Carregue pelo menos uma quantidade inteira maior que zero.",
+    "catalogError": "Não foi possível ler o catálogo do servidor: a lista fixa do módulo está sendo exibida.",
+    "photosTitle": "Fotos (opcional)",
+    "photosSubtitle": "Até 3 fotos do que sai; o movimento é válido sem fotos.",
+    "photoHelp": "{{count}} de {{max}} fotos · JPEG, PNG ou WebP · máximo 5 MB",
+    "photoAdd": "Adicionar foto",
+    "photoRemove": "Remover foto",
+    "photoDownload": "Abrir foto",
+    "photoCountError": "Máximo {{max}} fotos por saída.",
+    "photoSizeError": "Cada foto deve pesar menos de 5 MB.",
+    "photoTypeError": "Somente JPEG, PNG ou WebP.",
+    "photoUploadError": "A saída foi registrada, mas as fotos não puderam ser enviadas.",
+    "successTitle": "Saída registrada",
+    "successSubtitle": "O movimento já está salvo na Trindade.",
+    "erpAnswer": "Resposta do ERP",
+    "erpAccepted": "O ERP aceitou a saída.",
+    "erpRejected": "O ERP não confirmou a saída.",
+    "erpNoAnswer": "Ainda não há resposta do ERP.",
+    "copySummary": "Copiar resumo",
+    "copiedSummary": "Resumo copiado.",
+    "shareWhatsApp": "Compartilhar por WhatsApp",
+    "shareFailed": "Não foi possível compartilhar o resumo.",
+    "close": "Fechar",
+    "pendingTitle": "Saída pendente de envio ao ERP",
+    "pendingBody": "O movimento está salvo na Trindade. Tente o envio novamente quando o ERP estiver acessível.",
+    "resendErp": "Reenviar ao ERP",
+    "resendingErp": "Reenviando...",
+    "historyTitle": "Histórico de Saídas",
+    "historySubtitle": "Baixas por dia, bloco e estado de conciliação com o ERP",
+    "historyEmpty": "Não há saídas registradas neste dia.",
+    "historyLoadError": "Não foi possível carregar o histórico de saídas.",
+    "historyDaysUnavailable": "Não foi possível listar os dias com saídas.",
+    "historyDaysLabel": "Dias com saídas",
+    "dayLabel": "Dia",
+    "filterBlock": "Bloco",
+    "allBlocks": "Todos",
+    "conferir": "Conferir no ERP",
+    "confering": "Consultando o ERP...",
+    "erpCheckError": "Não foi possível consultar o ERP. Revise o acesso configurado e tente de novo.",
+    "erpOk": "ERP OK",
+    "erpPending": "Pendente",
+    "erpPartial": "Parcial",
+    "entLan": "ENT_LAN",
+    "totalUnits": "Total",
+    "share": "Compartilhar",
+    "noPhotos": "Sem fotos"
   },
   "stock": {
     "add": "Adicionar",
