@@ -13,6 +13,7 @@ import { auditRoutes } from './modules/audit/audit.routes.js';
 import { stockRoutes } from './modules/stock/stock.routes.js';
 import { appRoutes } from './modules/app/app.routes.js';
 import { massasRoutes } from './modules/massas/massas.routes.js';
+import { salidaRoutes } from './modules/salida/salida.routes.js';
 import { aeroIntegrationRoutes } from './modules/integration/aero.routes.js';
 import { GUEST_USERNAME } from './guest-user.js';
 
@@ -44,6 +45,12 @@ export async function registerApiRoutes(
 ): Promise<void> {
   await fastify.register(stockRoutes, { prefix: '/api/stock' });
   await fastify.register(massasRoutes, { prefix: '/api/massas-launch' });
+  // The baixa module: a private beta, so every route inside it carries its own username guard.
+  await fastify.register(salidaRoutes, {
+    prefix: '/api/salida',
+    photosDir: options.photosDir,
+    publicBaseUrl: options.publicBaseUrl,
+  });
   await fastify.register(aeroIntegrationRoutes, { prefix: '/api/integration/aero' });
   await fastify.register(authRoutes, {
     prefix: '/api/auth',
