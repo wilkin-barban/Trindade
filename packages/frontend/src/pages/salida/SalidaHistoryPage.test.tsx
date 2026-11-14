@@ -532,4 +532,18 @@ describe('SalidaHistoryPage — iPhone share and layout', () => {
     expect(screen.getByTestId('salida-history-actions').className).toContain('grid');
     expect(screen.getByTestId('salida-history-actions').className).toContain('sm:flex');
   });
+
+  it('keeps the help button in the title row and the launch action in its own row', async () => {
+    await renderReady();
+
+    const header = screen.getByTestId('salida-history-header');
+    const help = screen.getByTestId('salida-history-help');
+    const launch = screen.getByTestId('salida-history-launch');
+
+    expect(header.contains(help)).toBe(true);
+    expect(help.contains(launch)).toBe(false);
+    // The help sits beside the title, not at the end of the actions row.
+    expect(help.parentElement?.tagName).toBe('DIV');
+    expect(launch.closest('[data-testid="salida-history-help"]')).toBeNull();
+  });
 });

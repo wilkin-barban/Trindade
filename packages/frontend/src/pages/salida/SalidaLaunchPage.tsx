@@ -385,17 +385,18 @@ export function SalidaLaunchPage() {
           className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
         >
           <div className="min-w-0">
-            <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">{t('salida.title')}</h1>
+            <div className="flex items-center justify-between gap-2">
+              <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">{t('salida.title')}</h1>
+              <div className="shrink-0" data-testid="salida-launch-help">
+                <ModuleHelpModal
+                  title={t('moduleHelp.salida.title')}
+                  subtitle={t('moduleHelp.salida.subtitle')}
+                  description={t('moduleHelp.salida.description')}
+                  sections={t('moduleHelp.salida.sections', { returnObjects: true }) as unknown as HelpSection[]}
+                />
+              </div>
+            </div>
             <p className="mt-1 text-sm text-gray-500">{t('salida.subtitle')}</p>
-          </div>
-          <div className="flex w-full items-center gap-2 sm:w-auto sm:shrink-0">
-            <ModuleHelpModal
-              className="w-full sm:w-auto"
-              title={t('moduleHelp.salida.title')}
-              subtitle={t('moduleHelp.salida.subtitle')}
-              description={t('moduleHelp.salida.description')}
-              sections={t('moduleHelp.salida.sections', { returnObjects: true }) as unknown as HelpSection[]}
-            />
           </div>
         </div>
 

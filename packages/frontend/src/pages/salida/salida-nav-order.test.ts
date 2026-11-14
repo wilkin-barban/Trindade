@@ -22,26 +22,37 @@ function indexOf(href: string): number {
 }
 
 describe('salida navigation order', () => {
-  it('places Salida/Baja and its history right below Lanzamiento de Masas', () => {
-    const launch = indexOf('/massas-launch');
-    const salida = indexOf('/salida');
-    const history = indexOf('/salida-history');
-    const assai = indexOf('/assai-calculator');
-    const stock = indexOf('/stock-calculator');
-    const massasHistory = indexOf('/massas-history');
-
-    assert.ok(launch < salida, 'Salida/Baja must come after Lanzamiento de Masas');
-    assert.ok(salida < history, 'Histórico de Salidas must come after Salida/Baja');
-    assert.ok(history < assai, 'the calculators must come after the salida pair');
-    assert.ok(assai < stock, 'the Assaí calculator keeps its place before the stock one');
-    assert.ok(stock < massasHistory, 'the massas history keeps its place after the calculators');
+  it('follows the order the plant reads: each salida item below its massas counterpart', () => {
+    const expected = [
+      '/massas-launch',
+      '/salida',
+      '/assai-calculator',
+      '/stock-calculator',
+      '/massas-history',
+      '/salida-history',
+      '/stock-history',
+      '/loading/reports-history',
+      '/loading/history',
+      '/compartir',
+    ];
+    const positions = expected.map((href) => indexOf(href));
+    for (let index = 1; index < positions.length; index += 1) {
+      assert.ok(
+        positions[index - 1]! < positions[index]!,
+        `${expected[index - 1]} must come before ${expected[index]}`,
+      );
+    }
   });
 
   it('keeps both items behind the wilkin gate', () => {
-    const before = shell.slice(0, indexOf('/salida'));
-    const guard = before.lastIndexOf('isSalidaVisible(user)');
-    assert.notEqual(guard, -1, 'the salida items must still be rendered only for wilkin');
-    const between = shell.slice(guard, indexOf('/salida-history'));
-    assert.match(between, /isSalidaVisible\(user\) && \(/);
+    for (const href of ['/salida', '/salida-history']) {
+      const before = shell.slice(0, indexOf(href));
+      const guard = before.lastIndexOf('isSalidaVisible(user)');
+      assert.notEqual(guard, -1, `${href} must still be rendered only for wilkin`);
+      // The guard wraps the single item, so nothing between it and the href can close the JSX expression.
+      const between = shell.slice(guard, indexOf(href));
+      assert.match(between, /isSalidaVisible\(user\) && \(/);
+      assert.ok(!between.includes(')}'), `${href} escaped the guard`);
+    }
   });
 });
