@@ -44,6 +44,14 @@ después de la beta.
 
 #### Cambiado
 
+- **Salida / Baixa se lee y se comparte en el iPhone.** En 390 px el header de las dos pantallas apila título y
+  acciones en vez de partir el título en tres líneas; los chips de bloque quedan 2x2 y las acciones del histórico
+  ocupan el ancho completo. El compartir que no se encontraba ahora es un botón verde de WhatsApp en la tarjeta
+  de filtros (resumen del día con texto y fotos, deshabilitado con un aviso cuando no hay salidas) y en cada
+  movimiento (texto y sus fotos). Si el navegador no tiene hoja de compartir, el helper abre WhatsApp y, si el
+  popup se bloquea, copia el texto. La pantalla de lanzamiento ya no muestra «Solo wilkin» ni «Beta privada»: el
+  guard del servidor y la ruta siguen iguales.
+- **El menú pone Salida/Baja y su histórico justo debajo de Lanzamiento de Masas**, en ese orden.
 - **`POST /saidasitem` deja de estar pendiente.** El payload de salida usa `PED_*`, código a 6 dígitos, cantidad
   ×100, usuario en mayúsculas, serie `APL`, sin `PRO_CST` y sin `PED_DTMOVI`, y la observación es «Saida de
   insumos via Trindade».
