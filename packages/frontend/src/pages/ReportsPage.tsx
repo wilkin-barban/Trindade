@@ -403,8 +403,8 @@ export function ReportsPage() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="flex items-center gap-2 mb-1">
-        <h2 className="text-xl font-bold text-gray-800">
+      <div className="mb-1 flex flex-wrap items-center gap-2">
+        <h2 className="min-w-0 text-xl font-bold text-gray-800">
           {t('reports.newReport')}
         </h2>
         <ModuleHelpModal

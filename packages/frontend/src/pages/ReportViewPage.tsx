@@ -413,7 +413,7 @@ export function ReportViewPage() {
           <Link to={`/reports/${report.id}/edit`} className="flex-1 sm:flex-initial">
             <Button
               variant="outline"
-              className="w-full h-9 sm:h-11 px-2 sm:px-6 text-xs sm:text-base gap-1 sm:gap-2"
+              className="w-full h-11 px-2 sm:px-6 text-xs sm:text-base gap-1 sm:gap-2"
               data-testid="edit-report-btn"
             >
               <LucidePencil className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
@@ -424,7 +424,7 @@ export function ReportViewPage() {
         <Button
           onClick={handleExportPdf}
           disabled={pdfLoading || report.temperatures.length === 0}
-          className="flex-1 sm:flex-initial h-9 sm:h-11 px-2 sm:px-6 text-xs sm:text-base gap-1 sm:gap-2"
+          className="flex-1 sm:flex-initial h-11 px-2 sm:px-6 text-xs sm:text-base gap-1 sm:gap-2"
           data-testid="export-pdf-btn"
         >
           <LucideFileDown className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${pdfLoading ? 'animate-spin' : ''}`} />
@@ -433,7 +433,7 @@ export function ReportViewPage() {
         <Button
           onClick={() => setShowExport(true)}
           disabled={report.temperatures.length === 0}
-          className="flex-1 sm:flex-initial h-9 sm:h-11 px-2 sm:px-6 text-xs sm:text-base gap-1 sm:gap-2"
+          className="flex-1 sm:flex-initial h-11 px-2 sm:px-6 text-xs sm:text-base gap-1 sm:gap-2"
           data-testid="export-whatsapp-btn"
         >
           <LucideSend className="h-3.5 w-3.5 sm:h-4 sm:w-4" />

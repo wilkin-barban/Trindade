@@ -154,16 +154,18 @@ export function DashboardPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-800">
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <h3 className="min-w-0 text-lg font-semibold text-gray-800">
           {t('dashboard.overview')}
         </h3>
-        <ModuleHelpModal
-          title={t('moduleHelp.dashboard.title')}
-          subtitle={t('moduleHelp.dashboard.subtitle')}
-          description={t('moduleHelp.dashboard.description')}
-          sections={t('moduleHelp.dashboard.sections', { returnObjects: true }) as any}
-        />
+        <div className="shrink-0">
+          <ModuleHelpModal
+            title={t('moduleHelp.dashboard.title')}
+            subtitle={t('moduleHelp.dashboard.subtitle')}
+            description={t('moduleHelp.dashboard.description')}
+            sections={t('moduleHelp.dashboard.sections', { returnObjects: true }) as any}
+          />
+        </div>
       </div>
 
       {/* Seis tarjetas, en el orden del teléfono: lo que se hace hoy, el cronograma que corre, las masas, las

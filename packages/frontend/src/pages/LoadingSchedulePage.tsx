@@ -192,11 +192,12 @@ export function LoadingSchedulePage() {
       )}
 
       {/* Action buttons */}
-      <div className="flex justify-end gap-3 mt-6 mb-8">
+      <div className="mt-6 mb-8 flex flex-col gap-3 sm:flex-row sm:justify-end">
         <Button
           onClick={handleExportPdf}
           variant="outline"
           size="lg"
+          className="w-full sm:w-auto"
           data-testid="loading-export-pdf-btn"
           disabled={schedules.length === 0}
         >
@@ -206,6 +207,7 @@ export function LoadingSchedulePage() {
         <Button
           onClick={() => setExportOpen(true)}
           size="lg"
+          className="w-full sm:w-auto"
           data-testid="open-export-btn"
           disabled={schedules.length === 0}
         >
