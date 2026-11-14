@@ -40,7 +40,7 @@ Restricciones de la entrega:
 
 - T1 → S1. `packages/frontend/src/pages/salida/SalidaLaunchPage.tsx`: `salida.readOnly` pasa a `salida.session`
   («Sesión» / «Sessão») en ambos locales; la clave vieja se retira y el test de paridad la declara ausente.
-  Commit: el mismo del cierre (S1 y S2 comparten diff).
+  Commit: `b43a485d` (S1 y S2 comparten el commit atómico del cierre).
 - T2 → S2. `packages/backend/src/modules/integration/aero.log.service.ts`: `appendLocalAeroLog`, el único lugar
   que fija los campos nulos de una línea local; `aero.schema.ts` reconoce los cuatro eventos.
 - T3 → S2. Eventos en `salida.routes.ts` (alta y foto) y en `reports.routes.ts` (alta y foto), cada uno tras el
@@ -93,3 +93,9 @@ L3 — evidencia.
   no se toca desde la suite.
 - Path del archivo en producción: `logs/aero-integration.log`, volumen `./logs` del compose, el mismo que ya usa la
   integración Aero.
+- Deploy del 2026-11-14, commit `b43a485d`: `docker compose up -d --build api web` reconstruyó y recreó los dos
+  servicios; `api` y `web` quedaron `healthy`. Verificado en producción: `/api/health` 200, `/salida`,
+  `/salida-history`, `/reports` y `/loading` 200, `/api/salida/catalog` sin sesión 401. El contenedor puede
+  escribir el log (`appendFileSync` sobre `/app/packages/backend/logs/aero-integration.log` sin error) y el bundle
+  servido contiene el bloque `operatorLabel:"Operador",session:"Sesión",blocksLabel:"Bloques"`. No se creó ningún
+  dato falso en producción: la verificación del log fue un append de cero bytes.
