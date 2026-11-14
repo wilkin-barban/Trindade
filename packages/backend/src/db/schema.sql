@@ -311,7 +311,7 @@ CREATE TABLE IF NOT EXISTS aero_bridge_tickets (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
   token_hash   TEXT    NOT NULL UNIQUE,
   user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  action       TEXT    NOT NULL CHECK (action IN ('entrada','entrada_lote','movimentos','test')),
+  action       TEXT    NOT NULL CHECK (action IN ('entrada','entrada_lote','saida','movimentos','test')),
   endpoint     TEXT    NOT NULL,
   body         TEXT    NOT NULL,
   bodies       TEXT,
@@ -322,4 +322,39 @@ CREATE TABLE IF NOT EXISTS aero_bridge_tickets (
 );
 CREATE INDEX IF NOT EXISTS idx_aero_bridge_tickets_user ON aero_bridge_tickets(user_id);
 CREATE INDEX IF NOT EXISTS idx_aero_bridge_tickets_expires ON aero_bridge_tickets(expires_at);
+
+-- Revision 11: the salida (baixa) module — insumos, embalagens and bobinas leaving the plant.
+-- One movement per launch, its items in the order the operator typed them, and up to three optional
+-- photos. The catalog is fixed and lives in code, so the item keeps the product's name and block as they
+-- were launched: renaming a product later must not rewrite history. `salida_photos` is the only place a
+-- photo path is stored, and it keeps the same authenticated-read/public-token split as `report_photos`.
+CREATE TABLE IF NOT EXISTS salida_movements (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  movement_date TEXT    NOT NULL,
+  user_id       INTEGER NOT NULL REFERENCES users(id),
+  created_at    TEXT    NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_salida_movements_date ON salida_movements(movement_date);
+
+CREATE TABLE IF NOT EXISTS salida_movement_items (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  movement_id  INTEGER NOT NULL REFERENCES salida_movements(id) ON DELETE CASCADE,
+  product_code TEXT    NOT NULL,
+  product_name TEXT    NOT NULL,
+  block        TEXT    NOT NULL CHECK (block IN ('embalagens', 'bobinas', 'materia-prima')),
+  quantity     INTEGER NOT NULL CHECK (quantity > 0),
+  position     INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_salida_movement_items_movement ON salida_movement_items(movement_id);
+
+CREATE TABLE IF NOT EXISTS salida_photos (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  movement_id  INTEGER NOT NULL REFERENCES salida_movements(id) ON DELETE CASCADE,
+  file_path    TEXT    NOT NULL,
+  file_size    INTEGER NOT NULL,
+  mime_type    TEXT    NOT NULL,
+  public_token TEXT,
+  created_at   TEXT    NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_salida_photos_movement ON salida_photos(movement_id);
 

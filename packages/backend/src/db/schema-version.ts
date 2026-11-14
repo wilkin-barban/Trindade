@@ -18,11 +18,13 @@ import type Database from 'better-sqlite3';
  * - 9: adds `massa_launches.ent_lan`, the ERP seat an imported launch came from, unique when present.
  * - 10: adds `aero_integration_settings` (the erp password, encrypted, one row per owner) and
  *   `aero_bridge_tickets` (one-use tickets the iOS shortcut redeems for the envelope).
+ * - 11: adds the salida (baixa) module — `salida_movements`, `salida_movement_items` and `salida_photos` — and
+ *   widens the `aero_bridge_tickets.action` CHECK so the shortcut can be armed for `saida`.
  *
  * Databases created before versioning carry `user_version = 0` and are reported as
  * `unversioned`; nothing about them is assumed, and no startup path rewrites them.
  */
-export const SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 11;
 
 /**
  * The tables a database created by revision 1 must contain: the baseline the
@@ -70,6 +72,18 @@ export const REVISION_TEN_TABLES = ['aero_bridge_tickets', 'aero_integration_set
  * The inventory as it stood before revision 10: revisions 3, 4, 8 and 9 widened existing tables
  * and added none, so revisions 7, 8 and 9 are all required to contain exactly this.
  */
+/**
+ * Tables introduced by revision 11: the movement, its items and its optional photos.
+ *
+ * They are additive: no existing table changes shape except `aero_bridge_tickets`, whose
+ * `action` CHECK has to admit `saida` for the shortcut that writes the exit.
+ */
+export const REVISION_ELEVEN_TABLES = [
+  'salida_movements',
+  'salida_movement_items',
+  'salida_photos',
+] as const;
+
 const TABLES_THROUGH_REVISION_NINE: readonly string[] = [
   ...BASELINE_TABLES,
   ...REVISION_TWO_TABLES,
@@ -78,14 +92,20 @@ const TABLES_THROUGH_REVISION_NINE: readonly string[] = [
   ...REVISION_SEVEN_TABLES,
 ].sort();
 
+/** The inventory as it stood before revision 11: revisions 8 and 9 widened tables, 10 added two. */
+const TABLES_THROUGH_REVISION_TEN: readonly string[] = [
+  ...TABLES_THROUGH_REVISION_NINE,
+  ...REVISION_TEN_TABLES,
+].sort();
+
 /**
  * The user tables the approved schema defines. Kept in code because the read-only
  * status report needs an expectation to compare against; the test suite ties this
  * list to the tables `schema.sql` actually creates.
  */
 export const SCHEMA_TABLES: readonly string[] = [
-  ...TABLES_THROUGH_REVISION_NINE,
-  ...REVISION_TEN_TABLES,
+  ...TABLES_THROUGH_REVISION_TEN,
+  ...REVISION_ELEVEN_TABLES,
 ].sort();
 
 /**
@@ -101,7 +121,11 @@ export const SCHEMA_TABLES: readonly string[] = [
  * further is known about it.
  */
 export function requiredTablesFor(version: number): readonly string[] {
-  if (version >= 10) return SCHEMA_TABLES;
+  if (version >= 11) return SCHEMA_TABLES;
+  // A revision 10 database predates the salida module. Asking it for the three tables would classify it
+  // `incompatible`, and the migrate command refuses that verdict without opening the file for writing, so the
+  // very migration that adds them could never run.
+  if (version >= 10) return TABLES_THROUGH_REVISION_TEN;
   // A revision 9 database predates the ERP vault. Asking it for `aero_integration_settings` or
   // `aero_bridge_tickets` would classify it `incompatible`, and the migrate command refuses that
   // verdict without ever opening the file for writing, so the very migration that adds the two

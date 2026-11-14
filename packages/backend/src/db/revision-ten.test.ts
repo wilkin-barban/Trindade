@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { migrateDatabase } from './migrations.js';
 import {
+  REVISION_ELEVEN_TABLES,
   REVISION_TEN_TABLES,
   SCHEMA_TABLES,
   SCHEMA_VERSION,
@@ -18,6 +19,7 @@ const schema = readFileSync(join(import.meta.dirname, 'schema.sql'), 'utf-8');
 
 /** Revision 9 as production has it: everything the supported build creates, minus the revision-10 tables. */
 function revisionNineShape(db: Database.Database): void {
+  for (const table of REVISION_ELEVEN_TABLES) db.exec(`DROP TABLE IF EXISTS ${table}`);
   db.exec('DROP TABLE IF EXISTS aero_bridge_tickets');
   db.exec('DROP TABLE IF EXISTS aero_integration_settings');
   db.pragma('user_version = 9');
@@ -34,7 +36,9 @@ function schemaTables(db: Database.Database): string[] {
 
 describe('schema revision 10', () => {
   it('is the supported revision and declares the two tables it adds', () => {
-    assert.equal(SCHEMA_VERSION, 10);
+    // The constant moves with each revision; what this case pins is that revision 10 is at or below the one this
+    // build supports and that its two tables are part of the inventory.
+    assert.ok(SCHEMA_VERSION >= 10, `revision 10 is no longer supported (build is at ${SCHEMA_VERSION})`);
     assert.deepEqual([...REVISION_TEN_TABLES].sort(), ['aero_bridge_tickets', 'aero_integration_settings']);
     for (const table of REVISION_TEN_TABLES) assert.ok(SCHEMA_TABLES.includes(table));
   });
@@ -56,7 +60,10 @@ describe('schema revision 10', () => {
       assert.equal(requiredAtNine.includes(table), false, `revision 9 must not be asked for ${table}`);
     }
     for (const table of REVISION_TEN_TABLES) assert.ok(requiredTablesFor(10).includes(table));
-    assert.deepEqual([...requiredTablesFor(10)].sort(), [...SCHEMA_TABLES].sort());
+    // Revision 10 must not be asked for what later revisions added: it would be classified `incompatible` and
+    // the migration that gives it those tables could never run.
+    for (const table of REVISION_ELEVEN_TABLES) assert.equal(requiredTablesFor(10).includes(table), false);
+    assert.deepEqual([...requiredTablesFor(SCHEMA_VERSION)].sort(), [...SCHEMA_TABLES].sort());
   });
 
   it('classifies a healthy revision-9 database as outdated, never incompatible', () => {
@@ -84,8 +91,8 @@ describe('schema revision 10', () => {
     const result = migrateDatabase(db);
 
     assert.equal(result.outcome, 'migrated');
-    assert.equal(result.report.version, 10);
-    assert.equal(db.pragma('user_version', { simple: true }), 10);
+    assert.equal(result.report.version, SCHEMA_VERSION);
+    assert.equal(db.pragma('user_version', { simple: true }), SCHEMA_VERSION);
     for (const table of REVISION_TEN_TABLES) {
       assert.ok(schemaTables(db).includes(table), `${table} was not created`);
     }
