@@ -83,3 +83,41 @@ que fijan el resultado:
   «Si el encabezado del PDF sale del backend y no lo podés cambiar sin tocar API, documentalo como pendiente en el
   ODD; no toques backend.»
 
+
+L2 — ejecución y evidencia.
+
+  V1: las tres filas visuales de Salida muestran nombre + cantidad; el código queda en `aria-label` y
+  `data-testid` (assertado por test) y el mensaje de WhatsApp y el payload del ERP no cambian. La tarjeta del
+  histórico dejó de repetir el bloque por ítem: lo nombra el header.
+  V2: cada producto de Masas es una fila con el nombre y `un/cx` a la izquierda y el campo con las unidades a la
+  derecha; en `readOnly` el total ocupa el lugar del campo. Contenedor `grid-cols-1 sm:grid-cols-2 xl:grid-cols-3`.
+  V3: Assaí pasó de tabla de cuatro columnas a grilla de tres (`minmax(0,1fr) 5.5rem 3.25rem`), sin
+  `overflow-x-auto` ni `min-w-[320px]`, con `un/cx` como sublinea, input `h-11 text-base` y cajas a la derecha.
+  `ASSAI_PRODUCTS` queda en 8 productos y el mensaje no nombra Quadrada.
+  V4: `readReportProducts` filtra Quadrada solo de `assai`; `normal` y el catálogo del API quedan iguales.
+  V6: auditoría con header en tarjeta (título, subtítulo, total) y filtros en tarjeta propia con grid 1/2/4 y
+  controles de 44 px; tabla y lógica intactas.
+  V7: tarjeta de Salida en el Dashboard justo después de Masas, gateada por `isSalidaVisible`, con dos puertas y
+  tile 📤.
+
+  RED observado antes de cada cambio de datos/estructura: catálogo de Assaí `expected 8 actual 9` y el mensaje
+  nombraba Quadrada; la fila de Salida devolvía `'1474EMBALAG. NHOQUE 1kgun'`; la tarjeta del histórico devolvía
+  `'1474 EMBALAG. NHOQUE 1kgEmbalajes20 un'`; la grilla de Masas no era `flex` ni `xl:grid-cols-3`; V4 falló con
+  Quadrada en `assai` y con una oferta de solo Quadrada leída como error; V7 falló con 6 tarjetas en lugar de 7.
+
+  Verde final: `npm --workspace=packages/frontend run test:node` **718/718**, `NODE_ENV=test … test:unit`
+  **186/186** (25 archivos), `npm run typecheck` sin errores.
+
+  Un pin de la entrega anterior (`lib/iphone-layout.test.ts`) afirmaba la tabla con scroll de Assaí; se actualizó a
+  la grilla de tres columnas en el mismo commit de V3, que es su lugar. La clave `assai.perBox` quedó sin uso y se
+  retiró de ambos locales. `ReportEditPage` también usa `readReportProducts`, así que la pantalla de edición deja de
+  ofrecer Quadrada en una tarea Assaí: es la consecuencia buscada del límite que fija V4, no un cambio de esa
+  pantalla.
+
+  Pendientes declarados:
+  - El encabezado «CRONOGRAMA DE CARREGAMENTO» del texto/PDF de Cargamento sale de `/api/loading/export`
+    (backend): renombrarlo exige tocar la API, así que queda fuera de esta entrega y el e2e que lo espera no se
+    tocó.
+  - La tabla densa de `/admin/audit` conserva su scroll horizontal; el foco era el header y los filtros.
+  - Playwright no corre en este host (Ubuntu 26.04); los e2e de V4 y V5 quedaron como aserciones actualizadas, sin
+    ejecución local, y el CI los corre en Ubuntu 24.04.

@@ -44,6 +44,12 @@ después de la beta.
 
 #### Cambiado
 
+- **Remediación visual iPhone en Salida, Masas, Assaí, Reporte, Auditoría y Dashboard.** Las filas de Salida y
+  Masas muestran nombre y cantidad en una sola línea (el código de producto sigue en accesibilidad, tests,
+  payload y mensaje); la calculadora Assaí entra en 390 px con tres columnas y sin Quadrada; la tarea Assaí del
+  reporte deja de ofrecer Quadrada mientras Cajas pequeñas la conserva (filtro de la web, catálogo del API
+  intacto); Cargamento pasa a llamarse «Horario de Cargamento» / «Horário de Carregamento»; la auditoría estrena
+  header y tarjeta de filtros; y el Dashboard suma la tarjeta de Salida para `wilkin`.
 - **Pulido de la vista iPhone en toda la web.** El audit a 390 px corrigió seis defectos de clases: el `Input`
   compartido pasa a 16 px en móvil (iOS ya no hace zoom al enfocar), las acciones del reporte recuperan 44 px de
   alto, las filas de título de Dashboard y Nuevo Reporte dejan de apretar su botón de ayuda, las acciones de
