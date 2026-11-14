@@ -55,6 +55,7 @@ Directorios de apoyo:
 | `loading` | `/api/loading` | Cronogramas, conductores, vehículos, horarios e historial |
 | `stock` | `/api/stock` | Conteo diario, historial y resumen colectivo |
 | `massas` | `/api/massas-launch` | Lanzamientos, reporte del día e historial |
+| `salida` | `/api/salida` | Baja de insumos, embalagens e bobinas con histórico propio y conciliación de salidas |
 | `integration` | `/api/integration/aero` | Cofre del ERP, tickets del puente Scriptable, bitácora y espejo de movimientos del ERP |
 | `admin` | `/api/admin` | Usuarios, catálogos, vehículos, horarios y auditoría |
 | `audit` | `/api/admin/audit` | Consulta paginada de auditoría |
@@ -82,6 +83,11 @@ Directorios de apoyo:
 | `/api/massas-launch/report` | `GET` | Reporte alimentado por el ERP |
 | `/api/massas-launch/history` | `GET` | Historial de masas |
 | `/api/massas-launch/:id` | `PUT`, `DELETE` | Edición y borrado sujetos a autoría y fecha |
+| `/api/salida` | `GET`, `POST` | Movimientos del día y lanzamiento de una baja |
+| `/api/salida/catalog` | `GET` | Catálogo fijo de 21 productos |
+| `/api/salida/history` | `GET` | Días con movimientos y sus totales |
+| `/api/salida/:id/photos`, `/api/salida/photos/:photoId` | `GET`, `POST`, `DELETE` | Fotos opcionales del movimiento (máximo 3) y su lectura autenticada |
+| `/api/salida/photos/public/:token` | `GET` | Foto por token, sin sesión; el token es la credencial |
 | `/api/integration/aero/log` | `POST` | Bitácora de integración |
 | `/api/integration/aero/movements` | `GET`, `POST` | Espejo de movimientos del ERP |
 | `/api/integration/aero/settings` | `GET`, `PUT`, `DELETE` | Cofre del ERP por operador; la dirección es editable solo por `wilkin` |
@@ -152,7 +158,7 @@ El cliente release solo permite tráfico HTTP hacia la IP del WebService de la f
 
 ## 6. Modelo de datos
 
-SQLite con `PRAGMA user_version`. La revisión vigente es la **10** y el esquema tiene **20 tablas**.
+SQLite con `PRAGMA user_version`. La revisión vigente es la **11** y el esquema tiene **23 tablas**.
 
 | Dominio | Tablas |
 | --- | --- |
@@ -161,6 +167,7 @@ SQLite con `PRAGMA user_version`. La revisión vigente es la **10** y el esquema
 | Carga | `drivers`, `vehicles`, `loading_schedules` |
 | Stock | `stock_counts` |
 | Masas | `massa_launches` |
+| Salida / Baixa | `salida_movements`, `salida_movement_items`, `salida_photos` |
 | Integración | `aero_movements`, `aero_integration_settings`, `aero_bridge_tickets` |
 | Auditoría y ajustes | `audit_logs`, `settings` |
 
@@ -178,6 +185,7 @@ Revisiones:
 | 8 | Clave de `aero_movements` por asiento y producto |
 | 9 | `massa_launches.ent_lan` |
 | 10 | Cofre del ERP y tickets de un solo uso |
+| 11 | Módulo Salida / Baixa y acción `saida` del puente (el `CHECK` de `aero_bridge_tickets` se reconstruye preservando sus filas) |
 
 El servidor no migra al arrancar. La migración es un paso explícito del operador, solo por `db:migrate`; el
 procedimiento está en [despliegue.md](despliegue.md). `aero_integration_settings` guarda una fila por operador con la
@@ -231,6 +239,18 @@ sequenceDiagram
 2. Cada entrada acumula cajas y recalcula unidades.
 3. Un reset conserva el registro histórico del producto.
 4. El historial muestra solo los productos contados y su resumen colectivo.
+
+### 7.6 Salida / Baixa (beta privada)
+
+1. El operario abre `/salida`; el catálogo llega de `GET /api/salida/catalog` y el día es siempre el de São Paulo.
+2. Activa uno o más bloques, carga enteros en unidades y puede adjuntar hasta tres fotos.
+3. `POST /api/salida` persiste el movimiento en Trindade **antes** de cualquier intento contra el ERP.
+4. Las fotos se suben después; el fallo de una foto no invalida el movimiento.
+5. El puente recibe un ticket `saida` con uno a ocho payloads `PED_*`; con más de ocho productos el frontend
+   trocea en grupos de ocho y deja el resto en el outbox hasta que el operario lo reenvía.
+6. `/salida-history` es solo lectura: `Conferir no ERP` lee `/movimentoitem` con `ENTSAI: 'S'`, guarda el snapshot
+   en `aero_movements` y el backend reconcilia por fecha, código, cantidad y operador.
+7. Todo el módulo, y la acción `saida` del puente, responden `403` a cualquier cuenta que no sea `wilkin`.
 
 ### 7.5 Cofre del ERP y ticket de un solo uso
 

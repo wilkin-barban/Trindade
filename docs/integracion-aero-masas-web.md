@@ -357,7 +357,7 @@ Content-Type: application/json
 | --- | --- | --- |
 | `/usuarios` | `POST` | Prueba de credenciales y obtención del `CODIGO` |
 | `/entradasitem` | `POST` | Entrada de producción (lanzamiento de masas) |
-| `/saidasitem` | `POST` | Baja o consumo de stock (contrato listo, interfaz pendiente) |
+| `/saidasitem` | `POST` | Baja de insumos, embalagens e bobinas desde el módulo Salida / Baixa |
 | `/movimentoitem` | `POST` | Consulta de movimientos por usuario, producto y rango de fechas |
 
 Reglas de payload:
@@ -393,6 +393,13 @@ snapshot del día en `aero_movements` para que cualquier dispositivo la vea sin 
 producción —misma fecha, código, cantidad y operario—, la fila queda conciliada y deja de ofrecer editar y
 eliminar, para cualquier rol. No es una restricción de permisos sino de consistencia: Delphi ya asentó esa entrada.
 El backend rechaza `PUT` y `DELETE` aunque se los pida por fuera de la interfaz.
+
+**Las salidas tienen su propia conciliación.** El módulo Salida / Baixa escribe por `/saidasitem` con prefijo
+`PED_*` y reconcilia contra los asientos `ENTSAI: "S"` del espejo: misma fecha de planta, mismo código sin ceros,
+misma cantidad y mismo operador (username o nombre visible), consumiendo cada asiento una sola vez. Un movimiento
+queda `reconciled` con todos sus ítems conciliados, `partial` con algunos y `pending` sin ninguno; los asientos
+`E` nunca concilian una salida. `Conferir no ERP` es la lectura que llena ese espejo, y el movimiento local no se
+edita ni se borra aunque el ERP lo confirme.
 
 **La importación conserva la identidad del asiento.** `POST /api/massas-launch` acepta `ent_lan`, y el operario
 viaja **por ítem** en `items[].operator_name`: un lote de la tableta puede ser el trabajo de dos personas, y el

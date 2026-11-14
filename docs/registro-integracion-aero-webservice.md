@@ -101,8 +101,8 @@ Respuesta:
 
 ## 5. `POST /saidasitem` — baja o consumo de stock
 
-Mismo mecanismo que `/entradasitem`, pero decrementa stock. El contrato está listo; la interfaz de Trindade para
-dispararlo está pendiente.
+Mismo mecanismo que `/entradasitem`, pero decrementa stock. El módulo Salida / Baixa es la interfaz de Trindade que
+lo dispara, en beta privada para `wilkin`.
 
 ```json
 {
@@ -113,7 +113,7 @@ dispararlo está pendiente.
   "PED_USU": "WILKIN",
   "PED_SER": "APL",
   "PED_DTANOT": "2026-10-28",
-  "PED_OBS": "Saida de massas via Trindade",
+  "PED_OBS": "Saida de insumos via Trindade",
   "LOTES": []
 }
 ```

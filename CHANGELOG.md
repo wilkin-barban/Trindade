@@ -12,6 +12,42 @@ verificaciones está en [docs/release-android-historial.md](docs/release-android
 
 ## [Unreleased]
 
+### Módulo Salida / Baixa (beta privada)
+
+Baja de insumos, embalagens e bobinas desde la web, con histórico propio y conciliación contra los asientos de
+salida del ERP. Visible y usable solo por `wilkin`; la liberación al resto de los roles y Android quedan para
+después de la beta.
+
+#### Añadido
+
+- **Catálogo fijo de 21 productos** servido por `GET /api/salida/catalog`: 13 embalagens, 3 bobinas y 5
+  matéria-prima, en el orden de la planta, con códigos de 4 dígitos en la UI y 6 hacia el ERP. No incluye `1040`
+  y `1673` aparece una sola vez. No hay CRUD ni importación desde la UI.
+- **Endpoints del módulo**: `POST /api/salida` (movimiento único con todos los productos cargados),
+  `GET /api/salida?date=`, `GET /api/salida/history` y las cuatro rutas de fotos opcionales (máximo 3, 5 MB,
+  JPEG/PNG/WebP con verificación de bytes reales). Todo responde `401` sin sesión y `403` a cualquier cuenta que
+  no sea `wilkin`.
+- **Esquema revisión 11**, aditiva: `salida_movements`, `salida_movement_items` y `salida_photos`; el inventario
+  pasa de 20 a 23 tablas. `aero_bridge_tickets` es la única tabla existente que cambia, y solo su `CHECK`, que se
+  reconstruye copiando y contando las filas antes de soltar el original.
+- **Acción `saida` del puente Aero** (`saidasitem`), con uno a ocho payloads por ticket y `bodies` cuando viaja
+  más de uno; `entrada`, `entrada_lote`, `movimentos` y `test` siguen igual. La acción responde `403` a cualquier
+  cuenta que no sea `wilkin`, después de validar y antes de existir el ticket.
+- **Evento de auditoría `salida_sync`**, escrito como par `requested`/`result` con el mismo `attemptId`, sin
+  credenciales ni `Authorization`.
+- **Pantallas `/salida` y `/salida-history`** con los tres bloques de switch independiente, grilla de cantidades
+  enteras, fotos opcionales, resumen sticky en móvil, diálogo de éxito con el veredicto del ERP, chips de día,
+  filtro por bloque, estado `ERP OK`/`Pendente`/`Parcial`, `Conferir no ERP` (`ENTSAI: "S"`), `Reenviar ao ERP`
+  para lo pendiente y compartir por WhatsApp con las fotos cuando el navegador lo permite.
+- **Contrato OpenAPI** regenerado con los nueve endpoints del módulo y los tipos del cliente Android puestos al día
+  (código generado, sin cambios de la app).
+
+#### Cambiado
+
+- **`POST /saidasitem` deja de estar pendiente.** El payload de salida usa `PED_*`, código a 6 dígitos, cantidad
+  ×100, usuario en mayúsculas, serie `APL`, sin `PRO_CST` y sin `PED_DTMOVI`, y la observación es «Saida de
+  insumos via Trindade».
+
 La contraseña del ERP deja de vivir en el navegador. El servidor la guarda cifrada y entrega al iPhone un ticket de
 un solo uso que el script de Scriptable canjea por el sobre del pedido.
 
