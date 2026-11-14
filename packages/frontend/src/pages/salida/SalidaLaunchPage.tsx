@@ -380,21 +380,17 @@ export function SalidaLaunchPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-4 pb-4 sm:space-y-6">
       <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
-        <div className="flex items-start justify-between gap-3">
+        <div
+          data-testid="salida-launch-header"
+          className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
+        >
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">{t('salida.title')}</h1>
-              <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-800">
-                {t('salida.betaBadge')}
-              </span>
-              <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
-                {t('salida.soloWilkin')}
-              </span>
-            </div>
+            <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">{t('salida.title')}</h1>
             <p className="mt-1 text-sm text-gray-500">{t('salida.subtitle')}</p>
           </div>
-          <div className="shrink-0">
+          <div className="flex w-full items-center gap-2 sm:w-auto sm:shrink-0">
             <ModuleHelpModal
+              className="w-full sm:w-auto"
               title={t('moduleHelp.salida.title')}
               subtitle={t('moduleHelp.salida.subtitle')}
               description={t('moduleHelp.salida.description')}

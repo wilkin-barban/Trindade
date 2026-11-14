@@ -205,21 +205,20 @@ describe('SalidaHistoryPage', () => {
     expect(screen.getByTestId('salida-badge-3').textContent).toBe('Parcial');
   });
 
-  it('copies the summary when the platform has no share sheet', async () => {
-    const written: string[] = [];
-    Object.defineProperty(globalThis.navigator, 'share', { configurable: true, value: undefined });
-    Object.defineProperty(globalThis.navigator, 'clipboard', {
-      configurable: true,
-      value: { writeText: async (value: string) => void written.push(value) },
-    });
+  it('hands the movement summary to the share helper from the card action', async () => {
+    // The sheet, the WhatsApp link and the clipboard are the helper's business and are pinned in
+    // `lib/salida-share.test.ts`; what this page owns is that the card hands over the right text.
+    shareSalidaMock.mockClear();
+    shareSalidaMock.mockResolvedValue('shared');
 
     await renderReady();
     fireEvent.click(screen.getByTestId('salida-share-1'));
 
-    await waitFor(() => expect(written.length).toBe(1));
-    expect(written[0]).toContain('13/11/2026');
-    expect(written[0]).toContain('WILKIN');
-    expect(written[0]).toContain('EMBALAG. NHOQUE 1kg');
+    await waitFor(() => expect(shareSalidaMock).toHaveBeenCalledTimes(1));
+    const args = shareSalidaMock.mock.calls[0]![0] as { text: string };
+    expect(args.text).toContain('13/11/2026');
+    expect(args.text).toContain('WILKIN');
+    expect(args.text).toContain('EMBALAG. NHOQUE 1kg');
   });
 
   it('says the ERP could not be read instead of leaving the button spinning', async () => {
@@ -403,5 +402,134 @@ describe('SalidaHistoryPage', () => {
     expect(screen.getByTestId('salida-erp-answer').textContent).toContain('Saida enviada');
     expect(get).toHaveBeenCalledWith('/salida/history');
     expectNoCredential(audit);
+  });
+});
+
+/**
+ * The iPhone remediation: the day can be shared from the filter card, the cards carry a green WhatsApp action,
+ * and the screen stacks its header and its chips instead of squeezing them into two columns at 390 px.
+ *
+ * `shareSalida` is the seam: it is the one function that decides between the share sheet, WhatsApp and the
+ * clipboard, so the page is asserted on what it hands over (text and files) and not on how a browser behaves.
+ */
+const { shareSalidaMock } = vi.hoisted(() => ({
+  shareSalidaMock: vi.fn(async (_args: { text: string; photos?: File[] }) => 'shared' as const),
+}));
+
+vi.mock('../../lib/salida', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/salida')>()),
+  shareSalida: (args: { text: string; photos?: File[] }) => shareSalidaMock(args),
+}));
+
+const WITH_PHOTO = movement({
+  id: 7,
+  photos: [
+    {
+      id: 71,
+      file_path: 'a.jpg',
+      file_size: 10,
+      mime_type: 'image/jpeg',
+      url: '/api/salida/photos/71',
+      publicUrl: 'https://example.test/api/salida/photos/public/aaa',
+      created_at: '2026-11-13T11:00:00.000Z',
+    },
+    {
+      id: 72,
+      file_path: 'b.jpg',
+      file_size: 10,
+      mime_type: 'image/jpeg',
+      url: '/api/salida/photos/72',
+      publicUrl: 'https://example.test/api/salida/photos/public/bbb',
+      created_at: '2026-11-13T11:00:00.000Z',
+    },
+  ],
+});
+
+describe('SalidaHistoryPage — iPhone share and layout', () => {
+  beforeEach(() => {
+    shareSalidaMock.mockClear();
+    shareSalidaMock.mockResolvedValue('shared');
+    globalThis.fetch = (async () => ({
+      ok: true,
+      blob: async () => new Blob([new Uint8Array([1])], { type: 'image/jpeg' }),
+    })) as unknown as typeof fetch;
+  });
+
+  it('keeps the day share visible and disabled when the day has no movements, and says why', async () => {
+    get.mockImplementation(async (url: string) =>
+      url === '/salida/history'
+        ? { days: [{ date: '2026-11-14', total_units: 0, movements: [] }] }
+        : {},
+    );
+
+    await renderReady('/salida-history?date=2026-11-14');
+
+    const button = screen.getByTestId('salida-share-day');
+    expect(button).toBeDisabled();
+    expect(screen.getByTestId('salida-share-day-empty').textContent).toBe(
+      i18n.t('salida.shareDayEmpty'),
+    );
+  });
+
+  it('shares the day with its summary and every photo of the visible movements', async () => {
+    get.mockImplementation(async (url: string) =>
+      url === '/salida/history'
+        ? { days: [{ date: '2026-11-13', total_units: 23, movements: [RECONCILED, WITH_PHOTO] }] }
+        : {},
+    );
+
+    await renderReady('/salida-history?date=2026-11-13');
+    fireEvent.click(screen.getByTestId('salida-share-day'));
+
+    await waitFor(() => expect(shareSalidaMock).toHaveBeenCalledTimes(1));
+    const args = shareSalidaMock.mock.calls[0]![0];
+    expect(args.text).toContain('Movimientos: 2');
+    expect(args.text).toContain('EMBALAG. NHOQUE 1kg');
+    expect(args.text).toContain('Total: 40 un');
+    expect(args.photos?.length).toBe(2);
+    expect(args.photos?.[0]).toBeInstanceOf(File);
+  });
+
+  it('shares one movement with its own photos from the green card action', async () => {
+    get.mockImplementation(async (url: string) =>
+      url === '/salida/history'
+        ? { days: [{ date: '2026-11-13', total_units: 20, movements: [WITH_PHOTO] }] }
+        : {},
+    );
+
+    await renderReady('/salida-history?date=2026-11-13');
+    const button = screen.getByTestId('salida-share-7');
+    expect(button.textContent).toContain(i18n.t('salida.shareWhatsApp'));
+    fireEvent.click(button);
+
+    await waitFor(() => expect(shareSalidaMock).toHaveBeenCalledTimes(1));
+    const args = shareSalidaMock.mock.calls[0]![0];
+    expect(args.text).toContain('EMBALAG. NHOQUE 1kg');
+    expect(args.photos?.length).toBe(2);
+  });
+
+  it('replaces the bare empty paragraph with an icon, a sentence and a launch action', async () => {
+    get.mockImplementation(async (url: string) =>
+      url === '/salida/history'
+        ? { days: [{ date: '2026-11-14', total_units: 0, movements: [] }] }
+        : {},
+    );
+
+    await renderReady('/salida-history?date=2026-11-14');
+
+    expect(screen.getByTestId('salida-history-empty')).toBeInTheDocument();
+    expect(screen.getByTestId('salida-empty-title').textContent).toBe(i18n.t('salida.historyEmptyTitle'));
+    expect(screen.getByTestId('salida-empty-cta').textContent).toContain(i18n.t('salida.launch'));
+  });
+
+  it('stacks the header and lays the chips out 2x2 on a phone', async () => {
+    await renderReady();
+
+    expect(screen.getByTestId('salida-history-header').className).toContain('flex-col');
+    expect(screen.getByTestId('salida-history-header').className).toContain('sm:flex-row');
+    expect(screen.getByTestId('salida-block-filter').className).toContain('grid-cols-2');
+    expect(screen.getByTestId('salida-block-filter').className).toContain('sm:flex');
+    expect(screen.getByTestId('salida-history-actions').className).toContain('grid');
+    expect(screen.getByTestId('salida-history-actions').className).toContain('sm:flex');
   });
 });

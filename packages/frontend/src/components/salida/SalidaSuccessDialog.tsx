@@ -10,6 +10,7 @@ import {
   salidaQuantity,
   salidaSummaryText,
   salidaTotalUnits,
+  salidaPhotoFiles,
   shareSalida,
   type SalidaBlock,
   type SalidaMovement,
@@ -79,20 +80,7 @@ export function SalidaSuccessDialog({
    * They are downloaded from the record's own paths, never from a URL this page invented: a photo that cannot be
    * fetched is simply left out, and the same photo stays available as its own link under the grid.
    */
-  async function photoFiles(): Promise<File[]> {
-    const files: File[] = [];
-    for (const photo of movement?.photos ?? []) {
-      try {
-        const response = await fetch(photo.publicUrl || photo.url);
-        if (!response.ok) continue;
-        const blob = await response.blob();
-        files.push(new File([blob], `salida-${photo.id}.jpg`, { type: photo.mime_type || blob.type }));
-      } catch {
-        /* one unreadable photo is not a reason to lose the summary */
-      }
-    }
-    return files;
-  }
+
 
   const handleCopy = async () => {
     if (!text) return;
@@ -103,7 +91,7 @@ export function SalidaSuccessDialog({
   const handleShare = async () => {
     if (!text) return;
     setNote('');
-    const outcome = await shareSalida({ text, photos: await photoFiles() });
+    const outcome = await shareSalida({ text, photos: await salidaPhotoFiles(movement?.photos ?? []) });
     // A sheet that cannot carry files is not a failure: the text was copied instead, and the photos stay as
     // their own links under the summary.
     if (outcome === 'copied' || outcome === 'shared') setNote(t('salida.copiedSummary'));

@@ -15,7 +15,7 @@ import { saoPauloToday, formatDateLabel } from './date';
 import { AERO_BATCH_MAX } from './aero-batch';
 import { buildSaidaItemPayload, type AeroSaidaPayload, type StorageLike } from './aero-integration';
 import type { AeroAuditEvent } from './aero-audit';
-import { shareOrCopy, type ShareOutcome } from './whatsapp';
+import type { ShareOutcome } from './whatsapp';
 
 // ---- Catalogue (S1) ----
 
@@ -384,12 +384,133 @@ export function salidaSummaryText(
   return lines.join('\n').trimEnd();
 }
 
+/** The labels a day summary needs; the page passes its dictionary, the module invents none. */
+export interface SalidaDaySummaryLabels {
+  title: string;
+  movements: string;
+  total: string;
+  operator: string;
+  blocks: Record<SalidaBlock, string>;
+  status: Record<'reconciled' | 'partial' | 'pending', string>;
+}
+
+/** One movement as the day summary reads it: what left, who launched it and what the company answered. */
+export type SalidaDayShareMovement = Pick<
+  SalidaMovement,
+  'movement_date' | 'username' | 'display_name' | 'items' | 'reconciliation'
+>;
+
+function productsOf(items: SalidaDayShareMovement['items'], labels: Record<SalidaBlock, string>): string[] {
+  const grouped = salidaProductsByBlock(
+    items.map((item) => ({ code: item.product_code, name: item.product_name, block: item.block })),
+  );
+  const quantities = new Map(items.map((item) => [item.product_code, item.quantity]));
+  const lines: string[] = [];
+  for (const block of SALIDA_BLOCKS) {
+    const products = grouped[block];
+    if (products.length === 0) continue;
+    lines.push(`*${labels[block]}*`);
+    for (const product of products) {
+      lines.push(`• ${product.code} ${product.name} — ${salidaQuantity(quantities.get(product.code))} un`);
+    }
+  }
+  return lines;
+}
+
+/**
+ * The whole day in one message: the date, how many movements it holds, each of them with its operator, its
+ * blocks, its products and its state, and the total units at the end.
+ *
+ * The total is computed from the items and not from a field: the day summary is the operator's account of what
+ * left, and a total that disagrees with the lines below it is worse than no total.
+ */
+export function salidaDaySummaryText(
+  movements: readonly SalidaDayShareMovement[],
+  args: { date: string; labels: SalidaDaySummaryLabels },
+): string {
+  const { labels } = args;
+  const lines: string[] = [];
+  lines.push(`*${labels.title} — ${formatDateLabel(args.date)}*`);
+  lines.push(`${labels.movements}: ${movements.length}`);
+  lines.push('');
+
+  let total = 0;
+  movements.forEach((movement, index) => {
+    const units = movement.items.reduce((sum, item) => sum + salidaQuantity(item.quantity), 0);
+    total += units;
+    lines.push(`*${index + 1}. ${String(movement.username ?? '').toUpperCase()} — ${units} un*`);
+    lines.push(`${labels.operator}: ${String(movement.display_name ?? movement.username ?? '')}`);
+    lines.push(...productsOf(movement.items, labels.blocks));
+    const status = salidaReconciliationStatus({ reconciliation: movement.reconciliation });
+    const entLans = salidaEntLans({ reconciliation: movement.reconciliation });
+    const suffix = entLans.length > 0 ? ` (ENT_LAN ${entLans.join(', ')})` : '';
+    lines.push(`*${labels.status[status]}*${suffix}`);
+    lines.push('');
+  });
+
+  lines.push(`${labels.total}: ${total} un`);
+  return lines.join('\n').trimEnd();
+}
+
+/** A photo the record keeps, in the two links the module already serves. */
+export interface SalidaShareablePhoto {
+  id: number;
+  mime_type?: string | null;
+  url?: string | null;
+  publicUrl?: string | null;
+}
+
+/**
+ * The record's photos as files the share sheet can carry.
+ *
+ * A photo that cannot be fetched is left out instead of failing the share: the summary is the message, and the
+ * grid under it still offers every photo on its own. The name is derived from the id so two photos of the same
+ * movement never collide in the sheet.
+ */
+export async function salidaPhotoFiles(photos: readonly SalidaShareablePhoto[]): Promise<File[]> {
+  const files: File[] = [];
+  for (const photo of photos) {
+    const url = photo.publicUrl || photo.url;
+    if (!url) continue;
+    try {
+      const response = await fetch(url);
+      if (!response.ok) continue;
+      const blob = await response.blob();
+      const type = photo.mime_type || blob.type || 'image/jpeg';
+      const extension = type === 'image/png' ? 'png' : type === 'image/webp' ? 'webp' : 'jpg';
+      files.push(new File([blob], `salida-${photo.id}.${extension}`, { type }));
+    } catch {
+      /* one unreadable photo is not a reason to lose the summary */
+    }
+  }
+  return files;
+}
+
 /**
  * Shares the summary, with the photos when the platform can take files.
  *
  * A sheet that cannot carry files is not a reason to lose the summary: the text is copied instead, and the
  * screen keeps every photo downloadable on its own, which is the fallback S12 asks for.
  */
+/** WhatsApp's canonical endpoint with no number: the channel the plant forwards to, chosen by the operator. */
+export const SALIDA_WHATSAPP_ENDPOINT = 'https://api.whatsapp.com/send?text=';
+
+/**
+ * Opens WhatsApp in a new tab with the text, and answers whether a tab was actually opened.
+ *
+ * A blocked popup returns `null` (or throws), and a `null` here is the signal that the text still has to go
+ * somewhere: the caller copies it instead of leaving the operator with a button that did nothing.
+ */
+function openWhatsApp(text: string): boolean {
+  const windowLike = (globalThis as { window?: { open?: (url: string, target?: string) => unknown } }).window;
+  if (typeof windowLike?.open !== 'function') return false;
+  try {
+    return Boolean(windowLike.open(`${SALIDA_WHATSAPP_ENDPOINT}${encodeURIComponent(text)}`, '_blank'));
+  } catch {
+    return false;
+  }
+}
+
 export async function shareSalida(args: {
   text: string;
   photos?: readonly File[];
@@ -410,7 +531,27 @@ export async function shareSalida(args: {
     }
   }
 
-  return shareOrCopy(args.text);
+  if (typeof navigatorLike?.share === 'function') {
+    try {
+      await navigatorLike.share({ text: args.text });
+      return 'shared';
+    } catch (error) {
+      if ((error as { name?: string } | null)?.name === 'AbortError') return 'cancelled';
+    }
+  }
+
+  // No sheet, or a sheet that refused the text: WhatsApp is where the plant sends it, and the link is the only
+  // way to hand a message to that app from a desktop browser.
+  if (openWhatsApp(args.text)) return 'shared';
+
+  const clipboard = navigatorLike?.clipboard;
+  if (!clipboard) return 'failed';
+  try {
+    await clipboard.writeText(args.text);
+    return 'copied';
+  } catch {
+    return 'failed';
+  }
 }
 
 // ---- Write order (S6) ----
