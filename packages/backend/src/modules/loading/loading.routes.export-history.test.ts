@@ -23,6 +23,19 @@ function dateIn(days: number): string {
   return shift(getSaoPauloDateString(), days);
 }
 
+/**
+ * The day a batch actually loads, which is not always the day after it is scheduled.
+ *
+ * A Friday batch loads on Friday itself; every other day loads the next morning. That rule lives in the history
+ * endpoint's SQL (`strftime('%w', ls.schedule_date)`), and the fixture below used to assume `+1` for every
+ * weekday: it went red on any run where its computed day -- today plus twenty -- landed on a Friday, which is a
+ * property of the calendar and not of the code under test. The two branches are stated here, once, instead of
+ * being baked into one assertion.
+ */
+function loadingDayOf(batchDate: string): string {
+  return new Date(`${batchDate}T12:00:00Z`).getUTCDay() === 5 ? batchDate : shift(batchDate, 1);
+}
+
 /** The next future date that falls on `weekday` (0 = Sunday), never today. */
 function nextWeekday(weekday: number): string {
   const today = getSaoPauloDateString();
@@ -192,7 +205,7 @@ describe('Loading Schedule Routes', () => {
     assert.strictEqual(body.pagination.total, 1);
     assert.strictEqual(body.items.length, 1);
     assert.strictEqual(body.items[0].batch_date, historyDay);
-    assert.strictEqual(body.items[0].loading_date, shift(historyDay, 1));
+    assert.strictEqual(body.items[0].loading_date, loadingDayOf(historyDay));
     assert.strictEqual(body.items[0].total_loadings, 2);
     assert.strictEqual(body.items[0].creator.id, 1);
     assert.strictEqual(body.items[0].canEdit, true);
