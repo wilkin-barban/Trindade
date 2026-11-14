@@ -67,7 +67,7 @@
     "dashboard": "Panel de Control",
     "future": "Futuro",
     "loadingHistory": "Historial de Cargamento",
-    "loadingSchedule": "Cronograma de Carga",
+    "loadingSchedule": "Horario de Cargamento",
     "massasLaunch": "Lanzamiento de Masas",
     "massasHistory": "Historial de Masas",
     "menu": "Menú",
@@ -196,7 +196,7 @@
   },
   "loading": {
     "vehiclesError": "No se pudieron cargar los vehículos.",
-    "title": "Cronograma de Carga",
+    "title": "Horario de Cargamento",
     "description": "Organice las cargas del día por horario",
     "today": "Hoy",
     "previous": "Anterior",
@@ -849,7 +849,7 @@
       ]
     },
     "loading": {
-      "title": "Cronograma de Carga",
+      "title": "Horario de Cargamento",
       "subtitle": "Programación de salidas de camiones",
       "description": "Organización del despacho de mercadería por chofer, vehículo y horario de salida.",
       "sections": [

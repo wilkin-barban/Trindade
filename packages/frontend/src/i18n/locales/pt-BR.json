@@ -67,7 +67,7 @@
     "dashboard": "Dashboard",
     "future": "Futuro",
     "loadingHistory": "Histórico de Carregamento",
-    "loadingSchedule": "Cronograma de Carregamento",
+    "loadingSchedule": "Horário de Carregamento",
     "massasLaunch": "Lançamento de Massas",
     "massasHistory": "Histórico de Massas",
     "menu": "Menu",
@@ -196,7 +196,7 @@
   },
   "loading": {
     "vehiclesError": "Não foi possível carregar os veículos.",
-    "title": "Cronograma de Carregamento",
+    "title": "Horário de Carregamento",
     "description": "Organize os carregamentos do dia por horário",
     "today": "Hoje",
     "previous": "Anterior",
@@ -849,7 +849,7 @@
       ]
     },
     "loading": {
-      "title": "Cronograma de Carregamento",
+      "title": "Horário de Carregamento",
       "subtitle": "Programação de saídas dos caminhões",
       "description": "Planejamento das saídas e carregamento de mercadorias por motorista, veículo e faixa horária.",
       "sections": [

@@ -173,6 +173,6 @@ test.describe('Loading History — Filters and pagination', () => {
   test('back button links to the loading schedule', async ({ page }) => {
     await page.locator('[data-testid="back-to-schedule-link"]').click();
     await page.waitForURL(/\/loading$/);
-    await expect(page.getByRole('heading', { name: /Cronograma de Carregamento|Cronograma de Carga/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Horário de Carregamento|Horario de Cargamento/ })).toBeVisible();
   });
 });
