@@ -145,7 +145,8 @@ fecha y por movimiento.
   puede ejecutar en este host (Ubuntu 26.04 sin Chromium soportado, ver L7); corre en el lane de CI sobre
   ubuntu-24.04. Ruta: inline + verificador.
 - T11 — hecho, commit `d3b33462`: CHANGELOG, arquitectura, integración y guía de agentes.
-- T12 — pendiente: build, `docker compose up -d --build`, salud y evidencia.
+- T12 — hecho, ver L8: build, backup aprobado, migración 10→11, contenedores sanos, aviso de esquema
+  `current` y guarda `401` verificada contra producción.
 
 ## Invariantes
 ## Log
@@ -290,3 +291,27 @@ L7 — e2e de navegador: no se puede ejecutar en este host (preexistente, no del
   del módulo: **no se ejecutó ningún test**, así que el resultado no dice nada sobre el código nuevo. La cobertura
   de la UI de salida queda en los 696 tests node y los 164 de vitest, que sí corren en este host, y en el lane de
   CI, que corre sobre el sistema soportado.
+
+L8 — despliegue a producción y verificación de salud.
+
+  Build de `api` y `web` (`docker compose build`), conjunto de recuperación aprobado
+  `backups/recovery-20261114T023048Z` (`Set ID 0ff632af…`, snapshot 917504 bytes, `935…`, prueba aislada
+  `integrity: ok`, 20 tablas y 178 asientos de ERP, 1 ticket y 12 usuarios conservados; `APPROVED FOR ROLLBACK
+  BASELINE`), estado previo `revision 10 / 20 tablas / outdated`, migración `10 → 11` y estado posterior
+  `revision 11 / 23 tablas / current`.
+
+  Incidente del primer intento: el mismo comando de migración salió con código 1 y **sin ninguna línea de salida**
+  dentro del job, con la API ya detenida. La base quedó intacta en revisión 10 (`status` lo confirmó) y la
+  re-ejecución del comando, idéntica, migró limpia e imprimió los dos estados. No hubo escritura parcial: las
+  migraciones corren en transacciones `immediate` y el runner clasifica antes de abrir en escritura. La API estuvo
+  detenida unos tres minutos.
+
+  Verificación posterior:
+  - `docker compose ps`: `trindade-api-1` y `trindade-web-1` `Up (healthy)` (127.0.0.1:3005 y :8085).
+  - Aviso de esquema al arrancar: `level=30`, `verdict=current`, `revision=11`, `supportedRevision=11`,
+    `integrity=ok`, `tables=23`, sin faltantes ni sobrantes.
+  - `aero_bridge_tickets` conserva su única fila y su DDL ya admite `saida`; `quick_check: ok`.
+  - `GET /api/health` → `{"status":"ok"}`.
+  - `GET /api/salida/catalog` sin sesión → `401` (la guarda responde antes de tocar la base).
+  - El bundle publicado contiene los chunks `SalidaLaunchPage`, `SalidaHistoryPage` y `SalidaSuccessDialog`, y
+    `/salida` se sirve con `200` (la SPA redirige a `/dashboard` a quien no sea `wilkin`).
