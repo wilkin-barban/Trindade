@@ -171,6 +171,19 @@ describe('SalidaHistoryPage', () => {
     expect(screen.getByTestId('salida-badge-2').textContent).toBe('Pendente');
   });
 
+  it('hides the code and the per-item block, and keeps the code in the accessible name', async () => {
+    await renderReady();
+
+    const item = screen.getByTestId('salida-item-10');
+    expect(item.textContent).toContain('EMBALAG. NHOQUE 1kg');
+    // The code is traceability and the block already names the header: neither earns a slot on the phone.
+    expect(item.textContent).not.toContain('1474');
+    expect(item.textContent).not.toContain(i18n.t('salida.blocks.embalagens'));
+    expect(item.querySelector('[aria-label*="1474"]')).not.toBeNull();
+    // The block is still named once, in the header of the card.
+    expect(screen.getByTestId('salida-movement-1').textContent).toContain(i18n.t('salida.blocks.embalagens'));
+  });
+
   it('offers Reenviar ao ERP only for a movement the ERP has not confirmed', async () => {
     await renderReady();
 

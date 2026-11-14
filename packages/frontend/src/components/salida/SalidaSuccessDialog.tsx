@@ -146,8 +146,12 @@ export function SalidaSuccessDialog({
                       );
                       return (
                         <li key={product.code} className="flex items-baseline justify-between gap-3 text-sm">
-                          <span className="min-w-0 break-words text-gray-800">
-                            <span className="font-mono text-xs text-gray-500">{product.code}</span>{' '}
+                          {/* The record says name + quantity; the code stays in the accessible name and in the
+                              summary that goes out over WhatsApp. */}
+                          <span
+                            className="min-w-0 break-words text-gray-800"
+                            aria-label={`${product.code} ${product.name}`}
+                          >
                             {product.name}
                           </span>
                           <span className="shrink-0 font-semibold tabular-nums text-gray-900">

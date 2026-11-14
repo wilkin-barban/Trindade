@@ -170,6 +170,19 @@ describe('SalidaLaunchPage', () => {
     expect(screen.queryByTestId('salida-history-date')).toBeNull();
   });
 
+  it('hides the product code in the row and keeps it in the accessible name', async () => {
+    await renderReady();
+
+    const row = screen.getByTestId('salida-product-1474');
+    // The row reads name + quantity: the code is traceability, not something the operator has to read.
+    expect(row.textContent).toContain('EMBALAG. NHOQUE 1kg');
+    expect(row.textContent).not.toContain('1474');
+
+    // It is still there for a screen reader, for the tests and for the payload that leaves.
+    expect(row.getAttribute('data-testid')).toContain('1474');
+    expect(screen.getByTestId('salida-quantity-1474').getAttribute('aria-label')).toContain('1474');
+  });
+
   it('clears the quantities of a block that is switched off', async () => {
     await renderReady();
 
@@ -420,6 +433,19 @@ describe('SalidaLaunchPage', () => {
 
     await waitFor(() => expect(written.length).toBe(1));
     expect(written[0]).toContain('1474 EMBALAG. NHOQUE 1kg — 20 un');
+  });
+
+  it('hides the product code in the success dialog and keeps it readable for a screen reader', async () => {
+    writeSalidaLastMovement(MOVEMENT);
+    const data = encodeURIComponent(JSON.stringify({ success: true, message: 'Saidas enviadas' }));
+
+    await renderReady(`/salida?aero_action=saida&aero_data=${data}`);
+    const dialog = await screen.findByTestId('salida-success-dialog');
+
+    expect(dialog.textContent).toContain('EMBALAG. NHOQUE 1kg');
+    expect(dialog.textContent).not.toContain('1474');
+    // The code survives where it is read, not where it is drawn.
+    expect(dialog.querySelector('[aria-label*="1474"]')).not.toBeNull();
   });
 
   it('falls back to the fixed catalogue when the server does not answer', async () => {

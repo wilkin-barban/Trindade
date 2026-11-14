@@ -87,9 +87,14 @@ export function SalidaMovementCard({
               className="flex items-baseline justify-between gap-3 text-sm"
               data-testid={`salida-item-${item.id}`}
             >
-              <span className="min-w-0 break-words text-gray-800">
-                <span className="font-mono text-xs text-gray-500">{item.product_code}</span> {item.product_name}
-                <span className="ml-1 text-[11px] text-gray-400">{label(item.block)}</span>
+              {/* Name and quantity, one row. The code and the block used to ride along in front of the name;
+                  the block is already named in the header of the card, and the code stays where it is read
+                  instead of where it is drawn. */}
+              <span
+                className="min-w-0 break-words text-gray-800"
+                aria-label={`${item.product_code} ${item.product_name}`}
+              >
+                {item.product_name}
               </span>
               <span className="shrink-0 font-semibold tabular-nums text-gray-900">
                 {salidaQuantity(item.quantity)} {t('salida.unitsShort')}

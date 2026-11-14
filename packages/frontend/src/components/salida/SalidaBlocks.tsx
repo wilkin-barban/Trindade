@@ -52,7 +52,13 @@ export function SalidaBlockSwitch({
   );
 }
 
-/** One product of a block: its code, its fixed Portuguese name, and the units that leave. */
+/**
+ * One product of a block: its fixed Portuguese name and the units that leave.
+ *
+ * The catalogue code is not drawn any more. On a phone it was the widest thing in the row and the operator
+ * never typed it: it stays in the accessible name and in the test id, and it travels in the message and in
+ * the ERP payload, so nothing is lost by hiding it as text.
+ */
 export function SalidaProductRow({
   product,
   value,
@@ -71,15 +77,10 @@ export function SalidaProductRow({
       }`}
       data-testid={`salida-product-${product.code}`}
     >
+      {/* The name takes the free width and keeps the field on the same row: the code used to sit in front of
+          it and the pair did not fit a 390 px screen without wrapping. */}
       <div className="min-w-0 flex-1">
-        <div className="flex items-baseline gap-2">
-          <span className="shrink-0 font-mono text-xs font-semibold tabular-nums text-gray-500">
-            {product.code}
-          </span>
-          <span className="min-w-0 break-words text-xs font-bold leading-snug text-gray-800">
-            {product.name}
-          </span>
-        </div>
+        <span className="block break-words text-xs font-bold leading-snug text-gray-800">{product.name}</span>
       </div>
       <div className="flex shrink-0 items-center gap-1.5">
         <Input
