@@ -62,6 +62,13 @@ test.describe('Report Builder — Element Types', () => {
     await expect(page.locator('[data-testid="check-task-3"]')).toBeVisible();
     await expect(page.locator('[data-testid="check-task-4"]')).toBeVisible();
   });
+  test('does not ask the Quadrada checklist in Caixas Assai but keeps the small-box one', async ({ page }) => {
+    // The seed carries the same task name in both box categories: 60 in Caixas pequenas, 66 in Caixas Assai.
+    // The plant counts it in the small boxes only, so the builder must not offer the Assaí one.
+    await expect(page.locator('[data-testid="check-task-60"]')).toBeVisible();
+    await expect(page.locator('[data-testid="check-task-66"]')).toHaveCount(0);
+  });
+
   test('renders temperature tasks with numeric inputs', async ({ page }) => {
     // Temperature tasks: task IDs 5 (Câmara Principal), 6 (Câmara Resfriamento)
     const temp5 = page.locator('[data-testid="temperature-task-5"]');

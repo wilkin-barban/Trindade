@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, useCallback, type FormEvent } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { LucideArrowLeft, LucideTrash2, LucideUpload, LucideImage } from 'lucide-react';
@@ -15,6 +15,7 @@ import {
 import { toggleBoxType } from '../lib/report-box-types';
 import { reportItems } from '../lib/report-items';
 import { readReportProducts, type ReportProducts } from '../lib/report-products';
+import { visibleReportCategories } from '../lib/report-categories';
 import { ReceiptsSection } from '../components/reports/ReceiptsSection';
 import { ERP_RECEIPT_CATEGORY_ID, usesErpReceipts } from '../lib/receipts';
 
@@ -82,6 +83,9 @@ export function ReportEditPage() {
 
   const [report, setReport] = useState<ReportDetail | null>(null);
   const [categories, setCategories] = useState<CategoryType[]>([]);
+  // The list the form draws. `categories` stays raw because the payload is built from it: a report that already
+  // answered the Quadrada task keeps that row when it is saved again, even though the question is not asked here.
+  const visibleCategories = useMemo(() => visibleReportCategories(categories), [categories]);
   // The offer the server keeps; null means it could not be read, and the product blocks say so.
   const [products, setProducts] = useState<ReportProducts | null>(null);
   const [turno, setTurno] = useState<'tarde' | 'noite'>('tarde');
@@ -453,7 +457,7 @@ export function ReportEditPage() {
         </Card>
 
         {/* Category sections */}
-        {categories.filter((cat) => !cat.parent_category_id).map((cat) => (
+        {visibleCategories.filter((cat) => !cat.parent_category_id).map((cat) => (
           <Card key={cat.id} className="mb-6">
             <CardContent className="pt-6">
               {cat.id === ERP_RECEIPT_CATEGORY_ID && usesErpReceipts(report?.report_date ?? '') ? (
@@ -464,7 +468,7 @@ export function ReportEditPage() {
                 <>
                   <ReceiptsSection date={report?.report_date ?? ''} readOnly />
                   <BoxTypeList
-                    childrenCategories={categories.filter((child) => child.parent_category_id === cat.id)}
+                    childrenCategories={visibleCategories.filter((child) => child.parent_category_id === cat.id)}
                     products={products}
                     form={form}
                     onItemChange={handleItemChange}
@@ -478,7 +482,7 @@ export function ReportEditPage() {
               ) : (
                 <CategorySection
                   category={cat}
-                  children={categories.filter((child) => child.parent_category_id === cat.id)}
+                  children={visibleCategories.filter((child) => child.parent_category_id === cat.id)}
                   products={products}
                   form={form}
                   onItemChange={handleItemChange}

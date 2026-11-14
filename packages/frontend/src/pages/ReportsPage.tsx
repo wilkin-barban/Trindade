@@ -16,6 +16,7 @@ import {
 import { toggleBoxType } from '../lib/report-box-types';
 import { reportItems } from '../lib/report-items';
 import { readReportProducts, type ReportProducts } from '../lib/report-products';
+import { visibleReportCategories } from '../lib/report-categories';
 import { ReceiptsSection } from '../components/reports/ReceiptsSection';
 import { hasTemperatureTasks } from '../lib/report-sections';
 import { MassasReportSection } from '../components/reports/MassasReportSection';
@@ -149,7 +150,9 @@ export function ReportsPage() {
 
         if (cancelled) return;
 
-        setCategories(catData.categories);
+        // Quadrada is a Cajas pequeñas question; Cajas Assaí does not ask it. The filter is this web's rule and
+        // the API keeps answering both tasks.
+        setCategories(visibleReportCategories(catData.categories));
         setTurno(turnoData.turno as 'tarde' | 'noite');
         setProducts(readReportProducts(productData));
       } catch (err) {

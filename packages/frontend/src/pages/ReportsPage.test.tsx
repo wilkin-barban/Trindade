@@ -52,6 +52,10 @@ const CATEGORIES: CategoryType[] = [
   { id: 41, parent_category_id: 4, name_pt: 'Recebimento de congelados', name_es: 'Recepción de congelados', sort_order: 5, tasks: [task(410, 41, 'Conferência do congelado')] },
   { id: 3, parent_category_id: null, name_pt: 'Caixas', name_es: 'Cajas', sort_order: 3, tasks: [{ ...task(61, 3, 'Montagem Assai'), task_type: 'check_assai' as const }] },
   { id: 5, parent_category_id: null, name_pt: 'Caixas pequenas', name_es: 'Cajas pequeñas', sort_order: 6, tasks: [{ ...task(62, 5, 'Montagem Normal'), task_type: 'check_normal' as const }] },
+  // The two box checklists the plant answers by hand: small boxes keep their Quadrada task, Assaí does not
+  // ask it. The server answers both; the rule is this screen's, and it is pinned below.
+  { id: 9, parent_category_id: null, name_pt: 'Caixas pequenas', name_es: 'Cajas pequeñas', sort_order: 7, tasks: [{ ...task(60, 9, 'Quadrada') }] },
+  { id: 10, parent_category_id: null, name_pt: 'Caixas Assai', name_es: 'Cajas Assai', sort_order: 8, tasks: [{ ...task(66, 10, 'Quadrada') }, task(67, 10, 'Nhoque Kg')] },
 ];
 
 function renderPage() {
@@ -106,6 +110,15 @@ describe('ReportsPage — sections', () => {
     expect(screen.queryByTestId('product-task-61-Quadrada')).not.toBeInTheDocument();
     expect(screen.getByTestId('product-task-62-Quadrada')).toBeInTheDocument();
     expect(screen.getByTestId('product-task-62-Nhoque 400g')).toBeInTheDocument();
+  });
+
+  it('does not ask the Quadrada checklist in Cajas Assaí but keeps it in Cajas pequeñas', async () => {
+    renderPage();
+
+    // Task 66 is the Assaí checklist answer: it must not be a question of this form.
+    await screen.findByTestId('check-task-67');
+    expect(screen.queryByTestId('check-task-66')).not.toBeInTheDocument();
+    expect(screen.getByTestId('check-task-60')).toBeInTheDocument();
   });
 
   it('keeps the form and says so when the product offer cannot be read', async () => {

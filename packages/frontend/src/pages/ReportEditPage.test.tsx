@@ -117,6 +117,29 @@ describe('ReportEditPage — the body it saves', () => {
     expect(body.items.some((item) => item.taskId === 5)).toBe(false);
   });
 
+  it('does not ask the Quadrada checklist in Cajas Assaí but keeps the small-box one', async () => {
+    get.mockImplementation(async (url: string) => {
+      if (url === '/reports/7') return { report: REPORT };
+      if (url === '/reports/categories') {
+        return {
+          categories: [
+            ...CATEGORIES,
+            { id: 9, parent_category_id: null, name_pt: 'Caixas pequenas', name_es: 'Cajas pequeñas', sort_order: 7, tasks: [task(60, 9, 'check', 'Quadrada')] },
+            { id: 10, parent_category_id: null, name_pt: 'Caixas Assai', name_es: 'Cajas Assai', sort_order: 8, tasks: [task(66, 10, 'check', 'Quadrada'), task(67, 10, 'check', 'Nhoque Kg')] },
+          ],
+        };
+      }
+      if (url.endsWith('/photos')) return { photos: [] };
+      if (url === '/reports/products') return { assai: ['Nhoque Kg'], normal: ['Nhoque 400g'] };
+      return {};
+    });
+    renderPage();
+
+    expect(await screen.findByTestId('check-task-67')).toBeInTheDocument();
+    expect(screen.queryByTestId('check-task-66')).not.toBeInTheDocument();
+    expect(screen.getByTestId('check-task-60')).toBeInTheDocument();
+  });
+
   it('offers the product boxes the server answered when editing', async () => {
     const withProducts = {
       ...REPORT,
