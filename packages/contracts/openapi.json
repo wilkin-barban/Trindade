@@ -2111,7 +2111,8 @@
               "sync",
               "test",
               "import",
-              "queue_rejected"
+              "queue_rejected",
+              "salida_sync"
             ]
           },
           "phase": {
@@ -2284,6 +2285,7 @@
             "enum": [
               "entrada",
               "entrada_lote",
+              "saida",
               "movimentos",
               "test"
             ]
@@ -5366,6 +5368,951 @@
           "page",
           "limit",
           "totalPages"
+        ],
+        "additionalProperties": false
+      },
+      "SalidaProduct": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "block": {
+            "type": "string",
+            "enum": [
+              "embalagens",
+              "bobinas",
+              "materia-prima"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "block"
+        ],
+        "additionalProperties": false
+      },
+      "SalidaCatalogResponse": {
+        "type": "object",
+        "properties": {
+          "products": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "block": {
+                  "type": "string",
+                  "enum": [
+                    "embalagens",
+                    "bobinas",
+                    "materia-prima"
+                  ]
+                }
+              },
+              "required": [
+                "code",
+                "name",
+                "block"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "products"
+        ],
+        "additionalProperties": false
+      },
+      "SalidaItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "product_code": {
+            "type": "string"
+          },
+          "product_name": {
+            "type": "string"
+          },
+          "block": {
+            "type": "string",
+            "enum": [
+              "embalagens",
+              "bobinas",
+              "materia-prima"
+            ]
+          },
+          "quantity": {
+            "type": "integer"
+          },
+          "position": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "product_code",
+          "product_name",
+          "block",
+          "quantity",
+          "position"
+        ],
+        "additionalProperties": false
+      },
+      "SalidaPhoto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "file_path": {
+            "type": "string"
+          },
+          "file_size": {
+            "type": "integer"
+          },
+          "mime_type": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "publicUrl": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "file_path",
+          "file_size",
+          "mime_type",
+          "url",
+          "publicUrl",
+          "created_at"
+        ],
+        "additionalProperties": false
+      },
+      "SalidaReconciliation": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "reconciled",
+              "partial",
+              "pending"
+            ]
+          },
+          "ent_lans": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "matched_item_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          }
+        },
+        "required": [
+          "status",
+          "ent_lans",
+          "matched_item_ids"
+        ],
+        "additionalProperties": false
+      },
+      "SalidaMovement": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "movement_date": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "integer"
+          },
+          "username": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "product_code": {
+                  "type": "string"
+                },
+                "product_name": {
+                  "type": "string"
+                },
+                "block": {
+                  "type": "string",
+                  "enum": [
+                    "embalagens",
+                    "bobinas",
+                    "materia-prima"
+                  ]
+                },
+                "quantity": {
+                  "type": "integer"
+                },
+                "position": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "product_code",
+                "product_name",
+                "block",
+                "quantity",
+                "position"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "photos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "file_path": {
+                  "type": "string"
+                },
+                "file_size": {
+                  "type": "integer"
+                },
+                "mime_type": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "publicUrl": {
+                  "type": "string"
+                },
+                "created_at": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "file_path",
+                "file_size",
+                "mime_type",
+                "url",
+                "publicUrl",
+                "created_at"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "total_units": {
+            "type": "integer"
+          },
+          "reconciliation": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "reconciled",
+                  "partial",
+                  "pending"
+                ]
+              },
+              "ent_lans": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                }
+              },
+              "matched_item_ids": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                }
+              }
+            },
+            "required": [
+              "status",
+              "ent_lans",
+              "matched_item_ids"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "movement_date",
+          "user_id",
+          "username",
+          "display_name",
+          "created_at",
+          "items",
+          "photos",
+          "total_units",
+          "reconciliation"
+        ],
+        "additionalProperties": false
+      },
+      "SalidaCreateRequest": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "pattern": "^\\d{4}$"
+                },
+                "quantity": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                }
+              },
+              "required": [
+                "code",
+                "quantity"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 1,
+            "maxItems": 21
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "SalidaCreateResponse": {
+        "type": "object",
+        "properties": {
+          "movement": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "movement_date": {
+                "type": "string"
+              },
+              "user_id": {
+                "type": "integer"
+              },
+              "username": {
+                "type": "string"
+              },
+              "display_name": {
+                "type": "string"
+              },
+              "created_at": {
+                "type": "string"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "product_code": {
+                      "type": "string"
+                    },
+                    "product_name": {
+                      "type": "string"
+                    },
+                    "block": {
+                      "type": "string",
+                      "enum": [
+                        "embalagens",
+                        "bobinas",
+                        "materia-prima"
+                      ]
+                    },
+                    "quantity": {
+                      "type": "integer"
+                    },
+                    "position": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "product_code",
+                    "product_name",
+                    "block",
+                    "quantity",
+                    "position"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "photos": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "file_path": {
+                      "type": "string"
+                    },
+                    "file_size": {
+                      "type": "integer"
+                    },
+                    "mime_type": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "publicUrl": {
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "file_path",
+                    "file_size",
+                    "mime_type",
+                    "url",
+                    "publicUrl",
+                    "created_at"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "total_units": {
+                "type": "integer"
+              },
+              "reconciliation": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "reconciled",
+                      "partial",
+                      "pending"
+                    ]
+                  },
+                  "ent_lans": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "matched_item_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "required": [
+                  "status",
+                  "ent_lans",
+                  "matched_item_ids"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "movement_date",
+              "user_id",
+              "username",
+              "display_name",
+              "created_at",
+              "items",
+              "photos",
+              "total_units",
+              "reconciliation"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "movement"
+        ],
+        "additionalProperties": false
+      },
+      "SalidaListResponse": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "movements": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "movement_date": {
+                  "type": "string"
+                },
+                "user_id": {
+                  "type": "integer"
+                },
+                "username": {
+                  "type": "string"
+                },
+                "display_name": {
+                  "type": "string"
+                },
+                "created_at": {
+                  "type": "string"
+                },
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer"
+                      },
+                      "product_code": {
+                        "type": "string"
+                      },
+                      "product_name": {
+                        "type": "string"
+                      },
+                      "block": {
+                        "type": "string",
+                        "enum": [
+                          "embalagens",
+                          "bobinas",
+                          "materia-prima"
+                        ]
+                      },
+                      "quantity": {
+                        "type": "integer"
+                      },
+                      "position": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "product_code",
+                      "product_name",
+                      "block",
+                      "quantity",
+                      "position"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "photos": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer"
+                      },
+                      "file_path": {
+                        "type": "string"
+                      },
+                      "file_size": {
+                        "type": "integer"
+                      },
+                      "mime_type": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      },
+                      "publicUrl": {
+                        "type": "string"
+                      },
+                      "created_at": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "file_path",
+                      "file_size",
+                      "mime_type",
+                      "url",
+                      "publicUrl",
+                      "created_at"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "total_units": {
+                  "type": "integer"
+                },
+                "reconciliation": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "reconciled",
+                        "partial",
+                        "pending"
+                      ]
+                    },
+                    "ent_lans": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer"
+                      }
+                    },
+                    "matched_item_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "ent_lans",
+                    "matched_item_ids"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "id",
+                "movement_date",
+                "user_id",
+                "username",
+                "display_name",
+                "created_at",
+                "items",
+                "photos",
+                "total_units",
+                "reconciliation"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "date",
+          "movements"
+        ],
+        "additionalProperties": false
+      },
+      "SalidaHistoryResponse": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string"
+                },
+                "total_units": {
+                  "type": "integer"
+                },
+                "movements": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer"
+                      },
+                      "movement_date": {
+                        "type": "string"
+                      },
+                      "user_id": {
+                        "type": "integer"
+                      },
+                      "username": {
+                        "type": "string"
+                      },
+                      "display_name": {
+                        "type": "string"
+                      },
+                      "created_at": {
+                        "type": "string"
+                      },
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer"
+                            },
+                            "product_code": {
+                              "type": "string"
+                            },
+                            "product_name": {
+                              "type": "string"
+                            },
+                            "block": {
+                              "type": "string",
+                              "enum": [
+                                "embalagens",
+                                "bobinas",
+                                "materia-prima"
+                              ]
+                            },
+                            "quantity": {
+                              "type": "integer"
+                            },
+                            "position": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "product_code",
+                            "product_name",
+                            "block",
+                            "quantity",
+                            "position"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "photos": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer"
+                            },
+                            "file_path": {
+                              "type": "string"
+                            },
+                            "file_size": {
+                              "type": "integer"
+                            },
+                            "mime_type": {
+                              "type": "string"
+                            },
+                            "url": {
+                              "type": "string"
+                            },
+                            "publicUrl": {
+                              "type": "string"
+                            },
+                            "created_at": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "file_path",
+                            "file_size",
+                            "mime_type",
+                            "url",
+                            "publicUrl",
+                            "created_at"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "total_units": {
+                        "type": "integer"
+                      },
+                      "reconciliation": {
+                        "type": "object",
+                        "properties": {
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "reconciled",
+                              "partial",
+                              "pending"
+                            ]
+                          },
+                          "ent_lans": {
+                            "type": "array",
+                            "items": {
+                              "type": "integer"
+                            }
+                          },
+                          "matched_item_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "integer"
+                            }
+                          }
+                        },
+                        "required": [
+                          "status",
+                          "ent_lans",
+                          "matched_item_ids"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "movement_date",
+                      "user_id",
+                      "username",
+                      "display_name",
+                      "created_at",
+                      "items",
+                      "photos",
+                      "total_units",
+                      "reconciliation"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "date",
+                "total_units",
+                "movements"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "days"
+        ],
+        "additionalProperties": false
+      },
+      "SalidaPhotoResponse": {
+        "type": "object",
+        "properties": {
+          "photo": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "file_path": {
+                "type": "string"
+              },
+              "file_size": {
+                "type": "integer"
+              },
+              "mime_type": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "publicUrl": {
+                "type": "string"
+              },
+              "created_at": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "file_path",
+              "file_size",
+              "mime_type",
+              "url",
+              "publicUrl",
+              "created_at"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "photo"
+        ],
+        "additionalProperties": false
+      },
+      "SalidaPhotosResponse": {
+        "type": "object",
+        "properties": {
+          "photos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "file_path": {
+                  "type": "string"
+                },
+                "file_size": {
+                  "type": "integer"
+                },
+                "mime_type": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "publicUrl": {
+                  "type": "string"
+                },
+                "created_at": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "file_path",
+                "file_size",
+                "mime_type",
+                "url",
+                "publicUrl",
+                "created_at"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "photos"
         ],
         "additionalProperties": false
       }
@@ -9367,6 +10314,602 @@
           },
           "401": {
             "description": "Missing, invalid, or expired credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/salida/catalog": {
+      "get": {
+        "summary": "Read the fixed catalogue of products a baixa can give",
+        "description": "Beta privada: only the account `wilkin` is admitted. A missing or invalid token answers 401, and any other account -- a Trabalhador or another Administrador -- answers 403, because the guard is the username. Answers the 21 products, in the plant's order, each with its four-digit code, its Portuguese name and its block (`embalagens`, `bobinas` or `materia-prima`). The list is invariable in this delivery and has no CRUD: a client renders it and does not invent a copy of its own.",
+        "tags": [
+          "salida"
+        ],
+        "responses": {
+          "200": {
+            "description": "The 21 products, in the plant order",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalidaCatalogResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, or expired credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Beta privada: only the account `wilkin` is admitted, so any other account answers 403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/salida": {
+      "post": {
+        "summary": "Launch one baixa movement",
+        "description": "Beta privada: only the account `wilkin` is admitted. A missing or invalid token answers 401, and any other account -- a Trabalhador or another Administrador -- answers 403, because the guard is the username. Persists the movement in Trindade before any attempt against the ERP: a failed WebService leaves a pending movement in the history and never loses what the operator loaded. The date is the plant's current day in São Paulo and the operator is the session; neither is a field of the request. Each item stores the product name and block of that moment, so renaming the catalogue later cannot rewrite what was launched.",
+        "tags": [
+          "salida"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalidaCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The stored movement, with its items in launch order",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalidaCreateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The items are not between 1 and 21, a quantity is not a positive whole number, a code repeats, or a code is not in the catalogue (`SALIDA_INVALID_ITEMS` or `SALIDA_UNKNOWN_PRODUCT`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, or expired credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Beta privada: only the account `wilkin` is admitted, so any other account answers 403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Read one plant day of baixas",
+        "description": "Beta privada: only the account `wilkin` is admitted. A missing or invalid token answers 401, and any other account -- a Trabalhador or another Administrador -- answers 403, because the guard is the username. Answers the movements of the requested day, oldest launch first, each with its items, its photos and its reconciliation against the ERP. Without a `date` it answers the plant's current day rather than the server's. The reconciliation is computed on every read and never stored: the seats belong to the company and can arrive hours after the baixa.",
+        "tags": [
+          "salida"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "date",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The day and its movements",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalidaListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The date is not `YYYY-MM-DD` (`SALIDA_INVALID_DATE_FORMAT`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, or expired credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Beta privada: only the account `wilkin` is admitted, so any other account answers 403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/salida/history": {
+      "get": {
+        "summary": "Read the days that carry baixas",
+        "description": "Beta privada: only the account `wilkin` is admitted. A missing or invalid token answers 401, and any other account -- a Trabalhador or another Administrador -- answers 403, because the guard is the username. One entry per day that has movements, newest first, with the day's total units and the movements themselves. Read-only: nothing in this module edits or deletes a movement, so this is the only form the past has here.",
+        "tags": [
+          "salida"
+        ],
+        "responses": {
+          "200": {
+            "description": "The days with movements, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalidaHistoryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, or expired credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Beta privada: only the account `wilkin` is admitted, so any other account answers 403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/salida/{id}/photos": {
+      "get": {
+        "summary": "List the photos of one movement",
+        "description": "Beta privada: only the account `wilkin` is admitted. A missing or invalid token answers 401, and any other account -- a Trabalhador or another Administrador -- answers 403, because the guard is the username. Answers the photos in upload order, each with the authenticated route and the tokenised one the share sheet hands to somebody without a session.",
+        "tags": [
+          "salida"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The photos of the movement",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalidaPhotosResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The identifier is not a number (`SALIDA_INVALID_ID`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, or expired credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Beta privada: only the account `wilkin` is admitted, so any other account answers 403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such movement (`SALIDA_NOT_FOUND`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Attach one optional photo to a movement",
+        "description": "Beta privada: only the account `wilkin` is admitted. A missing or invalid token answers 401, and any other account -- a Trabalhador or another Administrador -- answers 403, because the guard is the username. Uploaded after the movement exists, so a launch is never held back by a camera. The file must be JPEG, PNG or WebP both in what it declares and in what its bytes are, at most 5 MB, and a movement carries at most three: without photos it is still a valid movement.",
+        "tags": [
+          "salida"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": [
+                  "file"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The stored photo, with its authenticated and its public URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalidaPhotoResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No file was sent, the file was empty, or the identifier is not a number",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, or expired credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Beta privada: only the account `wilkin` is admitted, so any other account answers 403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such movement (`SALIDA_NOT_FOUND`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The movement already carries three photos (`SALIDA_PHOTO_LIMIT`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The file exceeds the 5 MB limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The file is not JPEG, PNG or WebP, or its content does not match the declared type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/salida/photos/{photoId}": {
+      "get": {
+        "summary": "Serve one photo to a signed-in client",
+        "description": "Beta privada: only the account `wilkin` is admitted. A missing or invalid token answers 401, and any other account -- a Trabalhador or another Administrador -- answers 403, because the guard is the username. The bytes, with the stored MIME type as the content type.",
+        "tags": [
+          "salida"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "photoId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The image bytes",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The identifier is not a number (`SALIDA_INVALID_ID`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, or expired credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Beta privada: only the account `wilkin` is admitted, so any other account answers 403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such photo, or its file is gone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete one photo of a movement",
+        "description": "Beta privada: only the account `wilkin` is admitted. A missing or invalid token answers 401, and any other account -- a Trabalhador or another Administrador -- answers 403, because the guard is the username. Removes the row and then the file, best effort. The movement itself is never touched: a baixa that already left the plant is a record of what happened, not a draft.",
+        "tags": [
+          "salida"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "photoId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The photo was deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The identifier is not a number (`SALIDA_INVALID_ID`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, or expired credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Beta privada: only the account `wilkin` is admitted, so any other account answers 403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such photo (`SALIDA_NOT_FOUND`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/salida/photos/public/{token}": {
+      "get": {
+        "summary": "Serve one photo through its public token",
+        "description": "Unauthenticated by design and the only route of this module without a session: the token is the credential, because it is what a share sheet hands to somebody who has none. A missing or unknown token answers the same 404, so the route cannot be used to probe which tokens exist.",
+        "tags": [
+          "salida"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "token",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The image bytes",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No photo carries that token, or its file is gone",
             "content": {
               "application/json": {
                 "schema": {

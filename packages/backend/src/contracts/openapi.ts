@@ -111,6 +111,20 @@ import {
 } from '../modules/stock/stock.schema.js';
 import { LatestReleaseResponseSchema } from '../modules/app/app.schema.js';
 import {
+  CreateSalidaBodySchema,
+  SalidaCatalogResponseSchema,
+  SalidaCreateResponseSchema,
+  SalidaHistoryResponseSchema,
+  SalidaListResponseSchema,
+  SalidaPhotoResponseSchema,
+  SalidaPhotosResponseSchema,
+  SalidaProductSchema,
+  SalidaItemSchema,
+  SalidaMovementSchema,
+  SalidaPhotoSchema,
+  SalidaReconciliationSchema,
+} from '../modules/salida/salida.schema.js';
+import {
   MassaIndividualLaunchSchema,
   MassaProductTotalSchema,
   MassaHistoryDaySchema,
@@ -272,6 +286,9 @@ function apkBinaryResponse(description: string): ResponseConfig {
 const BATCH_DATE_PARAMS = z.object({ date: z.string() });
 const SCHEDULE_ID_PARAMS = z.object({ id: z.string() });
 const REPORT_ID_PARAMS = z.object({ id: z.string() });
+const SALIDA_ID_PARAMS = z.object({ id: z.string() });
+const SALIDA_PHOTO_ID_PARAMS = z.object({ photoId: z.string() });
+const SALIDA_TOKEN_PARAMS = z.object({ token: z.string() });
 const PHOTO_ID_PARAMS = z.object({ photoId: z.string() });
 const PHOTO_TOKEN_PARAMS = z.object({ token: z.string() });
 const ADMIN_ID_PARAMS = z.object({ id: z.string() });
@@ -291,6 +308,18 @@ const ADMINISTRATOR_ONLY =
 const ADMINISTRATOR_OR_WORKER =
   'Admits Administrador and Trabalhador: those are the only two roles this API defines, so the only ' +
   'refusal from the guard is a missing or invalid token, with 401.';
+
+/**
+ * The sentence every baixa operation carries.
+ *
+ * This surface is a private beta of one account, and that is a decision of the delivery rather than a role: the
+ * guard asks for the username `wilkin`, so a worker and even another administrator are refused with 403. OpenAPI
+ * has no vocabulary for a username, so the only place a client's author can learn it is this text -- and the
+ * suite asserts the same boundary against the running server, so the two cannot drift apart.
+ */
+const SALIDA_BETA_ONLY =
+  'Beta privada: only the account `wilkin` is admitted. A missing or invalid token answers 401, and any other ' +
+  'account -- a Trabalhador or another Administrador -- answers 403, because the guard is the username.';
 
 function buildRegistry(): OpenAPIRegistry {
   const registry = new OpenAPIRegistry();
@@ -432,6 +461,22 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
   registerComponent(registry, 'UpdateTimeSlotsRequest', UpdateTimeSlotsSchema);
   registerComponent(registry, 'AuditLog', AuditLogSchema);
   registerComponent(registry, 'AuditResponse', AuditResponseSchema);
+
+  // The baixa module. Registered in dependency order so the nested shapes exist before the movements that
+  // contain them: an unnamed child would be inlined at every use and the generated client would get an
+  // anonymous duplicate instead of the model it should have.
+  registerComponent(registry, 'SalidaProduct', SalidaProductSchema);
+  registerComponent(registry, 'SalidaCatalogResponse', SalidaCatalogResponseSchema);
+  registerComponent(registry, 'SalidaItem', SalidaItemSchema);
+  registerComponent(registry, 'SalidaPhoto', SalidaPhotoSchema);
+  registerComponent(registry, 'SalidaReconciliation', SalidaReconciliationSchema);
+  registerComponent(registry, 'SalidaMovement', SalidaMovementSchema);
+  registerComponent(registry, 'SalidaCreateRequest', CreateSalidaBodySchema);
+  registerComponent(registry, 'SalidaCreateResponse', SalidaCreateResponseSchema);
+  registerComponent(registry, 'SalidaListResponse', SalidaListResponseSchema);
+  registerComponent(registry, 'SalidaHistoryResponse', SalidaHistoryResponseSchema);
+  registerComponent(registry, 'SalidaPhotoResponse', SalidaPhotoResponseSchema);
+  registerComponent(registry, 'SalidaPhotosResponse', SalidaPhotosResponseSchema);
 
   // The failure envelopes every path reuses. Declared here rather than at module scope because
   // errorResponse resolves the schema to a component reference, and the map it consults is only
@@ -1579,6 +1624,199 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
     responses: {
       200: jsonResponse('The counted days', StockHistorySchema),
       401: UNAUTHORIZED,
+    },
+  });
+
+  // ---- salida (baixa) ----
+
+  /**
+   * The baixa surface, which is a private beta of one account.
+   *
+   * Every operation but the tokenised photo is behind the same username guard, so each one declares both
+   * refusals: 401 without a session and 403 for any other account. The public photo route is the exception and
+   * says so, because the token is its credential.
+   */
+  const SALIDA_FORBIDDEN = errorResponse(
+    'Beta privada: only the account `wilkin` is admitted, so any other account answers 403',
+  );
+
+  registry.registerPath({
+    method: 'get',
+    path: '/api/salida/catalog',
+    summary: 'Read the fixed catalogue of products a baixa can give',
+    description:
+      `${SALIDA_BETA_ONLY} Answers the 21 products, in the plant's order, each with its four-digit code, its ` +
+      'Portuguese name and its block (`embalagens`, `bobinas` or `materia-prima`). The list is invariable in ' +
+      'this delivery and has no CRUD: a client renders it and does not invent a copy of its own.',
+    tags: ['salida'],
+    responses: {
+      200: jsonResponse('The 21 products, in the plant order', SalidaCatalogResponseSchema),
+      401: UNAUTHORIZED,
+      403: SALIDA_FORBIDDEN,
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/salida',
+    summary: 'Launch one baixa movement',
+    description:
+      `${SALIDA_BETA_ONLY} Persists the movement in Trindade before any attempt against the ERP: a failed ` +
+      'WebService leaves a pending movement in the history and never loses what the operator loaded. The date ' +
+      'is the plant\'s current day in São Paulo and the operator is the session; neither is a field of the ' +
+      'request. Each item stores the product name and block of that moment, so renaming the catalogue later ' +
+      'cannot rewrite what was launched.',
+    tags: ['salida'],
+    request: { ...jsonRequest(CreateSalidaBodySchema) },
+    responses: {
+      201: jsonResponse('The stored movement, with its items in launch order', SalidaCreateResponseSchema),
+      400: errorResponse(
+        'The items are not between 1 and 21, a quantity is not a positive whole number, a code repeats, or a ' +
+        'code is not in the catalogue (' +
+          '`SALIDA_INVALID_ITEMS` or `SALIDA_UNKNOWN_PRODUCT`)',
+      ),
+      401: UNAUTHORIZED,
+      403: SALIDA_FORBIDDEN,
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/api/salida',
+    summary: 'Read one plant day of baixas',
+    description:
+      `${SALIDA_BETA_ONLY} Answers the movements of the requested day, oldest launch first, each with its ` +
+      'items, its photos and its reconciliation against the ERP. Without a `date` it answers the plant\'s ' +
+      'current day rather than the server\'s. The reconciliation is computed on every read and never stored: ' +
+      'the seats belong to the company and can arrive hours after the baixa.',
+    tags: ['salida'],
+    request: {
+      query: z.object({ date: z.string().optional() }),
+    },
+    responses: {
+      200: jsonResponse('The day and its movements', SalidaListResponseSchema),
+      400: errorResponse('The date is not `YYYY-MM-DD` (`SALIDA_INVALID_DATE_FORMAT`)'),
+      401: UNAUTHORIZED,
+      403: SALIDA_FORBIDDEN,
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/api/salida/history',
+    summary: 'Read the days that carry baixas',
+    description:
+      `${SALIDA_BETA_ONLY} One entry per day that has movements, newest first, with the day\'s total units and ` +
+      'the movements themselves. Read-only: nothing in this module edits or deletes a movement, so this is the ' +
+      'only form the past has here.',
+    tags: ['salida'],
+    responses: {
+      200: jsonResponse('The days with movements, newest first', SalidaHistoryResponseSchema),
+      401: UNAUTHORIZED,
+      403: SALIDA_FORBIDDEN,
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/api/salida/{id}/photos',
+    summary: 'List the photos of one movement',
+    description:
+      `${SALIDA_BETA_ONLY} Answers the photos in upload order, each with the authenticated route and the ` +
+      'tokenised one the share sheet hands to somebody without a session.',
+    tags: ['salida'],
+    request: { params: SALIDA_ID_PARAMS },
+    responses: {
+      200: jsonResponse('The photos of the movement', SalidaPhotosResponseSchema),
+      400: errorResponse('The identifier is not a number (`SALIDA_INVALID_ID`)'),
+      401: UNAUTHORIZED,
+      403: SALIDA_FORBIDDEN,
+      404: errorResponse('No such movement (`SALIDA_NOT_FOUND`)'),
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/salida/{id}/photos',
+    summary: 'Attach one optional photo to a movement',
+    description:
+      `${SALIDA_BETA_ONLY} Uploaded after the movement exists, so a launch is never held back by a camera. The ` +
+      'file must be JPEG, PNG or WebP both in what it declares and in what its bytes are, at most 5 MB, and a ' +
+      'movement carries at most three: without photos it is still a valid movement.',
+    tags: ['salida'],
+    request: {
+      params: SALIDA_ID_PARAMS,
+      body: {
+        content: {
+          'multipart/form-data': {
+            schema: {
+              type: 'object',
+              properties: { file: { type: 'string', format: 'binary' } },
+              required: ['file'],
+            },
+          },
+        },
+      },
+    },
+    responses: {
+      201: jsonResponse('The stored photo, with its authenticated and its public URL', SalidaPhotoResponseSchema),
+      400: errorResponse('No file was sent, the file was empty, or the identifier is not a number'),
+      401: UNAUTHORIZED,
+      403: SALIDA_FORBIDDEN,
+      404: errorResponse('No such movement (`SALIDA_NOT_FOUND`)'),
+      409: errorResponse('The movement already carries three photos (`SALIDA_PHOTO_LIMIT`)'),
+      413: errorResponse('The file exceeds the 5 MB limit'),
+      415: errorResponse('The file is not JPEG, PNG or WebP, or its content does not match the declared type'),
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/api/salida/photos/{photoId}',
+    summary: 'Serve one photo to a signed-in client',
+    description: `${SALIDA_BETA_ONLY} The bytes, with the stored MIME type as the content type.`,
+    tags: ['salida'],
+    request: { params: SALIDA_PHOTO_ID_PARAMS },
+    responses: {
+      200: binaryResponse('The image bytes'),
+      400: errorResponse('The identifier is not a number (`SALIDA_INVALID_ID`)'),
+      401: UNAUTHORIZED,
+      403: SALIDA_FORBIDDEN,
+      404: errorResponse('No such photo, or its file is gone'),
+    },
+  });
+
+  registry.registerPath({
+    method: 'delete',
+    path: '/api/salida/photos/{photoId}',
+    summary: 'Delete one photo of a movement',
+    description:
+      `${SALIDA_BETA_ONLY} Removes the row and then the file, best effort. The movement itself is never ` +
+      'touched: a baixa that already left the plant is a record of what happened, not a draft.',
+    tags: ['salida'],
+    request: { params: SALIDA_PHOTO_ID_PARAMS },
+    responses: {
+      200: jsonResponse('The photo was deleted', SuccessResponseSchema),
+      400: errorResponse('The identifier is not a number (`SALIDA_INVALID_ID`)'),
+      401: UNAUTHORIZED,
+      403: SALIDA_FORBIDDEN,
+      404: errorResponse('No such photo (`SALIDA_NOT_FOUND`)'),
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/api/salida/photos/public/{token}',
+    summary: 'Serve one photo through its public token',
+    description:
+      'Unauthenticated by design and the only route of this module without a session: the token is the ' +
+      'credential, because it is what a share sheet hands to somebody who has none. A missing or unknown token ' +
+      'answers the same 404, so the route cannot be used to probe which tokens exist.',
+    tags: ['salida'],
+    request: { params: SALIDA_TOKEN_PARAMS },
+    responses: {
+      200: binaryResponse('The image bytes'),
+      404: errorResponse('No photo carries that token, or its file is gone'),
     },
   });
 
