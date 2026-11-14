@@ -97,7 +97,7 @@ data class AeroLogRequest (
     /**
      * 
      *
-     * Values: test_connection,launch_sync,read_history,dispatch,sync,test,`import`,queue_rejected
+     * Values: test_connection,launch_sync,read_history,dispatch,sync,test,`import`,queue_rejected,salida_sync
      */
     @Serializable
     enum class Event(val value: kotlin.String) {
@@ -108,7 +108,8 @@ data class AeroLogRequest (
         @SerialName(value = "sync") sync("sync"),
         @SerialName(value = "test") test("test"),
         @SerialName(value = "import") `import`("import"),
-        @SerialName(value = "queue_rejected") queue_rejected("queue_rejected");
+        @SerialName(value = "queue_rejected") queue_rejected("queue_rejected"),
+        @SerialName(value = "salida_sync") salida_sync("salida_sync");
     }
     /**
      * 
