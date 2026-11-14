@@ -37,10 +37,19 @@ describe('iPhone polish', () => {
     assert.match(dashboard, /<div className="shrink-0">\s*<ModuleHelpModal/);
   });
 
-  it('stacks the loading actions full width on a phone', () => {
-    const loading = page('pages/LoadingSchedulePage.tsx');
-    assert.match(loading, /mt-6 mb-8 flex flex-col gap-3 sm:flex-row sm:justify-end/);
-    assert.equal((loading.match(/className="w-full sm:w-auto"/g) ?? []).length >= 2, true);
+  it('puts the two loading exports in one row on a phone', () => {
+    for (const file of ['pages/LoadingSchedulePage.tsx', 'pages/LoadingEditPage.tsx']) {
+      const source = page(file);
+      assert.match(source, /grid grid-cols-2 gap-2 sm:flex sm:justify-end sm:gap-3/, `${file} stacks its exports`);
+      assert.equal(
+        (source.match(/w-full[^"`]*sm:w-auto/g) ?? []).length >= 2,
+        true,
+        `${file} must let both buttons fill their own cell`,
+      );
+      assert.match(source, /text-xs/, `${file} keeps a phone-sized label`);
+      assert.match(source, /sm:text-sm/, `${file} keeps the desktop label size`);
+      assert.match(source, /whitespace-nowrap/, `${file} must not wrap «Exportar PDF»`);
+    }
   });
 
   it('lays the Assai calculator out in three columns instead of a table that scrolls', () => {

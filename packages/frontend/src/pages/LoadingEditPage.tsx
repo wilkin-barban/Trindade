@@ -336,11 +336,12 @@ export function LoadingEditPage() {
       )}
 
       {/* Action buttons */}
-      <div className="flex justify-end gap-3 mt-6 mb-8">
+      <div className="mt-6 mb-8 grid grid-cols-2 gap-2 sm:flex sm:justify-end sm:gap-3">
         <Button
           onClick={handleExportPdf}
           variant="outline"
           size="lg"
+          className="w-full whitespace-nowrap px-2 text-xs sm:w-auto sm:px-4 sm:text-sm"
           data-testid="loading-export-pdf-btn"
           disabled={schedules.length === 0 || pdfLoading}
         >
@@ -350,6 +351,7 @@ export function LoadingEditPage() {
         <Button
           onClick={() => setExportOpen(true)}
           size="lg"
+          className="w-full whitespace-nowrap px-2 text-xs sm:w-auto sm:px-4 sm:text-sm"
           data-testid="open-export-btn"
           disabled={schedules.length === 0}
         >
