@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { RefreshCw, Share2 } from 'lucide-react';
+import { MessageCircle, RefreshCw } from 'lucide-react';
 import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import { formatDateLabel } from '../../lib/date';
@@ -138,14 +138,13 @@ export function SalidaMovementCard({
         <div className="mt-3 flex flex-wrap gap-2">
           <Button
             type="button"
-            variant="outline"
             size="sm"
             onClick={() => onShare(movement)}
-            className="min-h-[44px]"
+            className="min-h-[44px] w-full bg-green-600 text-white hover:bg-green-700 sm:w-auto"
             data-testid={`salida-share-${movement.id}`}
           >
-            <Share2 className="h-4 w-4" />
-            {t('salida.share')}
+            <MessageCircle className="h-4 w-4" />
+            {t('salida.shareWhatsApp')}
           </Button>
           {status === 'pending' && onResend && (
             <Button
@@ -182,7 +181,12 @@ export function SalidaBlockFilter({
   ];
 
   return (
-    <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t('salida.filterBlock')}>
+    <div
+      className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center"
+      role="group"
+      aria-label={t('salida.filterBlock')}
+      data-testid="salida-block-filter"
+    >
       {options.map((option) => {
         const active = option.key === value;
         return (
@@ -191,7 +195,7 @@ export function SalidaBlockFilter({
             type="button"
             onClick={() => onChange(option.key)}
             aria-pressed={active}
-            className={`inline-flex min-h-[44px] items-center rounded-lg border px-3 text-sm font-medium transition-colors ${
+            className={`inline-flex min-h-[44px] w-full items-center justify-center rounded-lg border px-3 text-sm font-medium transition-colors sm:w-auto sm:justify-start ${
               active
                 ? 'border-blue-600 bg-blue-50 text-blue-900'
                 : 'border-gray-300 bg-white text-gray-800 hover:bg-gray-50'

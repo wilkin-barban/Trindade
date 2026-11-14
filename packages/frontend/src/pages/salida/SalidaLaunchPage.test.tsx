@@ -434,3 +434,39 @@ describe('SalidaLaunchPage', () => {
     expect(screen.getByTestId('salida-quantity-1474')).toBeInTheDocument();
   });
 });
+
+/**
+ * The launch screen of the remediation: the beta is enforced by the server and by the route gate, so the visible
+ * «Solo wilkin» badge added nothing an operator could act on and only stole the width of the title on a phone.
+ *
+ * The header is asserted on its stacking classes because that is the defect the screenshot shows: two columns at
+ * 390 px turn a two-line title into three lines and a one-line subtitle into six.
+ */
+describe('SalidaLaunchPage — iPhone header', () => {
+  it('shows no private-beta badge and no «Solo wilkin» text', async () => {
+    render(
+      <MemoryRouter initialEntries={['/salida']}>
+        <SalidaLaunchPage />
+      </MemoryRouter>,
+    );
+    await screen.findByTestId('salida-date');
+
+    expect(screen.queryByTestId('salida-beta-badge')).toBeNull();
+    expect(screen.queryByTestId('salida-solo-wilkin')).toBeNull();
+    expect(screen.queryByText(/solo wilkin/i)).toBeNull();
+    expect(screen.queryByText(/beta privada/i)).toBeNull();
+  });
+
+  it('stacks the title above the help action on a phone and keeps them in one row on a desktop', async () => {
+    render(
+      <MemoryRouter initialEntries={['/salida']}>
+        <SalidaLaunchPage />
+      </MemoryRouter>,
+    );
+    await screen.findByTestId('salida-date');
+
+    const header = screen.getByTestId('salida-launch-header');
+    expect(header.className).toContain('flex-col');
+    expect(header.className).toContain('sm:flex-row');
+  });
+});

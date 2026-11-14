@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ClipboardX, MessageCircle } from 'lucide-react';
 import { api } from '../../api/client';
 import { Button } from '../../components/ui/button';
 import { LoadingSpinner } from '../../components/ui/loading-spinner';
@@ -39,6 +39,8 @@ import {
   salidaReadResultEvent,
   salidaSyncRequestedEvent,
   salidaSyncResultEvent,
+  salidaDaySummaryText,
+  salidaPhotoFiles,
   salidaReconciliationStatus,
   salidaSummaryText,
   salidaTimeLabel,
@@ -391,15 +393,47 @@ export function SalidaHistoryPage() {
     }
   };
 
-  const shareMovement = async (movement: SalidaMovement) => {
-    setNotice(null);
-    const text = salidaSummaryText(movement, labels);
-    const outcome = await shareSalida({ text });
+  const reportShareOutcome = (outcome: Awaited<ReturnType<typeof shareSalida>>) => {
     if (outcome === 'copied' || outcome === 'shared') {
       setNotice({ type: 'success', message: t('salida.copiedSummary') });
     } else if (outcome === 'failed') {
       setNotice({ type: 'error', message: t('salida.shareFailed') });
     }
+  };
+
+  const shareMovement = async (movement: SalidaMovement) => {
+    setNotice(null);
+    const text = salidaSummaryText(movement, labels);
+    // The movement's own photos travel with the message; a photo that cannot be fetched is left out rather
+    // than failing the share.
+    const photos = await salidaPhotoFiles(movement.photos);
+    reportShareOutcome(await shareSalida({ text, photos }));
+  };
+
+  const shareDay = async () => {
+    if (visibleMovements.length === 0) return;
+    setNotice(null);
+    const text = salidaDaySummaryText(visibleMovements, {
+      date,
+      labels: {
+        title: t('salida.dayShareTitle'),
+        movements: t('salida.dayShareMovements'),
+        total: t('salida.totalUnits'),
+        operator: t('salida.operatorLabel'),
+        blocks: {
+          embalagens: t('salida.blocks.embalagens'),
+          bobinas: t('salida.blocks.bobinas'),
+          'materia-prima': t('salida.blocks.materia-prima'),
+        },
+        status: {
+          reconciled: t('salida.erpOk'),
+          partial: t('salida.erpPartial'),
+          pending: t('salida.erpPending'),
+        },
+      },
+    });
+    const photos = (await Promise.all(visibleMovements.map((movement) => salidaPhotoFiles(movement.photos)))).flat();
+    reportShareOutcome(await shareSalida({ text, photos }));
   };
 
   const pendingCount = visibleMovements.filter(
@@ -417,13 +451,17 @@ export function SalidaHistoryPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-4 pb-12 sm:space-y-6">
       <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
-        <div className="flex items-start justify-between gap-3">
+        <div
+          data-testid="salida-history-header"
+          className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
+        >
           <div className="min-w-0">
             <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">{t('salida.historyTitle')}</h1>
             <p className="mt-1 text-sm text-gray-500">{t('salida.historySubtitle')}</p>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex w-full items-center gap-2 sm:w-auto sm:shrink-0">
             <ModuleHelpModal
+              className="flex-1 sm:flex-initial"
               title={t('moduleHelp.salidaHistory.title')}
               subtitle={t('moduleHelp.salidaHistory.subtitle')}
               description={t('moduleHelp.salidaHistory.description')}
@@ -434,7 +472,7 @@ export function SalidaHistoryPage() {
               variant="outline"
               size="sm"
               onClick={() => navigate('/salida')}
-              className="min-h-[44px]"
+              className="min-h-[44px] flex-1 sm:flex-initial"
             >
               <ArrowLeft className="h-4 w-4" />
               {t('salida.launch')}
@@ -471,18 +509,41 @@ export function SalidaHistoryPage() {
           failedMessage={t('salida.historyDaysUnavailable')}
         />
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-3">
+        <div
+          data-testid="salida-history-actions"
+          className="grid grid-cols-1 gap-2 border-t border-gray-100 pt-3 sm:flex sm:items-center sm:justify-between"
+        >
           <SalidaBlockFilter value={block} onChange={setBlock} />
-          <Button
-            type="button"
-            onClick={() => void handleCheckErp()}
-            disabled={checking}
-            className="min-h-[44px]"
-            data-testid="salida-check-erp"
-          >
-            {checking ? t('salida.confering') : t('salida.conferir')}
-          </Button>
+          <div className="grid grid-cols-1 gap-2 sm:flex sm:items-center">
+            <Button
+              type="button"
+              onClick={() => void handleCheckErp()}
+              disabled={checking}
+              className="min-h-[44px] w-full sm:w-auto"
+              data-testid="salida-check-erp"
+            >
+              {checking ? t('salida.confering') : t('salida.conferir')}
+            </Button>
+            {/* El resumen del día es la acción que el operario no encontraba: vive acá, junto a los filtros, y
+                queda visible aunque no haya nada: sin movimientos está deshabilitado y dice por qué. */}
+            <Button
+              type="button"
+              onClick={() => void shareDay()}
+              disabled={visibleMovements.length === 0}
+              className="min-h-[44px] w-full bg-green-600 text-white hover:bg-green-700 sm:w-auto"
+              data-testid="salida-share-day"
+            >
+              <MessageCircle className="h-4 w-4" />
+              {t('salida.shareDay')}
+            </Button>
+          </div>
         </div>
+
+        {visibleMovements.length === 0 && (
+          <p className="text-xs text-gray-500" data-testid="salida-share-day-empty">
+            {t('salida.shareDayEmpty')}
+          </p>
+        )}
 
         {checkError && (
           <p role="alert" className="text-sm text-red-700" data-testid="salida-check-error">
@@ -498,12 +559,25 @@ export function SalidaHistoryPage() {
       </div>
 
       {visibleMovements.length === 0 ? (
-        <p
-          className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-600 shadow-sm"
+        <div
+          className="rounded-xl border border-gray-200 bg-white p-6 text-center shadow-sm"
           data-testid="salida-history-empty"
         >
-          {t('salida.historyEmpty')}
-        </p>
+          <ClipboardX className="mx-auto h-8 w-8 text-gray-400" aria-hidden="true" />
+          <h2 data-testid="salida-empty-title" className="mt-2 text-base font-semibold text-gray-900">
+            {t('salida.historyEmptyTitle')}
+          </h2>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-gray-500">{t('salida.historyEmptyBody')}</p>
+          <Button
+            type="button"
+            onClick={() => navigate('/salida')}
+            className="mt-4 min-h-[44px] w-full sm:w-auto"
+            data-testid="salida-empty-cta"
+          >
+            <ArrowLeft className="h-4 w-4 rotate-180" />
+            {t('salida.launch')}
+          </Button>
+        </div>
       ) : (
         <div className="space-y-3">
           {visibleMovements.map((movement) => (
