@@ -100,9 +100,9 @@ test.describe('Report Builder — Element Types', () => {
 
   test('renders check_assai tasks as fixed Assaí product checkboxes', async ({ page }) => {
     const taskId = await createProductTemplateTask(page, 'check_assai', 'Assaí E2E');
+    // The server still offers Quadrada for both tasks; Assaí is the one that does not ask for it.
     const expectedProducts = [
       'Nhoque Kg',
-      'Quadrada',
       'Rolo 500',
       'Rolo kg',
       'Rolo 2kg',
@@ -114,6 +114,7 @@ test.describe('Report Builder — Element Types', () => {
 
     await expect(page.locator(`text=Montaje Assaí E2E`)).toBeVisible();
     await expect(page.locator(`input[data-testid^="product-task-${taskId}-"]`)).toHaveCount(expectedProducts.length);
+    await expect(page.getByTestId(`product-task-${taskId}-Quadrada`)).toHaveCount(0);
 
     for (const product of expectedProducts) {
       const checkbox = page.getByTestId(`product-task-${taskId}-${product}`);
@@ -133,6 +134,8 @@ test.describe('Report Builder — Element Types', () => {
 
     await expect(page.locator(`text=Montaje Normal E2E`)).toBeVisible();
     await expect(page.locator(`input[data-testid^="product-task-${taskId}-"]`)).toHaveCount(expectedProducts.length);
+    // Quadrada stays in the small-box task: it is the Assaí one that does not ask for it.
+    await expect(page.getByTestId(`product-task-${taskId}-Quadrada`)).toBeVisible();
 
     for (const product of expectedProducts) {
       const checkbox = page.getByTestId(`product-task-${taskId}-${product}`);

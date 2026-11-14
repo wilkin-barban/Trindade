@@ -26,6 +26,15 @@ function names(value: unknown): string[] | null {
   return value;
 }
 
+/**
+ * The products the Assaí task does not ask, even though the server still offers them.
+ *
+ * The plant counts `Quadrada` in Cajas pequeñas, not in Assaí. That is a decision of this screen, so it lives
+ * here and not in the catalogue: the backend, the OpenAPI contract and Android keep answering the full list,
+ * and a report filed before this rule keeps its own answers untouched.
+ */
+const NOT_ASKED_BY_ASSAI = new Set(['Quadrada']);
+
 /** The catalogue the server answered, or null when the answer is not one. */
 export function readReportProducts(body: unknown): ReportProducts | null {
   if (!isRecord(body)) return null;
@@ -34,5 +43,8 @@ export function readReportProducts(body: unknown): ReportProducts | null {
   const normal = names(body.normal);
   if (assai === null || normal === null) return null;
 
-  return { assai, normal };
+  return {
+    assai: assai.filter((name) => !NOT_ASKED_BY_ASSAI.has(name.trim())),
+    normal,
+  };
 }

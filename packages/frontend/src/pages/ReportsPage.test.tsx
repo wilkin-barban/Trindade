@@ -51,6 +51,7 @@ const CATEGORIES: CategoryType[] = [
   { id: 4, parent_category_id: null, name_pt: 'Recebimento', name_es: 'Recepción', sort_order: 4, tasks: [task(43, 4, 'Recebimento de farinha')] },
   { id: 41, parent_category_id: 4, name_pt: 'Recebimento de congelados', name_es: 'Recepción de congelados', sort_order: 5, tasks: [task(410, 41, 'Conferência do congelado')] },
   { id: 3, parent_category_id: null, name_pt: 'Caixas', name_es: 'Cajas', sort_order: 3, tasks: [{ ...task(61, 3, 'Montagem Assai'), task_type: 'check_assai' as const }] },
+  { id: 5, parent_category_id: null, name_pt: 'Caixas pequenas', name_es: 'Cajas pequeñas', sort_order: 6, tasks: [{ ...task(62, 5, 'Montagem Normal'), task_type: 'check_normal' as const }] },
 ];
 
 function renderPage() {
@@ -66,7 +67,7 @@ beforeEach(async () => {
   get.mockImplementation(async (url: string) => {
     if (url === '/reports/categories') return { categories: CATEGORIES };
     if (url === '/reports/turno') return { turno: 'tarde' };
-    if (url === '/reports/products') return { assai: ['Nhoque Kg', 'Quadrada'], normal: ['Nhoque 400g'] };
+    if (url === '/reports/products') return { assai: ['Nhoque Kg', 'Quadrada'], normal: ['Nhoque 400g', 'Quadrada'] };
     return {};
   });
   await i18n.changeLanguage('es');
@@ -95,7 +96,16 @@ describe('ReportsPage — sections', () => {
     renderPage();
 
     expect(await screen.findByTestId('product-task-61-Nhoque Kg')).toBeInTheDocument();
-    expect(screen.getByTestId('product-task-61-Quadrada')).toBeInTheDocument();
+  });
+
+  it('leaves Quadrada out of the Assaí task and keeps it in Cajas pequeñas', async () => {
+    renderPage();
+
+    // The plant counts Quadrada in the small-box task, not in Assaí: the server still offers it for both.
+    await screen.findByTestId('product-task-61-Nhoque Kg');
+    expect(screen.queryByTestId('product-task-61-Quadrada')).not.toBeInTheDocument();
+    expect(screen.getByTestId('product-task-62-Quadrada')).toBeInTheDocument();
+    expect(screen.getByTestId('product-task-62-Nhoque 400g')).toBeInTheDocument();
   });
 
   it('keeps the form and says so when the product offer cannot be read', async () => {
@@ -107,7 +117,8 @@ describe('ReportsPage — sections', () => {
     });
     renderPage();
 
-    expect(await screen.findByTestId('report-products-unavailable')).toBeInTheDocument();
+    // One banner per section that asks for the offer: the Assaí task and the small-box task both do now.
+    expect((await screen.findAllByTestId('report-products-unavailable')).length).toBeGreaterThan(0);
     // The rest of the report is still a report: one missing offer does not take the other sections down.
     expect(screen.getByTestId('check-task-1')).toBeInTheDocument();
     expect(screen.queryByTestId('product-task-61-Nhoque Kg')).not.toBeInTheDocument();
