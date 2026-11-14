@@ -53,12 +53,13 @@ data class AeroBridgeTicketRequest (
     /**
      * 
      *
-     * Values: entrada,entrada_lote,movimentos,test
+     * Values: entrada,entrada_lote,saida,movimentos,test
      */
     @Serializable
     enum class Action(val value: kotlin.String) {
         @SerialName(value = "entrada") entrada("entrada"),
         @SerialName(value = "entrada_lote") entrada_lote("entrada_lote"),
+        @SerialName(value = "saida") saida("saida"),
         @SerialName(value = "movimentos") movimentos("movimentos"),
         @SerialName(value = "test") test("test");
     }
