@@ -1,6 +1,9 @@
-import { describe, it, before, after, beforeEach } from 'node:test';
+import { describe, it, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 import { randomUUID } from 'node:crypto';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import type Database from 'better-sqlite3';
 
@@ -1352,4 +1355,132 @@ describe('Reports Routes', () => {
     assert.strictEqual(res3.statusCode, 201);
   });
 
+  /**
+   * The local audit trail of the reports module.
+   *
+   * The module already writes `audit_logs` for every change it makes. This is the other file: the plant's
+   * operator reads `aero-integration.log` to answer "what happened today" without a database client, and a
+   * report that only lives in `audit_logs` is invisible from there.
+   */
+  describe('the local audit line', () => {
+    interface LocalLine {
+      event: string;
+      user: string;
+      role: string;
+      destinationUrl: string;
+      phase: string | null;
+      httpStatus: number | null;
+      response: string | null;
+      error: string | null;
+      launchId: number | null;
+      note: string;
+      payload: Record<string, unknown>;
+    }
+
+    const logFile = () => join(logDir, 'aero-integration.log');
+    const readLog = (): LocalLine[] =>
+      readFileSync(logFile(), 'utf8')
+        .split('\n')
+        .filter((line) => line.trim().length > 0)
+        .map((line) => JSON.parse(line) as LocalLine);
+
+    let logDir: string;
+
+    beforeEach(() => {
+      logDir = mkdtempSync(join(tmpdir(), 'reports-audit-'));
+      process.env.AERO_LOG_DIR = logDir;
+    });
+
+    afterEach(() => {
+      delete process.env.AERO_LOG_DIR;
+      rmSync(logDir, { recursive: true, force: true });
+    });
+
+    it('records report_create with the report it stored and no credentials', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/reports',
+        headers: { authorization: `Bearer ${token}` },
+        payload: {
+          turno: 'tarde',
+          notes: 'Local audit line',
+          temperatures: buildTemperatureReadings(db),
+        },
+      });
+      assert.strictEqual(res.statusCode, 201, res.body);
+      const { report } = JSON.parse(res.body) as {
+        report: { id: number; report_date: string; turno: string; items: unknown[] };
+      };
+
+      const lines = readLog();
+      assert.strictEqual(lines.length, 1);
+      const [line] = lines;
+      assert.strictEqual(line.event, 'report_create');
+      assert.strictEqual(line.destinationUrl, 'local://reports');
+      assert.strictEqual(line.note, 'local=reports · action=create');
+      // A local write is not an attempt at anybody, so it has no phase and no status.
+      assert.strictEqual(line.phase, null);
+      assert.strictEqual(line.httpStatus, null);
+      assert.strictEqual(line.response, null);
+      assert.strictEqual(line.error, null);
+      assert.strictEqual(line.launchId, null);
+      assert.ok(line.user.length > 0, 'the line names the user who filed the report');
+      assert.ok(line.role.length > 0, 'the line names the role of that user');
+
+      assert.strictEqual(line.payload.reportId, report.id);
+      assert.strictEqual(line.payload.reportDate, report.report_date);
+      assert.strictEqual(line.payload.turno, report.turno);
+      assert.strictEqual(line.payload.itemCount, report.items.length);
+
+      const text = JSON.stringify(line).toLowerCase();
+      for (const forbidden of ['authorization', 'password', 'senha', 'credential', 'basic ']) {
+        assert.strictEqual(text.includes(forbidden), false, `the line carries ${forbidden}`);
+      }
+    });
+
+    it('records report_photo with the photo it stored', async () => {
+      const reportId = await createTestReport();
+      const { body, boundary } = multipartBody('file', 'audit.jpg', 'image/jpeg', fakeJpeg);
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/reports/${reportId}/photos`,
+        headers: {
+          authorization: `Bearer ${token}`,
+          'content-type': `multipart/form-data; boundary=${boundary}`,
+        },
+        payload: body,
+      });
+      assert.strictEqual(res.statusCode, 201, res.body);
+      const { photo } = JSON.parse(res.body) as { photo: { id: number; file_size: number } };
+
+      const lines = readLog().filter((line) => line.event === 'report_photo');
+      assert.strictEqual(lines.length, 1);
+      const [line] = lines;
+      assert.strictEqual(line.destinationUrl, 'local://reports');
+      assert.strictEqual(line.note, 'local=reports · action=photo');
+      assert.strictEqual(line.phase, null);
+      assert.strictEqual(line.payload.reportId, reportId);
+      assert.strictEqual(line.payload.photoId, photo.id);
+      assert.strictEqual(line.payload.fileSize, photo.file_size);
+      assert.strictEqual(line.payload.mimeType, 'image/jpeg');
+    });
+
+    it('writes nothing when the report is refused', async () => {
+      // A duplicate turno answers 400: no row was created, so no line may claim one was.
+      const first = await createTestReport('tarde');
+      assert.ok(first > 0);
+      const duplicate = await app.inject({
+        method: 'POST',
+        url: '/api/reports',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { turno: 'tarde', temperatures: buildTemperatureReadings(db) },
+      });
+      assert.strictEqual(duplicate.statusCode, 400, duplicate.body);
+
+      const creates = readLog().filter((line) => line.event === 'report_create');
+      assert.strictEqual(creates.length, 1, 'only the accepted report is in the log');
+      assert.strictEqual(creates[0].payload.reportId, first);
+      assert.strictEqual(existsSync(logFile()), true);
+    });
+  });
 });

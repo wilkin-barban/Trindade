@@ -137,6 +137,50 @@ const rows: readonly Row[] = [
     accepted: true,
   },
 
+  // ---- the API's own local lines: what the plant kept, not what the ERP answered ----
+  {
+    // Transcribed from `appendLocalAeroLog` in the salida routes: the movement is already stored when the line
+    // is written, and the line carries the summary the operator would otherwise have to open the card to see.
+    who: 'the backend records a baixa it stored locally',
+    body: {
+      event: 'salida_create',
+      destinationUrl: 'local://salida',
+      payload: { movementId: 84, movementDate: '2026-11-09', itemCount: 2, totalUnits: 23, blocks: ['embalagens', 'bobinas'] },
+      note: 'local=salida · action=create',
+    },
+    accepted: true,
+  },
+  {
+    who: 'the backend records a baixa photo it stored locally',
+    body: {
+      event: 'salida_photo',
+      destinationUrl: 'local://salida',
+      payload: { movementId: 84, photoId: 7, fileSize: 2048, mimeType: 'image/jpeg' },
+      note: 'local=salida · action=photo',
+    },
+    accepted: true,
+  },
+  {
+    who: 'the backend records a report it stored locally',
+    body: {
+      event: 'report_create',
+      destinationUrl: 'local://reports',
+      payload: { reportId: 412, reportDate: '2026-11-09', turno: 'tarde', itemCount: 36 },
+      note: 'local=reports · action=create',
+    },
+    accepted: true,
+  },
+  {
+    who: 'the backend records a report photo it stored locally',
+    body: {
+      event: 'report_photo',
+      destinationUrl: 'local://reports',
+      payload: { reportId: 412, photoId: 91, fileSize: 4096, mimeType: 'image/png' },
+      note: 'local=reports · action=photo',
+    },
+    accepted: true,
+  },
+
   // ---- android: AeroAudit.request + AeroAudit.testRequest ----
   {
     who: 'android records a connection test with the elapsed time',
@@ -451,9 +495,28 @@ describe('the Aero audit contract, pinned to the bodies each client sends', () =
     // Two of the canonical events have one author on purpose. `queue_rejected` is only ever written by the
     // phone, which is the side that holds a queue. `salida_sync` is only ever written by the web, because the
     // baixa module is a private beta of one account and Android is out of this delivery; when the phone gets
-    // the screen, the row that pins it here is what will notice the second author is missing.
-    const canonical = ['launch_sync', 'read_history', 'test_connection', 'import', 'queue_rejected', 'salida_sync'];
-    const singleAuthorEvents = new Set(['queue_rejected', 'salida_sync']);
+    // the screen, the row that pins it here is what will notice the second author is missing. The four local
+    // events have one author too, and it is not a client at all: the API writes them about its own database.
+    const canonical = [
+      'launch_sync',
+      'read_history',
+      'test_connection',
+      'import',
+      'queue_rejected',
+      'salida_sync',
+      'salida_create',
+      'salida_photo',
+      'report_create',
+      'report_photo',
+    ];
+    const singleAuthorEvents = new Set([
+      'queue_rejected',
+      'salida_sync',
+      'salida_create',
+      'salida_photo',
+      'report_create',
+      'report_photo',
+    ]);
     const authors = new Map<string, Set<string>>();
     for (const row of rows.filter((r) => r.accepted)) {
       const body = row.body as { event?: string; client?: string; note?: string };

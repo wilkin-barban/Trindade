@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
-import { after, before, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import { randomUUID } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -442,6 +443,133 @@ describe('salida routes', () => {
     it('answers 404 instead of 401 for a photo id that does not exist', async () => {
       const response = await app.inject({ method: 'GET', url: '/api/salida/photos/999999', headers: wilkin() });
       assert.equal(response.statusCode, 404);
+    });
+  });
+
+  /**
+   * The local audit trail of the baixa.
+   *
+   * `aero-integration.log` was, until now, only a record of what left the plant towards the ERP. These lines are
+   * the other half: what the plant kept. The point of asserting them over http instead of calling the emitter is
+   * that the ordering is the rule -- a line written before the row would claim a movement that a refusal never
+   * stored.
+   */
+  describe('the local audit line', () => {
+    interface LocalLine {
+      event: string;
+      user: string;
+      role: string;
+      destinationUrl: string;
+      phase: string | null;
+      httpStatus: number | null;
+      response: string | null;
+      error: string | null;
+      launchId: number | null;
+      note: string;
+      payload: Record<string, unknown>;
+    }
+
+    const logFile = () => join(logDir, 'aero-integration.log');
+    const readLog = (): LocalLine[] =>
+      readFileSync(logFile(), 'utf8')
+        .split('\n')
+        .filter((line) => line.trim().length > 0)
+        .map((line) => JSON.parse(line) as LocalLine);
+
+    let logDir: string;
+
+    beforeEach(() => {
+      logDir = mkdtempSync(join(tmpdir(), 'salida-audit-'));
+      process.env.AERO_LOG_DIR = logDir;
+    });
+
+    afterEach(() => {
+      delete process.env.AERO_LOG_DIR;
+      rmSync(logDir, { recursive: true, force: true });
+    });
+
+    it('records salida_create with the movement it stored, and no credentials', async () => {
+      const response = await launch([
+        { code: '1474', quantity: 20 },
+        { code: '1900', quantity: 3 },
+      ]);
+      assert.equal(response.statusCode, 201, response.body);
+      const { movement } = JSON.parse(response.body) as {
+        movement: { id: number; movement_date: string; items: { block: string }[] };
+      };
+
+      const lines = readLog();
+      assert.equal(lines.length, 1);
+      const [line] = lines;
+      assert.equal(line.event, 'salida_create');
+      assert.equal(line.user, 'wilkin');
+      assert.equal(line.role, 'Administrador');
+      assert.equal(line.destinationUrl, 'local://salida');
+      assert.equal(line.note, 'local=salida · action=create');
+      // A local write has no phase and no HTTP status: it is not an attempt against anybody.
+      assert.equal(line.phase, null);
+      assert.equal(line.httpStatus, null);
+      assert.equal(line.response, null);
+      assert.equal(line.error, null);
+      assert.equal(line.launchId, null);
+
+      assert.equal(line.payload.movementId, movement.id);
+      assert.equal(line.payload.movementDate, movement.movement_date);
+      assert.equal(line.payload.itemCount, 2);
+      assert.equal(line.payload.totalUnits, 23);
+      assert.deepEqual(
+        line.payload.blocks,
+        [...new Set(movement.items.map((item) => item.block))],
+      );
+
+      const text = JSON.stringify(line).toLowerCase();
+      for (const forbidden of ['authorization', 'password', 'senha', 'credential', 'basic ']) {
+        assert.equal(text.includes(forbidden), false, `the line carries ${forbidden}`);
+      }
+    });
+
+    it('records salida_photo with the photo it stored', async () => {
+      const movementId = await launchOne('1474', 7);
+      const upload = await uploadPhoto(movementId);
+      assert.equal(upload.statusCode, 201, upload.body);
+      const { photo } = JSON.parse(upload.body) as { photo: { id: number; file_size: number } };
+
+      const lines = readLog().filter((line) => line.event === 'salida_photo');
+      assert.equal(lines.length, 1);
+      const [line] = lines;
+      assert.equal(line.user, 'wilkin');
+      assert.equal(line.role, 'Administrador');
+      assert.equal(line.destinationUrl, 'local://salida');
+      assert.equal(line.note, 'local=salida · action=photo');
+      assert.equal(line.phase, null);
+      assert.equal(line.payload.movementId, movementId);
+      assert.equal(line.payload.photoId, photo.id);
+      assert.equal(line.payload.fileSize, photo.file_size);
+      assert.equal(line.payload.mimeType, 'image/jpeg');
+    });
+
+    it('writes nothing when the launch is refused', async () => {
+      // The line records a fact, so a 400 has nothing to record: a log that mentioned the refused attempt would
+      // make a refused quantity look like a movement somebody has to reconcile.
+      const refused = await launch([{ code: '1474', quantity: 0 }]);
+      assert.equal(refused.statusCode, 400, refused.body);
+      assert.equal(existsSync(logFile()), false);
+    });
+
+    it('answers 201 when the audit file cannot be written, because the movement is already stored', async () => {
+      // The log is a witness, not the transaction. A read-only or full volume has to degrade to a warning: a 500
+      // here would tell the operator the baixa failed and invite a second, duplicated movement.
+      const unwritable = join(logDir, 'not-a-directory');
+      writeFileSync(unwritable, 'this path is a file, so the log directory cannot be created');
+      process.env.AERO_LOG_DIR = unwritable;
+
+      const response = await launch([{ code: '1474', quantity: 4 }]);
+      assert.equal(response.statusCode, 201, response.body);
+      const movementId = (JSON.parse(response.body) as { movement: { id: number } }).movement.id;
+      const stored = db.prepare('SELECT COUNT(*) AS count FROM salida_movements WHERE id = ?').get(movementId) as {
+        count: number;
+      };
+      assert.equal(stored.count, 1);
     });
   });
 });

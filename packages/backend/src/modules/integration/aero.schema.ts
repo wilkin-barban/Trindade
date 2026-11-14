@@ -21,6 +21,10 @@ export type AeroErrorCode = (typeof AERO_ERROR_CODES)[keyof typeof AERO_ERROR_CO
  * `salida_sync` is the baixa's own line, and it is deliberately not folded into `launch_sync`: a movement of
  * insumos leaving the plant posting to `/saidasitem` is a different operation from a masse entry posting to
  * `/entradasitem`, and a log that called both `launch_sync` would not let anybody tell them apart afterwards.
+ *
+ * The four `*_create`/`*_photo` events are the local half written by the API itself, after the row is already
+ * stored: they record what the plant kept, not what the ERP answered. A reader that filtered the file by
+ * `phase` would never see them, which is why they carry no phase at all.
  */
 export const AeroLogEventSchema = z.enum([
   'test_connection',
@@ -32,6 +36,10 @@ export const AeroLogEventSchema = z.enum([
   'import',
   'queue_rejected',
   'salida_sync',
+  'salida_create',
+  'salida_photo',
+  'report_create',
+  'report_photo',
 ]);
 
 /**

@@ -942,7 +942,7 @@
     "subtitle": "Baixa de insumos, embalagens e bobinas com conciliação contra o ERP",
     "dateLabel": "Data",
     "operatorLabel": "Operador",
-    "readOnly": "Somente leitura",
+    "session": "Sessão",
     "blocksLabel": "Blocos",
     "blocksHint": "Desligar um bloco limpa suas quantidades; ligá-lo de novo o deixa vazio.",
     "blocks": {

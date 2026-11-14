@@ -36,6 +36,16 @@ describe('locale parity', () => {
     assert.deepEqual([...es.keys()].filter((key) => !pt.has(key)), [], 'keys only in es');
   });
 
+  it('keeps the operator label of the baixa saying it is the session, in both languages', () => {
+    // The operator of a salida is not a field: it is the session that created the movement, and the label next
+    // to the username has to say that instead of "read-only", which the reader takes for a disabled control.
+    assert.equal(dictionaries.get('es')!.get('salida.session'), 'Sesión');
+    assert.equal(dictionaries.get('pt-BR')!.get('salida.session'), 'Sessão');
+    for (const locale of LOCALES) {
+      assert.equal(dictionaries.get(locale)!.has('salida.readOnly'), false, `${locale} kept salida.readOnly`);
+    }
+  });
+
   it('keeps the placeholders of the ERP results in both languages', () => {
     for (const locale of LOCALES) {
       const flat = dictionaries.get(locale)!;

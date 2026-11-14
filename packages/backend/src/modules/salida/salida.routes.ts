@@ -10,6 +10,7 @@ import { getSaoPauloDateString } from '../../utils/date.js';
 import { SALIDA_PRODUCTS, findSalidaProduct } from './salida.catalog.js';
 import { CreateSalidaBodySchema, SALIDA_ERROR_CODES } from './salida.schema.js';
 import * as service from './salida.service.js';
+import { appendLocalAeroLog } from '../integration/aero.log.service.js';
 
 /**
  * The salida (baixa) endpoints, mounted at /api/salida.
@@ -123,6 +124,28 @@ export async function salidaRoutes(fastify: FastifyInstance, options: SalidaRout
       userId: request.user!.sub,
       publicBaseUrl,
     });
+
+    // The movement is already stored, so the line records a fact. A log that cannot be written is a warning:
+    // turning a saved baixa into a 500 would tell the operator to launch it again and duplicate the movement.
+    try {
+      appendLocalAeroLog({
+        event: 'salida_create',
+        user: request.user!.username,
+        role: request.user!.role,
+        destinationUrl: 'local://salida',
+        payload: {
+          movementId: movement.id,
+          movementDate: movement.movement_date,
+          itemCount: movement.items.length,
+          totalUnits: movement.total_units,
+          blocks: [...new Set(movement.items.map((item) => item.block))],
+        },
+        note: 'local=salida · action=create',
+      });
+    } catch (error) {
+      request.log.warn(`Failed to append the salida_create audit line: ${String(error)}`);
+    }
+
     return reply.status(201).send({ movement });
   });
 
@@ -271,6 +294,25 @@ export async function salidaRoutes(fastify: FastifyInstance, options: SalidaRout
         fastify.log.warn(`Failed to delete orphan salida photo: ${storedName}`);
       }
       throw error;
+    }
+
+    // Optional photo of a stored movement: same rule as the launch, the row is the fact and the line follows it.
+    try {
+      appendLocalAeroLog({
+        event: 'salida_photo',
+        user: request.user!.username,
+        role: request.user!.role,
+        destinationUrl: 'local://salida',
+        payload: {
+          movementId,
+          photoId: photo.id,
+          fileSize: photo.file_size,
+          mimeType: photo.mime_type,
+        },
+        note: 'local=salida · action=photo',
+      });
+    } catch (error) {
+      request.log.warn(`Failed to append the salida_photo audit line: ${String(error)}`);
     }
 
     return reply.status(201).send({ photo });

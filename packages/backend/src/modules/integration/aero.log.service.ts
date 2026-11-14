@@ -31,6 +31,63 @@ export interface AeroLogEntry {
 }
 
 /**
+ * The local half of the audit trail.
+ *
+ * These four events never leave the machine: they record that a movement, a report or one of their photos was
+ * written into Trindade's own database. They live in the same file as the ERP calls on purpose, because the
+ * question an operator asks on a Monday morning -- "did the plant record this?" -- is answered by reading one
+ * line, not by correlating a file with the database.
+ *
+ * The spelling is fixed here and in `AeroLogEventSchema`; the two lists are what the contract test pins.
+ */
+export const AERO_LOCAL_EVENTS = ['salida_create', 'salida_photo', 'report_create', 'report_photo'] as const;
+
+export type AeroLocalEvent = (typeof AERO_LOCAL_EVENTS)[number];
+
+/** The two local surfaces that own the events above. */
+export type AeroLocalDestination = 'local://salida' | 'local://reports';
+
+/**
+ * Appends one local event, with the fields the remote events always keep null.
+ *
+ * A local write has no phase, no HTTP status, no response and no attempt: it happened. Accepting
+ * `appendAeroLog` directly would make every caller repeat eight nulls and would let them drift, so the shape of a
+ * local line is stated once here.
+ */
+export function appendLocalAeroLog(
+  entry: {
+    event: AeroLocalEvent;
+    user: string;
+    role: string;
+    destinationUrl: AeroLocalDestination;
+    payload: unknown;
+    note: string;
+  },
+  dir?: string,
+): string {
+  return appendAeroLog(
+    {
+      ts: new Date().toISOString(),
+      event: entry.event,
+      phase: null,
+      user: entry.user,
+      role: entry.role,
+      destinationUrl: entry.destinationUrl,
+      httpStatus: null,
+      payload: entry.payload,
+      response: null,
+      error: null,
+      launchId: null,
+      note: entry.note,
+      client: null,
+      attemptId: null,
+      durationMs: null,
+    },
+    dir,
+  );
+}
+
+/**
  * Resolves the directory where the Aero integration audit log is stored.
  * Honors AERO_LOG_DIR from the environment when set and non-empty, falling back
  * to the `logs` folder under the process current working directory.

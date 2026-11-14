@@ -414,7 +414,7 @@ export function SalidaLaunchPage() {
             </dt>
             <dd className="font-medium text-gray-900" data-testid="salida-operator">
               {user?.username ?? ''}
-              <span className="ml-2 text-xs font-normal text-gray-500">({t('salida.readOnly')})</span>
+              <span className="ml-2 text-xs font-normal text-gray-500">({t('salida.session')})</span>
             </dd>
           </div>
         </dl>

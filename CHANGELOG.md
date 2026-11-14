@@ -12,6 +12,29 @@ verificaciones está en [docs/release-android-historial.md](docs/release-android
 
 ## [Unreleased]
 
+### Auditoría local y etiqueta de sesión
+
+Los módulos Salida/Baja y Reportes escriben ahora su alta y sus fotos en el mismo `logs/aero-integration.log` que
+la integración Aero, y el operador de `/salida` se rotula como sesión en lugar de como campo de solo lectura.
+
+#### Añadido
+
+- **Cuatro eventos locales en `aero-integration.log`**, escritos por el backend después de guardar la fila:
+  `salida_create` (`movementId`, `movementDate`, `itemCount`, `totalUnits`, `blocks`), `salida_photo`
+  (`movementId`, `photoId`, `fileSize`, `mimeType`), `report_create` (`reportId`, `reportDate`, `turno`,
+  `itemCount`) y `report_photo` (`reportId`, `photoId`, `fileSize`, `mimeType`). Sin credenciales ni
+  `Authorization`; `phase`, `httpStatus`, `response`, `error` y `launchId` quedan en `null` porque no son intentos
+  contra el ERP. La escritura va en `try/catch` con `request.log.warn`: un volumen sin permiso no convierte una
+  salida válida en un `500`.
+- **Los cuatro eventos se reconocen en `AeroLogEventSchema`**, con el contrato OpenAPI y el cliente Kotlin generado
+  regenerados. La app Android no cambia.
+
+#### Cambiado
+
+- **El operador de `/salida` dice «Sesión»** («Sessão» en portugués) en lugar de «Solo lectura». Es una etiqueta: el
+  campo sigue siendo de solo lectura, y la descripción del histórico que habla de «registro de solo lectura» sigue
+  siendo correcta.
+
 ### Módulo Salida / Baixa (beta privada)
 
 Baja de insumos, embalagens e bobinas desde la web, con histórico propio y conciliación contra los asientos de

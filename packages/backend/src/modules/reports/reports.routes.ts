@@ -15,6 +15,7 @@ import {
 import { apiError } from '../../utils/api-error.js';
 import { getSaoPauloDateString } from '../../utils/date.js';
 import { AERO_MOVEMENTS_ERROR_CODES } from '../integration/aero.movements.schema.js';
+import { appendLocalAeroLog } from '../integration/aero.log.service.js';
 import { dayReceipts } from './receipts.service.js';
 import * as query from './reports.query.service.js';
 import * as command from './reports.command.service.js';
@@ -140,6 +141,26 @@ export async function reportsRoutes(fastify: FastifyInstance, opts: ReportsRoute
           ipAddress: request.ip,
           details: { turno: report.turno },
         });
+
+        // The report is stored, so this line records what the plant kept. A failure here is a warning and never
+        // a 500: the operator would read the error as "the report was not created" and file it twice.
+        try {
+          appendLocalAeroLog({
+            event: 'report_create',
+            user: request.user!.username,
+            role: request.user!.role,
+            destinationUrl: 'local://reports',
+            payload: {
+              reportId: report.id,
+              reportDate: report.report_date,
+              turno: report.turno,
+              itemCount: report.items.length,
+            },
+            note: 'local=reports · action=create',
+          });
+        } catch (error) {
+          request.log.warn(`Failed to append the report_create audit line: ${String(error)}`);
+        }
 
         return reply.status(201).send({ report });
       } catch (err: any) {
@@ -598,6 +619,25 @@ export async function reportsRoutes(fastify: FastifyInstance, opts: ReportsRoute
         ipAddress: request.ip,
         details: { reportId, fileName: storedName, fileSize: data.length },
       });
+
+      // Same rule as the report itself: the photo row exists by now, and the line only records it.
+      try {
+        appendLocalAeroLog({
+          event: 'report_photo',
+          user: request.user!.username,
+          role: request.user!.role,
+          destinationUrl: 'local://reports',
+          payload: {
+            reportId,
+            photoId: photo.id,
+            fileSize: photo.file_size,
+            mimeType: photo.mime_type,
+          },
+          note: 'local=reports · action=photo',
+        });
+      } catch (error) {
+        request.log.warn(`Failed to append the report_photo audit line: ${String(error)}`);
+      }
 
       return reply.status(201).send({ photo });
     }

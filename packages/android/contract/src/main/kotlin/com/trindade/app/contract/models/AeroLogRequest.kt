@@ -97,7 +97,7 @@ data class AeroLogRequest (
     /**
      * 
      *
-     * Values: test_connection,launch_sync,read_history,dispatch,sync,test,`import`,queue_rejected,salida_sync
+     * Values: test_connection,launch_sync,read_history,dispatch,sync,test,`import`,queue_rejected,salida_sync,salida_create,salida_photo,report_create,report_photo
      */
     @Serializable
     enum class Event(val value: kotlin.String) {
@@ -109,7 +109,11 @@ data class AeroLogRequest (
         @SerialName(value = "test") test("test"),
         @SerialName(value = "import") `import`("import"),
         @SerialName(value = "queue_rejected") queue_rejected("queue_rejected"),
-        @SerialName(value = "salida_sync") salida_sync("salida_sync");
+        @SerialName(value = "salida_sync") salida_sync("salida_sync"),
+        @SerialName(value = "salida_create") salida_create("salida_create"),
+        @SerialName(value = "salida_photo") salida_photo("salida_photo"),
+        @SerialName(value = "report_create") report_create("report_create"),
+        @SerialName(value = "report_photo") report_photo("report_photo");
     }
     /**
      * 

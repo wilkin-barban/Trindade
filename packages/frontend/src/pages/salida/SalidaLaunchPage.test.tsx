@@ -161,11 +161,14 @@ beforeEach(async () => {
 });
 
 describe('SalidaLaunchPage', () => {
-  it('shows the plant day and the session operator, read-only', async () => {
+  it('shows the plant day and the session operator', async () => {
     await renderReady();
 
     expect(screen.getByTestId('salida-date').textContent).toMatch(/^Hoje · \d{2}\/\d{2}\/\d{4}$/);
     expect(screen.getByTestId('salida-operator').textContent).toContain('wilkin');
+    // The operator is the session, and the label says so: it is not an empty field the reader can fill in.
+    expect(screen.getByTestId('salida-operator').textContent).toContain('Sesión');
+    expect(screen.getByTestId('salida-operator').textContent).not.toContain('Solo lectura');
     // No date input exists: the day is the plant's and the operator cannot choose another one.
     expect(screen.queryByTestId('salida-history-date')).toBeNull();
   });
