@@ -91,7 +91,8 @@ export function AssaiCalculatorPage() {
 
       <Card>
         <CardContent className="p-3">
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[320px] text-sm">
             <thead>
               <tr className="border-b text-left text-xs text-gray-500 uppercase">
                 <th className="py-2 pr-2">{t('assai.product')}</th>
@@ -136,6 +137,7 @@ export function AssaiCalculatorPage() {
               ))}
             </tbody>
           </table>
+          </div>
 
           <div className="flex items-center justify-between pt-3 border-t mt-2">
             <span className="text-sm text-gray-500">{t('assai.totalLabel')}</span>
