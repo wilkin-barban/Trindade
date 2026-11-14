@@ -57,7 +57,10 @@
     "goodsProgress": "{{done}}/{{total}} mercaderías",
     "shareApp": "Compartir App",
     "shareAppHint": "Enviar la app y los accesos al próximo celular",
-    "massasLaunchNow": "Lanzar ahora"
+    "massasLaunchNow": "Lanzar ahora",
+    "salidaHint": "Registrar salida de producto",
+    "salidaNow": "Lanzar ahora",
+    "salidaHistory": "Ver Historial"
   },
   "nav": {
     "adminPanel": "Panel de Administración",
@@ -400,11 +403,14 @@
   },
   "audit": {
     "title": "Auditoría",
+    "subtitle": "Lo que se hizo, quién lo hizo y cuándo.",
+    "totalLogs": "Registros en total: {{total}}",
     "accessDenied": {
       "title": "Acceso Restringido",
       "description": "Esta área es exclusiva para administradores."
     },
     "filters": {
+      "title": "Filtros",
       "action": "Acción",
       "entity": "Entidad",
       "userId": "ID Usuario",
@@ -506,7 +512,6 @@
     "errorUnits": "Cantidad errada de unidades",
     "freeNumber": "Coloque el WhatsApp",
     "message": "Mensaje",
-    "perBox": "Por caja",
     "product": "Producto",
     "selectDriver": "Elegir chofer con teléfono",
     "share": "Enviar por WhatsApp",
