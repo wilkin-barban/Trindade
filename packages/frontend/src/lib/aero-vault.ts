@@ -27,7 +27,13 @@ export interface AeroVaultSettings {
   updatedAt: string | null;
 }
 
-export type AeroBridgeAction = 'entrada' | 'entrada_lote' | 'movimentos' | 'test';
+/**
+ * The words the server arms a ticket for.
+ *
+ * `saida` is the stock exit of the Salida / Baixa module: it shares the bridge and the vault with the entries,
+ * and its endpoint (`saidasitem`) is chosen by the server from the action, never by this page.
+ */
+export type AeroBridgeAction = 'entrada' | 'entrada_lote' | 'saida' | 'movimentos' | 'test';
 
 /** What the page hands to the Shortcut: a token that lives 120 s and burns on first use. */
 export interface AeroBridgeTicket {

@@ -26,7 +26,7 @@ export interface AeroAuditEvent {
    * belongs to whichever client brought a seat in. They are one column because a reader filters the log
    * by event, not by app; `client` is the field that says who wrote the line.
    */
-  event: 'test_connection' | 'launch_sync' | 'read_history' | 'dispatch' | 'sync' | 'test' | 'import';
+  event: 'test_connection' | 'launch_sync' | 'read_history' | 'salida_sync' | 'dispatch' | 'sync' | 'test' | 'import';
   phase?: 'requested' | 'result';
   destinationUrl: string;
   httpStatus?: number | null;

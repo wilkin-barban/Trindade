@@ -13,8 +13,14 @@
 
 export const AERO_PENDING_ATTEMPT_STORAGE_KEY = 'trindade.aero.pending-attempt.v1';
 
-/** Which bridge trip the attempt belongs to. The page names it, the callback checks it. */
-export type AeroPendingAction = 'movimentos' | 'entrada' | 'entrada_lote';
+/**
+ * Which bridge trip the attempt belongs to. The page names it, the callback checks it.
+ *
+ * `saida` is the stock exit of Salida / Baixa: it shares the bridge with the entries and the movements read,
+ * and it is a third trip because a page must never close an answer with an identifier that belongs to
+ * another one still in flight.
+ */
+export type AeroPendingAction = 'movimentos' | 'entrada' | 'entrada_lote' | 'saida';
 
 export interface AeroPendingAttempt {
   action: AeroPendingAction;
@@ -79,7 +85,12 @@ export function loadAeroPendingAttempt(
     const parsed = JSON.parse(raw) as Record<string, unknown> | null;
     if (!parsed || typeof parsed !== 'object') return null;
     const { action: storedAction, attemptId, startedAt, date } = parsed;
-    if (storedAction !== 'movimentos' && storedAction !== 'entrada' && storedAction !== 'entrada_lote') {
+    if (
+      storedAction !== 'movimentos' &&
+      storedAction !== 'entrada' &&
+      storedAction !== 'entrada_lote' &&
+      storedAction !== 'saida'
+    ) {
       return null;
     }
     if (typeof attemptId !== 'string' || attemptId.length === 0) return null;
