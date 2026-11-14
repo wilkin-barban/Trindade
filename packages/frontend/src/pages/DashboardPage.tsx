@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
+import { useAuth } from '../contexts/AuthContext';
+import { isSalidaVisible } from '../lib/salida';
 import { shareOrCopy } from '../lib/whatsapp';
 import { activeScheduleLink } from '../lib/active-schedule-link';
 import { Card, CardContent } from '../components/ui/card';
@@ -27,7 +29,7 @@ interface DashboardSummary {
 interface SummaryCardProps {
   title: string;
   value: React.ReactNode;
-  icon: string;
+  icon: React.ReactNode;
   /** The card's single door, when it has one. Never combined with links inside `value`. */
   to?: string;
   testId?: string;
@@ -79,6 +81,7 @@ function SummaryRow({ label, value, testId }: { label: string; value: string; te
 
 export function DashboardPage() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -168,9 +171,10 @@ export function DashboardPage() {
         </div>
       </div>
 
-      {/* Seis tarjetas, en el orden del teléfono: lo que se hace hoy, el cronograma que corre, las masas, las
-          dos calculadoras y la app que se comparte. Y tres columnas en escritorio, no cinco: seis tarjetas en
-          una grilla de cinco dejan una sola huérfana en la segunda fila. */}
+      {/* Siete tarjetas para quien está en la beta de Salida y seis para el resto, en el orden del teléfono:
+          lo que se hace hoy, el cronograma que corre, las masas, la salida, las dos calculadoras y la app que
+          se comparte. Y tres columnas en escritorio, no cinco: seis tarjetas en una grilla de cinco dejan una
+          sola huérfana en la segunda fila. */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <SummaryCard
           title={t('dashboard.reportsToday')}
@@ -256,6 +260,43 @@ export function DashboardPage() {
           }
           icon="🍝"
         />
+        {/* La salida: beta privada, así que la tarjeta existe solo para la cuenta que está adentro. Como la de
+            masas, no es un enlace sino una superficie con dos puertas -- lanzar e histórico --, porque envolverla
+            en un ancla y dejar la otra adentro deja el ancla interna sin destino propio. */}
+        {isSalidaVisible(user) && (
+          <SummaryCard
+            title={t('nav.salida')}
+            testId="dashboard-card-salida"
+            value={
+              <div className="space-y-1">
+                <span className="text-sm text-gray-500">{t('dashboard.salidaHint')}</span>
+                <div className="flex flex-wrap items-center gap-3 pt-1">
+                  <Link
+                    to="/salida"
+                    className="text-xs font-medium text-rose-700 hover:underline"
+                    data-testid="dashboard-salida-launch"
+                  >
+                    {t('dashboard.salidaNow')}
+                  </Link>
+                  <Link
+                    to="/salida-history"
+                    className="text-xs font-medium text-rose-700 hover:underline"
+                    data-testid="dashboard-salida-history"
+                  >
+                    {t('dashboard.salidaHistory')}
+                  </Link>
+                </div>
+              </div>
+            }
+            icon={
+              <span
+                className="flex h-11 w-11 items-center justify-center rounded-xl bg-rose-100 text-xl"
+              >
+                📤
+              </span>
+            }
+          />
+        )}
         <SummaryCard
           title={t('dashboard.stock')}
           testId="dashboard-card-stock"

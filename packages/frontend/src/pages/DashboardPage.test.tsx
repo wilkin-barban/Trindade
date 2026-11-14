@@ -4,8 +4,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import i18n from '../i18n/config';
 
 /**
- * The dashboard is the same screen on both clients: six cards in the phone's order and one panel with every
- * count on it.
+ * The dashboard is the same screen on both clients: the cards in the phone's order and one panel with every
+ * count on it. One of the cards is guarded -- Salida / Baixa is a private beta -- so the phone's order is
+ * asserted for the account that is inside it and for the one that is not.
  *
  * Three things are asserted because three things were wrong: the grid carried a card the phone does not draw
  * (Histórico de Contagem, reachable from the counter instead), each count had a card of its own where the
@@ -15,9 +16,26 @@ import i18n from '../i18n/config';
  */
 const get = vi.fn();
 
+/** The account the dashboard is rendering for. `wilkin` is the one inside the Salida beta. */
+let currentUser: { id: number; username: string; role: string } = {
+  id: 2,
+  username: 'ana',
+  role: 'Administrador',
+};
+
 vi.mock('../api/client', () => ({
   api: { get: (...args: unknown[]) => get(...args) },
   ApiClientError: class ApiClientError extends Error {},
+}));
+
+vi.mock('../contexts/AuthContext', () => ({
+  useAuth: () => ({
+    user: currentUser,
+    token: 'token',
+    isLoading: false,
+    login: vi.fn(),
+    logout: vi.fn(),
+  }),
 }));
 
 const { DashboardPage } = await import('./DashboardPage');
@@ -47,6 +65,7 @@ function renderPage() {
 }
 
 beforeEach(async () => {
+  currentUser = { id: 2, username: 'ana', role: 'Administrador' };
   get.mockReset();
   get.mockImplementation(async (url: string) => {
     if (url.startsWith('/dashboard/summary')) return SUMMARY;
@@ -72,14 +91,44 @@ describe('DashboardPage', () => {
     expect(screen.queryByText('Historial de conteo')).not.toBeInTheDocument();
   });
 
-  it('gives the masas card two doors and no anchor around them', async () => {
-    renderPage();
+  it('gives the masas card two doors and no anchor around them', async () => {    renderPage();
 
     const card = await screen.findByTestId('dashboard-card-massas');
     // A card that is a link wraps its own body: the inner door would be an anchor inside an anchor.
     expect(card.querySelector('a a')).toBeNull();
     expect(within(card).getByTestId('dashboard-massas-launch')).toHaveAttribute('href', '/massas-launch');
     expect(within(card).getByTestId('dashboard-massas-history')).toHaveAttribute('href', '/massas-history');
+  });
+
+  it('draws seven cards for wilkin, with Salida right after Masas', async () => {
+    currentUser = { id: 1, username: 'wilkin', role: 'Administrador' };
+    renderPage();
+
+    const cards = await screen.findAllByTestId(/^dashboard-card-/);
+    const texts = cards.map((card) => card.textContent ?? '');
+    expect(texts).toHaveLength(7);
+    expect(texts[2]).toContain('Lanzamiento de Masas');
+    expect(texts[3]).toContain('Salida / Baixa');
+  });
+
+  it('gives the Salida card the two doors it needs, and no anchor around them', async () => {
+    currentUser = { id: 1, username: 'wilkin', role: 'Administrador' };
+    renderPage();
+
+    const card = await screen.findByTestId('dashboard-card-salida');
+    expect(card.querySelector('a a')).toBeNull();
+    expect(within(card).getByTestId('dashboard-salida-launch')).toHaveAttribute('href', '/salida');
+    expect(within(card).getByTestId('dashboard-salida-history')).toHaveAttribute('href', '/salida-history');
+  });
+
+  it('does not draw the Salida card for an account outside the beta', async () => {
+    renderPage();
+
+    await screen.findByTestId('dashboard-card-massas');
+    expect(screen.queryByTestId('dashboard-card-salida')).not.toBeInTheDocument();
+    // Nor its doors: a link drawn but not shown is still a link a screen reader can reach.
+    expect(screen.queryByTestId('dashboard-salida-launch')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('dashboard-salida-history')).not.toBeInTheDocument();
   });
 
   it('reads every count in one panel, with the pairs as done/total', async () => {
