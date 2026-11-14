@@ -64,7 +64,7 @@ export function MassasLaunchGrid({
           </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {products.map((product) => {
             const currentBoxes = quantities[product.code] || '';
             const numBoxes = parseInt(currentBoxes || '0', 10);
@@ -74,48 +74,49 @@ export function MassasLaunchGrid({
               <div
                 key={product.code}
                 data-testid={`massas-product-${product.code}`}
-                className={`p-3 rounded-lg border transition-all ${
+                className={`flex items-center gap-2 rounded-lg border p-3 transition-colors ${
                   numBoxes > 0 ? 'bg-amber-50/50 border-amber-300 shadow-xs' : 'bg-gray-50/50 border-gray-200'
                 }`}
               >
-                <div className="flex justify-between items-start gap-1 mb-1">
-                  {/* Sin `truncate`: en un teléfono el nombre quedaba "MASSA LASANHA TRADICIONAL ..." y el
-                      título del tooltip no existe en una pantalla táctil. Envuelve y se lee entero. */}
-                  <span className="text-xs font-bold text-gray-800 leading-snug break-words min-w-0" title={product.name}>
+                {/* Nombre a la izquierda con las unidades por caja como sublinea, y el campo con las unidades
+                    calculadas a la derecha: la misma fila que `SalidaProductRow`. Apilar el nombre arriba del
+                    campo gastaba dos renglones por producto, veinte en un telefono. Sin `truncate`: en una
+                    pantalla tactil no hay tooltip que rescate un nombre cortado. */}
+                <div className="min-w-0 flex-1">
+                  <span
+                    className="block break-words text-xs font-bold leading-snug text-gray-800"
+                    title={product.name}
+                  >
                     {product.name}
                   </span>
-                  <span className="text-[11px] text-gray-500 font-medium shrink-0">
+                  <span className="mt-0.5 block text-[10px] font-medium text-gray-500">
                     {product.unitsPerBox} un/cx
                   </span>
                 </div>
 
-                {/* Las unidades nacen de las cajas: van en el mismo renglón, al lado del campo, en vez
-                    de gastar un renglón propio en cada tarjeta. Diez productos son diez renglones
-                    menos que recorrer con el pulgar. */}
-                <div className="mt-2 flex items-center gap-2">
-                  <div className="min-w-0 flex-1">
-                    {readOnly ? (
-                      // The day's own number, in the place the field would be: the operator reads the record
-                      // instead of an empty box that suggests it can still be filled.
-                      <span
-                        className="flex h-11 items-center justify-center rounded-md border border-gray-200 bg-white text-base font-bold text-gray-900 sm:h-9 sm:text-sm"
-                        data-testid={`massas-closed-${product.code}`}
-                      >
-                        {product.totalBoxes} cx
-                      </span>
-                    ) : (
-                      <Input
-                        type="number"
-                        min="0"
-                        step="1"
-                        inputMode="numeric"
-                        placeholder="0 cx"
-                        value={currentBoxes}
-                        onChange={(e) => onQuantityChange(product.code, e.target.value)}
-                        className="h-11 text-base text-center font-bold sm:h-9 sm:text-sm"
-                      />
-                    )}
-                  </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  {readOnly ? (
+                    // The day's own number, in the place the field would be: the operator reads the record
+                    // instead of an empty box that suggests it can still be filled.
+                    <span
+                      className="flex h-11 min-w-[4.5rem] items-center justify-center rounded-md border border-gray-200 bg-white px-2 text-base font-bold text-gray-900 sm:h-9 sm:text-sm"
+                      data-testid={`massas-closed-${product.code}`}
+                    >
+                      {product.totalBoxes} cx
+                    </span>
+                  ) : (
+                    <Input
+                      type="number"
+                      min="0"
+                      step="1"
+                      inputMode="numeric"
+                      placeholder="0 cx"
+                      value={currentBoxes}
+                      onChange={(e) => onQuantityChange(product.code, e.target.value)}
+                      aria-label={product.name}
+                      className="h-11 w-20 text-base text-center font-bold sm:h-9 sm:text-sm"
+                    />
+                  )}
                   <span
                     className={`w-14 shrink-0 text-right text-xs font-semibold ${
                       numBoxes > 0 ? 'text-amber-700' : 'text-gray-500'

@@ -5,6 +5,7 @@ import { massasUnifiedRows } from '../../lib/massas-unified';
 import type { AeroErpMovementItem } from '../../lib/aero-integration';
 import type { MassaIndividualLaunch, MassaProductTotal } from '../../lib/massas';
 import { MassasCollectiveTable } from './MassasCollectiveTable';
+import { MassasLaunchGrid } from './MassasLaunchGrid';
 
 /**
  * The two lower sections of the massas screen, as the operator reads them.
@@ -82,6 +83,65 @@ function renderTable(options: { seats?: AeroErpMovementItem[]; launches?: MassaI
 
   return { ...view, unifiedRows, onImport, onStartEdit, onDelete };
 }
+
+describe('MassasLaunchGrid — one row per product', () => {
+  /**
+   * The launch grid of a phone: name on the left with the units-per-box as a subline, the field and the computed
+   * units on the right. The name above the field was a stack, and ten products stacked are twenty lines to scroll
+   * with a thumb before the operator reaches `Lançar`.
+   */
+  function renderGrid(options: { readOnly?: boolean } = {}) {
+    render(
+      <MassasLaunchGrid
+        products={CATALOG}
+        quantities={{ '1045': '4' }}
+        onQuantityChange={vi.fn()}
+        onLaunch={vi.fn()}
+        submitting={false}
+        readOnly={options.readOnly}
+      />,
+    );
+    return screen.getByTestId('massas-product-1045');
+  }
+
+  it('keeps the name, its subline and the field in one row', () => {
+    const row = renderGrid();
+
+    expect(row.className).toContain('flex');
+    expect(row.className).toContain('items-center');
+    expect(row.className).not.toContain('flex-col');
+
+    const name = within(row).getByText('MASSA CASEIRA');
+    // The units per box are a 10px subline of the name, not a second column competing with the field.
+    const perBox = within(row).getByText('10 un/cx');
+    expect(perBox.className).toContain('text-[10px]');
+    expect(name.parentElement).toBe(perBox.parentElement);
+
+    const field = within(row).getByRole('spinbutton');
+    // The field is the name's sibling column, never its child: no stacking.
+    expect(name.parentElement?.contains(field)).toBe(false);
+    expect(field.parentElement?.parentElement).toBe(row);
+    expect(within(row).getByText('40 un')).toBeInTheDocument();
+  });
+
+  it('lays the products out one, two and three per row instead of five', () => {
+    renderGrid();
+
+    const grid = screen.getByTestId('massas-product-1045').parentElement!;
+    expect(grid.className).toContain('grid-cols-1');
+    expect(grid.className).toContain('sm:grid-cols-2');
+    expect(grid.className).toContain('xl:grid-cols-3');
+  });
+
+  it('puts the closed day\'s total where the field would be', () => {
+    const row = renderGrid({ readOnly: true });
+
+    expect(within(row).getByTestId('massas-closed-1045').textContent).toBe('0 cx');
+    expect(within(row).queryByRole('spinbutton')).toBeNull();
+    // Still one row, still the subline under the name.
+    expect(within(row).getByText('10 un/cx').className).toContain('text-[10px]');
+  });
+});
 
 describe('MassasCollectiveTable — the unified day in both sections', () => {
   beforeEach(async () => {
