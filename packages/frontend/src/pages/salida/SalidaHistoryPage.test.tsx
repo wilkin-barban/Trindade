@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import i18n from '../../i18n/config';
@@ -546,7 +546,7 @@ describe('SalidaHistoryPage — iPhone share and layout', () => {
     expect(screen.getByTestId('salida-history-actions').className).toContain('sm:flex');
   });
 
-  it('keeps the help button in the title row and the launch action in its own row', async () => {
+  it('keeps the help button in the title row and a compact launch link in its own row', async () => {
     await renderReady();
 
     const header = screen.getByTestId('salida-history-header');
@@ -558,5 +558,19 @@ describe('SalidaHistoryPage — iPhone share and layout', () => {
     // The help sits beside the title, not at the end of the actions row.
     expect(help.parentElement?.tagName).toBe('DIV');
     expect(launch.closest('[data-testid="salida-history-help"]')).toBeNull();
+
+    // The rest of the histories offer a compact link, not a full-width button: `flex-1`/`w-full` stretched it
+    // across the phone and made the header look like a primary action.
+    expect(launch.tagName).toBe('A');
+    expect(launch.getAttribute('href')).toBe('/salida');
+    expect(launch.className).toContain('shrink-0');
+    expect(launch.className).not.toContain('flex-1');
+    expect(launch.className).not.toContain('w-full');
+    expect(launch.className).toContain('h-11');
+    // Short label on the phone, full one from `sm` up.
+    expect(launch.textContent).toContain(i18n.t('salida.launchShort'));
+    expect(launch.textContent).toContain(i18n.t('salida.launch'));
+    expect(within(launch).getByText(i18n.t('salida.launchShort')).className).toContain('sm:hidden');
+    expect(within(launch).getByText(i18n.t('salida.launch')).className).toContain('hidden');
   });
 });

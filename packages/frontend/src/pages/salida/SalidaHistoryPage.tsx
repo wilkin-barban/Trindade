@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ClipboardX, MessageCircle } from 'lucide-react';
 import { api } from '../../api/client';
 import { Button } from '../../components/ui/button';
@@ -470,17 +470,15 @@ export function SalidaHistoryPage() {
             <p className="mt-1 text-sm text-gray-500">{t('salida.historySubtitle')}</p>
           </div>
           <div className="flex w-full items-center gap-2 sm:w-auto sm:shrink-0">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => navigate('/salida')}
-              className="min-h-[44px] flex-1 sm:flex-initial"
+            <Link
+              to="/salida"
+              className="inline-flex h-11 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-300 bg-white px-3 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 sm:h-10"
               data-testid="salida-history-launch"
             >
-              <ArrowLeft className="h-4 w-4" />
-              {t('salida.launch')}
-            </Button>
+              <ArrowLeft className="h-4 w-4 shrink-0" />
+              <span className="sm:hidden">{t('salida.launchShort')}</span>
+              <span className="hidden sm:inline">{t('salida.launch')}</span>
+            </Link>
           </div>
         </div>
       </div>

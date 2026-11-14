@@ -1008,7 +1008,8 @@
     "entLan": "ENT_LAN",
     "totalUnits": "Total",
     "share": "Compartilhar",
-    "noPhotos": "Sem fotos"
+    "noPhotos": "Sem fotos",
+    "launchShort": "Lançar"
   },
   "stock": {
     "add": "Adicionar",
