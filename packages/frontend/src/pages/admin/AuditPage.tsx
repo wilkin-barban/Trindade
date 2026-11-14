@@ -172,58 +172,111 @@ export function AuditPage() {
 
   return (
     <div>
-      <h3 className="text-lg font-semibold text-gray-800 mb-4">{t('audit.title')}</h3>
-
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 mb-4 items-end">
-        <div className="space-y-1">
-          <label className="block text-xs font-medium text-gray-600">{t('audit.filters.action')}</label>
-          <select
-            value={actionInput}
-            onChange={(e) => setActionInput(e.target.value)}
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm bg-white"
+      {/* Qué es esta pantalla antes de qué hay en ella: el título, una línea que dice para qué sirve y cuánto
+          hay registrado. En el teléfono el total vivía al pie de la tabla, y una pantalla que empieza en una
+          tabla sin decir cuántos registros hay se lee como si no hubiera ninguno. */}
+      <Card className="mb-4" data-testid="audit-header">
+        <CardContent className="pt-6">
+          <h3 className="text-lg font-semibold text-gray-800">{t('audit.title')}</h3>
+          <p className="mt-1 text-sm text-gray-500">{t('audit.subtitle')}</p>
+          <p
+            className="mt-2 text-sm font-medium tabular-nums text-gray-700"
+            data-testid="audit-total-logs"
           >
-            {ACTIONS.map((a) => (
-              <option key={a.value} value={a.value}>
-                {t(a.labelKey)}
-              </option>
-            ))}
-          </select>
-        </div>
+            {t('audit.totalLogs', { total })}
+          </p>
+        </CardContent>
+      </Card>
 
-        <div className="space-y-1">
-          <label className="block text-xs font-medium text-gray-600">{t('audit.filters.entity')}</label>
-          <select
-            value={entityTypeInput}
-            onChange={(e) => setEntityTypeInput(e.target.value)}
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm bg-white"
+      {/* Filters: one column on a phone and four on a desktop. Each control fills its column and clears 44px,
+          which is the floor for a tap target on a phone held in the plant; the buttons sit side by side only
+          when there is room for both. */}
+      <Card className="mb-4" data-testid="audit-filters">
+        <CardContent className="pt-6">
+          <h4 className="mb-3 text-sm font-semibold text-gray-800">{t('audit.filters.title')}</h4>
+          <div
+            className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4"
+            data-testid="audit-filters-grid"
           >
-            {ENTITY_TYPES.map((e) => (
-              <option key={e.value} value={e.value}>
-                {t(e.labelKey)}
-              </option>
-            ))}
-          </select>
-        </div>
+            <div className="space-y-1">
+              <label
+                htmlFor="audit-filter-action"
+                className="block text-xs font-medium text-gray-600"
+              >
+                {t('audit.filters.action')}
+              </label>
+              <select
+                id="audit-filter-action"
+                value={actionInput}
+                onChange={(e) => setActionInput(e.target.value)}
+                className="min-h-[44px] w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-base sm:text-sm"
+              >
+                {ACTIONS.map((a) => (
+                  <option key={a.value} value={a.value}>
+                    {t(a.labelKey)}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        <div className="space-y-1">
-          <label className="block text-xs font-medium text-gray-600">{t('audit.filters.userId')}</label>
-          <input
-            type="number"
-            value={userIdInput}
-            onChange={(e) => setUserIdInput(e.target.value)}
-            placeholder={t('audit.filters.userIdPlaceholder')}
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm w-24"
-          />
-        </div>
+            <div className="space-y-1">
+              <label
+                htmlFor="audit-filter-entity"
+                className="block text-xs font-medium text-gray-600"
+              >
+                {t('audit.filters.entity')}
+              </label>
+              <select
+                id="audit-filter-entity"
+                value={entityTypeInput}
+                onChange={(e) => setEntityTypeInput(e.target.value)}
+                className="min-h-[44px] w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-base sm:text-sm"
+              >
+                {ENTITY_TYPES.map((e) => (
+                  <option key={e.value} value={e.value}>
+                    {t(e.labelKey)}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        <Button size="sm" onClick={handleApplyFilters}>
-          {t('audit.filters.filter')}
-        </Button>
-        <Button size="sm" variant="outline" onClick={handleClearFilters}>
-          {t('audit.filters.clear')}
-        </Button>
-      </div>
+            <div className="space-y-1">
+              <label
+                htmlFor="audit-filter-user-id"
+                className="block text-xs font-medium text-gray-600"
+              >
+                {t('audit.filters.userId')}
+              </label>
+              <input
+                id="audit-filter-user-id"
+                type="number"
+                value={userIdInput}
+                onChange={(e) => setUserIdInput(e.target.value)}
+                placeholder={t('audit.filters.userIdPlaceholder')}
+                className="min-h-[44px] w-full rounded-md border border-gray-300 px-3 py-2 text-base sm:text-sm"
+              />
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+              <Button
+                size="sm"
+                onClick={handleApplyFilters}
+                className="min-h-[44px] w-full sm:w-auto"
+              >
+                {t('audit.filters.filter')}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleClearFilters}
+                className="min-h-[44px] w-full sm:w-auto"
+              >
+                {t('audit.filters.clear')}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {error && (
         <div className="p-3 mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md">
