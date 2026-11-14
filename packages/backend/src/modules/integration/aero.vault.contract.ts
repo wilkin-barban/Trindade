@@ -27,7 +27,13 @@ export const AeroVaultSettingsRequestSchema = z
   })
   .strict();
 
-export const AeroBridgeActionSchema = z.enum(['entrada', 'entrada_lote', 'movimentos', 'test']);
+/**
+ * The actions the shortcut can be armed for, as the published contract names them.
+ *
+ * `saida` joined the four that existed: it is the baixa of insumos, embalagens and bobinas, and it is a batch
+ * (1..8 payloads) because one movement can carry several products. Every existing name keeps its meaning.
+ */
+export const AeroBridgeActionSchema = z.enum(['entrada', 'entrada_lote', 'saida', 'movimentos', 'test']);
 
 export const AeroBridgeTicketRequestSchema = z
   .object({

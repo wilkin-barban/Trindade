@@ -105,6 +105,38 @@ const rows: readonly Row[] = [
     accepted: true,
   },
 
+  {
+    // Transcribed from the baixa module's emitter: a movement of insumos leaving the plant posts to
+    // `/saidasitem`, and the line is the only place an attempt against the exits is recorded.
+    who: 'web records a baixa request it is about to send',
+    body: {
+      event: 'salida_sync',
+      phase: 'requested',
+      destinationUrl: `${ANDROID_WS}/saidasitem`,
+      payload: { PRO_COD: '001474', PRO_QTD: 2000, PED_SER: 'APL' },
+      note: 'client=web · via=bridge',
+      client: 'web',
+      attemptId: 'attempt-9c1d4b07',
+      durationMs: 0,
+    },
+    accepted: true,
+  },
+  {
+    who: 'web reports the baixa result with the ERP answer',
+    body: {
+      event: 'salida_sync',
+      phase: 'result',
+      destinationUrl: `${ANDROID_WS}/saidasitem`,
+      httpStatus: 200,
+      response: '{"success":true,"message":"Saida efetuada"}',
+      note: 'client=web · via=bridge',
+      client: 'web',
+      attemptId: 'attempt-9c1d4b07',
+      durationMs: 1120,
+    },
+    accepted: true,
+  },
+
   // ---- android: AeroAudit.request + AeroAudit.testRequest ----
   {
     who: 'android records a connection test with the elapsed time',
@@ -415,7 +447,13 @@ describe('the Aero audit contract, pinned to the bodies each client sends', () =
   it('has a real emitter for every canonical event, written by the client that produces it', () => {
     // One row per event is not enough: the web and the phone write the same event with different notes and
     // different fields, and a contract pinned only to one of them drifts the moment the other changes.
-    const canonical = ['launch_sync', 'read_history', 'test_connection', 'import', 'queue_rejected'];
+    //
+    // Two of the canonical events have one author on purpose. `queue_rejected` is only ever written by the
+    // phone, which is the side that holds a queue. `salida_sync` is only ever written by the web, because the
+    // baixa module is a private beta of one account and Android is out of this delivery; when the phone gets
+    // the screen, the row that pins it here is what will notice the second author is missing.
+    const canonical = ['launch_sync', 'read_history', 'test_connection', 'import', 'queue_rejected', 'salida_sync'];
+    const singleAuthorEvents = new Set(['queue_rejected', 'salida_sync']);
     const authors = new Map<string, Set<string>>();
     for (const row of rows.filter((r) => r.accepted)) {
       const body = row.body as { event?: string; client?: string; note?: string };
@@ -430,7 +468,10 @@ describe('the Aero audit contract, pinned to the bodies each client sends', () =
     for (const event of canonical) {
       assert.ok(authors.has(event), `no accepted fixture for ${event}`);
       const who = authors.get(event)!;
-      assert.ok(who.size >= 2 || event === 'queue_rejected', `${event} is pinned to a single author: ${[...who]}`);
+      assert.ok(
+        who.size >= 2 || singleAuthorEvents.has(event),
+        `${event} is pinned to a single author: ${[...who]}`
+      );
     }
   });
 

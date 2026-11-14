@@ -13,9 +13,14 @@ export type AeroErrorCode = (typeof AERO_ERROR_CODES)[keyof typeof AERO_ERROR_CO
 /**
  * Valid event types for the company Aero WebService integration audit trail.
  *
- * The canonical names are `launch_sync`, `read_history` and `test_connection`; both the web and the
- * current Android client write them. The older `dispatch`, `sync` and `test` aliases remain accepted
- * only so an APK already in the field keeps writing. New clients must use the canonical spelling.
+ * The canonical names are `launch_sync`, `read_history`, `test_connection`, `import`, `queue_rejected` and
+ * `salida_sync`; both the web and the current Android client write them. The older `dispatch`, `sync` and
+ * `test` aliases remain accepted only so an APK already in the field keeps writing. New clients must use the
+ * canonical spelling.
+ *
+ * `salida_sync` is the baixa's own line, and it is deliberately not folded into `launch_sync`: a movement of
+ * insumos leaving the plant posting to `/saidasitem` is a different operation from a masse entry posting to
+ * `/entradasitem`, and a log that called both `launch_sync` would not let anybody tell them apart afterwards.
  */
 export const AeroLogEventSchema = z.enum([
   'test_connection',
@@ -26,6 +31,7 @@ export const AeroLogEventSchema = z.enum([
   'test',
   'import',
   'queue_rejected',
+  'salida_sync',
 ]);
 
 /**

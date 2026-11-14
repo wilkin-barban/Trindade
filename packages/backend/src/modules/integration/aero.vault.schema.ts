@@ -28,6 +28,7 @@ export const AERO_BRIDGE_ERROR_CODES = {
   INVALID_ACTION: 'AERO_BRIDGE_INVALID_ACTION',
   INVALID_PAYLOADS: 'AERO_BRIDGE_INVALID_PAYLOADS',
   INVALID_CALLBACK: 'AERO_BRIDGE_INVALID_CALLBACK',
+  FORBIDDEN: 'AERO_BRIDGE_FORBIDDEN',
 } as const;
 
 export type AeroBridgeErrorCode = (typeof AERO_BRIDGE_ERROR_CODES)[keyof typeof AERO_BRIDGE_ERROR_CODES];
@@ -68,14 +69,35 @@ export const AeroVaultSettingsBodySchema = z
 
 export type AeroVaultSettingsBody = z.infer<typeof AeroVaultSettingsBodySchema>;
 
-/** The four actions the shortcut knows. Everything else is refused before a row is written. */
-export const AERO_BRIDGE_ACTIONS = ['entrada', 'entrada_lote', 'movimentos', 'test'] as const;
+/**
+ * The five actions the shortcut knows. Everything else is refused before a row is written.
+ *
+ * `saida` is the baixa of insumos, embalagens and bobinas: a whole movement of up to eight products leaves as
+ * one ticket, so it is a batch like `entrada_lote` and not a single payload like the others.
+ */
+export const AERO_BRIDGE_ACTIONS = ['entrada', 'entrada_lote', 'saida', 'movimentos', 'test'] as const;
 
 export type AeroBridgeActionName = (typeof AERO_BRIDGE_ACTIONS)[number];
 
 /** One batch action carries two to eight payloads; each of the others carries exactly one. */
 export const AERO_BRIDGE_BATCH_MIN_PAYLOADS = 2;
 export const AERO_BRIDGE_BATCH_MAX_PAYLOADS = 8;
+
+/**
+ * How many payloads each action accepts.
+ *
+ * `saida` starts at one because a movement with a single product is a movement, while `entrada_lote` starts at
+ * two because a "lot" of one is the single entry that already exists. Declared as a range per action instead of
+ * a branch inside the parser, so the rule the message describes and the rule the code applies are the same one.
+ */
+export const AERO_BRIDGE_PAYLOAD_RANGE: Record<AeroBridgeActionName, { min: number; max: number }> = {
+  entrada: { min: 1, max: 1 },
+  entrada_lote: { min: AERO_BRIDGE_BATCH_MIN_PAYLOADS, max: AERO_BRIDGE_BATCH_MAX_PAYLOADS },
+  saida: { min: 1, max: AERO_BRIDGE_BATCH_MAX_PAYLOADS },
+  movimentos: { min: 1, max: 1 },
+  test: { min: 1, max: 1 },
+};
+
 export const AERO_BRIDGE_MAX_SERIALIZED_BYTES = 32 * 1024;
 
 export const AeroBridgeActionSchema = z.enum(AERO_BRIDGE_ACTIONS);
@@ -134,10 +156,8 @@ export function parseAeroBridgeTicketRequest(
   }
 
   const count = payloads.length;
-  const validCount =
-    rawAction === 'entrada_lote'
-      ? count >= AERO_BRIDGE_BATCH_MIN_PAYLOADS && count <= AERO_BRIDGE_BATCH_MAX_PAYLOADS
-      : count === 1;
+  const range = AERO_BRIDGE_PAYLOAD_RANGE[rawAction];
+  const validCount = count >= range.min && count <= range.max;
   if (!validCount) {
     return { ok: false, code: AERO_BRIDGE_ERROR_CODES.INVALID_PAYLOADS };
   }
