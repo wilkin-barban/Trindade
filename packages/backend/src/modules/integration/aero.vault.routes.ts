@@ -56,12 +56,30 @@ const PASSWORD_REQUIRED_MESSAGE =
   'Falta la contraseña del ERP: es la primera vez que se guarda esta configuración y no hay una anterior. ' +
   'Escríbala para guardarla cifrada en el servidor.';
 
+/**
+ * The account the baixa beta belongs to.
+ *
+ * A literal on purpose, and on the server: the guard in front of these routes proves a role, and the role is not
+ * what the beta narrows. The same literal the salida module guards its routes with.
+ */
+const SAIDA_BETA_USERNAME = 'wilkin';
+
 const INVALID_ACTION_MESSAGE =
-  'La acción del Atajo no es válida: use entrada, entrada_lote, movimentos o test.';
+  'La acción del Atajo no es válida: use entrada, entrada_lote, saida, movimentos o test.';
 
 const INVALID_PAYLOADS_MESSAGE =
   'Los datos del Atajo no son válidos para esa acción: entrada, movimentos y test llevan exactamente un objeto, ' +
-  'entrada_lote lleva entre 2 y 8, y el total no puede superar los 32 KB.';
+  'entrada_lote lleva entre 2 y 8, saida lleva entre 1 y 8, y el total no puede superar los 32 KB.';
+
+/**
+ * The sentence a `saida` ticket answers to anybody who is not the beta user.
+ *
+ * It says what it is and not what to do about it, because there is nothing to do: the baixa module is a private
+ * beta by decision, and the rest of the bridge (including `entrada`) keeps working for the same account.
+ */
+const SAIDA_FORBIDDEN_MESSAGE =
+  'La acción saida está en beta privada: solo el usuario wilkin puede generar este ticket. ' +
+  'Las demás acciones del Atajo siguen funcionando igual.';
 
 const INVALID_CALLBACK_MESSAGE =
   'El destino de vuelta del Atajo no es válido: tiene que ser una ruta de esta misma aplicación, ' +
@@ -192,6 +210,15 @@ export async function aeroVaultRoutes(fastify: FastifyInstance) {
           [AERO_BRIDGE_ERROR_CODES.INVALID_CALLBACK]: INVALID_CALLBACK_MESSAGE,
         };
         return reply.status(400).send(apiError(messages[parsed.code] ?? INVALID_PAYLOADS_MESSAGE, parsed.code));
+      }
+
+      // The baixa action is a private beta, and the guard in front of this handler only proves the role. The
+      // account is what the beta narrows, so it is checked here -- after the shape, before any secret is read
+      // and before a row is written -- and it answers 403 to the accounts the bridge otherwise admits.
+      if (parsed.request.action === 'saida' && request.user!.username !== SAIDA_BETA_USERNAME) {
+        return reply
+          .status(403)
+          .send(apiError(SAIDA_FORBIDDEN_MESSAGE, AERO_BRIDGE_ERROR_CODES.FORBIDDEN));
       }
 
       if (vaultKeyForRequest() === null) return vaultNotConfigured(reply);

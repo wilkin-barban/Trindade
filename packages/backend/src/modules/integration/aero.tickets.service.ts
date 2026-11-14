@@ -37,6 +37,7 @@ const TABLE = 'aero_bridge_tickets';
 export const BRIDGE_ENDPOINT_BY_ACTION: Record<AeroBridgeActionName, string> = {
   entrada: 'entradasitem',
   entrada_lote: 'entradasitem',
+  saida: 'saidasitem',
   movimentos: 'movimentoitem?_method=PATCH',
   test: 'usuarios',
 };
@@ -182,7 +183,11 @@ export function issueBridgeTicket(
   const tokenHash = hashBridgeTicket(token);
   const serialized = input.payloads.map((payload) => JSON.stringify(payload));
   const body = serialized[0];
-  const bodies = input.action === 'entrada_lote' ? JSON.stringify(serialized) : null;
+  // `bodies` is the batch: every payload in order, for the actions that can carry more than one. `saida` is a
+  // batch only when it really has several products, so a one-product baixa keeps the plain `body` the shortcut
+  // already sends for the single actions.
+  const carriesEveryBody = input.action === 'entrada_lote' || (input.action === 'saida' && input.payloads.length > 1);
+  const bodies = carriesEveryBody ? JSON.stringify(serialized) : null;
   const createdAt = now.toISOString();
   const expiresAt = new Date(now.getTime() + BRIDGE_TICKET_TTL_MS).toISOString();
 

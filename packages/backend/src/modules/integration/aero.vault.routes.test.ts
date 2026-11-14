@@ -354,7 +354,9 @@ describe('ERP vault and bridge tickets', () => {
         { action: 'entrada_lote', payloads: [{ a: 1 }] },
         { action: 'entrada_lote', payloads: Array.from({ length: 9 }, () => ({ a: 1 })) },
         { action: 'entrada', payloads: ['not an object'] },
-        { action: 'saida', payloads: [{}] },
+        // `saida` joined the batch actions: an empty ticket is still refused, while one to eight payloads is the
+        // legal range the baixa module uses. Its own counts are asserted in saida.bridge.test.ts.
+        { action: 'saida', payloads: [] },
       ];
       for (const testCase of cases) {
         const response = await app.inject({
