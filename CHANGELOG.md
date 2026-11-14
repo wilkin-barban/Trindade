@@ -44,6 +44,13 @@ después de la beta.
 
 #### Cambiado
 
+- **Pulido de la vista iPhone en toda la web.** El audit a 390 px corrigió seis defectos de clases: el `Input`
+  compartido pasa a 16 px en móvil (iOS ya no hace zoom al enfocar), las acciones del reporte recuperan 44 px de
+  alto, las filas de título de Dashboard y Nuevo Reporte dejan de apretar su botón de ayuda, las acciones de
+  exportación de Cargamento se apilan a ancho completo y la tabla de Assaí se desplaza dentro de su tarjeta en
+  lugar de estirar la página. Sin cambios de lógica, permisos ni contratos.
+- **El menú pone Histórico de Salidas justo debajo de Histórico de Masas**, y la ayuda de las dos pantallas de
+  Salida pasa a la fila del título, como en el resto de los históricos.
 - **Salida / Baixa se lee y se comparte en el iPhone.** En 390 px el header de las dos pantallas apila título y
   acciones en vez de partir el título en tres líneas; los chips de bloque quedan 2x2 y las acciones del histórico
   ocupan el ancho completo. El compartir que no se encontraba ahora es un botón verde de WhatsApp en la tarjeta
