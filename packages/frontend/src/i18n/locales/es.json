@@ -26,11 +26,11 @@
     "passwordChangedRelogin": "La contraseña o la cuenta ha cambiado; inicie sesión nuevamente."
   },
   "dashboard": {
-    "activeSchedule": "Cronograma activo",
+    "activeSchedule": "Horario de Cargamento activo",
     "activeUsers": "Usuarios Activos",
     "assai": "Calculadora de Assaí",
     "assaiHint": "Calcular pedido de compra",
-    "createSchedule": "Crear cronograma",
+    "createSchedule": "Crear horario de cargamento",
     "deferredNotice": "Nuevos módulos estarán disponibles en versiones futuras.",
     "higieneCount": "Hig. y Org. -> {{done}} Tareas",
     "loadingError": "Error al cargar el panel de control",
@@ -49,7 +49,7 @@
     "stockHistory": "Historial de conteo",
     "stockHistoryHint": "Ver los días contados",
     "title": "Panel de Control",
-    "viewSchedule": "Ver cronograma",
+    "viewSchedule": "Ver horario de cargamento",
     "summaryTitle": "Resumen",
     "higieneLabel": "Hig. y Org.",
     "recepcionLabel": "Recepción",
@@ -215,11 +215,11 @@
     "phone": "Teléfono (WhatsApp, opcional)",
     "saveFletero": "Guardar fletero",
     "deleteEntry": "Remover programación",
-    "loadingError": "Error al cargar el cronograma.",
+    "loadingError": "Error al cargar el horario de cargamento.",
     "saveError": "Error al guardar la programación.",
-    "scheduleAlreadyExists": "Ya existe un cronograma para esta fecha en el historial.",
+    "scheduleAlreadyExists": "Ya existe un horario de cargamento para esta fecha en el historial.",
     "deleteError": "Error al eliminar la programación.",
-    "exportTitle": "Exportar Cronograma",
+    "exportTitle": "Exportar Horario de Cargamento",
     "exportPdf": "Exportar PDF",
     "exportTxt": "Exportar TXT",
     "copy": "Copiar",
@@ -464,7 +464,7 @@
     "filterMonth": "Mes",
     "filterUser": "Usuario",
     "viewReport": "Ver reporte del {{date}}",
-    "viewLoading": "Ver cronograma del {{date}}",
+    "viewLoading": "Ver horario de cargamento del {{date}}",
     "editLoading": "Editar carga del {{date}}",
     "deactivateReport": "Desactivar reporte del {{date}}",
     "deleteReport": "Eliminar reporte del {{date}}",
@@ -765,7 +765,7 @@
           "description": "Consulte el avance de los relatorios diarios y la cantidad de cargamentos activos.",
           "steps": [
             "Haga clic en las tarjetas para abrir directamente la función deseada.",
-            "Use los accesos rápidos para compartir cronogramas o consultar historiales."
+            "Use los accesos rápidos para compartir horarios de cargamento o consultar historiales."
           ]
         }
       ]
@@ -859,12 +859,12 @@
       "description": "Organización del despacho de mercadería por chofer, vehículo y horario de salida.",
       "sections": [
         {
-          "title": "Armado del Cronograma",
+          "title": "Armado del Horario de Cargamento",
           "description": "Seleccione la fecha de carga y asigne cada chofer a su vehículo y franja horaria programada."
         },
         {
           "title": "Historial y WhatsApp",
-          "description": "Consulte cronogramas pasados y envíe la programación a los choferes por WhatsApp."
+          "description": "Consulte horarios de cargamento pasados y envíe la programación a los choferes por WhatsApp."
         }
       ]
     },

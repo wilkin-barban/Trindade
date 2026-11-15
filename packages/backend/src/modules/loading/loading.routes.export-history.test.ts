@@ -147,7 +147,7 @@ describe('Loading Schedule Routes', () => {
     assert.strictEqual(res.statusCode, 200);
     const text: string = JSON.parse(res.body).text;
 
-    assert.ok(text.startsWith('🚛 *CRONOGRAMA DE CARREGAMENTO*'));
+    assert.ok(text.startsWith('🚛 *HORÁRIO DE CARREGAMENTO*'));
     assert.ok(text.includes(`📅 ${ptWeekday(shift(WEDNESDAY, 1))} • ${ptDate(shift(WEDNESDAY, 1))}`));
     assert.ok(text.includes('━━━━━━━━━━━━━━'));
     assert.ok(text.includes('🕓 04:00  │ Diego'));

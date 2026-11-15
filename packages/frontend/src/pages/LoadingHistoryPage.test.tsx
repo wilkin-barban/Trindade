@@ -136,7 +136,7 @@ describe('LoadingHistoryPage', () => {
     expect(screen.getByTestId('loading-history-closed-2026-10-30')).toHaveTextContent('Solo lectura');
     const view = screen.getByTestId('view-loading-batch-2026-10-30');
     expect(view).toHaveAttribute('href', '/loading/edit?date=2026-10-30&view=1');
-    expect(view).toHaveAttribute('aria-label', 'Ver cronograma del 30/10/2026');
+    expect(view).toHaveAttribute('aria-label', 'Ver horario de cargamento del 30/10/2026');
     expect(view).toHaveClass('min-h-12', 'min-w-12');
     expect(screen.queryByRole('link', { name: 'Editar' })).toBeNull();
   });

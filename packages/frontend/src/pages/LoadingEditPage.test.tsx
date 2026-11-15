@@ -147,7 +147,7 @@ describe('LoadingEditPage', () => {
     // the address asked for. It still shows the distribution and names itself as a view, not an editor.
     await waitFor(() => expect(screen.getByTestId('loading-edit-readonly-banner')).toBeInTheDocument());
     expect(screen.getByTestId('loading-edit-readonly-banner').textContent).toBe('Día cerrado: solo lectura.');
-    expect(screen.getByText('Ver cronograma')).toBeInTheDocument();
+    expect(screen.getByText('Ver horario de cargamento')).toBeInTheDocument();
     expect(screen.getByTestId('edit-entry-1')).toHaveTextContent('04:00');
     expect(screen.queryByTestId('slot-select-1')).toBeNull();
     expect(screen.queryByTestId('edit-btn-1')).toBeNull();

@@ -69,7 +69,7 @@ beforeEach(async () => {
   get.mockReset();
   get.mockImplementation(async (url: string) => {
     if (url.startsWith('/dashboard/summary')) return SUMMARY;
-    return { text: 'cronograma' };
+    return { text: 'horario' };
   });
   await i18n.changeLanguage('es');
 });
@@ -82,7 +82,7 @@ describe('DashboardPage', () => {
     const texts = titles.map((card) => card.textContent ?? '');
     expect(texts).toHaveLength(6);
     expect(texts[0]).toContain('Reportes de Hoy');
-    expect(texts[1]).toContain('Cronograma activo');
+    expect(texts[1]).toContain('Horario de Cargamento activo');
     expect(texts[2]).toContain('Lanzamiento de Masas');
     expect(texts[3]).toContain('Calculador de Estoque');
     expect(texts[4]).toContain('Calculadora de Assaí');

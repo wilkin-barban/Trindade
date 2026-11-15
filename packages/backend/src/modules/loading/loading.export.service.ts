@@ -8,7 +8,7 @@ interface ExportScheduleRow {
   vehicle_plate: string | null;
 }
 
-const HEADER = '🚛 *CRONOGRAMA DE CARREGAMENTO*';
+const HEADER = '🚛 *HORÁRIO DE CARREGAMENTO*';
 const SEPARATOR = '━━━━━━━━━━━━━━';
 
 const WEEKDAYS = [

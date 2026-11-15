@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { goToProtected } from './auth-helpers';
+import { apiToken, goToProtected } from './auth-helpers';
 
 const API_BASE = 'http://localhost:3099/api';
 
@@ -7,7 +7,7 @@ const API_BASE = 'http://localhost:3099/api';
  * Helper: POST to the backend API with auth.
  */
 async function apiPost(page: Page, url: string, body: unknown) {
-  const token = await page.evaluate(() => localStorage.getItem('auth_token'));
+  const token = await apiToken(page);
   const response = await page.request.post(`${API_BASE}${url}`, {
     data: body,
     headers: { Authorization: `Bearer ${token}` },
@@ -19,7 +19,7 @@ async function apiPost(page: Page, url: string, body: unknown) {
  * Helper: DELETE from the backend API with auth.
  */
 async function apiDelete(page: Page, url: string) {
-  const token = await page.evaluate(() => localStorage.getItem('auth_token'));
+  const token = await apiToken(page);
   const response = await page.request.delete(`${API_BASE}${url}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -30,7 +30,7 @@ async function apiDelete(page: Page, url: string) {
  * Helper: GET from the backend API with auth.
  */
 async function apiGet<T = unknown>(page: Page, url: string): Promise<T> {
-  const token = await page.evaluate(() => localStorage.getItem('auth_token'));
+  const token = await apiToken(page);
   const response = await page.request.get(`${API_BASE}${url}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -460,7 +460,7 @@ test.describe('Loading Schedule — Export Modal', () => {
     await apiPost(page, '/loading/drivers', { name: 'Export Test Driver' });
     const driversRes = await page.request.get(`${API_BASE}/loading/drivers`, {
       headers: {
-        Authorization: `Bearer ${await page.evaluate(() => localStorage.getItem('auth_token'))}`,
+        Authorization: `Bearer ${await apiToken(page)}`,
       },
     });
     const driversData = await driversRes.json();
@@ -486,7 +486,7 @@ test.describe('Loading Schedule — Export Modal', () => {
     await expect(textContent).toBeVisible();
 
     const text = await textContent.textContent();
-    expect(text).toContain('CRONOGRAMA DE CARREGAMENTO'); // Portuguese header
+    expect(text).toContain('HORÁRIO DE CARREGAMENTO'); // Portuguese header
     expect(text).toContain(nextLoadingDayDisplay());
     expect(text).toContain('━━━━━━━━━━━━━━');
     expect(text).toContain('📌 Total de carregamentos:');

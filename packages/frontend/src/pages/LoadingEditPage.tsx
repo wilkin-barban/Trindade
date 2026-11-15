@@ -71,7 +71,7 @@ export function LoadingEditPage() {
     try {
       const data = await api.get<{ text: string }>(`/loading/export?date=${date}`);
 
-      await exportScheduleTextAsPdf(data.text, `cronograma-${date}`);
+      await exportScheduleTextAsPdf(data.text, `horario-${date}`);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : t('loading.exportError')

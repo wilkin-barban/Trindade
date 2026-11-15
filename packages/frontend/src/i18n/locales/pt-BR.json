@@ -26,11 +26,11 @@
     "passwordChangedRelogin": "A senha ou a conta foi alterada; entre novamente."
   },
   "dashboard": {
-    "activeSchedule": "Cronograma ativo",
+    "activeSchedule": "Horário de Carregamento ativo",
     "activeUsers": "Usuários Ativos",
     "assai": "Calculadora de Assaí",
     "assaiHint": "Calcular pedido de compra",
-    "createSchedule": "Criar cronograma",
+    "createSchedule": "Criar horário de carregamento",
     "deferredNotice": "Novos módulos estarão disponíveis em versões futuras.",
     "higieneCount": "Hig. & Org. -> {{done}} Tarefas",
     "loadingError": "Erro ao carregar dashboard",
@@ -49,7 +49,7 @@
     "stockHistory": "Histórico de Contagem",
     "stockHistoryHint": "Ver os dias contados",
     "title": "Dashboard",
-    "viewSchedule": "Ver cronograma",
+    "viewSchedule": "Ver horário de carregamento",
     "summaryTitle": "Resumo",
     "higieneLabel": "Hig. & Org.",
     "recepcionLabel": "Recepção",
@@ -215,11 +215,11 @@
     "phone": "Telefone (WhatsApp, opcional)",
     "saveFletero": "Salvar fletero",
     "deleteEntry": "Remover agendamento",
-    "loadingError": "Erro ao carregar cronograma.",
+    "loadingError": "Erro ao carregar o horário de carregamento.",
     "saveError": "Erro ao salvar agendamento.",
-    "scheduleAlreadyExists": "Já existe um cronograma para esta data no histórico.",
+    "scheduleAlreadyExists": "Já existe um horário de carregamento para esta data no histórico.",
     "deleteError": "Erro ao excluir agendamento.",
-    "exportTitle": "Exportar Cronograma",
+    "exportTitle": "Exportar Horário de Carregamento",
     "exportPdf": "Exportar PDF",
     "exportTxt": "Exportar TXT",
     "copy": "Copiar",
@@ -464,7 +464,7 @@
     "filterMonth": "Mês",
     "filterUser": "Usuário",
     "viewReport": "Ver relatório de {{date}}",
-    "viewLoading": "Ver cronograma de {{date}}",
+    "viewLoading": "Ver horário de carregamento de {{date}}",
     "editLoading": "Editar carregamento de {{date}}",
     "deactivateReport": "Desativar relatório de {{date}}",
     "deleteReport": "Excluir relatório de {{date}}",
@@ -765,7 +765,7 @@
           "description": "Veja o progresso dos relatórios de higiene e recepção do dia, bem como a quantidade de cargas ativas.",
           "steps": [
             "Clique nos cartões para abrir diretamente a funcionalidade desejada.",
-            "Utilize os atalhos rápidos para enviar cronogramas por WhatsApp ou consultar históricos."
+            "Utilize os atalhos rápidos para enviar horários de carregamento por WhatsApp ou consultar históricos."
           ]
         }
       ]
@@ -864,7 +864,7 @@
         },
         {
           "title": "Histórico e WhatsApp",
-          "description": "Consulte cronogramas anteriores e dispare a programação para os motoristas no WhatsApp."
+          "description": "Consulte horários de carregamento anteriores e dispare a programação para os motoristas no WhatsApp."
         }
       ]
     },

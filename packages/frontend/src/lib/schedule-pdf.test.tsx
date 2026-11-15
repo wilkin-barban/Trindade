@@ -27,16 +27,16 @@ describe('schedule-pdf', () => {
   it('leaves no node behind when the export succeeds', async () => {
     exportPdf.mockResolvedValue(undefined);
 
-    await exportScheduleTextAsPdf('Cronograma do dia', 'cronograma-2026-11-02');
+    await exportScheduleTextAsPdf('Horário de Carregamento do dia', 'horario-2026-11-02');
 
-    expect(exportPdf).toHaveBeenCalledWith(TEMP_TEXT_ID, 'cronograma-2026-11-02');
+    expect(exportPdf).toHaveBeenCalledWith(TEMP_TEXT_ID, 'horario-2026-11-02');
     expect(document.getElementById(TEMP_TEXT_ID)).toBeNull();
   });
 
   it('leaves no node behind when the export throws', async () => {
     exportPdf.mockRejectedValue(new Error('canvas refused'));
 
-    await expect(exportScheduleTextAsPdf('Cronograma do dia', 'cronograma-2026-11-02')).rejects.toThrow(
+    await expect(exportScheduleTextAsPdf('Horário de Carregamento do dia', 'horario-2026-11-02')).rejects.toThrow(
       'canvas refused'
     );
 
