@@ -53,7 +53,9 @@ function readStoredUser(): User | null {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  // The cached name paints the shell while the cookie is being renewed; it is a hint for the first frame, never
+  // the proof of a session.
+  const [user, setUser] = useState<User | null>(() => readStoredUser());
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -75,22 +77,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Restore the session on mount from the cookie, which every tab shares and a reload keeps. The cached user is
-  // the hint that this browser had a session -- a display name, not a credential -- and it is what keeps an
-  // anonymous visit from posting a refresh it cannot answer on every page load.
+  // Restore the session on mount from the cookie, which every tab shares and a reload keeps.
+  //
+  // The cookie is the session, not the cached user: `localStorage` can be cleared by the browser, by a privacy
+  // setting or by a person tidying up, and a browser that still holds a valid HttpOnly cookie is still signed
+  // in. Gating this on the cached name turned that into a silent sign-out. The price is one refused refresh on
+  // a genuinely anonymous visit, and a refusal is not an error the operator caused, so it stays quiet.
   useEffect(() => {
     let cancelled = false;
 
     async function restoreSession() {
-      if (!readStoredUser()) {
-        if (!cancelled) setIsLoading(false);
-        return;
-      }
       // The renewal is the sign-in proof now: the browser presents the cookie, and only a rotated session
-      // answers with an access token. A refusal is not an error the operator caused, so it just stays signed
-      // out instead of showing the expiry notice.
+      // answers with an access token.
       const renewed = await refreshTokenOnce(null);
       if (!renewed) {
+        // A person who signs in while this renewal is in flight has already proved the session: the refusal of
+        // the cookie they no longer had must not sign them back out.
+        if (getAccessToken()) {
+          if (!cancelled) setIsLoading(false);
+          return;
+        }
         clearStoredSession();
         if (!cancelled) {
           setToken(null);
@@ -109,6 +115,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setIsLoading(false);
         }
       } catch {
+        if (getAccessToken()) {
+          if (!cancelled) setIsLoading(false);
+          return;
+        }
         clearStoredSession();
         if (!cancelled) {
           setToken(null);

@@ -134,11 +134,40 @@ describe('the session provider', () => {
 
     renderProvider();
 
-    await waitFor(() => expect(screen.getByTestId('user').textContent).toBe('wilkin'));
+    await waitFor(() => expect(screen.getByTestId('token').textContent).toBe('access-1'));
+    expect(screen.getByTestId('user').textContent).toBe('wilkin');
     expect(refreshTokenOnce).toHaveBeenCalledTimes(1);
     expect(get).toHaveBeenCalledWith('/auth/me');
-    expect(screen.getByTestId('token').textContent).toBe('access-1');
     expect(localStorage.getItem('auth_token')).toBeNull();
+  });
+
+  it('lands signed in when the cookie is valid even though localStorage was cleared', async () => {
+    // The cookie is the session. localStorage can be emptied by a privacy setting, a cleared profile or a person
+    // tidying up, and a browser that still holds a valid HttpOnly cookie is still signed in; gating the renewal
+    // on the cached name turned that into a silent sign-out.
+    expect(localStorage.getItem('auth_user')).toBeNull();
+    get.mockResolvedValue({ user: { id: 1, username: 'wilkin', role: 'Administrador' } });
+
+    const mounted = renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId('token').textContent).toBe('access-1'));
+    expect(screen.getByTestId('user').textContent).toBe('wilkin');
+    expect(refreshTokenOnce).toHaveBeenCalledTimes(1);
+    mounted.unmount();
+  });
+
+  it('shares the renewed session with a second tab that mounts later', async () => {
+    get.mockResolvedValue({ user: { id: 1, username: 'wilkin', role: 'Administrador' } });
+    const first = renderProvider();
+    await waitFor(() => expect(screen.getByTestId('user').textContent).toBe('wilkin'));
+    first.unmount();
+
+    // A second tab is a second mount against the same cookie jar: it renews on its own and lands signed in,
+    // without the first tab's token being read from anywhere.
+    renderProvider();
+    await waitFor(() => expect(screen.getAllByTestId('user').at(-1)?.textContent).toBe('wilkin'));
+    expect(localStorage.getItem('auth_token')).toBeNull();
+    screen.getAllByTestId('user').forEach(() => undefined);
   });
 
   it('stays anonymous when the cookie no longer holds a session', async () => {
