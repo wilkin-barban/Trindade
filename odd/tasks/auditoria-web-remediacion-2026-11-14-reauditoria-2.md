@@ -100,3 +100,30 @@ carrera interpretara un 401 como sesión expirada y limpiara la sesión.
 | E2E host | **118/118** y **118/118** (dos corridas consecutivas) |
 | Migración 12 (ensayo sobre copia de producción) | 6 → 6 filas idénticas, integridad ok |
 | Producción | sin cambios en esta iteración: el deploy espera la autorización de la revisión 12 |
+
+### Revisión 12 aplicada en producción (autorizada)
+
+Autorización del usuario recibida con las 6 filas encontradas. Ejecución:
+
+1. **Backup inmediatamente antes**: `VACUUM INTO trindade.pre-revision12-20261115T114641Z.db` (909312 bytes) dentro del
+   volumen, y copia en `backups/trindade.pre-revision12-20261115T114641Z.db` en el host.
+2. **Foto del estado**: 23 tablas, 5315 filas totales, `report_photos` con **6 filas** (ids, tamaños, MIME, tokens y
+   fechas capturados en JSON).
+3. **Deploy** `api` + `web`. La API **se negó a arrancar** con `Database startup refused: outdated — revision 11 is
+   older than the supported revision 12`, que es el comportamiento correcto: este proyecto migra por comando, no al
+   arrancar. Se aplicó con `docker compose run --rm --no-deps api node packages/backend/dist/db/migrate.js` y la API
+   arrancó sola.
+4. **Verificación posterior**: `user_version = 12`, `integrity_check = ok`, 23 tablas; **6 filas antes y 6 después,
+   idénticas campo por campo** (`id`, `report_id`, `file_path`, `file_size`, `mime_type`, `public_token`,
+   `created_at`); `CHECK` del MIME incluye `image/heic`; **ninguna otra tabla cambió** (comparación de conteos de las
+   22 restantes: 0 diferencias).
+
+Producción verificada: `/api/health` 200; `/salida`, `/salida-history`, `/reports`, `/loading` 200; catálogo 401;
+CSP, HSTS, nosniff, DENY, Referrer-Policy, HTML `no-cache`, asset gzip + `immutable`, API `no-store`; log escribible;
+`POST /api/reports/1/photos` sin sesión 401. HEIC en lo desplegado: la ruta compilada contiene `image/heic`,
+`image/heif`, `ftyp` y las marcas; el bundle web de `ReportsPage` y `ReportEditPage` ofrece
+`image/jpeg,image/png,image/webp,image/heic,image/heif`.
+
+Pruebas de la iteración: backend **923/923**, node **727/727**, Vitest **200/200**, typecheck limpio, E2E **118/118**
+dos veces consecutivas. La subida HEIC real desde un iPhone queda como verificación de campo: el backend ya la
+acepta y la guarda, y Safari es el único navegador que además la muestra.
