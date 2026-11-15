@@ -17,7 +17,6 @@ interface LoginResponse {
   token: string;
   user: { id: number; username: string; role: string };
 }
-
 type E2EIdentity = { username: string; password: string };
 interface E2EFixtures {
   admin: E2EIdentity;
@@ -30,16 +29,38 @@ export async function getE2EIdentities(page: Page): Promise<E2EFixtures> {
 }
 
 /**
- * Programmatically authenticate by calling the backend API directly,
- * then store the JWT in localStorage via addInitScript before the app loads.
+ * Programmatically authenticate through the API and let the browser keep the session cookie.
  *
- * Uses addInitScript to inject credentials before any page JS runs,
- * so AuthContext.restoreSession picks them up on mount.
+ * `page.request` shares the browser context's cookie jar, so a web login performed here stores the
+ * `HttpOnly` refresh cookie exactly where a real sign-in would: nothing has to be injected into the page. The
+ * app then renews from that cookie on mount, which is the same path a reload takes -- and it is the only path
+ * there is now, because no token is written to `localStorage` for a script (or a spec) to read.
+ *
+ * Returns the access token for the specs that have to call the API directly; it is short-lived by design.
  */
-export async function loginViaApi(page: Page, identity?: E2EIdentity): Promise<void> {
+/**
+ * An access token for a spec that calls the API directly.
+ *
+ * The browser no longer holds one: the web session is an HttpOnly cookie and the access token lives in memory, so
+ * a spec cannot read either out of `localStorage`. Asking the API for a short-lived token the same way a native
+ * client does is the honest route -- it is a real credential, minted for this test, and it expires on its own.
+ */
+export async function apiToken(page: Page, identity?: E2EIdentity): Promise<string> {
+  const selectedIdentity = identity ?? (await getE2EIdentities(page)).admin;
+  const response = await page.request.post(`${API_BASE}/auth/login`, { data: selectedIdentity });
+  if (!response.ok()) {
+    throw new Error(`API login failed: ${response.status()} ${response.statusText()}`);
+  }
+  const data = (await response.json()) as { token?: string };
+  if (!data.token) throw new Error('The API login did not return an access token');
+  return data.token;
+}
+
+export async function loginViaApi(page: Page, identity?: E2EIdentity): Promise<LoginResponse> {
   const selectedIdentity = identity ?? (await getE2EIdentities(page)).admin;
   const response = await page.request.post(`${API_BASE}/auth/login`, {
     data: selectedIdentity,
+    headers: { 'X-Trindade-Client': 'web' },
   });
 
   if (!response.ok()) {
@@ -49,15 +70,24 @@ export async function loginViaApi(page: Page, identity?: E2EIdentity): Promise<v
 
   const data: LoginResponse = await response.json();
 
-  // Use addInitScript to inject credentials BEFORE React mounts.
-  // This avoids the about:blank localStorage restriction.
+  // The cookie comes back in `Set-Cookie` on that response and lands in the context's jar on its own, so the
+  // browser holds the session. Asserting it here turns a silently unauthenticated context into a clear failure
+  // at the login, not three screens later.
+  const cookies = await page.context().cookies(API_BASE);
+  if (!cookies.some((cookie) => cookie.name === 'trindade_refresh')) {
+    throw new Error('Login succeeded but the session cookie was not stored by the browser context');
+  }
+
+  // Only the identity is seeded into the page: it is the hint the provider uses to decide that this browser may
+  // have a session, and it is not a credential. The token stays in the cookie jar above and nowhere else.
   await page.addInitScript(
-    ({ token, user }) => {
-      localStorage.setItem('auth_token', token);
+    ({ user }) => {
       localStorage.setItem('auth_user', JSON.stringify(user));
     },
-    { token: data.token, user: data.user }
+    { user: data.user },
   );
+
+  return data;
 }
 
 /**
@@ -113,7 +143,7 @@ export async function getActiveTemperatureReadings(
 
 /**
  * Visit a protected route after logging in via API.
- * Navigates straight to the route; AuthContext picks up the injected credentials.
+ * Navigates straight to the route; AuthContext renews the session from the cookie on mount.
  */
 export async function goToProtected(page: Page, path: string, identity?: E2EIdentity): Promise<void> {
   await loginViaApi(page, identity);

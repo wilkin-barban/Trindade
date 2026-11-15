@@ -22,7 +22,10 @@ export interface TestFixtures {
   jwtSecret: string;
 }
 
-export async function buildAuthTestApp(): Promise<{
+export async function buildAuthTestApp(options: {
+  refreshTokenTtlDays?: number;
+  cookieSecure?: boolean;
+} = {}): Promise<{
   app: import('fastify').FastifyInstance;
   db: import('better-sqlite3').Database;
   fixtures: TestFixtures;
@@ -54,7 +57,12 @@ export async function buildAuthTestApp(): Promise<{
   const app = Fastify({ logger: false });
   app.decorate('db', db);
   app.decorate('authenticate', createAuthenticate(fixtures.jwtSecret));
-  await app.register(authRoutes, { prefix: '/api/auth', jwtSecret: fixtures.jwtSecret });
+  await app.register(authRoutes, {
+    prefix: '/api/auth',
+    jwtSecret: fixtures.jwtSecret,
+    refreshTokenTtlDays: options.refreshTokenTtlDays,
+    cookieSecure: options.cookieSecure,
+  });
   await app.register(bootstrapRoutes, { prefix: '/api/auth' });
   app.get('/__test_admin_only', { preHandler: [app.authenticate, requireRole('Administrador')] }, async () => 'ok');
   await app.ready();

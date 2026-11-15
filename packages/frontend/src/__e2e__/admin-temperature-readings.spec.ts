@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
-import { goToProtected } from './auth-helpers';
+import { apiToken, goToProtected } from './auth-helpers';
 
 test('admin configures and preserves temperature readings on a task', async ({ page }) => {
   await goToProtected(page, '/admin');
-  const token = await page.evaluate(() => localStorage.getItem('auth_token'));
+  const token = await apiToken(page);
   const categoriesResponse = await page.request.get('http://localhost:3099/api/admin/categories', {
     headers: { Authorization: `Bearer ${token}` },
   });

@@ -37,13 +37,15 @@ globalThis.window = {
 } as any;
 
 // Dynamic import of client after globals are configured
-const { api, consumeSessionExpiredNotice, handleUnauthorizedRedirect } = await import('./client');
+const { api, consumeSessionExpiredNotice, handleUnauthorizedRedirect, getAccessToken, setAccessToken } =
+  await import('./client');
 
 interface RecordedRequest {
   url: string;
   method: string;
   headers: Record<string, string>;
   body: any;
+  credentials?: RequestCredentials;
 }
 
 const originalFetch = globalThis.fetch;
@@ -53,45 +55,100 @@ function resetEnvironment() {
   mockLocalStorage.clear();
   mockSessionStorage.clear();
   recordedRequests = [];
+  setAccessToken(null);
   globalThis.window.location.pathname = '/dashboard';
   globalThis.window.location.href = '/dashboard';
   globalThis.fetch = originalFetch;
 }
 
+function record(input: RequestInfo | URL, init?: RequestInit): RecordedRequest {
+  let body: any = null;
+  if (init?.body && typeof init.body === 'string') {
+    try {
+      body = JSON.parse(init.body);
+    } catch {
+      body = init.body;
+    }
+  }
+  const recorded: RecordedRequest = {
+    url: String(input),
+    method: init?.method || 'GET',
+    headers: (init?.headers as Record<string, string>) || {},
+    body,
+    credentials: init?.credentials,
+  };
+  recordedRequests.push(recorded);
+  return recorded;
+}
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
 test('an expired session closes the ERP session it belonged to', () => {
-  // The JWT expiring is a logout the operator did not ask for, and it has to close the same things: the
-  // token, the plant password this tab held and the auto-read mark. A mark left behind fires a read for a
-  // launch of a session that is gone.
+  // The session ending is a logout the operator did not ask for, and it has to close the same things: the
+  // in-memory access token, the plant password this tab held and the auto-read mark. A mark left behind fires
+  // a read for a launch of a session that is gone.
   resetEnvironment();
-  mockLocalStorage.setItem('auth_token', 'expired-access-token');
+  setAccessToken('expired-access-token');
   mockLocalStorage.setItem('auth_user', JSON.stringify({ id: 1, username: 'test' }));
   mockLocalStorage.setItem('trindade.aero.auto-read.v1', JSON.stringify({ date: '2026-11-03', at: Date.now() }));
   mockSessionStorage.setItem('trindade.aero.session.v1', 'secret');
 
   handleUnauthorizedRedirect();
 
-  assert.equal(mockLocalStorage.getItem('auth_token'), null);
+  assert.equal(getAccessToken(), null);
   assert.equal(mockLocalStorage.getItem('auth_user'), null);
   assert.equal(mockSessionStorage.getItem('trindade.aero.session.v1'), null);
   assert.equal(mockLocalStorage.getItem('trindade.aero.auto-read.v1'), null);
 });
 
+test('no credential is ever written to localStorage', async (t) => {
+  await t.test('login keeps the access token in memory and never persists it', async () => {
+    resetEnvironment();
+    globalThis.fetch = async (input, init) => {
+      record(input, init);
+      return json({
+        token: 'logged-in-access-token',
+        expiresIn: 7200,
+        user: { id: 10, username: 'testuser', role: 'Administrador' },
+      });
+    };
+
+    await api.post('/auth/login', { username: 'testuser', password: 'secretpassword123' });
+
+    assert.equal(getAccessToken(), 'logged-in-access-token');
+    assert.equal(mockLocalStorage.getItem('auth_token'), null);
+    assert.equal(mockLocalStorage.getItem('auth_refresh_token'), null);
+    // The cookie is the session; the browser has to be told to keep it.
+    assert.equal(recordedRequests[0].credentials, 'include');
+    assert.equal(recordedRequests[0].headers['X-Trindade-Client'], 'web');
+  });
+
+  await t.test('a token left behind by an older build is purged, not reused', async () => {
+    resetEnvironment();
+    mockLocalStorage.setItem('auth_token', 'legacy-access-token');
+    mockLocalStorage.setItem('auth_refresh_token', 'legacy-refresh-token');
+    mockLocalStorage.setItem('auth_user', JSON.stringify({ id: 1, username: 'test' }));
+
+    handleUnauthorizedRedirect();
+
+    assert.equal(mockLocalStorage.getItem('auth_token'), null);
+    assert.equal(mockLocalStorage.getItem('auth_refresh_token'), null);
+  });
+});
+
 test('the web client declares itself on every call', async (t) => {
   await t.test('sends X-Trindade-Client: web, and a per-request attempt when asked', async () => {
     resetEnvironment();
-    mockLocalStorage.setItem('auth_token', 'valid-access-token');
+    setAccessToken('valid-access-token');
 
-    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-      recordedRequests.push({
-        url: String(input),
-        method: init?.method || 'GET',
-        headers: (init?.headers as Record<string, string>) || {},
-        body: null,
-      });
-      return new Response(JSON.stringify({ ok: true }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
+    globalThis.fetch = async (input, init) => {
+      record(input, init);
+      return json({ ok: true });
     };
 
     await api.get('/integration/aero/movements?date=2026-11-03');
@@ -109,61 +166,38 @@ test('the web client declares itself on every call', async (t) => {
   });
 });
 
-test('session rotation and refresh token handling', async (t) => {
-  await t.test('expired access token -> silent renewal -> original request retried once with new token', async () => {
+test('session rotation and cookie renewal', async (t) => {
+  await t.test('expired access token -> cookie renewal -> original request retried once with new token', async () => {
     resetEnvironment();
-    mockLocalStorage.setItem('auth_token', 'expired-access-token');
-    mockLocalStorage.setItem('auth_refresh_token', 'valid-refresh-token');
+    setAccessToken('expired-access-token');
     mockLocalStorage.setItem('auth_user', JSON.stringify({ id: 1, username: 'test' }));
 
     let normalCallCount = 0;
     let refreshCallCount = 0;
 
-    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-      const url = String(input);
-      const method = init?.method || 'GET';
-      const headers = (init?.headers as Record<string, string>) || {};
-      let parsedBody = null;
-      if (init?.body && typeof init.body === 'string') {
-        try {
-          parsedBody = JSON.parse(init.body);
-        } catch {
-          parsedBody = init.body;
-        }
-      }
-      recordedRequests.push({ url, method, headers, body: parsedBody });
+    globalThis.fetch = async (input, init) => {
+      const req = record(input, init);
 
-      if (url.endsWith('/api/users/options')) {
+      if (req.url.endsWith('/api/users/options')) {
         normalCallCount++;
         if (normalCallCount === 1) {
-          assert.equal(headers['Authorization'], 'Bearer expired-access-token');
-          return new Response(JSON.stringify({ error: 'Invalid or expired token' }), {
-            status: 401,
-            headers: { 'Content-Type': 'application/json' },
-          });
+          assert.equal(req.headers['Authorization'], 'Bearer expired-access-token');
+          return json({ error: 'Invalid or expired token' }, 401);
         }
-        assert.equal(headers['Authorization'], 'Bearer fresh-access-token');
-        return new Response(JSON.stringify({ users: [{ id: 1, name: 'Wilkin' }] }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
+        assert.equal(req.headers['Authorization'], 'Bearer fresh-access-token');
+        return json({ users: [{ id: 1, name: 'Wilkin' }] });
       }
 
-      if (url.endsWith('/api/auth/refresh')) {
+      if (req.url.endsWith('/api/auth/refresh')) {
         refreshCallCount++;
-        assert.equal(method, 'POST');
-        assert.equal(parsedBody?.refreshToken, 'valid-refresh-token');
-        return new Response(
-          JSON.stringify({
-            token: 'fresh-access-token',
-            refreshToken: 'fresh-refresh-token',
-            expiresIn: 7200,
-          }),
-          {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-          }
-        );
+        assert.equal(req.method, 'POST');
+        // The browser presents the session in its HttpOnly cookie: no token in the body, no bearer header,
+        // and the browser has to be told to send it.
+        assert.equal(req.body, null);
+        assert.equal(req.headers['Authorization'], undefined);
+        assert.equal(req.credentials, 'include');
+        assert.equal(req.headers['X-Trindade-Client'], 'web');
+        return json({ token: 'fresh-access-token', expiresIn: 7200 });
       }
 
       return new Response('Not found', { status: 404 });
@@ -174,29 +208,50 @@ test('session rotation and refresh token handling', async (t) => {
     assert.deepEqual(result, { users: [{ id: 1, name: 'Wilkin' }] });
     assert.equal(normalCallCount, 2, 'expected original request to be called then retried');
     assert.equal(refreshCallCount, 1, 'expected exactly one refresh call');
-    assert.equal(mockLocalStorage.getItem('auth_token'), 'fresh-access-token');
-    assert.equal(mockLocalStorage.getItem('auth_refresh_token'), 'fresh-refresh-token');
+    // The renewed access token stays in memory; the rotated refresh token lives in the cookie and never reaches
+    // this code, so nothing here could write it down.
+    assert.equal(getAccessToken(), 'fresh-access-token');
+    assert.equal(mockLocalStorage.getItem('auth_token'), null);
+    assert.equal(mockLocalStorage.getItem('auth_refresh_token'), null);
+  });
+
+  await t.test('a reload renews from the cookie alone, with no token in memory', async () => {
+    resetEnvironment();
+    mockLocalStorage.setItem('auth_user', JSON.stringify({ id: 1, username: 'test' }));
+
+    globalThis.fetch = async (input, init) => {
+      const req = record(input, init);
+      if (req.url.endsWith('/api/auth/refresh')) {
+        assert.equal(req.credentials, 'include');
+        return json({ token: 'renewed-from-cookie', expiresIn: 7200 });
+      }
+      if (req.url.endsWith('/api/auth/me')) {
+        assert.equal(req.headers['Authorization'], 'Bearer renewed-from-cookie');
+        return json({ user: { id: 1, username: 'test', role: 'Administrador' } });
+      }
+      return new Response('Not found', { status: 404 });
+    };
+
+    const { refreshTokenOnce } = await import('./client');
+    assert.equal(await refreshTokenOnce(null), true);
+    assert.equal(getAccessToken(), 'renewed-from-cookie');
+
+    const me = await api.get<{ user: { username: string } }>('/auth/me');
+    assert.equal(me.user.username, 'test');
   });
 
   await t.test('failed renewal -> session cleared and redirected to login', async () => {
     resetEnvironment();
-    mockLocalStorage.setItem('auth_token', 'expired-access-token');
-    mockLocalStorage.setItem('auth_refresh_token', 'revoked-refresh-token');
+    setAccessToken('expired-access-token');
     mockLocalStorage.setItem('auth_user', JSON.stringify({ id: 1, username: 'test' }));
 
-    globalThis.fetch = async (input: RequestInfo | URL): Promise<Response> => {
-      const url = String(input);
-      if (url.endsWith('/api/users/options')) {
-        return new Response(JSON.stringify({ error: 'Invalid or expired token' }), {
-          status: 401,
-          headers: { 'Content-Type': 'application/json' },
-        });
+    globalThis.fetch = async (input, init) => {
+      const req = record(input, init);
+      if (req.url.endsWith('/api/users/options')) {
+        return json({ error: 'Invalid or expired token' }, 401);
       }
-      if (url.endsWith('/api/auth/refresh')) {
-        return new Response(JSON.stringify({ error: 'Invalid or expired session' }), {
-          status: 401,
-          headers: { 'Content-Type': 'application/json' },
-        });
+      if (req.url.endsWith('/api/auth/refresh')) {
+        return json({ error: 'Invalid or expired session' }, 401);
       }
       return new Response('Not found', { status: 404 });
     };
@@ -212,36 +267,20 @@ test('session rotation and refresh token handling', async (t) => {
       }
     );
 
-    assert.equal(mockLocalStorage.getItem('auth_token'), null);
-    assert.equal(mockLocalStorage.getItem('auth_refresh_token'), null);
+    assert.equal(getAccessToken(), null);
     assert.equal(mockLocalStorage.getItem('auth_user'), null);
+    assert.equal(mockLocalStorage.getItem('auth_token'), null);
     assert.equal(consumeSessionExpiredNotice(), true);
     assert.equal(globalThis.window.location.href, '/login');
   });
 
-  await t.test('refresh token is never attached to a normal request', async () => {
+  await t.test('no credential ever travels on a normal request', async () => {
     resetEnvironment();
-    mockLocalStorage.setItem('auth_token', 'valid-access-token');
-    mockLocalStorage.setItem('auth_refresh_token', 'secret-refresh-token');
+    setAccessToken('valid-access-token');
 
-    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-      const url = String(input);
-      const method = init?.method || 'GET';
-      const headers = (init?.headers as Record<string, string>) || {};
-      let parsedBody = null;
-      if (init?.body && typeof init.body === 'string') {
-        try {
-          parsedBody = JSON.parse(init.body);
-        } catch {
-          parsedBody = init.body;
-        }
-      }
-      recordedRequests.push({ url, method, headers, body: parsedBody });
-
-      return new Response(JSON.stringify({ ok: true }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
+    globalThis.fetch = async (input, init) => {
+      record(input, init);
+      return json({ ok: true });
     };
 
     await api.get('/reports');
@@ -249,72 +288,48 @@ test('session rotation and refresh token handling', async (t) => {
 
     for (const req of recordedRequests) {
       assert.notEqual(req.url, '/api/auth/refresh');
-      // Authorization header must ONLY carry access token, never refresh token
+      // Authorization header must ONLY carry the access token
       assert.equal(req.headers['Authorization'], 'Bearer valid-access-token');
-      // Body must never contain refresh token
+      assert.equal(req.headers['Cookie'], undefined);
+      // Body must never contain a refresh token
       if (req.body && typeof req.body === 'object') {
         assert.equal(req.body.refreshToken, undefined);
-        assert.equal(JSON.stringify(req.body).includes('secret-refresh-token'), false);
       }
     }
   });
 
   await t.test('two parallel 401s produce one single refresh call (no stampede)', async () => {
     resetEnvironment();
-    mockLocalStorage.setItem('auth_token', 'expired-access-token');
-    mockLocalStorage.setItem('auth_refresh_token', 'valid-refresh-token');
+    setAccessToken('expired-access-token');
 
     let refreshCallCount = 0;
     let reportsCallCount = 0;
     let productsCallCount = 0;
 
-    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-      const url = String(input);
-      const headers = (init?.headers as Record<string, string>) || {};
+    globalThis.fetch = async (input, init) => {
+      const req = record(input, init);
 
-      if (url.endsWith('/api/reports')) {
+      if (req.url.endsWith('/api/reports')) {
         reportsCallCount++;
-        if (headers['Authorization'] === 'Bearer expired-access-token') {
-          return new Response(JSON.stringify({ error: 'Invalid or expired token' }), {
-            status: 401,
-            headers: { 'Content-Type': 'application/json' },
-          });
+        if (req.headers['Authorization'] === 'Bearer expired-access-token') {
+          return json({ error: 'Invalid or expired token' }, 401);
         }
-        return new Response(JSON.stringify({ reports: [] }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
+        return json({ reports: [] });
       }
 
-      if (url.endsWith('/api/products')) {
+      if (req.url.endsWith('/api/products')) {
         productsCallCount++;
-        if (headers['Authorization'] === 'Bearer expired-access-token') {
-          return new Response(JSON.stringify({ error: 'Invalid or expired token' }), {
-            status: 401,
-            headers: { 'Content-Type': 'application/json' },
-          });
+        if (req.headers['Authorization'] === 'Bearer expired-access-token') {
+          return json({ error: 'Invalid or expired token' }, 401);
         }
-        return new Response(JSON.stringify({ products: [] }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
+        return json({ products: [] });
       }
 
-      if (url.endsWith('/api/auth/refresh')) {
+      if (req.url.endsWith('/api/auth/refresh')) {
         refreshCallCount++;
         // Simulate network latency for refresh
         await new Promise((resolve) => setTimeout(resolve, 30));
-        return new Response(
-          JSON.stringify({
-            token: 'renewed-access-token',
-            refreshToken: 'renewed-refresh-token',
-            expiresIn: 7200,
-          }),
-          {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-          }
-        );
+        return json({ token: 'renewed-access-token', expiresIn: 7200 });
       }
 
       return new Response('Not found', { status: 404 });
@@ -330,40 +345,25 @@ test('session rotation and refresh token handling', async (t) => {
     assert.equal(refreshCallCount, 1, 'two concurrent 401s must trigger only ONE refresh call');
     assert.equal(reportsCallCount, 2, 'reports request retried once with new token');
     assert.equal(productsCallCount, 2, 'products request retried once with new token');
-    assert.equal(mockLocalStorage.getItem('auth_token'), 'renewed-access-token');
-    assert.equal(mockLocalStorage.getItem('auth_refresh_token'), 'renewed-refresh-token');
+    assert.equal(getAccessToken(), 'renewed-access-token');
   });
 
   await t.test('retried request that still returns 401 fails without infinite loop', async () => {
     resetEnvironment();
-    mockLocalStorage.setItem('auth_token', 'expired-access-token');
-    mockLocalStorage.setItem('auth_refresh_token', 'valid-refresh-token');
+    setAccessToken('expired-access-token');
 
     let callCount = 0;
     let refreshCount = 0;
 
-    globalThis.fetch = async (input: RequestInfo | URL): Promise<Response> => {
-      const url = String(input);
-      if (url.endsWith('/api/users/options')) {
+    globalThis.fetch = async (input, init) => {
+      const req = record(input, init);
+      if (req.url.endsWith('/api/users/options')) {
         callCount++;
-        return new Response(JSON.stringify({ error: 'Invalid or expired token' }), {
-          status: 401,
-          headers: { 'Content-Type': 'application/json' },
-        });
+        return json({ error: 'Invalid or expired token' }, 401);
       }
-      if (url.endsWith('/api/auth/refresh')) {
+      if (req.url.endsWith('/api/auth/refresh')) {
         refreshCount++;
-        return new Response(
-          JSON.stringify({
-            token: 'token-that-also-fails',
-            refreshToken: 'refresh-2',
-            expiresIn: 7200,
-          }),
-          {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-          }
-        );
+        return json({ token: 'token-that-also-fails', expiresIn: 7200 });
       }
       return new Response('Not found', { status: 404 });
     };
@@ -382,25 +382,21 @@ test('session rotation and refresh token handling', async (t) => {
     assert.equal(refreshCount, 1, 'must refresh at most once');
     assert.equal(callCount, 2, 'must retry at most once');
     assert.equal(consumeSessionExpiredNotice(), true);
-    assert.equal(mockLocalStorage.getItem('auth_token'), null);
+    assert.equal(getAccessToken(), null);
   });
 
   await t.test('login 401 with Invalid credentials never triggers refresh', async () => {
     resetEnvironment();
-    mockLocalStorage.setItem('auth_refresh_token', 'stale-refresh-token');
 
     let refreshCalled = false;
-    globalThis.fetch = async (input: RequestInfo | URL): Promise<Response> => {
+    globalThis.fetch = async (input) => {
       const url = String(input);
       if (url.endsWith('/api/auth/login')) {
-        return new Response(JSON.stringify({ error: 'Invalid credentials' }), {
-          status: 401,
-          headers: { 'Content-Type': 'application/json' },
-        });
+        return json({ error: 'Invalid credentials' }, 401);
       }
       if (url.endsWith('/api/auth/refresh')) {
         refreshCalled = true;
-        return new Response(JSON.stringify({ ok: true }), { status: 200 });
+        return json({ ok: true });
       }
       return new Response('Not found', { status: 404 });
     };
@@ -423,36 +419,25 @@ test('session rotation and refresh token handling', async (t) => {
     // the request, is what expired. Reading the prose to decide would skip the renewal the moment the
     // sentence changed.
     resetEnvironment();
-    mockLocalStorage.setItem('auth_token', 'expired-access-token');
-    mockLocalStorage.setItem('auth_refresh_token', 'valid-refresh-token');
+    setAccessToken('expired-access-token');
 
     let refreshCalled = false;
     let reportsCallCount = 0;
 
-    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-      const url = String(input);
-      const headers = (init?.headers as Record<string, string>) || {};
+    globalThis.fetch = async (input, init) => {
+      const req = record(input, init);
 
-      if (url.endsWith('/api/auth/refresh')) {
+      if (req.url.endsWith('/api/auth/refresh')) {
         refreshCalled = true;
-        return new Response(JSON.stringify({ token: 'renewed-access-token', refreshToken: 'renewed-refresh-token' }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
+        return json({ token: 'renewed-access-token', expiresIn: 7200 });
       }
 
-      if (url.endsWith('/api/reports')) {
+      if (req.url.endsWith('/api/reports')) {
         reportsCallCount++;
-        if (headers['Authorization'] === 'Bearer expired-access-token') {
-          return new Response(JSON.stringify({ error: 'Request denied by policy', code: 'DENIED' }), {
-            status: 401,
-            headers: { 'Content-Type': 'application/json' },
-          });
+        if (req.headers['Authorization'] === 'Bearer expired-access-token') {
+          return json({ error: 'Request denied by policy', code: 'DENIED' }, 401);
         }
-        return new Response(JSON.stringify({ reports: [] }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
+        return json({ reports: [] });
       }
 
       return new Response('Not found', { status: 404 });
@@ -461,112 +446,54 @@ test('session rotation and refresh token handling', async (t) => {
     assert.deepEqual(await api.get<{ reports: any[] }>('/reports'), { reports: [] });
     assert.equal(refreshCalled, true, 'the renewal does not depend on how the 401 was worded');
     assert.equal(reportsCallCount, 2);
-    assert.equal(mockLocalStorage.getItem('auth_token'), 'renewed-access-token');
+    assert.equal(getAccessToken(), 'renewed-access-token');
   });
 
-  await t.test('successful login stores refresh token in localStorage', async () => {
+  await t.test('logout revokes the cookie session with the in-memory token and forgets it', async () => {
     resetEnvironment();
-    globalThis.fetch = async (input: RequestInfo | URL): Promise<Response> => {
-      const url = String(input);
-      if (url.endsWith('/api/auth/login')) {
-        return new Response(
-          JSON.stringify({
-            token: 'logged-in-access-token',
-            refreshToken: 'logged-in-refresh-token',
-            expiresIn: 7200,
-            user: { id: 10, username: 'testuser', role: 'Administrador' },
-          }),
-          {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-          }
-        );
-      }
-      return new Response('Not found', { status: 404 });
+    setAccessToken('current-access-token');
+    mockLocalStorage.setItem('auth_user', JSON.stringify({ id: 1, username: 'test' }));
+
+    globalThis.fetch = async (input, init) => {
+      record(input, init);
+      return json({ success: true });
     };
 
-    await api.post('/auth/login', { username: 'testuser', password: 'secretpassword123' });
+    const { logoutSession } = await import('./client');
+    await logoutSession();
 
-    assert.equal(mockLocalStorage.getItem('auth_token'), 'logged-in-access-token');
-    assert.equal(mockLocalStorage.getItem('auth_refresh_token'), 'logged-in-refresh-token');
-  });
-
-  await t.test('401 with no stored refresh token immediately redirects without calling refresh endpoint', async () => {
-    resetEnvironment();
-    mockLocalStorage.setItem('auth_token', 'some-access-token');
-    // NO auth_refresh_token set
-
-    let refreshCalled = false;
-    globalThis.fetch = async (input: RequestInfo | URL): Promise<Response> => {
-      const url = String(input);
-      if (url.endsWith('/api/users/options')) {
-        return new Response(JSON.stringify({ error: 'Invalid or expired token' }), {
-          status: 401,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
-      if (url.endsWith('/api/auth/refresh')) {
-        refreshCalled = true;
-        return new Response(JSON.stringify({ ok: true }), { status: 200 });
-      }
-      return new Response('Not found', { status: 404 });
-    };
-
-    await assert.rejects(
-      async () => {
-        await api.get('/users/options');
-      },
-      (err: any) => {
-        assert.equal(err.status, 401);
-        return true;
-      }
-    );
-
-    assert.equal(refreshCalled, false, 'must not call refresh endpoint without refresh token');
-    assert.equal(mockLocalStorage.getItem('auth_token'), null);
-    assert.equal(consumeSessionExpiredNotice(), true);
+    const call = recordedRequests[0];
+    assert.ok(call.url.endsWith('/api/auth/logout'));
+    assert.equal(call.method, 'POST');
+    assert.equal(call.headers['Authorization'], 'Bearer current-access-token');
+    assert.equal(call.credentials, 'include');
+    assert.equal(call.headers['X-Trindade-Client'], 'web');
+    assert.equal(getAccessToken(), null);
+    assert.equal(mockLocalStorage.getItem('auth_user'), null);
   });
 
   await t.test('api.upload transparently renews session and retries once on 401', async () => {
     resetEnvironment();
-    mockLocalStorage.setItem('auth_token', 'expired-access-token');
-    mockLocalStorage.setItem('auth_refresh_token', 'valid-refresh-token');
+    setAccessToken('expired-access-token');
 
     let uploadCallCount = 0;
     let refreshCallCount = 0;
 
-    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-      const url = String(input);
-      const headers = (init?.headers as Record<string, string>) || {};
+    globalThis.fetch = async (input, init) => {
+      const req = record(input, init);
 
-      if (url.endsWith('/api/reports/upload')) {
+      if (req.url.endsWith('/api/reports/upload')) {
         uploadCallCount++;
-        if (headers['Authorization'] === 'Bearer expired-access-token') {
-          return new Response(JSON.stringify({ error: 'Invalid or expired token' }), {
-            status: 401,
-            headers: { 'Content-Type': 'application/json' },
-          });
+        if (req.headers['Authorization'] === 'Bearer expired-access-token') {
+          return json({ error: 'Invalid or expired token' }, 401);
         }
-        assert.equal(headers['Authorization'], 'Bearer fresh-access-token');
-        return new Response(JSON.stringify({ url: '/photo.jpg' }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
+        assert.equal(req.headers['Authorization'], 'Bearer fresh-access-token');
+        return json({ url: '/photo.jpg' });
       }
 
-      if (url.endsWith('/api/auth/refresh')) {
+      if (req.url.endsWith('/api/auth/refresh')) {
         refreshCallCount++;
-        return new Response(
-          JSON.stringify({
-            token: 'fresh-access-token',
-            refreshToken: 'fresh-refresh-token',
-            expiresIn: 7200,
-          }),
-          {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-          }
-        );
+        return json({ token: 'fresh-access-token', expiresIn: 7200 });
       }
 
       return new Response('Not found', { status: 404 });
@@ -578,8 +505,7 @@ test('session rotation and refresh token handling', async (t) => {
     assert.deepEqual(result, { url: '/photo.jpg' });
     assert.equal(uploadCallCount, 2, 'upload should retry once after refresh');
     assert.equal(refreshCallCount, 1);
-    assert.equal(mockLocalStorage.getItem('auth_token'), 'fresh-access-token');
-    assert.equal(mockLocalStorage.getItem('auth_refresh_token'), 'fresh-refresh-token');
+    assert.equal(getAccessToken(), 'fresh-access-token');
   });
 
   resetEnvironment();

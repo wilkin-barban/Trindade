@@ -2,6 +2,7 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import cookie from '@fastify/cookie';
 import { corsPolicy } from './cors-policy.js';
 import multipart from '@fastify/multipart';
 import { loadRuntimeConfig } from './runtime-config.js';
@@ -85,6 +86,10 @@ if (!sessionStoreAvailable) {
 
 // Browser access is limited to the approved HTTPS origin; native clients still use authentication.
 await server.register(cors, corsPolicy);
+
+// The web session lives in an `HttpOnly` cookie scoped to the auth routes, so the parser has to be in place
+// before those routes are registered. The cookie's attributes are decided in `auth.cookies.ts`.
+await server.register(cookie);
 
 // Multipart — 5MB file size limit
 await server.register(multipart, {

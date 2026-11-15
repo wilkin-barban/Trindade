@@ -29,6 +29,16 @@ import {
   revokeUserSessions,
   rotateSession,
 } from './auth.sessions.service.js';
+import {
+  clearRefreshCookie,
+  clientKindOf,
+  crossSiteRefusal,
+  refreshCookieFrom,
+  registerRefreshCookieSupport,
+  resolveRefreshCookieSecure,
+  setRefreshCookie,
+  type RefreshCookieSettings,
+} from './auth.cookies.js';
 
 /**
  * Access-token lifetime in seconds. Short by design: an access token is stateless and
@@ -55,6 +65,16 @@ export interface AuthRoutesOptions {
   /** Rate limiter and admission controller for public worker registration. */
   rateLimiter?: RegistrationRateLimiter;
   authAdmissionLimiter?: AuthAdmissionLimiter;
+  /**
+   * Whether the refresh cookie must carry `Secure`. Defaults to the deployment's own answer: HTTPS app URL,
+   * or a production run, with `AUTH_COOKIE_INSECURE=true` as the only opt-out for a plain-HTTP install.
+   */
+  cookieSecure?: boolean;
+  /**
+   * Origins a browser may legitimately call the API from. Only used to recognise a same-origin session
+   * request: an `Origin` that is neither this host nor one of these is a cross-site refresh and is refused.
+   */
+  allowedOrigins?: readonly string[];
 }
 
 interface UserRow {
@@ -72,6 +92,19 @@ export async function authRoutes(fastify: FastifyInstance, options: AuthRoutesOp
   const sessionStoreAvailable = options.sessionStoreAvailable ?? (() => true);
   const rateLimiter = options.rateLimiter ?? defaultRegistrationRateLimiter;
   const admissionLimiter = options.authAdmissionLimiter ?? defaultAuthAdmissionLimiter;
+  const allowedOrigins = options.allowedOrigins ?? [];
+  const cookieSettings: RefreshCookieSettings = {
+    secure: options.cookieSecure ?? resolveRefreshCookieSecure({
+      appUrl: process.env.PUBLIC_APP_URL || process.env.APP_URL,
+      nodeEnv: process.env.NODE_ENV,
+      allowInsecure: process.env.AUTH_COOKIE_INSECURE,
+    }),
+    maxAgeSeconds: Math.floor(refreshTokenTtlDays * 24 * 60 * 60),
+  };
+
+  // The cookie parser has to exist before the handlers below read `request.cookies`. `server.ts` registers it
+  // for the whole API; a test app that mounts only these routes gets it here instead.
+  await registerRefreshCookieSupport(fastify);
 
   function refuseAdmission(reply: FastifyReply, retryAfterSeconds: number) {
     return reply.header('Retry-After', String(retryAfterSeconds)).status(429).send({
@@ -184,6 +217,11 @@ export async function authRoutes(fastify: FastifyInstance, options: AuthRoutesOp
 
       const { current, refreshToken, token } = issued;
 
+      // The browser gets the session as a cookie it cannot read; the phone gets it in the body, which is the
+      // only channel it has. Sending both to the browser would put the token back within reach of any script.
+      const webClient = clientKindOf(request) === 'web';
+      if (webClient) setRefreshCookie(reply, refreshToken, cookieSettings);
+
       try {
         auditLog(fastify.db, {
           userId: current.id,
@@ -197,7 +235,9 @@ export async function authRoutes(fastify: FastifyInstance, options: AuthRoutesOp
 
       return reply.send({
         token,
-        refreshToken,
+        ...(webClient
+          ? {}
+          : { refreshToken }),
         expiresIn: ACCESS_TOKEN_TTL_SECONDS,
         user: {
           id: current.id,
@@ -215,7 +255,7 @@ export async function authRoutes(fastify: FastifyInstance, options: AuthRoutesOp
   fastify.post(
     '/refresh',
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const parse = refreshSessionSchema.safeParse(request.body);
+      const parse = refreshSessionSchema.safeParse(request.body ?? {});
 
       if (!parse.success) {
         return reply.status(400).send({
@@ -224,11 +264,28 @@ export async function authRoutes(fastify: FastifyInstance, options: AuthRoutesOp
         });
       }
 
-      const admission = admissionLimiter.refresh(parse.data.refreshToken);
+      // Two channels present the session here: the browser's cookie and, for the native app, the body. The
+      // cookie is checked first because it is the one a browser sends on its own -- and precisely because a
+      // browser sends it on its own, a request it labels as cross-site is refused before the token is used.
+      const cookieToken = refreshCookieFrom(request);
+      if (cookieToken) {
+        const refusal = crossSiteRefusal(request, allowedOrigins);
+        if (refusal) {
+          request.log.warn('Refused a cross-site refresh authenticated by cookie');
+          return reply.status(403).send({ error: refusal.message, code: refusal.code });
+        }
+      }
+
+      const presentedToken = cookieToken ?? parse.data.refreshToken;
+      if (!presentedToken) {
+        return reply.status(401).send({ error: 'Invalid or expired session' });
+      }
+
+      const admission = admissionLimiter.refresh(presentedToken);
       if (!admission.allowed) return refuseAdmission(reply, admission.retryAfterSeconds);
       if (!sessionStoreAvailable()) return refuseWithoutSessionStore(request, reply);
 
-      const result = rotateSession(fastify.db, parse.data.refreshToken, refreshTokenTtlDays, request.ip);
+      const result = rotateSession(fastify.db, presentedToken, refreshTokenTtlDays, request.ip);
 
       if (result.outcome !== 'rotated') {
         if (result.outcome === 'reused-within-grace') {
@@ -256,6 +313,13 @@ export async function authRoutes(fastify: FastifyInstance, options: AuthRoutesOp
         { expiresIn: ACCESS_TOKEN_TTL_SECONDS }
       );
 
+      // A browser session stays in the browser's cookie: either it presented that cookie, or it declared
+      // itself and is migrating out of the body. Re-setting it is also what drops the old cookie value, so the
+      // rotated token replaces the one the browser held.
+      if (cookieToken || clientKindOf(request) === 'web') {
+        setRefreshCookie(reply, result.refreshToken, cookieSettings);
+      }
+
       try {
         auditLog(fastify.db, {
           userId: result.userId,
@@ -272,7 +336,9 @@ export async function authRoutes(fastify: FastifyInstance, options: AuthRoutesOp
 
       return reply.send({
         token,
-        refreshToken: result.refreshToken,
+        // The browser's new session token travels in the cookie and nowhere else. The phone, which presents
+        // the token in the body, receives the rotated one the same way: it has no other place to keep it.
+        ...(clientKindOf(request) === 'web' ? {} : { refreshToken: result.refreshToken }),
         expiresIn: ACCESS_TOKEN_TTL_SECONDS,
       });
     }
@@ -498,13 +564,26 @@ export async function authRoutes(fastify: FastifyInstance, options: AuthRoutesOp
 
       // Ends only the session this client is holding. Other devices stay logged in, which is why
       // this is not `revokeUserSessions`: logging out on a phone must not end the desktop's session.
-      if (parse.data.refreshToken) {
+      //
+      // The browser holds its session in the cookie, so that is the token to end, and a cross-site
+      // request that got this far is refused for the same reason a refresh is.
+      const cookieToken = refreshCookieFrom(request);
+      if (cookieToken) {
+        const refusal = crossSiteRefusal(request, allowedOrigins);
+        if (refusal) {
+          request.log.warn('Refused a cross-site logout authenticated by cookie');
+          return reply.status(403).send({ error: refusal.message, code: refusal.code });
+        }
+      }
+
+      const revokedToken = cookieToken ?? parse.data.refreshToken;
+      if (revokedToken) {
         if (sessionStoreAvailable()) {
           // End the session this caller is holding, and no other. A token that belongs to a
           // different account is refused instead of revoked: otherwise any authenticated caller
           // could sign somebody else out with a token it happens to possess.
-          if (sessionOwnerId(fastify.db, parse.data.refreshToken) === request.user!.sub) {
-            revokeSession(fastify.db, parse.data.refreshToken);
+          if (sessionOwnerId(fastify.db, revokedToken) === request.user!.sub) {
+            revokeSession(fastify.db, revokedToken);
           } else {
             request.log.warn('Logout refused session revocation: the presented token belongs to another account');
           }
@@ -522,6 +601,9 @@ export async function authRoutes(fastify: FastifyInstance, options: AuthRoutesOp
         entityType: 'auth',
         ipAddress: request.ip,
       });
+
+      // The cookie goes even when it arrived empty, so a browser that declares itself never keeps a stale one.
+      if (cookieToken || clientKindOf(request) === 'web') clearRefreshCookie(reply, cookieSettings);
 
       return reply.send({ success: true });
     }

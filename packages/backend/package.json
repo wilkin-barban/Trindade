@@ -17,6 +17,7 @@
     "test:e2e:server": "tsx src/e2e-server.ts"
   },
   "dependencies": {
+    "@fastify/cookie": "^11.1.5",
     "@fastify/cors": "^11.0.0",
     "@fastify/multipart": "^10.0.0",
     "bcryptjs": "^2.4.3",

@@ -38,7 +38,7 @@ import kotlinx.serialization.Contextual
 data class RefreshRequest (
 
     @SerialName(value = "refreshToken")
-    val refreshToken: kotlin.String
+    val refreshToken: kotlin.String? = null
 
 ) {
 

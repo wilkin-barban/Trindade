@@ -390,8 +390,20 @@ describe('Auth Routes', () => {
       assert.strictEqual(JSON.parse(replay.body).error, 'Invalid or expired session');
     });
 
-    it('rejects a malformed refresh payload with 400', async () => {
+    it('refuses a refresh that presents no credential at all', async () => {
+      // No cookie and no body: there is no session to rotate, and the answer is the same one an expired token
+      // gets so a caller cannot probe whether one existed.
       const res = await app.inject({ method: 'POST', url: '/api/auth/refresh', payload: {} });
+      assert.strictEqual(res.statusCode, 401);
+      assert.strictEqual(JSON.parse(res.body).error, 'Invalid or expired session');
+    });
+
+    it('rejects a malformed refresh payload with 400', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/auth/refresh',
+        payload: { refreshToken: 42 },
+      });
       assert.strictEqual(res.statusCode, 400);
       assert.strictEqual(JSON.parse(res.body).error, 'Invalid input');
     });

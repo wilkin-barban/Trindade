@@ -1,10 +1,10 @@
 import { test, expect, type Page } from '@playwright/test';
-import { goToProtected } from './auth-helpers';
+import { apiToken, goToProtected } from './auth-helpers';
 
 const API_BASE = 'http://localhost:3099/api';
 
 async function apiPost(page: Page, url: string, body: unknown) {
-  const token = await page.evaluate(() => localStorage.getItem('auth_token'));
+  const token = await apiToken(page);
   const response = await page.request.post(`${API_BASE}${url}`, {
     data: body,
     headers: { Authorization: `Bearer ${token}` },

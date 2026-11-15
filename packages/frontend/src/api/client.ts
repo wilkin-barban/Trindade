@@ -69,7 +69,28 @@ export function consumeGuestReadonlyNotice(): string | null {
 
 export const AUTH_SESSION_REFRESHED_EVENT = 'auth-session-refreshed';
 
+/**
+ * The access token, held in memory and nowhere else.
+ *
+ * It is short-lived and cannot be revoked, so it is the one credential the tab may keep: writing it to
+ * `localStorage` would hand it to any script on the page and leave it there after the tab closed. The refresh
+ * token, which *is* the session, never reaches JavaScript at all: it lives in an `HttpOnly` cookie the browser
+ * sends on its own, and `AuthContext` renews from it on mount.
+ */
+let accessToken: string | null = null;
+
+export function setAccessToken(token: string | null): void {
+  accessToken = token;
+}
+
+export function getAccessToken(): string | null {
+  return accessToken;
+}
+
 export function clearStoredSession(): void {
+  accessToken = null;
+  // The two credential keys are purged, not just avoided: a session left behind by an older build would still
+  // be readable by any script that runs after this one.
   localStorage.removeItem('auth_token');
   localStorage.removeItem('auth_refresh_token');
   localStorage.removeItem('auth_user');
@@ -106,15 +127,17 @@ function isTokenlessPath(path: string): boolean {
 
 let inFlightRefresh: Promise<boolean> | null = null;
 
-export async function refreshTokenOnce(attemptedToken: string): Promise<boolean> {
-  const currentToken = localStorage.getItem('auth_token');
-  if (currentToken && currentToken !== attemptedToken) {
+/**
+ * Renew the session from the cookie.
+ *
+ * The browser sends the refresh token by itself; nothing is read from storage and nothing is posted, so this
+ * works on a reload where the tab only has the user's name cached and no token at all. The single in-flight
+ * promise is what stops a screen full of failed calls from firing one renewal each.
+ */
+export async function refreshTokenOnce(attemptedToken: string | null = null): Promise<boolean> {
+  // Another caller already renewed: the token in hand is not the one that failed.
+  if (attemptedToken && accessToken && accessToken !== attemptedToken) {
     return true;
-  }
-
-  const refreshToken = localStorage.getItem('auth_refresh_token');
-  if (!refreshToken) {
-    return false;
   }
 
   if (inFlightRefresh) {
@@ -127,11 +150,14 @@ export async function refreshTokenOnce(attemptedToken: string): Promise<boolean>
       const lang = localStorage.getItem('i18nextLng') || 'pt-BR';
       const response = await fetch(apiUrl('/auth/refresh'), {
         method: 'POST',
+        // The session travels in the cookie, so the browser has to include it even if this page were served
+        // from a different origin than the API.
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           'Accept-Language': lang,
+          'X-Trindade-Client': 'web',
         },
-        body: JSON.stringify({ refreshToken }),
       });
 
       if (!response.ok) {
@@ -139,17 +165,16 @@ export async function refreshTokenOnce(attemptedToken: string): Promise<boolean>
       }
 
       const data = await response.json();
-      if (!data || typeof data !== 'object' || !data.token || !data.refreshToken) {
+      if (!data || typeof data !== 'object' || !data.token) {
         return false;
       }
 
-      localStorage.setItem('auth_token', data.token);
-      localStorage.setItem('auth_refresh_token', data.refreshToken);
+      accessToken = data.token;
 
       if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
         window.dispatchEvent(
           new CustomEvent(AUTH_SESSION_REFRESHED_EVENT, {
-            detail: { token: data.token, refreshToken: data.refreshToken },
+            detail: { token: data.token },
           })
         );
       }
@@ -166,6 +191,31 @@ export async function refreshTokenOnce(attemptedToken: string): Promise<boolean>
 
   inFlightRefresh = refreshPromise;
   return inFlightRefresh;
+}
+
+/**
+ * End this session on the server and forget it here.
+ *
+ * The body carries no token: the browser's session is the cookie, and the server revokes whichever session the
+ * cookie names after refusing a cross-site request. The access token still travels as a bearer because the
+ * logout route is authenticated, and it is what proves the cookie belongs to this caller.
+ */
+export async function logoutSession(): Promise<void> {
+  const token = accessToken;
+  try {
+    await fetch(apiUrl('/auth/logout'), {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        'X-Trindade-Client': 'web',
+      },
+    });
+  } catch {
+    /* a failed logout still signs the operator out here */
+  } finally {
+    clearStoredSession();
+  }
 }
 
 export class ApiClientError extends Error {
@@ -192,7 +242,7 @@ async function request<T>(
   options: RequestInit = {},
   isRetry = false
 ): Promise<T> {
-  const token = localStorage.getItem('auth_token');
+  const token = accessToken;
   const lang = localStorage.getItem('i18nextLng') || 'pt-BR';
 
   const headers: Record<string, string> = {
@@ -231,6 +281,9 @@ async function request<T>(
     response = await fetch(apiUrl(path), {
       ...options,
       headers,
+      // The session cookie travels only to the auth routes, so this costs nothing on the routes that never
+      // read it -- and it is what makes the renewal work from a page that holds no token yet.
+      credentials: 'include',
     });
   } catch (err) {
     if (isNetworkError(err)) {
@@ -245,28 +298,30 @@ async function request<T>(
     data = await response.json();
   }
 
-  // Store refresh token and access token if returned on login
+  // A successful login hands the access token over in the body; the session itself arrived as the cookie the
+  // browser stored on its own and never reaches this code.
   if (response.ok && isLoginRequest(path) && data && typeof data === 'object') {
     if (data.token) {
-      localStorage.setItem('auth_token', data.token);
-    }
-    if (data.refreshToken) {
-      localStorage.setItem('auth_refresh_token', data.refreshToken);
+      accessToken = data.token;
     }
   }
 
   if (response.status === 401) {
-    if (token && !isTokenlessPath(path)) {
-      // A 401 with a token in hand means the session expired, whatever sentence the server chose
-      // to wrap it in: the renewal is attempted once and the original request retried.
+    if (!isTokenlessPath(path)) {
+      // A 401 means the session expired, whatever sentence the server chose to wrap it in: the renewal is
+      // attempted once from the cookie and the original request retried.
       if (!isRetry) {
         const renewed = await refreshTokenOnce(token);
         if (renewed) {
           return request<T>(path, options, true);
         }
       }
-      handleUnauthorizedRedirect();
-      throw new ApiClientError(401, i18n.t('api.sessionExpired'));
+      // Only a caller that believed it was signed in is shown the expiry notice: a first visit has no session
+      // to expire, and bouncing it to the login page would be a redirect loop.
+      if (token) {
+        handleUnauthorizedRedirect();
+        throw new ApiClientError(401, i18n.t('api.sessionExpired'));
+      }
     }
 
     const rawError = (data && (data.error || data.message)) || '';
@@ -333,7 +388,7 @@ export const api = {
    * Does NOT set Content-Type so the browser sets it with the correct boundary.
    */
   async upload<T>(path: string, formData: FormData, isRetry = false): Promise<T> {
-    const token = localStorage.getItem('auth_token');
+    const token = accessToken;
     const lang = localStorage.getItem('i18nextLng') || 'pt-BR';
 
     const headers: Record<string, string> = {
@@ -350,6 +405,7 @@ export const api = {
         method: 'POST',
         headers,
         body: formData,
+        credentials: 'include',
       });
     } catch (err) {
       if (isNetworkError(err)) {
@@ -365,15 +421,17 @@ export const api = {
     }
 
     if (response.status === 401) {
-      if (token && !isTokenlessPath(path)) {
+      if (!isTokenlessPath(path)) {
         if (!isRetry) {
           const renewed = await refreshTokenOnce(token);
           if (renewed) {
             return api.upload<T>(path, formData, true);
           }
         }
-        handleUnauthorizedRedirect();
-        throw new ApiClientError(401, i18n.t('api.sessionExpired'));
+        if (token) {
+          handleUnauthorizedRedirect();
+          throw new ApiClientError(401, i18n.t('api.sessionExpired'));
+        }
       }
 
       const rawError = (data && (data.error || data.message)) || '';

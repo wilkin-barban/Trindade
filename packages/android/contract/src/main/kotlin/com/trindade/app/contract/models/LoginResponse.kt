@@ -33,9 +33,9 @@ import kotlinx.serialization.Contextual
  * 
  *
  * @param token 
- * @param refreshToken 
  * @param expiresIn 
  * @param user 
+ * @param refreshToken 
  */
 @Serializable
 
@@ -44,14 +44,14 @@ data class LoginResponse (
     @SerialName(value = "token")
     val token: kotlin.String,
 
-    @SerialName(value = "refreshToken")
-    val refreshToken: kotlin.String,
-
     @SerialName(value = "expiresIn")
     val expiresIn: kotlin.Int,
 
     @SerialName(value = "user")
-    val user: LoginResponseUser
+    val user: LoginResponseUser,
+
+    @SerialName(value = "refreshToken")
+    val refreshToken: kotlin.String? = null
 
 ) {
 

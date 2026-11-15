@@ -102,7 +102,13 @@ describe('auth route admission (isolated limiter)', () => {
     const loggedIn = await login(fixtures.admin.username);
     assert.equal(loggedIn.statusCode, 200);
     const token = loggedIn.json().refreshToken as string;
-    const invalidRefresh = await app.inject({ method: 'POST', url: '/api/auth/refresh', payload: {} });
+    // A payload that fails the schema is refused before the limiter is charged for it; a payload with no
+    // credential at all is a session answer (401), not a schema error.
+    const invalidRefresh = await app.inject({
+      method: 'POST',
+      url: '/api/auth/refresh',
+      payload: { refreshToken: 7 },
+    });
     assert.equal(invalidRefresh.statusCode, 400);
     const rotated = await refresh(token);
     assert.equal(rotated.statusCode, 200);

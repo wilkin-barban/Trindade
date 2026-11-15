@@ -495,7 +495,13 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
     tags: ['auth'],
     request: { ...jsonRequest(loginSchema) },
     responses: {
-      200: jsonResponse('Authenticated. The refresh token is the session and is rotated on every refresh.', LoginResponseSchema),
+      200: jsonResponse(
+        'Authenticated. The access token is returned in the body. The refresh token is the session: it is set as '
+          + 'the HttpOnly `trindade_refresh` cookie (Path=/api/auth, SameSite=Strict, Secure over HTTPS) when the '
+          + 'caller sends `X-Trindade-Client: web`, and returned in the body only for native clients, which have no '
+          + 'cookie jar.',
+        LoginResponseSchema,
+      ),
       400: INVALID_INPUT,
       401: errorResponse('The credentials are wrong, or the account is inactive'),
       429: errorResponse('Too many login attempts or concurrent password checks; Retry-After gives seconds to wait'),
@@ -505,18 +511,26 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
   registry.registerPath({
     method: 'post',
     path: '/api/auth/refresh',
-    summary: 'Rotate a refresh session into a new token pair',
+    summary: 'Rotate a refresh session into a new access token',
     description:
       'Unauthenticated by design: a client refreshes precisely because its access token has expired. ' +
+      'The refresh token is read from the `trindade_refresh` cookie (web) or from the body (native clients). ' +
+      'A cookie-authenticated request is refused with 403 when the browser says it came from another site ' +
+      '(`Origin` or `Sec-Fetch-Site`), with `SameSite=Strict` as the second line of defence. ' +
       'Every failure answers identically so a caller cannot probe whether a token existed, had expired, ' +
       'or had been revoked. Presenting a token that was already rotated away is treated as a leak and ' +
       'revokes the whole session family.',
     tags: ['auth'],
     request: { ...jsonRequest(refreshSessionSchema) },
     responses: {
-      200: jsonResponse('A new token pair. The presented refresh token is no longer valid.', RefreshResponseSchema),
+      200: jsonResponse(
+        'The new access token. The presented refresh token is no longer valid: the web receives the rotated one '
+          + 'as an updated cookie, native clients receive it in the body.',
+        RefreshResponseSchema,
+      ),
       400: INVALID_INPUT,
-      401: errorResponse('The refresh token is unknown, expired, revoked, or its family was revoked'),
+      401: errorResponse('No session was presented, or the refresh token is unknown, expired, revoked, or its family was revoked'),
+      403: errorResponse('A cookie-authenticated request came from another origin (`auth.cross_site_request`)'),
       429: errorResponse('Too many refresh attempts; Retry-After gives seconds to wait'),
     },
   });
@@ -526,14 +540,16 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
     path: '/api/auth/logout',
     summary: 'End the session this client is holding',
     description:
-      'Ends only the session whose refresh token is presented, so logging out on one device leaves other ' +
-      'devices signed in. The body is optional: the web client sends none.',
+      'Ends only the session the caller is holding -- the one named by the `trindade_refresh` cookie for the ' +
+      'browser, or by the body for native clients -- so logging out on one device leaves other devices signed ' +
+      'in. The body is optional: the web client sends none, and the cookie is cleared either way.',
     tags: ['auth'],
     request: { ...jsonRequest(logoutSchema, { required: false }) },
     responses: {
-      200: jsonResponse('The session was ended. Idempotent: an unknown or already-ended token still succeeds.', SuccessResponseSchema),
+      200: jsonResponse('The session was ended and the cookie cleared. Idempotent: an unknown or already-ended token still succeeds.', SuccessResponseSchema),
       400: INVALID_INPUT,
       401: UNAUTHORIZED,
+      403: errorResponse('A cookie-authenticated request came from another origin (`auth.cross_site_request`)'),
     },
   });
 

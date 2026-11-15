@@ -4,7 +4,7 @@ import { fillAllTemperatureInputs, getE2EIdentities, goToProtected } from './aut
 const API_BASE = 'http://localhost:3099/api';
 
 async function apiPost(page: Page, url: string, body: unknown) {
-  const token = await page.evaluate(() => localStorage.getItem('auth_token'));
+  const token = await apiToken(page);
   const response = await page.request.post(`${API_BASE}${url}`, {
     data: body,
     headers: { Authorization: `Bearer ${token}` },

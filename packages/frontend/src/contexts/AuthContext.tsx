@@ -8,8 +8,10 @@ import {
 } from 'react';
 import {
   api,
-  apiUrl,
   clearStoredSession,
+  getAccessToken,
+  logoutSession,
+  refreshTokenOnce,
   AUTH_SESSION_REFRESHED_EVENT,
 } from '../api/client';
 import { clearAeroAutoRead } from '../lib/aero-auto-read';
@@ -31,20 +33,37 @@ export interface AuthState {
 
 const AuthContext = createContext<AuthState | null>(null);
 
+/**
+ * The cached identity, and nothing else.
+ *
+ * `auth_user` is a name and a role, not a credential: it is what lets a reload show the shell while the session
+ * is still being renewed. The tokens are elsewhere on purpose -- the access token in memory, the session in an
+ * `HttpOnly` cookie -- so a script that reads this storage gets a display name and no key to the plant.
+ */
+const STORED_USER_KEY = 'auth_user';
+
+function readStoredUser(): User | null {
+  const raw = localStorage.getItem(STORED_USER_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as User;
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Synchronize token state and localStorage when background session renewal happens
+  // A background renewal hands the provider a new access token. The refresh token never travels in this
+  // event: it left JavaScript the moment the server set the cookie.
   useEffect(() => {
     const handleRefreshed = (event: Event) => {
-      const custom = event as CustomEvent<{ token: string; refreshToken: string }>;
+      const custom = event as CustomEvent<{ token?: string }>;
       if (custom.detail?.token) {
         setToken(custom.detail.token);
-        if (custom.detail.refreshToken) {
-          localStorage.setItem('auth_refresh_token', custom.detail.refreshToken);
-        }
       }
     };
 
@@ -56,34 +75,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Restore session from localStorage on mount
+  // Restore the session on mount from the cookie, which every tab shares and a reload keeps. The cached user is
+  // the hint that this browser had a session -- a display name, not a credential -- and it is what keeps an
+  // anonymous visit from posting a refresh it cannot answer on every page load.
   useEffect(() => {
     let cancelled = false;
 
     async function restoreSession() {
-      const storedToken = localStorage.getItem('auth_token');
-      const storedUser = localStorage.getItem('auth_user');
-
-      if (!storedToken || !storedUser) {
+      if (!readStoredUser()) {
         if (!cancelled) setIsLoading(false);
         return;
       }
-
-      try {
-        JSON.parse(storedUser) as User;
-      } catch {
+      // The renewal is the sign-in proof now: the browser presents the cookie, and only a rotated session
+      // answers with an access token. A refusal is not an error the operator caused, so it just stays signed
+      // out instead of showing the expiry notice.
+      const renewed = await refreshTokenOnce(null);
+      if (!renewed) {
         clearStoredSession();
-        if (!cancelled) setIsLoading(false);
+        if (!cancelled) {
+          setToken(null);
+          setUser(null);
+          setIsLoading(false);
+        }
         return;
       }
 
       try {
-        // api.get transparently renews the session if the access token has expired
         const data = await api.get<{ user: User }>('/auth/me');
         if (!cancelled) {
-          setToken(localStorage.getItem('auth_token'));
+          setToken(getAccessToken());
           setUser(data.user);
-          localStorage.setItem('auth_user', JSON.stringify(data.user));
+          localStorage.setItem(STORED_USER_KEY, JSON.stringify(data.user));
           setIsLoading(false);
         }
       } catch {
@@ -105,16 +127,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (username: string, password: string): Promise<User> => {
-      const response = await api.post<{ token: string; refreshToken?: string; user: User }>(
+      // The client declares itself as the web on every call, so the server answers with the access token and
+      // sets the session cookie instead of putting the refresh token in the body.
+      const response = await api.post<{ token: string; user: User }>(
         '/auth/login',
         { username, password }
       );
 
-      localStorage.setItem('auth_token', response.token);
-      if (response.refreshToken) {
-        localStorage.setItem('auth_refresh_token', response.refreshToken);
-      }
-      localStorage.setItem('auth_user', JSON.stringify(response.user));
+      localStorage.setItem(STORED_USER_KEY, JSON.stringify(response.user));
       setToken(response.token);
       setUser(response.user);
 
@@ -124,14 +144,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(() => {
-    // Try to call the backend logout endpoint (best-effort, fire-and-forget)
-    const token = localStorage.getItem('auth_token');
-    if (token) {
-      fetch(apiUrl('/auth/logout'), {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-      }).catch(() => { /* ignore network errors during logout */ });
-    }
+    // Best-effort server call: it revokes the session the cookie names and clears the cookie. The browser
+    // forgets everything here regardless, so a failed network call cannot leave the tab signed in.
+    void logoutSession().catch(() => undefined);
 
     clearStoredSession();
     // The ERP password belongs to the session it was typed in: logging out of Trindade closes it too.

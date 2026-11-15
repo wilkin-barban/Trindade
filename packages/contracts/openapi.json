@@ -144,7 +144,6 @@
         },
         "required": [
           "token",
-          "refreshToken",
           "expiresIn",
           "user"
         ],
@@ -166,7 +165,6 @@
         },
         "required": [
           "token",
-          "refreshToken",
           "expiresIn"
         ],
         "additionalProperties": false
@@ -3809,10 +3807,7 @@
             "type": "string",
             "minLength": 1
           }
-        },
-        "required": [
-          "refreshToken"
-        ]
+        }
       },
       "LogoutRequest": {
         "type": "object",
@@ -6341,7 +6336,7 @@
         },
         "responses": {
           "200": {
-            "description": "Authenticated. The refresh token is the session and is rotated on every refresh.",
+            "description": "Authenticated. The access token is returned in the body. The refresh token is the session: it is set as the HttpOnly `trindade_refresh` cookie (Path=/api/auth, SameSite=Strict, Secure over HTTPS) when the caller sends `X-Trindade-Client: web`, and returned in the body only for native clients, which have no cookie jar.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6385,8 +6380,8 @@
     },
     "/api/auth/refresh": {
       "post": {
-        "summary": "Rotate a refresh session into a new token pair",
-        "description": "Unauthenticated by design: a client refreshes precisely because its access token has expired. Every failure answers identically so a caller cannot probe whether a token existed, had expired, or had been revoked. Presenting a token that was already rotated away is treated as a leak and revokes the whole session family.",
+        "summary": "Rotate a refresh session into a new access token",
+        "description": "Unauthenticated by design: a client refreshes precisely because its access token has expired. The refresh token is read from the `trindade_refresh` cookie (web) or from the body (native clients). A cookie-authenticated request is refused with 403 when the browser says it came from another site (`Origin` or `Sec-Fetch-Site`), with `SameSite=Strict` as the second line of defence. Every failure answers identically so a caller cannot probe whether a token existed, had expired, or had been revoked. Presenting a token that was already rotated away is treated as a leak and revokes the whole session family.",
         "tags": [
           "auth"
         ],
@@ -6401,7 +6396,7 @@
         },
         "responses": {
           "200": {
-            "description": "A new token pair. The presented refresh token is no longer valid.",
+            "description": "The new access token. The presented refresh token is no longer valid: the web receives the rotated one as an updated cookie, native clients receive it in the body.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6421,7 +6416,17 @@
             }
           },
           "401": {
-            "description": "The refresh token is unknown, expired, revoked, or its family was revoked",
+            "description": "No session was presented, or the refresh token is unknown, expired, revoked, or its family was revoked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "A cookie-authenticated request came from another origin (`auth.cross_site_request`)",
             "content": {
               "application/json": {
                 "schema": {
@@ -6446,7 +6451,7 @@
     "/api/auth/logout": {
       "post": {
         "summary": "End the session this client is holding",
-        "description": "Ends only the session whose refresh token is presented, so logging out on one device leaves other devices signed in. The body is optional: the web client sends none.",
+        "description": "Ends only the session the caller is holding -- the one named by the `trindade_refresh` cookie for the browser, or by the body for native clients -- so logging out on one device leaves other devices signed in. The body is optional: the web client sends none, and the cookie is cleared either way.",
         "tags": [
           "auth"
         ],
@@ -6462,7 +6467,7 @@
         },
         "responses": {
           "200": {
-            "description": "The session was ended. Idempotent: an unknown or already-ended token still succeeds.",
+            "description": "The session was ended and the cookie cleared. Idempotent: an unknown or already-ended token still succeeds.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6483,6 +6488,16 @@
           },
           "401": {
             "description": "Missing, invalid, or expired credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "A cookie-authenticated request came from another origin (`auth.cross_site_request`)",
             "content": {
               "application/json": {
                 "schema": {

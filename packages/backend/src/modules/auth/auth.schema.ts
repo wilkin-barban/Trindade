@@ -67,7 +67,12 @@ export const updateProfileSchema = z
 export type UpdateProfileBody = z.infer<typeof updateProfileSchema>;
 
 export const refreshSessionSchema = z.object({
-  refreshToken: z.string().min(1, 'Refresh token is required'),
+  /**
+   * Optional on purpose: the browser presents its session in the refresh cookie and posts no body, while the
+   * native app, which has no cookie jar, keeps sending the token here. A request that carries neither is
+   * refused by the route with the same 401 an expired token gets.
+   */
+  refreshToken: z.string().min(1, 'Refresh token is required').optional(),
 });
 
 export type RefreshSessionBody = z.infer<typeof refreshSessionSchema>;
@@ -146,7 +151,8 @@ export const AuthProfileSchema = z
 export const LoginResponseSchema = z
   .object({
     token: z.string(),
-    refreshToken: z.string(),
+    /** Present for native clients, which keep the session in the body; the web receives it as a cookie. */
+    refreshToken: z.string().optional(),
     expiresIn: z.number().int().positive(),
     user: AuthUserSchema,
   })
@@ -155,7 +161,8 @@ export const LoginResponseSchema = z
 export const RefreshResponseSchema = z
   .object({
     token: z.string(),
-    refreshToken: z.string(),
+    /** Rotated session token for native clients; the web receives the rotated cookie instead. */
+    refreshToken: z.string().optional(),
     expiresIn: z.number().int().positive(),
   })
   .strict();
