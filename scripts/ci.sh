@@ -26,6 +26,11 @@ run_step() {
 }
 
 run_step 'Install dependencies' npm ci
+
+# The tree that ships is the one audited: development packages are excluded, and a high or critical advisory in
+# what the API and the web actually run is a failure, not a warning to read later. No `--json` and no `|| true`:
+# suppressing the verdict is how the previous five advisories survived four releases.
+run_step 'Audit production dependencies' npm audit --omit=dev --audit-level=high
 run_step 'Build all workspaces' npm run build
 run_step 'Typecheck backend and frontend' npm run typecheck
 

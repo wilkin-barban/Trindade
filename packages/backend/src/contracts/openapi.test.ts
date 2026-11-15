@@ -1,3 +1,5 @@
+// Zod 4 needs the extension before a schema exists; this must stay the first import.
+import './zod-openapi.js';
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import type { FastifyInstance } from 'fastify';

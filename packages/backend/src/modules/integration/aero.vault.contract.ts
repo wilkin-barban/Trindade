@@ -38,7 +38,7 @@ export const AeroBridgeActionSchema = z.enum(['entrada', 'entrada_lote', 'saida'
 export const AeroBridgeTicketRequestSchema = z
   .object({
     action: AeroBridgeActionSchema,
-    payloads: z.array(z.record(z.unknown())).min(1).max(8),
+    payloads: z.array(z.record(z.string(), z.unknown())).min(1).max(8),
     callbackPath: z.string().min(1).max(2048).optional(),
   })
   .strict();
@@ -59,7 +59,7 @@ export const AeroBridgeEnvelopeSchema = z
   .object({
     url: z.string().min(1),
     method: z.literal('POST'),
-    headers: z.record(z.string()),
+    headers: z.record(z.string(), z.string()),
     body: z.string(),
     bodies: z.array(z.string()).optional(),
     callback: z.string().min(1),

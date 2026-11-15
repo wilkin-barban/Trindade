@@ -1,12 +1,8 @@
-import { OpenAPIRegistry, OpenApiGeneratorV31, extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
+// First, and on purpose: Zod 4 hands `.openapi` to a schema when it is created, so the extension has to run
+// before the schema modules below are evaluated. See `zod-openapi.ts`.
+import { z } from './zod-openapi.js';
+import { OpenAPIRegistry, OpenApiGeneratorV31 } from '@asteasolutions/zod-to-openapi';
 import type { ResponseConfig } from '@asteasolutions/zod-to-openapi';
-import { z } from 'zod';
-
-// `registry.register(refId, schema)` names a schema by calling `.openapi(refId)` on it, so
-// Zod's prototype has to be extended before anything is registered. This patches the
-// process that builds the contract — the generator and the contract test — and nothing
-// else, because nothing else imports this module.
-extendZodWithOpenApi(z);
 import {
   AuthProfileSchema,
   AuthUserSchema,
