@@ -148,8 +148,9 @@ class AuthRepository @Inject constructor(
         }
 
         val body = response.body()
-        if (response.isSuccessful && body != null) {
-            tokenStore.save(body.token, body.refreshToken)
+        val refreshToken = body?.refreshToken
+        if (response.isSuccessful && body != null && refreshToken != null) {
+            tokenStore.save(body.token, refreshToken)
             // The role arrives once per session, with the pair, and is recorded here rather than derived anywhere
             // else: every surface that asks what this operator may open reads it from the store.
             tokenStore.saveRole(body.user.role)
@@ -331,7 +332,8 @@ class AuthRepository @Inject constructor(
         val body = response?.body()
         if (response?.isSuccessful != true || body == null) return false
 
-        tokenStore.save(body.token, body.refreshToken)
+        val rotatedRefreshToken = body.refreshToken ?: return false
+        tokenStore.save(body.token, rotatedRefreshToken)
         return true
     }
 
