@@ -1,4 +1,6 @@
 import type Database from 'better-sqlite3';
+import { existsSync, unlinkSync } from 'node:fs';
+import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { aeroMovementsTableExists, listAeroMovements } from '../integration/aero.movements.service.js';
 import { getSaoPauloDateString } from '../../utils/date.js';
@@ -22,6 +24,14 @@ import type {
 
 /** A movement carries at most three photos. Without photos it is still a valid movement. */
 export const MAX_SALIDA_PHOTOS = 3;
+
+/**
+ * How long a salida photo is kept, in days.
+ *
+ * Longer than the reports window because this file is the evidence of an exit that already reached the ERP; the
+ * value is the fallback for callers that do not pass the configured one (`SALIDA_PHOTO_RETENTION_DAYS`).
+ */
+export const DEFAULT_SALIDA_PHOTO_RETENTION_DAYS = 90;
 
 /** How long a photo's public token is. Long enough that guessing it is not a way to read the plant's photos. */
 const PUBLIC_TOKEN_BYTES = 16;
@@ -341,4 +351,43 @@ export function deleteSalidaPhoto(db: Database.Database, photoId: number): Salid
   if (!row) return null;
   db.prepare('DELETE FROM salida_photos WHERE id = ?').run(photoId);
   return row;
+}
+
+/**
+ * Delete the photos that fell out of the retention window: the row and the file, together.
+ *
+ * The window is checked once, by the query, and every row it returns is evicted whole. `julianday` parses the
+ * column instead of comparing it as text, because this module writes full ISO instants (`...T...Z`) while SQLite's
+ * own `datetime()` writes a space-separated one; a textual comparison would age one of them wrongly. A file that is
+ * already gone is not an error -- the row still goes -- so a second run deletes nothing and answers `deleted: 0`.
+ *
+ * Mirrors `cleanupExpiredPhotos` in the reports module on purpose: one shape for both attachments, so an operator
+ * reading either cleanup reads the same thing.
+ */
+export function cleanupExpiredSalidaPhotos(
+  db: Database.Database,
+  photosDir: string,
+  retentionDays = DEFAULT_SALIDA_PHOTO_RETENTION_DAYS,
+): { deleted: number; errors: number } {
+  const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
+  const expired = db
+    .prepare(
+      `SELECT ${PHOTO_COLUMNS} FROM salida_photos WHERE julianday(created_at) < julianday(?)`,
+    )
+    .all(cutoff) as SalidaPhotoRow[];
+
+  let deleted = 0;
+  let errors = 0;
+  const deleteRow = db.prepare('DELETE FROM salida_photos WHERE id = ?');
+  for (const photo of expired) {
+    const filePath = join(photosDir, photo.file_path);
+    try {
+      if (existsSync(filePath)) unlinkSync(filePath);
+      deleteRow.run(photo.id);
+      deleted += 1;
+    } catch {
+      errors += 1;
+    }
+  }
+  return { deleted, errors };
 }

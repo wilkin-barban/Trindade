@@ -521,7 +521,7 @@ En la fábrica:
 | Reporte del día desde el ERP | Implementada |
 | Importación de asiento y conciliación | Implementada |
 | Alta de operario desde el asiento | Implementada |
-| Bajas de stock `/saidasitem` | Contrato listo; interfaz pendiente |
+| Bajas de stock `/saidasitem` | Implementada en `/salida` y `/salida-history` (beta de `wilkin`); el alta local y la foto se auditan en `logs/aero-integration.log` con `salida_create`/`salida_photo` |
 | Escritura directa en Firebird | Descartada; se usa el WebService |
 
 ## 13. Referencias

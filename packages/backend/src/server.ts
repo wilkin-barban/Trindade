@@ -14,6 +14,7 @@ import {
   sessionStoreExists,
 } from './modules/auth/auth.sessions.service.js';
 import { cleanupExpiredPhotos } from './modules/reports/reports.lifecycle.service.js';
+import { cleanupExpiredSalidaPhotos } from './modules/salida/salida.service.js';
 import { assertVaultKeyAtStartup } from './modules/integration/vault.crypto.js';
 import { registerApiRoutes } from './routes.js';
 
@@ -34,6 +35,10 @@ const server = Fastify({
   logger: {
     level: process.env.LOG_LEVEL || 'info',
   },
+  // Only the deployment's own proxy may speak for a client. The list is explicit (loopback plus the private
+  // container bridge, overridable with `TRUSTED_PROXY_CIDRS`) and never `true`: with an unrestricted trust any
+  // client could send its own `X-Forwarded-For` and choose the address the audit and session rows record.
+  trustProxy: config.trustedProxies,
 });
 
 // Everything under `/api/` and `/p/` answers with the session or with a token that stands for one, so no
@@ -106,15 +111,15 @@ await registerApiRoutes(server, {
 
 
 
-// Both cleanups below delete dead data at startup and leave the schema untouched. Each keeps its
-// own window because photos and sessions are pruned for different reasons, but neither is a magic
-// number buried in a call.
-const PHOTO_RETENTION_DAYS = 30;
+// Every cleanup below deletes dead data at startup and leaves the schema untouched. Each keeps its own window
+// because photos and sessions are pruned for different reasons, but none of them is a magic number buried in a
+// call: the salida window comes from the runtime configuration, and the two older ones stay where they were.
+const REPORT_PHOTO_RETENTION_DAYS = 30;
 const SESSION_RETENTION_DAYS = 30;
 
 function runPhotoRetentionCleanup() {
   try {
-    const result = cleanupExpiredPhotos(db, PHOTOS_DIR, PHOTO_RETENTION_DAYS);
+    const result = cleanupExpiredPhotos(db, PHOTOS_DIR, REPORT_PHOTO_RETENTION_DAYS);
     if (result.deleted > 0 || result.errors > 0) {
       server.log.info({ result }, 'Report photo retention cleanup finished');
     }
@@ -126,6 +131,27 @@ function runPhotoRetentionCleanup() {
 runPhotoRetentionCleanup();
 const photoRetentionInterval = setInterval(runPhotoRetentionCleanup, 24 * 60 * 60 * 1000);
 photoRetentionInterval.unref?.();
+
+/**
+ * The salida photos, which had no window at all while the reports ones did.
+ *
+ * Same shape as the reports cleanup above, one registry apart: the file and its row go together, and a movement
+ * whose photo was evicted still reads as the exit it recorded.
+ */
+function runSalidaPhotoRetentionCleanup() {
+  try {
+    const result = cleanupExpiredSalidaPhotos(db, PHOTOS_DIR, config.salidaPhotoRetentionDays);
+    if (result.deleted > 0 || result.errors > 0) {
+      server.log.info({ result }, 'Salida photo retention cleanup finished');
+    }
+  } catch (err) {
+    server.log.warn({ err }, 'Salida photo retention cleanup failed');
+  }
+}
+
+runSalidaPhotoRetentionCleanup();
+const salidaPhotoRetentionInterval = setInterval(runSalidaPhotoRetentionCleanup, 24 * 60 * 60 * 1000);
+salidaPhotoRetentionInterval.unref?.();
 
 // Same shape as the photo retention cleanup above. Guarded by the session-store check because the
 // table only exists once an operator has migrated, and startup must never create it.

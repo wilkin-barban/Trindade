@@ -546,8 +546,7 @@ describe('SalidaHistoryPage — iPhone share and layout', () => {
     expect(screen.getByTestId('salida-history-actions').className).toContain('sm:flex');
   });
 
-  it('keeps the help button in the title row and a compact launch link in its own row', async () => {
-    await renderReady();
+  it('keeps the help button in the title row and a compact launch link in its own row', async () => {    await renderReady();
 
     const header = screen.getByTestId('salida-history-header');
     const help = screen.getByTestId('salida-history-help');
@@ -572,5 +571,42 @@ describe('SalidaHistoryPage — iPhone share and layout', () => {
     expect(launch.textContent).toContain(i18n.t('salida.launch'));
     expect(within(launch).getByText(i18n.t('salida.launchShort')).className).toContain('sm:hidden');
     expect(within(launch).getByText(i18n.t('salida.launch')).className).toContain('hidden');
+  });
+});
+
+/**
+ * A photo the retention cleanup removed leaves a row the history still points at.
+ *
+ * The card must not draw a broken image over that row: the bytes answer 404, the exit is still the exit, and the
+ * reader needs to be told the file is gone instead of being shown a browser's broken-image glyph.
+ */
+describe('SalidaHistoryPage — a photo the retention window already removed', () => {
+  it('replaces the broken image with the plain unavailable notice in both keys', async () => {
+    get.mockImplementation(async (url: string) =>
+      url === '/salida/history'
+        ? { days: [{ date: '2026-11-13', total_units: 20, movements: [WITH_PHOTO] }] }
+        : {},
+    );
+
+    await renderReady('/salida-history?date=2026-11-13');
+
+    const card = screen.getByTestId('salida-movement-7');
+    const images = within(card).getAllByRole('img');
+    expect(images).toHaveLength(2);
+
+    // The first photo's file is gone: the server answered 404, which is what an image error means here.
+    fireEvent.error(images[0]!);
+
+    expect(screen.queryByTestId('salida-photo-71')).toBeNull();
+    const notice = screen.getByTestId('salida-photo-unavailable-71');
+    expect(notice.textContent).toContain(i18n.t('salida.photoUnavailable'));
+    expect(screen.getByTestId('salida-photo-unavailable-note').textContent).toBe(
+      i18n.t('salida.photoUnavailableBody'),
+    );
+
+    // The other photo is untouched: one evicted file is not a reason to hide the rest of the card.
+    expect(screen.getByTestId('salida-photo-72')).not.toBeNull();
+    expect(within(card).getAllByRole('img')).toHaveLength(1);
+    expect(within(card).getByTestId(`salida-total-7`).textContent).toContain('20');
   });
 });

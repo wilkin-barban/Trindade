@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
-import { readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import Database from 'better-sqlite3';
 import bcrypt from 'bcryptjs';
 import { REFERENCE_DATASET, verifyReferencePrerequisites } from '../../db/reference-data.js';
 import {
   MAX_SALIDA_PHOTOS,
+  DEFAULT_SALIDA_PHOTO_RETENTION_DAYS,
+  cleanupExpiredSalidaPhotos,
   countSalidaPhotos,
   createSalidaMovement,
   deleteSalidaPhoto,
@@ -239,6 +242,68 @@ describe('salida service', () => {
       assert.equal(countSalidaPhotos(db, movement.id), 2);
       assert.equal(getSalidaPhotoById(db, saved[0].id), null);
       assert.equal(deleteSalidaPhoto(db, saved[0].id), null);
+    });
+
+    /**
+     * A photo written `daysAgo` days back, with its bytes on disk in a directory of its own.
+     *
+     * The row is inserted directly because the age is the point: `saveSalidaPhoto` always stamps the present, and a
+     * cleanup test that cannot go back in time can only assert that nothing ever happens.
+     */
+    const storePhoto = (daysAgo: number) => {
+      const photosDir = join(tmpdir(), `trindade-salida-retention-${process.pid}-${daysAgo}-${Math.random()}`);
+      mkdirSync(photosDir, { recursive: true });
+      const movement = createSalidaMovement(db, {
+        items: [{ code: '1900', quantity: 1 }],
+        userId,
+        date: '2026-09-01',
+      });
+      const storedName = `retention-${daysAgo}.jpg`;
+      const filePath = join(photosDir, storedName);
+      writeFileSync(filePath, Buffer.from([0xff, 0xd8, 0xff, 0xd9]));
+      const createdAt = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString();
+      const inserted = db
+        .prepare(
+          `INSERT INTO salida_photos (movement_id, file_path, file_size, mime_type, public_token, created_at)
+           VALUES (?, ?, ?, 'image/jpeg', ?, ?)`,
+        )
+        .run(movement.id, storedName, 4, `token-${Math.random()}`, createdAt);
+      return { photoId: Number(inserted.lastInsertRowid), filePath, photosDir };
+    };
+
+    it('deletes a photo older than the window: row and file', () => {
+      assert.equal(DEFAULT_SALIDA_PHOTO_RETENTION_DAYS, 90);
+      const expired = storePhoto(DEFAULT_SALIDA_PHOTO_RETENTION_DAYS + 1);
+
+      const cleanup = cleanupExpiredSalidaPhotos(db, expired.photosDir);
+
+      assert.equal(cleanup.deleted, 1);
+      assert.equal(cleanup.errors, 0);
+      assert.equal(getSalidaPhotoById(db, expired.photoId), null);
+      assert.equal(existsSync(expired.filePath), false);
+    });
+
+    it('leaves a photo inside the window untouched', () => {
+      const fresh = storePhoto(DEFAULT_SALIDA_PHOTO_RETENTION_DAYS - 1);
+
+      const cleanup = cleanupExpiredSalidaPhotos(db, fresh.photosDir);
+
+      assert.equal(cleanup.deleted, 0);
+      assert.equal(cleanup.errors, 0);
+      assert.ok(getSalidaPhotoById(db, fresh.photoId));
+      assert.equal(existsSync(fresh.filePath), true);
+    });
+
+    it('is idempotent: a second run finds nothing left to delete', () => {
+      const expired = storePhoto(DEFAULT_SALIDA_PHOTO_RETENTION_DAYS + 5);
+
+      const first = cleanupExpiredSalidaPhotos(db, expired.photosDir);
+      const second = cleanupExpiredSalidaPhotos(db, expired.photosDir);
+
+      assert.deepEqual(first, { deleted: 1, errors: 0 });
+      assert.deepEqual(second, { deleted: 0, errors: 0 });
+      assert.equal(getSalidaPhotoById(db, expired.photoId), null);
+      assert.equal(existsSync(expired.filePath), false);
     });
   });
 });

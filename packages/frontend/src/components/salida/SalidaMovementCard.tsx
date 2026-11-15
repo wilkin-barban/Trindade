@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { MessageCircle, RefreshCw } from 'lucide-react';
+import { ImageOff, MessageCircle, RefreshCw } from 'lucide-react';
 import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import { formatDateLabel } from '../../lib/date';
@@ -37,6 +38,12 @@ export function SalidaMovementCard({
   resending?: boolean;
 }) {
   const { t } = useTranslation();
+  // The retention cleanup deletes the file and its row together, so a card drawn from a cached page can point at
+  // bytes the server no longer has. The ids it answered 404 for are remembered so the tile can say so instead of
+  // leaving the browser's broken-image glyph where a photo used to be.
+  const [unavailablePhotos, setUnavailablePhotos] = useState<ReadonlySet<number>>(() => new Set());
+  const markPhotoUnavailable = (photoId: number) =>
+    setUnavailablePhotos((current) => new Set(current).add(photoId));
   const status = salidaReconciliationStatus(movement);
   const entLans = salidaEntLans(movement);
   const blocks = SALIDA_BLOCKS.filter((block) => movement.items.some((item) => item.block === block));
@@ -118,23 +125,45 @@ export function SalidaMovementCard({
         </div>
 
         {movement.photos.length > 0 ? (
-          <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
-            {movement.photos.map((photo) => (
-              <a
-                key={photo.id}
-                href={photo.publicUrl || photo.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block aspect-square overflow-hidden rounded-md border border-gray-200"
-                title={t('salida.photoDownload')}
-              >
-                <img
-                  src={photo.publicUrl || photo.url}
-                  alt={t('salida.photoDownload')}
-                  className="h-full w-full object-cover"
-                />
-              </a>
-            ))}
+          <div className="mt-3 space-y-2">
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+              {movement.photos.map((photo) =>
+                unavailablePhotos.has(photo.id) ? (
+                  <div
+                    key={photo.id}
+                    className="flex aspect-square flex-col items-center justify-center gap-1 rounded-md border border-dashed border-gray-300 bg-gray-50 p-1 text-center"
+                    data-testid={`salida-photo-unavailable-${photo.id}`}
+                  >
+                    <ImageOff className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                    <span className="text-[11px] font-semibold leading-tight text-gray-700">
+                      {t('salida.photoUnavailable')}
+                    </span>
+                  </div>
+                ) : (
+                  <a
+                    key={photo.id}
+                    href={photo.publicUrl || photo.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block aspect-square overflow-hidden rounded-md border border-gray-200"
+                    title={t('salida.photoDownload')}
+                    data-testid={`salida-photo-${photo.id}`}
+                  >
+                    <img
+                      src={photo.publicUrl || photo.url}
+                      alt={t('salida.photoDownload')}
+                      className="h-full w-full object-cover"
+                      onError={() => markPhotoUnavailable(photo.id)}
+                    />
+                  </a>
+                ),
+              )}
+            </div>
+            {unavailablePhotos.size > 0 && (
+              <p className="text-xs text-gray-500" data-testid="salida-photo-unavailable-note">
+                {t('salida.photoUnavailableBody')}
+              </p>
+            )}
           </div>
         ) : (
           <p className="mt-3 text-xs text-gray-400">{t('salida.noPhotos')}</p>
