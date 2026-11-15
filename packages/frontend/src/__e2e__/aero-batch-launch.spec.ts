@@ -42,15 +42,14 @@ function batchAnswer(total: number, failAtIndex = -1): unknown[] {
 }
 
 async function openLaunchPage(page: Page) {
-  // The configuration is what turns the switch on: seeded before the app reads it.
+  // The configuration is what turns the switch on: seeded before the app reads it. It is seeded once, on the
+  // first document -- an init script runs on every navigation, and clearing the queue there wiped the item the
+  // app had just written when the flow moved to another screen.
   await page.addInitScript(
-    ({ key, value, queueKey }) => {
-      window.localStorage.setItem(key, value);
-      // The device queue lives in the browser profile and the suite shares one: a leftover item from another
-      // spec would change the count this test asserts, so every document starts with an empty queue.
-      window.localStorage.removeItem(queueKey);
+    ({ key, value }) => {
+      if (!window.localStorage.getItem(key)) window.localStorage.setItem(key, value);
     },
-    { key: AERO_SETTINGS_KEY, value: SETTINGS, queueKey: AERO_QUEUE_KEY },
+    { key: AERO_SETTINGS_KEY, value: SETTINGS },
   );
   // The password is not part of what the device keeps, so the tab asks for it once -- the same thing an
   // operator does -- and then walks to the launch screen through the app, which is what keeps it in memory.
@@ -67,11 +66,14 @@ async function waitForInFlight(page: Page, expected: number): Promise<void> {
     .toBe(expected);
 }
 
-async function launchProducts(page: Page, count: number, boxes = '2') {
+async function launchProducts(page: Page, count: number, boxes = '2', startAt = 0) {
   const quantities = page.locator('input[type="number"]');
   for (let index = 0; index < count; index += 1) {
-    await quantities.nth(index).fill(boxes);
-    await quantities.nth(index).blur();
+    // `startAt` gives each test its own products. The suite shares one day, and a second launch of a product the
+    // same day already recorded is refused by the server -- which is correct, and would have made these tests
+    // depend on the order they run in.
+    await quantities.nth(startAt + index).fill(boxes);
+    await quantities.nth(startAt + index).blur();
   }
 
   await page.getByRole('button', { name: /Lançar/ }).click();
@@ -100,7 +102,12 @@ async function answer(page: Page, action: string, payload: unknown) {
 
 test.use({ viewport: { width: 375, height: 667 }, userAgent: IPHONE_UA });
 
+// The file drives the whole app: a login, a screen, a batch through the bridge, a dialog. 30 s is the suite's
+// default and it measures the runner, not the flow, once the suite competes for the machine.
+test.describe.configure({ timeout: 60_000 });
+
 test.describe('a launch of many products leaves once', () => {
+
   test('three products travel in one envelope and come back in one dialog', async ({ page }) => {
     await loginAsAeroOwner(page);
     await openLaunchPage(page);
@@ -133,7 +140,11 @@ test.describe('a launch of many products leaves once', () => {
   test('one refused product comes back as a warning with the retry in the operator hand', async ({ page }) => {
     await loginAsAeroOwner(page);
     await openLaunchPage(page);
-    await launchProducts(page, 3, '1');
+    await launchProducts(page, 3, '1', 3);
+    // The shortcut answers a batch the page has to have written first: delivering it before the ticket exists is
+    // a reply to a question nobody asked, and the page has no way to attach it. The first test waits for this;
+    // the two that followed did not, and that is the race that made them pass alone and fail in a suite.
+    await waitForInFlight(page, 3);
 
     // The ERP records two and refuses the third.
     await answer(page, 'entrada_lote', batchAnswer(3, 2));
@@ -144,9 +155,12 @@ test.describe('a launch of many products leaves once', () => {
     await expect(result).toContainText('2 de 3 sincronizados');
 
     // Exactly the refused product waits for the operator, at the front of the queue, and no second trip was
-    // taken on its own.
+    // taken on its own. The queue is written by the app after the dialog renders, so this waits for the write
+    // instead of reading the storage once and blaming the app for winning a race it was going to win.
+    await expect
+      .poll(async () => (await readQueue(page))?.items.length, { timeout: 30_000 })
+      .toBe(1);
     const queue = (await readQueue(page))!;
-    expect(queue.items).toHaveLength(1);
     expect(queue.inFlight).toHaveLength(0);
 
     const retry = result.locator('[data-testid="massa-result-retry"]');
@@ -157,7 +171,8 @@ test.describe('a launch of many products leaves once', () => {
   test('a phone still on the old eight actions does not open a batch dialog for one product', async ({ page }) => {
     await loginAsAeroOwner(page);
     await openLaunchPage(page);
-    await launchProducts(page, 1);
+    await launchProducts(page, 1, '2', 6);
+    await waitForInFlight(page, 1);
 
     // Un producto solo viaja por `entrada`, sin `bodies`, igual que antes del lote.
     await waitForInFlight(page, 1);
