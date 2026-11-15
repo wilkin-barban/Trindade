@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "test:e2e": "env -u NO_COLOR npx playwright test",
     "test:e2e:ui": "env -u NO_COLOR npx playwright test --ui",
+    "test:e2e:host": "env -u NO_COLOR PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-x64 npx playwright test",
     "test:node": "node --test --import tsx \"src/**/*.test.ts\"",
     "test:unit": "vitest run"
   },

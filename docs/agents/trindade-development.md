@@ -121,6 +121,22 @@ NODE_ENV=test npm --workspace=packages/frontend run test:unit
 cd packages/frontend && npx playwright test --project=chromium
 ```
 
+En los hosts Ubuntu 26.04, Playwright rechaza Chromium por la versión de la distribución. El repositorio pisa la
+plataforma declarada con `PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-x64`, que es lo que ya hace
+`playwright.config.ts` al iniciar la suite; la instalación de los binarios tiene que usar el mismo valor, porque
+el comando de instalación no lee la configuración:
+
+```bash
+cd packages/frontend
+PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-x64 npx playwright install chromium chromium-headless-shell
+npm run test:e2e:host
+```
+
+`test:e2e:host` es la suite completa en este host (evidencia: 117/118 en 9m 40s el 2026-11-14). El CI sigue
+corriendo en `ubuntu-24.04` y no necesita ninguna bandera. Si un binario descargado así fallara por bibliotecas
+del sistema, la alternativa reproducible es el contenedor oficial
+`mcr.microsoft.com/playwright:v1.60.0-noble` con `--network host` y el repositorio montado.
+
 Los tests e2e comparten un servidor y un día de planta. Un test no debe asumir que un espejo está vacío; leer el
 estado o aislar el dato que crea. Un fallo intermitente por estado compartido se corrige en el test, no se
 “arregla” repitiendo el run.
