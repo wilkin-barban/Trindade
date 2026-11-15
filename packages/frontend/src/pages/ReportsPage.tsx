@@ -514,7 +514,7 @@ export function ReportsPage() {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:border-blue-500 resize-y"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-base sm:text-sm shadow-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:border-blue-500 resize-y"
               placeholder={t('reports.notesPlaceholder')}
               data-testid="notes-textarea"
             />
@@ -542,11 +542,13 @@ export function ReportsPage() {
                     <button
                       type="button"
                       onClick={() => removePendingPhoto(photo.id)}
-                      className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full"
+                      className="absolute right-1 top-1 inline-flex h-11 w-11 items-start justify-end rounded-full"
                       title={t('reports.photoRemove')}
                       data-testid="remove-pending-photo-btn"
                     >
-                      <LucideTrash2 className="h-3 w-3" />
+                      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white">
+                        <LucideTrash2 className="h-3 w-3" />
+                      </span>
                     </button>
                   </div>
                 ))}

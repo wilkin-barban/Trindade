@@ -53,6 +53,10 @@ const CATEGORIES_AFTER_CUTOFF: CategoryType[] = [
   { id: 41, parent_category_id: 4, name_pt: 'Recebimento de congelados', name_es: 'Recepción de congelados', sort_order: 5, tasks: [task(410, 41)] },
 ];
 
+function photoFile(name: string) {
+  return new File([new Uint8Array([0xff, 0xd8, 0xff])], name, { type: 'image/jpeg' });
+}
+
 const REPORT = {
   id: 7,
   turno: 'tarde' as const,
@@ -96,6 +100,18 @@ beforeEach(async () => {
     if (url === '/reports/categories') return { categories: CATEGORIES };
     if (url.endsWith('/photos')) return { photos: [] };
     return {};
+  });
+  // jsdom has no object URLs: the preview of a picked photo is a name here, and nothing else uses it.
+  let objects = 0;
+  Object.defineProperty(URL, 'createObjectURL', {
+    configurable: true,
+    writable: true,
+    value: () => `blob:report/${++objects}`,
+  });
+  Object.defineProperty(URL, 'revokeObjectURL', {
+    configurable: true,
+    writable: true,
+    value: () => undefined,
   });
   await i18n.changeLanguage('es');
 });
@@ -196,5 +212,64 @@ describe('ReportEditPage — the body it saves', () => {
       { taskId: 1, checked: false },
       { taskId: 2, checked: false },
     ]);
+  });
+});
+
+/**
+ * The phone the operators actually carry: 16 px fields so iOS does not zoom on focus, and 44 px targets.
+ *
+ * The photo the report already has is revealed on hover on a desktop; a phone has no hover, so on the small
+ * screen it is simply there -- an invisible 44 px button over the photo would be a trap, not a target.
+ */
+describe('ReportEditPage — the phone, 390 px', () => {
+  it('keeps the notes field at 16 px on the phone and only shrinks it from sm', async () => {
+    renderPage();
+
+    const notes = await screen.findByTestId('notes-textarea');
+    const classes = notes.className.split(/\s+/);
+
+    expect(classes).toContain('text-base');
+    expect(classes).not.toContain('text-sm');
+    expect(classes).toContain('sm:text-sm');
+    // The field keeps the rest of its look, disabled state included.
+    expect(classes).toContain('w-full');
+    expect(classes).toContain('disabled:cursor-not-allowed');
+  });
+
+  it('gives the remove-photo button a 44 px target without growing the badge', async () => {
+    renderPage();
+
+    fireEvent.change(await screen.findByTestId('report-photo-input'), {
+      target: { files: [photoFile('a.jpg')] },
+    });
+    const remove = screen.getByTestId('remove-pending-photo-btn');
+    const classes = remove.className.split(/\s+/);
+
+    expect(classes).toContain('h-11');
+    expect(classes).toContain('w-11');
+    expect(remove.querySelector('span')?.className.split(/\s+/)).toContain('h-5');
+
+    fireEvent.click(remove);
+    expect(screen.queryByTestId('remove-pending-photo-btn')).not.toBeInTheDocument();
+  });
+
+  it('gives the delete button of a saved photo a 44 px target and shows it on the phone', async () => {
+    get.mockImplementation(async (url: string) => {
+      if (url === '/reports/7') return { report: REPORT };
+      if (url === '/reports/categories') return { categories: CATEGORIES };
+      if (url.endsWith('/photos')) return { photos: [{ id: 11, url: '/reports/photos/11' }] };
+      return {};
+    });
+    renderPage();
+
+    const remove = await screen.findByTestId('delete-existing-photo-btn');
+    const classes = remove.className.split(/\s+/);
+
+    expect(classes).toContain('h-11');
+    expect(classes).toContain('w-11');
+    // Hidden behind a hover a phone does not have: the reveal is the desktop's, from `sm` on.
+    expect(classes).toContain('opacity-100');
+    expect(classes).toContain('sm:opacity-0');
+    expect(classes).toContain('sm:group-hover:opacity-100');
   });
 });

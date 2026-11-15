@@ -57,11 +57,13 @@ export function SalidaPhotoPicker({
               <button
                 type="button"
                 onClick={() => onRemove(photo.id)}
-                className="absolute right-1 top-1 inline-flex h-9 w-9 items-center justify-center rounded-full bg-red-600 text-white shadow"
+                className="absolute right-1 top-1 inline-flex h-11 w-11 items-start justify-end rounded-full"
                 aria-label={t('salida.photoRemove')}
                 data-testid={`salida-photo-remove-${photo.id}`}
               >
-                <Trash2 className="h-4 w-4" />
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-red-600 text-white shadow">
+                  <Trash2 className="h-4 w-4" />
+                </span>
               </button>
             </div>
           ))}

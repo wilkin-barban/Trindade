@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import i18n from '../i18n/config';
@@ -66,6 +66,10 @@ function renderPage() {
   );
 }
 
+function photoFile(name: string) {
+  return new File([new Uint8Array([0xff, 0xd8, 0xff])], name, { type: 'image/jpeg' });
+}
+
 beforeEach(async () => {
   get.mockReset();
   get.mockImplementation(async (url: string) => {
@@ -73,6 +77,18 @@ beforeEach(async () => {
     if (url === '/reports/turno') return { turno: 'tarde' };
     if (url === '/reports/products') return { assai: ['Nhoque Kg', 'Quadrada'], normal: ['Nhoque 400g', 'Quadrada'] };
     return {};
+  });
+  // jsdom has no object URLs: the preview of a picked photo is a name here, and nothing else uses it.
+  let objects = 0;
+  Object.defineProperty(URL, 'createObjectURL', {
+    configurable: true,
+    writable: true,
+    value: () => `blob:report/${++objects}`,
+  });
+  Object.defineProperty(URL, 'revokeObjectURL', {
+    configurable: true,
+    writable: true,
+    value: () => undefined,
   });
   await i18n.changeLanguage('es');
 });
@@ -144,5 +160,47 @@ describe('ReportsPage — sections', () => {
     const asked = get.mock.calls.map(([url]) => url as string);
     expect(asked).toContain('/reports/categories');
     expect(asked).toContain('/reports/turno');
+  });
+});
+
+/**
+ * The phone the operators actually carry.
+ *
+ * iOS Safari zooms the whole page when a field under 16 px takes focus, and Apple asks 44x44 px for a tappable
+ * control. Both are class declarations, so both are asserted here rather than measured in a browser.
+ */
+describe('ReportsPage — the phone, 390 px', () => {
+  it('keeps the notes field at 16 px on the phone and only shrinks it from sm', async () => {
+    renderPage();
+
+    const notes = await screen.findByTestId('notes-textarea');
+    const classes = notes.className.split(/\s+/);
+
+    // 16 px where the phone reads it; the desktop size is the `sm` one, never the base.
+    expect(classes).toContain('text-base');
+    expect(classes).not.toContain('text-sm');
+    expect(classes).toContain('sm:text-sm');
+    // The field is still the field: the rest of the look did not travel with the font size.
+    expect(classes).toContain('w-full');
+    expect(classes).toContain('resize-y');
+  });
+
+  it('gives the remove-photo button a 44 px target without growing the badge', async () => {
+    renderPage();
+
+    fireEvent.change(await screen.findByTestId('report-photo-input'), {
+      target: { files: [photoFile('a.jpg')] },
+    });
+    const remove = screen.getByTestId('remove-pending-photo-btn');
+    const classes = remove.className.split(/\s+/);
+
+    // h-11/w-11 is 2.75rem: the 44 px floor. The round badge inside stays 20 px (h-5/w-5).
+    expect(classes).toContain('h-11');
+    expect(classes).toContain('w-11');
+    expect(classes).not.toContain('h-9');
+    expect(remove.querySelector('span')?.className.split(/\s+/)).toContain('h-5');
+
+    fireEvent.click(remove);
+    expect(screen.queryByTestId('remove-pending-photo-btn')).not.toBeInTheDocument();
   });
 });
