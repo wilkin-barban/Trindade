@@ -321,7 +321,9 @@ export const SALIDA_MAX_PHOTOS = 3;
 /** The same ceiling the report photos carry. */
 export const SALIDA_MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 
-export const SALIDA_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
+// HEIC/HEIF are what an iPhone camera hands the browser, and the Salida endpoint accepts them: a picker that
+// refused them here would block the upload before the request that knows how to store it.
+export const SALIDA_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'] as const;
 
 export type SalidaPhotoRejection = 'count' | 'size' | 'type';
 

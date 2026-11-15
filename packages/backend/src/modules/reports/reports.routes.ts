@@ -567,6 +567,17 @@ export async function reportsRoutes(fastify: FastifyInstance, opts: ReportsRoute
 
       // Validate MIME declaration and magic bytes. Browser MIME alone is not trusted.
       if (!mimeType || !ALLOWED_MIME_TYPES.includes(mimeType as any)) {
+        // An iPhone can hand the browser a HEIC, and this table's `mime_type` still refuses it at the database
+        // level: saying "invalid format" to a camera photo reads as a broken picker. The message names the case
+        // until the schema revision that widens the column lands.
+        const declared = (mimeType ?? '').toLowerCase();
+        if (declared === 'image/heic' || declared === 'image/heif') {
+          return reply.status(415).send({
+            error:
+              'Fotos HEIC/HEIF ainda não são aceitas em Relatórios. Envie a foto como JPEG, PNG ou WebP.',
+            code: 'REPORT_PHOTO_HEIC_UNSUPPORTED',
+          });
+        }
         return reply.status(415).send({ error: 'Formato inválido. Envie apenas imagens JPEG, PNG ou WebP.' });
       }
 

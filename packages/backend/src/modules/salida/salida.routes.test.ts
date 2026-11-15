@@ -37,6 +37,35 @@ describe('salida routes', () => {
     0x00, 0x48, 0x00, 0x00, 0xff, 0xd9,
   ]);
 
+  /**
+   * An iPhone still in its container form: `ftyp` at bytes 4..8 and the brand at bytes 8..12.
+   *
+   * That is the whole of what the server may trust — a HEIC and a HEIF differ only in the brand, and neither can
+   * be told apart from a JPEG without reading the bytes.
+   */
+  function isoBmffStill(brand: string): Buffer {
+    return Buffer.concat([
+      Buffer.from([0x00, 0x00, 0x00, 0x18]),
+      Buffer.from('ftyp', 'ascii'),
+      Buffer.from(brand, 'ascii'),
+      Buffer.from([0x00, 0x00, 0x00, 0x00]),
+      Buffer.from('mif1heic', 'ascii'),
+      Buffer.from([0x00, 0x00, 0x00, 0x00]),
+    ]);
+  }
+
+  const fakeHeic = isoBmffStill('heic');
+  const fakePng = Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    Buffer.from([0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52]),
+  ]);
+  const fakeWebp = Buffer.concat([
+    Buffer.from('RIFF', 'ascii'),
+    Buffer.from([0x24, 0x00, 0x00, 0x00]),
+    Buffer.from('WEBPVP8 ', 'ascii'),
+    Buffer.from([0x00, 0x00, 0x00, 0x00]),
+  ]);
+
   function multipartBody(mimeType: string, data: Buffer): { body: Buffer; boundary: string } {
     const boundary = `----SalidaBoundary${randomUUID()}`;
     const CRLF = '\r\n';
@@ -67,7 +96,7 @@ describe('salida routes', () => {
     return JSON.parse(response.body).movement.id as number;
   }
 
-  async function uploadPhoto(movementId: number, mimeType = 'image/jpeg', data = fakeJpeg) {
+  async function uploadPhoto(movementId: number, mimeType = 'image/jpeg', data: Buffer = fakeJpeg) {
     const { body, boundary } = multipartBody(mimeType, data);
     return app.inject({
       method: 'POST',
@@ -351,6 +380,65 @@ describe('salida routes', () => {
     it('refuses a declared image whose bytes are not one', async () => {
       const movementId = await launchOne('1355', 4);
       const response = await uploadPhoto(movementId, 'image/jpeg', Buffer.from('not an image at all'));
+      assert.equal(response.statusCode, 415, response.body);
+    });
+
+    it('accepts an iPhone HEIC, stores `.heic` and serves the bytes back', async () => {
+      const movementId = await launchOne('1473', 3);
+      const created = await uploadPhoto(movementId, 'image/heic', fakeHeic);
+      assert.equal(created.statusCode, 201, created.body);
+
+      const { photo } = JSON.parse(created.body);
+      assert.equal(photo.mime_type, 'image/heic');
+      assert.ok(photo.file_path.endsWith('.heic'), `file_path should end with .heic, got ${photo.file_path}`);
+      assert.ok(existsSync(join(photosDir, photo.file_path)), 'the bytes must be on disk');
+
+      const served = await app.inject({
+        method: 'GET',
+        url: `/api/salida/photos/${photo.id}`,
+        headers: wilkin(),
+      });
+      assert.equal(served.statusCode, 200, served.body);
+      assert.equal(served.headers['content-type'], 'image/heic');
+      assert.deepEqual(served.rawPayload, fakeHeic);
+    });
+
+    it('maps the HEIF family of the same header to `image/heif` and `.heif`', async () => {
+      const movementId = await launchOne('1473', 2);
+      const created = await uploadPhoto(movementId, 'image/heif', isoBmffStill('mif1'));
+      assert.equal(created.statusCode, 201, created.body);
+
+      const { photo } = JSON.parse(created.body);
+      assert.equal(photo.mime_type, 'image/heif');
+      assert.ok(photo.file_path.endsWith('.heif'), `file_path should end with .heif, got ${photo.file_path}`);
+    });
+
+    it('keeps accepting JPEG, PNG and WebP and keeps their extensions', async () => {
+      const movementId = await launchOne('1473', 1);
+      const cases: { mime: string; data: Buffer; ext: string }[] = [
+        { mime: 'image/jpeg', data: fakeJpeg, ext: '.jpg' },
+        { mime: 'image/png', data: fakePng, ext: '.png' },
+        { mime: 'image/webp', data: fakeWebp, ext: '.webp' },
+      ];
+
+      for (const item of cases) {
+        const response = await uploadPhoto(movementId, item.mime, item.data);
+        assert.equal(response.statusCode, 201, `${item.mime}: ${response.body}`);
+        const { photo } = JSON.parse(response.body);
+        assert.equal(photo.mime_type, item.mime);
+        assert.ok(photo.file_path.endsWith(item.ext), `${item.mime} should store ${item.ext}`);
+      }
+    });
+
+    it('refuses a declared HEIC whose bytes are not an ISO-BMFF container', async () => {
+      const movementId = await launchOne('1473', 4);
+      const response = await uploadPhoto(movementId, 'image/heic', Buffer.from('not a heic at all'));
+      assert.equal(response.statusCode, 415, response.body);
+    });
+
+    it('refuses a HEIC file declared as `image/jpeg`', async () => {
+      const movementId = await launchOne('1473', 5);
+      const response = await uploadPhoto(movementId, 'image/jpeg', fakeHeic);
       assert.equal(response.statusCode, 415, response.body);
     });
 

@@ -32,10 +32,18 @@ export interface SalidaRouteOptions {
 const BETA_USERNAME = 'wilkin';
 
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
-const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
+const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'] as const;
 
 /**
- * Content sniffing for the three formats the upload accepts.
+ * The brands an iPhone hands to a browser. `heic` and its variants are HEVC stills; `mif1`/`msf1` are the generic
+ * HEIF container the same encoder also writes. The two families are one header apart, so only the brand separates
+ * them.
+ */
+const HEIC_BRANDS = ['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis', 'hevm', 'hevs'] as const;
+const HEIF_BRANDS = ['mif1', 'msf1'] as const;
+
+/**
+ * Content sniffing for the formats the upload accepts.
  *
  * The declared MIME type comes from the browser and a browser can be told anything, so the bytes are what
  * decide. Duplicated from `reports.routes.ts` on purpose: the two modules share a rule, not a lifecycle, and a
@@ -56,6 +64,12 @@ function detectImageMime(data: Buffer): string | null {
   ) {
     return 'image/webp';
   }
+  // ISO base media file: `ftyp` at bytes 4..8, the brand at 8..12.
+  if (data.length >= 12 && data.subarray(4, 8).toString('ascii') === 'ftyp') {
+    const brand = data.subarray(8, 12).toString('ascii');
+    if ((HEIC_BRANDS as readonly string[]).includes(brand)) return 'image/heic';
+    if ((HEIF_BRANDS as readonly string[]).includes(brand)) return 'image/heif';
+  }
   return null;
 }
 
@@ -63,6 +77,8 @@ function detectImageMime(data: Buffer): string | null {
 function extensionForMime(mimeType: string): string {
   if (mimeType === 'image/png') return '.png';
   if (mimeType === 'image/webp') return '.webp';
+  if (mimeType === 'image/heic') return '.heic';
+  if (mimeType === 'image/heif') return '.heif';
   return '.jpg';
 }
 
@@ -247,7 +263,12 @@ export async function salidaRoutes(fastify: FastifyInstance, options: SalidaRout
     if (!mimeType || !ALLOWED_MIME_TYPES.includes(mimeType as (typeof ALLOWED_MIME_TYPES)[number])) {
       return reply
         .status(415)
-        .send(apiError('Formato inválido. Envie apenas imagens JPEG, PNG ou WebP.', SALIDA_ERROR_CODES.INVALID_PHOTO));
+        .send(
+          apiError(
+            'Formato inválido. Envie apenas imagens JPEG, PNG, WebP, HEIC ou HEIF.',
+            SALIDA_ERROR_CODES.INVALID_PHOTO,
+          ),
+        );
     }
 
     const detected = detectImageMime(data);
@@ -256,7 +277,7 @@ export async function salidaRoutes(fastify: FastifyInstance, options: SalidaRout
         .status(415)
         .send(
           apiError(
-            'Arquivo inválido. O conteúdo não corresponde a uma imagem JPEG, PNG ou WebP.',
+            'Arquivo inválido. O conteúdo não corresponde a uma imagem JPEG, PNG, WebP, HEIC ou HEIF.',
             SALIDA_ERROR_CODES.INVALID_PHOTO,
           ),
         );

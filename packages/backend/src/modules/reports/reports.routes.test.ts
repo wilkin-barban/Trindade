@@ -711,6 +711,34 @@ describe('Reports Routes', () => {
     0x00, 0x48, 0x00, 0x00, 0xff, 0xd9,
   ]);
 
+  /**
+   * An iPhone still in its container form: `ftyp` at bytes 4..8 and the brand at bytes 8..12.
+   *
+   * A HEIC and a HEIF differ only in the brand, and neither can be told apart from a JPEG without the bytes.
+   */
+  function isoBmffStill(brand: string): Buffer {
+    return Buffer.concat([
+      Buffer.from([0x00, 0x00, 0x00, 0x18]),
+      Buffer.from('ftyp', 'ascii'),
+      Buffer.from(brand, 'ascii'),
+      Buffer.from([0x00, 0x00, 0x00, 0x00]),
+      Buffer.from('mif1heic', 'ascii'),
+      Buffer.from([0x00, 0x00, 0x00, 0x00]),
+    ]);
+  }
+
+  const fakeHeic = isoBmffStill('heic');
+  const fakePng = Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    Buffer.from([0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52]),
+  ]);
+  const fakeWebp = Buffer.concat([
+    Buffer.from('RIFF', 'ascii'),
+    Buffer.from([0x24, 0x00, 0x00, 0x00]),
+    Buffer.from('WEBPVP8 ', 'ascii'),
+    Buffer.from([0x00, 0x00, 0x00, 0x00]),
+  ]);
+
   function multipartBody(
     fieldname: string,
     filename: string,
@@ -833,6 +861,83 @@ describe('Reports Routes', () => {
     });
 
     assert.strictEqual(res.statusCode, 415);
+  });
+
+  // The table behind this endpoint still constrains `mime_type` to JPEG/PNG/WebP, and SQLite cannot alter a CHECK
+  // without a table rebuild (schema revision 12). Until that revision lands the refusal names the format instead
+  // of telling an iPhone that its camera photo has an "invalid format"; Salida, whose table has no such check,
+  // accepts HEIC today.
+  it('POST /:id/photos refuses a HEIC with 415 and says why, naming the format', async () => {
+    const reportId = await createTestReport();
+    const { body, boundary } = multipartBody('file', 'iphone.HEIC', 'image/heic', fakeHeic);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/reports/${reportId}/photos`,
+      headers: {
+        authorization: `Bearer ${token}`,
+        'content-type': `multipart/form-data; boundary=${boundary}`,
+      },
+      payload: body,
+    });
+
+    assert.strictEqual(res.statusCode, 415, res.body);
+    const result = JSON.parse(res.body);
+    assert.strictEqual(result.code, 'REPORT_PHOTO_HEIC_UNSUPPORTED');
+    assert.match(result.error, /HEIC\/HEIF/);
+    assert.match(result.error, /JPEG, PNG ou WebP/);
+  });
+
+  it('POST /:id/photos refuses a HEIF with the same explicit answer', async () => {
+    const reportId = await createTestReport();
+    const { body, boundary } = multipartBody('file', 'iphone.heif', 'image/heif', isoBmffStill('mif1'));
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/reports/${reportId}/photos`,
+      headers: {
+        authorization: `Bearer ${token}`,
+        'content-type': `multipart/form-data; boundary=${boundary}`,
+      },
+      payload: body,
+    });
+
+    assert.strictEqual(res.statusCode, 415, res.body);
+    assert.strictEqual(JSON.parse(res.body).code, 'REPORT_PHOTO_HEIC_UNSUPPORTED');
+  });
+
+  it('POST /:id/photos rejects a declared HEIC whose bytes are not ISO-BMFF with 415', async () => {
+    const reportId = await createTestReport();
+    const { body, boundary } = multipartBody('file', 'fake.heic', 'image/heic', Buffer.from('not a heic at all'));
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/reports/${reportId}/photos`,
+      headers: {
+        authorization: `Bearer ${token}`,
+        'content-type': `multipart/form-data; boundary=${boundary}`,
+      },
+      payload: body,
+    });
+
+    assert.strictEqual(res.statusCode, 415, res.body);
+  });
+
+  it('POST /:id/photos rejects a HEIC declared as `image/jpeg` with 415', async () => {
+    const reportId = await createTestReport();
+    const { body, boundary } = multipartBody('file', 'mislabelled.heic', 'image/jpeg', fakeHeic);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/reports/${reportId}/photos`,
+      headers: {
+        authorization: `Bearer ${token}`,
+        'content-type': `multipart/form-data; boundary=${boundary}`,
+      },
+      payload: body,
+    });
+
+    assert.strictEqual(res.statusCode, 415, res.body);
   });
 
   it('POST /:id/photos rejects the sixth photo with 409', async () => {
