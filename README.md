@@ -133,6 +133,19 @@ make ci-android
 
 Los workflows de GitHub Actions ejecutan la misma compuerta en cada push y pull request. El contrato OpenAPI se regenera y se compara en CI; no se edita a mano.
 
+La suite del backend es hermética: no lee el `.env` del desarrollador ni necesita secretos reales. `pretest`
+construye `dist` antes de correr, dos tests arrancan el servidor con una clave de cofre de test explícita y
+`scripts/ci.sh` exporta una efímera para su propio paso, así que un clon limpio pasa sin preparar el entorno.
+
+```bash
+npm --workspace=packages/backend test   # construye dist y corre la suite (node:test)
+npm audit --omit=dev --audit-level=high # dependencias de producción; high o critical rompen el gate
+cd packages/frontend && npm run test:e2e:host   # Playwright en Ubuntu 26.04 (ver guía de agentes)
+```
+
+El `npm audit` del árbol de producción se revisa en cada actualización de dependencias: una vulnerabilidad high o
+critical en el árbol que se despliega se trata como un fallo, no como un aviso.
+
 ## Distribución Android
 
 La instancia de producción sirve el APK firmado en `GET /api/app/download-apk` y publica la versión vigente en `GET /api/app/latest-release`; la app consulta ese endpoint y compara `versionName` y `buildNumber`. La release de GitHub `v0.7.5` publica el mismo binario que sirve la instancia, con el mismo sha256; `v0.7.4`, `v0.7.0` y `v0.7.1` conservan su asset histórico. El procedimiento de publicación está en [la guía de agentes](docs/agents/trindade-development.md).

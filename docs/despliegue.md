@@ -460,6 +460,20 @@ sección 14.
 Variables opcionales que lee `docker-compose.yml`: `API_PORT`, `DATABASE_PATH`, `PHOTOS_DIR`, `LOG_LEVEL` y
 `AERO_LOG_DIR`.
 
+### Retención de fotos y proxies de confianza
+
+- `SALIDA_PHOTO_RETENTION_DAYS` (90 por defecto): cuántos días se conserva una foto de salida. La foto de reporte
+  tiene su propia ventana fija de 30 días, que no se configura por entorno. El limpiador corre al arrancar y cada
+  24 h, borra la fila y el archivo
+  de lo que quedó fuera de la ventana, y no toca nada dentro de ella. Un valor que no sea un entero positivo
+  impide arrancar: una ventana en cero borraría la foto en el momento de subirla. La foto de salida dura más
+  porque es evidencia de una salida que ya llegó al ERP. Antes del primer arranque con esta política conviene un
+  backup del volumen de datos, porque el primer barrido borra lo que ya excedió la ventana.
+- `TRUSTED_PROXY_CIDRS` (`127.0.0.1/8,::1/128,172.16.0.0/12` por defecto): quién puede declarar la IP del cliente
+  con `X-Forwarded-For`. Solo loopback y la red de Docker por defecto; `true`, `*` y `/0` se rechazan con un
+  mensaje. Si el bridge de Docker usa otro rango, declararlo acá: un peer fuera de la lista conserva su propia
+  dirección aunque mande el encabezado.
+
 Para TLS con Nginx del host, usar `docker/nginx-standalone-host.conf.example` en dos pasos: primero HTTP para el
 desafío ACME, luego HTTPS. Certbot:
 
