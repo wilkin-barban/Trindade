@@ -12,5 +12,8 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['src/**/*.test.tsx'],
     setupFiles: ['./src/test/setup.ts'],
+    // jsdom is expensive to build and each file used to get its own copy. Sharing one environment per worker
+    // removes that cost without letting a test see another test's globals: files still get a fresh module graph.
+    pool: 'vmThreads',
   },
 });

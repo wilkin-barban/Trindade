@@ -52,5 +52,7 @@ fi
 
 printf '\n========== CI gate passed ==========%s' $'\n'
 
-# npm run lint is intentionally absent: no workspace defines lint, so the root
-# --if-present lint command is a green no-op rather than a verification check.
+# There is no lint step, and there is no `npm run lint` either: the root script was a `--if-present`
+# no-op because no workspace defined lint, so a green result said nothing about the code. A gate that
+# cannot fail is worse than an absent one, because it is read as evidence. Static checking is
+# `npm run typecheck` above; a real linter is a separate decision with its own baseline.
