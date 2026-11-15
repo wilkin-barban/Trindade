@@ -294,6 +294,30 @@ describe('salida service', () => {
       assert.equal(existsSync(fresh.filePath), true);
     });
 
+    it('refuses a stored path that would escape the photos directory', () => {
+      // The routes write a bare UUID name, but the row is data: a `..` in it would make the cleanup unlink a file the
+      // module does not own. The row stays and the file outside is untouched, so a human can look at it.
+      const expired = storePhoto(DEFAULT_SALIDA_PHOTO_RETENTION_DAYS + 1);
+      const outside = join(expired.photosDir, '..', `escape-${Math.random()}.jpg`);
+      writeFileSync(outside, Buffer.from([0xff, 0xd8, 0xff, 0xd9]));
+      const escaping = db
+        .prepare(
+          `INSERT INTO salida_photos (movement_id, file_path, file_size, mime_type, public_token, created_at)
+           SELECT movement_id, ?, 4, 'image/jpeg', 'escape-token', created_at FROM salida_photos WHERE id = ?`,
+        )
+        .run(`../${outside.split('/').pop()}`, expired.photoId);
+
+      const cleanup = cleanupExpiredSalidaPhotos(db, expired.photosDir);
+
+      assert.equal(cleanup.errors, 1);
+      assert.ok(getSalidaPhotoById(db, Number(escaping.lastInsertRowid)), 'the escaping row must survive');
+      assert.equal(existsSync(outside), true, 'a file outside the photos directory must not be deleted');
+
+      // The row survives by design, so the test removes its own fixture: this file shares one database, and a
+      // surviving row would make the next cleanup look like it failed.
+      db.prepare('DELETE FROM salida_photos WHERE id = ?').run(Number(escaping.lastInsertRowid));
+    });
+
     it('is idempotent: a second run finds nothing left to delete', () => {
       const expired = storePhoto(DEFAULT_SALIDA_PHOTO_RETENTION_DAYS + 5);
 

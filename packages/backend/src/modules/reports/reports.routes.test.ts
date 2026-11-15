@@ -1271,6 +1271,35 @@ describe('Reports Routes', () => {
   });
 
 
+  it('cleanupExpiredPhotos ages an ISO timestamp as the instant it is', async () => {
+    // The column holds both SQLite's space-separated value and full ISO instants; comparing them as text gave the
+    // ISO one an extra day of life, because 'T' sorts after ' '. The window is a time, so it is parsed as one.
+    const { cleanupExpiredPhotos } = await import('./reports.lifecycle.service.js');
+    const { writeFileSync, existsSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const result = await buildTestApp();
+    const localApp = result.app;
+    const localDb = result.db;
+    try {
+      const filePath = join(result.photosDir, 'iso-expired.jpg');
+      writeFileSync(filePath, fakeJpeg);
+      // A row on the cutoff's calendar day but earlier in the day is the case the text comparison got wrong:
+      // 'T' sorts after ' ' in the tenth column, so the row survived a run that should have evicted it.
+      const cutoffInstant = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const iso = `${cutoffInstant.toISOString().slice(0, 10)}T00:00:00.000Z`;
+      localDb.prepare(`INSERT INTO reports (id, user_id, turno, report_date, notes, created_at) VALUES (9703, 1, 'tarde', '2026-01-01', 'ISO photo report', datetime('now', '-31 days'))`).run();
+      localDb.prepare(`INSERT INTO report_photos (id, report_id, file_path, file_size, mime_type, public_token, created_at) VALUES (9703, 9703, 'iso-expired.jpg', ?, 'image/jpeg', 'iso-token', ?)`).run(fakeJpeg.length, iso);
+
+      const cleanup = cleanupExpiredPhotos(localDb, result.photosDir, 30);
+
+      assert.strictEqual(cleanup.deleted, 1);
+      assert.strictEqual(existsSync(filePath), false);
+    } finally {
+      await localApp.close();
+      localDb.close();
+    }
+  });
+
   it('cleanupExpiredPhotos keeps fresh photo rows and files', async () => {
     const { cleanupExpiredPhotos } = await import('./reports.lifecycle.service.js');
     const { writeFileSync, existsSync } = await import('node:fs');

@@ -89,7 +89,11 @@ function parseTrustedProxies(raw: string | undefined): string[] {
     .split(',')
     .map((entry) => entry.trim())
     .filter((entry) => entry !== '');
-  if (entries.length === 0) return [...DEFAULT_TRUSTED_PROXY_CIDRS];
+  // A value made only of commas is a typo, not a request for the defaults: falling back in silence would leave the
+  // operator believing the proxy list is theirs.
+  if (entries.length === 0) {
+    throw new Error('TRUSTED_PROXY_CIDRS must list at least one IP address or CIDR block');
+  }
   return entries.map(parseTrustedProxy);
 }
 

@@ -1,7 +1,7 @@
 import type Database from 'better-sqlite3';
 import { existsSync, unlinkSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import type { HistoryQuery, HistoryPagination, ReportListItem, ReportPhoto } from './reports.schema.js';
 import { projectHistoryPermissions, type HistoryActor, parseSqliteDate } from '../history-permissions.js';
 import { GUEST_USERNAME } from '../../guest-user.js';
@@ -189,15 +189,22 @@ export function activateReport(db: Database.Database, reportId: number): boolean
 }
 
 export function cleanupExpiredPhotos(db: Database.Database, photosDir: string, retentionDays = 30): { deleted: number; errors: number } {
-  const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
+  const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
+  // `julianday` parses the column instead of comparing it as text: this table now holds both SQLite's
+  // space-separated `datetime()` value and full ISO instants, and `'T' > ' '` gave the ISO one an extra day.
   const expired = db
-    .prepare(`SELECT id, report_id, file_path, file_size, mime_type, public_token, created_at FROM report_photos WHERE created_at < ?`)
+    .prepare(`SELECT id, report_id, file_path, file_size, mime_type, public_token, created_at FROM report_photos WHERE julianday(created_at) < julianday(?)`)
     .all(cutoff) as ReportPhoto[];
 
   let deleted = 0;
   let errors = 0;
   const deleteRow = db.prepare('DELETE FROM report_photos WHERE id = ?');
   for (const photo of expired) {
+    // A row is data: a path that is not a plain file name would unlink something outside the photos directory.
+    if (photo.file_path !== basename(photo.file_path)) {
+      errors += 1;
+      continue;
+    }
     const filePath = join(photosDir, photo.file_path);
     try {
       if (existsSync(filePath)) unlinkSync(filePath);

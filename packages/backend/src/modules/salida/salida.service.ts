@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
 import { existsSync, unlinkSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { aeroMovementsTableExists, listAeroMovements } from '../integration/aero.movements.service.js';
 import { getSaoPauloDateString } from '../../utils/date.js';
@@ -380,6 +380,12 @@ export function cleanupExpiredSalidaPhotos(
   let errors = 0;
   const deleteRow = db.prepare('DELETE FROM salida_photos WHERE id = ?');
   for (const photo of expired) {
+    // The paths this module writes are a bare file name, but the row is data: a `..` in it would make the cleanup
+    // unlink a file outside the photos directory. Anything that is not a plain name is refused and left for a human.
+    if (photo.file_path !== basename(photo.file_path)) {
+      errors += 1;
+      continue;
+    }
     const filePath = join(photosDir, photo.file_path);
     try {
       if (existsSync(filePath)) unlinkSync(filePath);

@@ -546,7 +546,8 @@ describe('SalidaHistoryPage — iPhone share and layout', () => {
     expect(screen.getByTestId('salida-history-actions').className).toContain('sm:flex');
   });
 
-  it('keeps the help button in the title row and a compact launch link in its own row', async () => {    await renderReady();
+  it('keeps the help button in the title row and a compact launch link in its own row', async () => {
+    await renderReady();
 
     const header = screen.getByTestId('salida-history-header');
     const help = screen.getByTestId('salida-history-help');

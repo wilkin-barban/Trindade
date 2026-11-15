@@ -27,6 +27,11 @@ describe('Runtime configuration', () => {
     assert.throws(() => requireJwtSecret('   '), /required/);
   });
 
+  it('refuses a proxy list that is only separators instead of using the defaults', () => {
+    // Silence here would leave the operator believing the list is theirs while the defaults apply.
+    assert.throws(() => loadRuntimeConfig({ JWT_SECRET: STRONG_SECRET, TRUSTED_PROXY_CIDRS: ',' }), /at least one/);
+  });
+
   it('counts UTF-8 bytes and requires at least 32', () => {
     assert.throws(() => requireJwtSecret('a'.repeat(31)), /32 UTF-8 bytes/);
     assert.strictEqual(requireJwtSecret('á'.repeat(16)), 'á'.repeat(16));
