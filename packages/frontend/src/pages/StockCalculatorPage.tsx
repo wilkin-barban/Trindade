@@ -453,13 +453,28 @@ export function StockCalculatorPage() {
             </pre>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <Button onClick={shareWhatsApp} disabled={day === null} data-testid="stock-share">
-              {t('stock.shareWhatsapp')}
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              onClick={shareWhatsApp}
+              disabled={day === null}
+              className="min-h-[44px] w-full px-2 text-sm"
+              aria-label={t('stock.shareWhatsapp')}
+              data-testid="stock-share"
+            >
+              {t('stock.shareWhatsappShort')}
             </Button>
-            <Button variant="outline" onClick={sendEmail} disabled={day === null} data-testid="stock-email">
-              {t('stock.shareEmail')}
+            <Button
+              variant="outline"
+              onClick={sendEmail}
+              disabled={day === null}
+              className="min-h-[44px] w-full px-2 text-sm"
+              aria-label={t('stock.shareEmail')}
+              data-testid="stock-email"
+            >
+              {t('stock.shareEmailShort')}
             </Button>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-gray-400">{EMAIL_TO}</span>
             {note !== '' && (
               <span className="text-xs text-gray-500" data-testid="stock-note">

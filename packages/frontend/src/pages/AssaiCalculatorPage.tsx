@@ -22,7 +22,7 @@ import { ModuleHelpModal } from '../components/ui/ModuleHelpModal';
  * heading. It is a template and not four table columns: the units-per-box is a subline of the product's name, and
  * the three remaining columns are the ones an operator reads -- what it is, how many units, how many boxes.
  */
-const ASSAI_ROW_GRID = 'grid grid-cols-[minmax(0,1fr)_5.5rem_3.25rem] items-center gap-x-2';
+const ASSAI_ROW_GRID = 'grid grid-cols-[minmax(0,1fr)_5.5rem_3.5rem] items-center gap-x-2';
 
 /**
  * The Assaí order calculator.
@@ -104,7 +104,7 @@ export function AssaiCalculatorPage() {
           >
             <span>{t('assai.product')}</span>
             <span className="text-center">{t('assai.units')}</span>
-            <span className="text-right">{t('assai.boxes')}</span>
+            <span className="text-right pr-3">{t('assai.boxes')}</span>
           </div>
 
           <ul className="divide-y divide-gray-100" data-testid="assai-rows">
@@ -154,7 +154,7 @@ export function AssaiCalculatorPage() {
                   )}
                 </div>
                 <div
-                  className="text-right text-sm font-semibold tabular-nums text-gray-900"
+                  className="text-right text-sm font-semibold tabular-nums text-gray-900 pr-3"
                   data-testid={`assai-boxes-${line.product}`}
                 >
                   {line.filled && line.exact ? line.boxes : ''}

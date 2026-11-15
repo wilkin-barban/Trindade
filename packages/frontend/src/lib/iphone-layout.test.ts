@@ -60,6 +60,19 @@ describe('iPhone polish', () => {
     assert.doesNotMatch(assai, /overflow-x-auto/);
     assert.doesNotMatch(assai, /min-w-\[320px\]/);
     assert.match(assai, /data-testid="assai-grid-header"/);
-    assert.match(assai, /grid-cols-\[minmax\(0,1fr\)_5\.5rem_3\.25rem\]/);
+    assert.match(assai, /grid-cols-\[minmax\(0,1fr\)_5\.5rem_3\.5rem\]/);
+    assert.equal((assai.match(/pr-3/g) ?? []).length >= 2, true, 'the Caixas value and heading keep clear of the card edge');
+  });
+
+  it('puts the stock share actions side by side on a phone', () => {
+    for (const file of ['pages/StockCalculatorPage.tsx', 'pages/StockHistoryPage.tsx']) {
+      const source = page(file);
+      assert.match(source, /grid grid-cols-2 gap-2/, `${file} must place WhatsApp and e-mail in one row`);
+      assert.match(source, /shareWhatsappShort/, `${file} must use the short WhatsApp label`);
+      assert.match(source, /shareEmailShort/, `${file} must use the short e-mail label`);
+      assert.match(source, /min-h-\[44px\]/, `${file} keeps the 44 px touch target`);
+      assert.match(source, /aria-label=\{t\('stock\.shareWhatsapp'\)\}/, `${file} keeps the full accessible WhatsApp name`);
+      assert.match(source, /aria-label=\{t\('stock\.shareEmail'\)\}/, `${file} keeps the full accessible e-mail name`);
+    }
   });
 });
