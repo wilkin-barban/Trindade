@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { fillAllTemperatureInputs, getE2EIdentities, goToProtected } from './auth-helpers';
+import { apiToken, fillAllTemperatureInputs, getE2EIdentities, goToProtected } from './auth-helpers';
 
 const API_BASE = 'http://localhost:3099/api';
 

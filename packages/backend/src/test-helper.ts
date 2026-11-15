@@ -136,7 +136,13 @@ export async function buildTestApp(options: Pick<AuthRoutesOptions, 'authAdmissi
   app.decorate('authenticate', createAuthenticate(fixtures.jwtSecret));
 
   // Register routes
-  await app.register(authRoutes, { prefix: '/api/auth', jwtSecret: fixtures.jwtSecret, ...options });
+  await app.register(authRoutes, {
+    prefix: '/api/auth',
+    jwtSecret: fixtures.jwtSecret,
+    // The browser talks to this app through the Vite dev server, whose origin is what it puts in `Origin`.
+    allowedOrigins: ['http://localhost:5173'],
+    ...options,
+  });
   await app.register(bootstrapRoutes, { prefix: '/api/auth' });
   await app.register(dashboardRoutes, { prefix: '/api/dashboard' });
   await app.register(reportsRoutes, { prefix: '/api/reports', photosDir, publicBaseUrl: 'https://example.test' });

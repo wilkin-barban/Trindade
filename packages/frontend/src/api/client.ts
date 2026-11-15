@@ -153,8 +153,10 @@ export async function refreshTokenOnce(attemptedToken: string | null = null): Pr
         // The session travels in the cookie, so the browser has to include it even if this page were served
         // from a different origin than the API.
         credentials: 'include',
+        // No body and no Content-Type: the web asks for a renewal with the cookie alone, and declaring JSON over an
+        // empty body is what Fastify refuses with EMPTY_JSON_BODY -- a 400 that looked exactly like an expired
+        // session. A native client sends the token in the body and keeps its own content type.
         headers: {
-          'Content-Type': 'application/json',
           'Accept-Language': lang,
           'X-Trindade-Client': 'web',
         },

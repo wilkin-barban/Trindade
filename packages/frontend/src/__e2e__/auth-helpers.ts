@@ -73,7 +73,9 @@ export async function loginViaApi(page: Page, identity?: E2EIdentity): Promise<L
   // The cookie comes back in `Set-Cookie` on that response and lands in the context's jar on its own, so the
   // browser holds the session. Asserting it here turns a silently unauthenticated context into a clear failure
   // at the login, not three screens later.
-  const cookies = await page.context().cookies(API_BASE);
+  // No URL filter: a cookie scoped to `Path=/api/auth` is not returned for `/api`, and asking for it that way
+  // reports a missing cookie that the browser actually holds.
+  const cookies = await page.context().cookies();
   if (!cookies.some((cookie) => cookie.name === 'trindade_refresh')) {
     throw new Error('Login succeeded but the session cookie was not stored by the browser context');
   }

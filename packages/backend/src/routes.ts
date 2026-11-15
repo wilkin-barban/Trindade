@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { authRoutes } from './modules/auth/auth.routes.js';
 import { bootstrapRoutes } from './modules/auth/bootstrap.routes.js';
+import { APPROVED_WEB_ORIGINS } from './cors-policy.js';
 import { dashboardRoutes } from './modules/dashboard/dashboard.routes.js';
 import { reportsRoutes } from './modules/reports/reports.routes.js';
 import { getPhotoByPublicToken } from './modules/reports/reports.lifecycle.service.js';
@@ -57,6 +58,9 @@ export async function registerApiRoutes(
     jwtSecret: options.jwtSecret,
     refreshTokenTtlDays: options.refreshTokenTtlDays,
     sessionStoreAvailable: options.sessionStoreAvailable,
+    // The origin the SPA is served from is the one a browser puts in `Origin`, and behind a dev proxy the API's
+    // own Host is the upstream: comparing only against that would refuse every renewal in development.
+    allowedOrigins: [options.publicBaseUrl, ...APPROVED_WEB_ORIGINS],
   });
   await fastify.register(bootstrapRoutes, { prefix: '/api/auth' });
   await fastify.register(dashboardRoutes, { prefix: '/api/dashboard' });

@@ -12,6 +12,38 @@ verificaciones está en [docs/release-android-historial.md](docs/release-android
 
 ## [Unreleased]
 
+### Remediación de la auditoría web (2026-11-14)
+
+#### Seguridad
+
+- **Dependencias**: `zod` 4.6.7 y `@asteasolutions/zod-to-openapi` 9 (el contrato generado quedó idéntico), más
+  `fastify` 5.12.8, `fast-uri` 3.1.9/4.2.3, `dompurify` 3.4.18 y `@fastify/busboy` 3.2.5. `npm audit --omit=dev`: **0
+  vulnerabilidades**, y la compuerta de CI ahora corre `npm audit --omit=dev --audit-level=high`.
+- **Headers y CSP**: la web sirve `Content-Security-Policy`, `X-Content-Type-Options`, `X-Frame-Options`,
+  `Referrer-Policy` y `server_tokens off`, con `always`; la API no los duplica.
+- **Sesión web**: el refresh token deja `localStorage` y pasa a cookie `HttpOnly; SameSite=Strict; Path=/api/auth`
+  (`Secure` en HTTPS) emitida solo al cliente que la pide (`X-Trindade-Client: web`). El access token vive en
+  memoria. Android conserva su flujo por body sin cambios.
+- **Redacción del log**: `response` y `error` de `logs/aero-integration.log` se redactan antes de escribirse.
+
+#### Añadido
+
+- **Compresión y caché**: gzip en nginx, `immutable` para `/assets`, `no-cache` para el HTML y `no-store` para el
+  JSON autenticado de `/api` y `/p`.
+- **Retención de fotos de Salida**: `SALIDA_PHOTO_RETENTION_DAYS` (90 por defecto), limpieza de fila y archivo al
+  arrancar y cada 24 h; la tarjeta del histórico muestra «foto no disponible» en lugar de una imagen rota.
+- **IP real en auditoría**: `trustProxy` con lista explícita (`TRUSTED_PROXY_CIDRS`), sin comodines.
+
+#### Cambiado
+
+- **iPhone**: las notas de reporte usan 16 px (sin zoom de iOS) y los botones de borrar foto tienen 44×44.
+- **Copys**: el módulo se llama «Horario de Cargamento» / «Horário de Carregamento» en toda la interfaz, en el
+  documento compartido y en el PDF.
+- **E2E en este host**: `npm run test:e2e:host` corre Playwright en Ubuntu 26.04 con
+  `PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-x64`.
+- **Calidad**: la suite del backend es hermética (`AERO_VAULT_KEY` de test explícita, `pretest` construye `dist`),
+  Vitest comparte un jsdom por worker y el `lint` que no era un lint se retiró.
+
 ### Auditoría local y etiqueta de sesión
 
 Los módulos Salida/Baja y Reportes escriben ahora su alta y sus fotos en el mismo `logs/aero-integration.log` que
