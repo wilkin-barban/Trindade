@@ -469,6 +469,18 @@ Variables opcionales que lee `docker-compose.yml`: `API_PORT`, `DATABASE_PATH`, 
   impide arrancar: una ventana en cero borraría la foto en el momento de subirla. La foto de salida dura más
   porque es evidencia de una salida que ya llegó al ERP. Antes del primer arranque con esta política conviene un
   backup del volumen de datos, porque el primer barrido borra lo que ya excedió la ventana.
+### El borde TLS y la cabecera `Server`
+
+El certificado y el puerto 443 no los sirve el contenedor `web` de este repositorio: los termina otro nginx
+(el contenedor `portfolio-nginx` de este host, que además publica el portafolio y proxya
+`trindademasas.duckdns.org` a `127.0.0.1:8085`). Por eso:
+
+- `Strict-Transport-Security` sí se puede emitir desde `docker/nginx.conf` y viaja al cliente.
+- `server_tokens off` tiene que estar en el bloque del borde, en el proyecto que lo versiona; el bloque del
+  contenedor no puede apagar una cabecera que el borde agrega después. Sin esa línea, la respuesta pública sigue
+  diciendo `Server: nginx/<versión>`.
+- Al cambiar el borde, verificar con `curl -sSI https://trindademasas.duckdns.org | grep -iE 'server|strict-transport'`.
+
 - `TRUSTED_PROXY_CIDRS` (el compose declara `127.0.0.1/8,::1/128,172.19.0.0/16`): quién puede declarar la IP del
   cliente con `X-Forwarded-For`. El valor por defecto del código es solo loopback; el rango del bridge vive en
   `docker-compose.yml` porque Docker lo asigna al crear la red (`docker network inspect trindade_default`). Si esa
