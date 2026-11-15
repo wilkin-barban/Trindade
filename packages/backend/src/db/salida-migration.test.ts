@@ -77,7 +77,9 @@ function insertTicket(db: Database.Database, tokenHash: string, action: string):
 
 describe('schema revision 11', () => {
   it('is the supported revision and declares the three salida tables', () => {
-    assert.equal(SCHEMA_VERSION, 11);
+    // The constant moves with each revision; what this case pins is that revision 11 is at or below the one this
+    // build supports and that its three tables are part of the inventory.
+    assert.ok(SCHEMA_VERSION >= 11, `revision 11 is no longer supported (build is at ${SCHEMA_VERSION})`);
     assert.deepEqual([...REVISION_ELEVEN_TABLES].sort(), [
       'salida_movement_items',
       'salida_movements',
@@ -122,7 +124,7 @@ describe('schema revision 11', () => {
     const result = migrateDatabase(db);
 
     assert.equal(result.outcome, 'migrated');
-    assert.equal(result.report.version, 11);
+    assert.equal(result.report.version, SCHEMA_VERSION);
     for (const table of REVISION_ELEVEN_TABLES) assert.ok(schemaTables(db).includes(table));
 
     const preserved = db

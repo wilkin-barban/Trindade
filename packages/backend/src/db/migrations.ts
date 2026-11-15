@@ -18,6 +18,69 @@ export type MigrateResult =
   | { outcome: 'refused'; reason: string; report: SchemaReport };
 
 /**
+ * The `report_photos.mime_type` CHECK this build writes, kept in one place so the DDL a migrated database stores and
+ * the DDL a fresh installation gets from `schema.sql` cannot drift apart.
+ */
+const REPORT_PHOTO_MIME_CHECK =
+  "CHECK(mime_type IN ('image/jpeg','image/png','image/webp','image/heic','image/heif'))";
+
+/**
+ * Revision 11 → 12: widen `report_photos.mime_type` for the two formats an iPhone camera writes.
+ *
+ * SQLite cannot alter a CHECK in place, so the table is rebuilt the same way revision 11 rebuilt
+ * `aero_bridge_tickets`: create the final shape under a temporary name, copy every row with its own id, count the
+ * copy against the original, and only then drop the original. The count is compared inside the same immediate
+ * transaction, so an interrupted migration leaves the old table untouched instead of losing a photo link. Dropping
+ * a table drops its indexes, so `idx_report_photos_report_id` is recreated; the `public_token` UNIQUE constraint and
+ * the AUTOINCREMENT sequence come back with the table and its rows.
+ *
+ * Re-entering the step is a no-op: the stored DDL is the flag, so a database whose table already admits `image/heic`
+ * (a fresh installation, or one interrupted after this step) is left exactly as it is.
+ *
+ * Returns whether the table was rebuilt.
+ */
+export function widenReportPhotoMimeCheck(db: Database.Database): boolean {
+  const stored = db
+    .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'report_photos'")
+    .get() as { sql: string } | undefined;
+  if (!stored || stored.sql.includes("'image/heic'")) return false;
+
+  db.pragma('foreign_keys = OFF');
+  try {
+    db.transaction(() => {
+      const before = (db.prepare('SELECT COUNT(*) AS n FROM report_photos').get() as { n: number }).n;
+
+      db.exec(`CREATE TABLE report_photos_revision12 (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        report_id    INTEGER NOT NULL REFERENCES reports(id),
+        file_path    TEXT    NOT NULL,
+        file_size    INTEGER NOT NULL,
+        mime_type    TEXT    NOT NULL ${REPORT_PHOTO_MIME_CHECK},
+        public_token TEXT    UNIQUE,
+        created_at   TEXT    NOT NULL DEFAULT (datetime('now'))
+      )`);
+
+      db.exec(`INSERT INTO report_photos_revision12
+        (id, report_id, file_path, file_size, mime_type, public_token, created_at)
+        SELECT id, report_id, file_path, file_size, mime_type, public_token, created_at
+        FROM report_photos`);
+
+      const after = (db.prepare('SELECT COUNT(*) AS n FROM report_photos_revision12').get() as { n: number }).n;
+      if (after !== before) {
+        throw new Error(`report_photos rebuild copied ${after} of ${before} rows; refusing to drop the original`);
+      }
+
+      db.exec('DROP TABLE report_photos');
+      db.exec('ALTER TABLE report_photos_revision12 RENAME TO report_photos');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_report_photos_report_id ON report_photos(report_id)');
+    }).immediate();
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
+  return true;
+}
+
+/**
  * Bring an existing database up to the supported revision, once, and never at
  * startup. This is the sanctioned write path that the Production Immutability Gate
  * leaves to an explicit operator decision: the caller opens the file read-write only
@@ -83,6 +146,13 @@ export function migrateDatabase(db: Database.Database): MigrateResult {
     { to: 9, apply: () => migrateMassaLaunchSeats(db) },
     { to: 10, apply: () => migrateAeroVault(db) },
     { to: 11, apply: () => migrateSalida(db) },
+    {
+      to: 12,
+      apply: () => {
+        widenReportPhotoMimeCheck(db);
+        stampSchemaVersion(db, 12);
+      },
+    },
   ];
 
   for (const step of steps) {

@@ -36,7 +36,9 @@ interface PendingPhoto {
 
 const MAX_PHOTOS = 5;
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
-const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+// An iPhone camera writes HEIC/HEIF, and the backend stores both since schema revision 12: refusing them here
+// would turn a photo the server accepts into an "invalid format" the operator cannot explain.
+const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
 
 export function ReportsPage() {
   const { t, i18n } = useTranslation();
@@ -560,7 +562,7 @@ export function ReportsPage() {
               <input
                 type="file"
                 multiple
-                accept="image/jpeg,image/png,image/webp"
+                accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
                 className="hidden"
                 disabled={pendingPhotos.length >= MAX_PHOTOS || submitting}
                 onChange={(e) => {

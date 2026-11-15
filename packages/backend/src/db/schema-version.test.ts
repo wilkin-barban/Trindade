@@ -103,6 +103,15 @@ describe('schema revision', () => {
     );
   });
 
+  // Revision 12 widened one CHECK on `report_photos` and added no table, so a revision-11 database is held to the
+  // same inventory the supported build declares. Requiring anything more would classify it `incompatible` and make
+  // the very step that widens it unreachable.
+  it('keeps the revision-11 inventory for revision 12, which adds no table', () => {
+    assert.ok(SCHEMA_VERSION >= 12, `revision 12 is no longer supported (build is at ${SCHEMA_VERSION})`);
+    assert.deepEqual([...requiredTablesFor(11)].sort(), [...requiredTablesFor(SCHEMA_VERSION)].sort());
+    assert.deepEqual([...SCHEMA_TABLES].sort(), [...requiredTablesFor(SCHEMA_VERSION)].sort());
+  });
+
   it('schema.sql creates exactly the tables the report expects', () => {
     const db = new Database(':memory:');
     db.exec(schema);

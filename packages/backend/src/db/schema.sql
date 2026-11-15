@@ -138,12 +138,16 @@ CREATE TABLE IF NOT EXISTS report_temperatures (
 -- ============================================================
 -- Report Photos
 -- ============================================================
+-- Revision 12 widens the `mime_type` CHECK: an iPhone camera hands the browser a HEIC, and refusing it at the
+-- database level made the Reports screen unable to store a photo it had already accepted. SQLite cannot alter a
+-- CHECK in place, so an existing database gets this shape from the revision-12 rebuild in `migrations.ts`; a fresh
+-- one is created this way and never needs it.
 CREATE TABLE IF NOT EXISTS report_photos (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   report_id   INTEGER NOT NULL REFERENCES reports(id),
   file_path    TEXT    NOT NULL,
   file_size    INTEGER NOT NULL,             -- bytes, max 5MB
-  mime_type    TEXT    NOT NULL CHECK(mime_type IN ('image/jpeg','image/png','image/webp')),
+  mime_type    TEXT    NOT NULL CHECK(mime_type IN ('image/jpeg','image/png','image/webp','image/heic','image/heif')),
   public_token TEXT    UNIQUE,
   created_at   TEXT    NOT NULL DEFAULT (datetime('now'))
 );

@@ -29,20 +29,40 @@ export interface ReportsRouteOptions {
 }
 
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
-const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
+const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'] as const;
+
+/**
+ * The brands an iPhone hands to a browser. `heic` and its variants are HEVC stills; `mif1`/`msf1` are the generic
+ * HEIF container the same encoder also writes. The two families share one header, so only the brand separates them.
+ */
+const HEIC_BRANDS = ['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis', 'hevm', 'hevs'] as const;
+const HEIF_BRANDS = ['mif1', 'msf1'] as const;
 
 function detectImageMime(data: Buffer): string | null {
   if (data.length >= 3 && data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff) return 'image/jpeg';
   if (data.length >= 8 && data.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
   if (data.length >= 12 && data.subarray(0, 4).toString('ascii') === 'RIFF' && data.subarray(8, 12).toString('ascii') === 'WEBP') return 'image/webp';
+  // ISO base media file: `ftyp` at bytes 4..8, the brand at 8..12. Same rule the salida upload applies, duplicated
+  // on purpose: the two modules share a format, not a lifecycle.
+  if (data.length >= 12 && data.subarray(4, 8).toString('ascii') === 'ftyp') {
+    const brand = data.subarray(8, 12).toString('ascii');
+    if ((HEIC_BRANDS as readonly string[]).includes(brand)) return 'image/heic';
+    if ((HEIF_BRANDS as readonly string[]).includes(brand)) return 'image/heif';
+  }
   return null;
 }
 
+/** The extension is derived from the detected type, never from the name the client sent. */
 function extensionForMime(mimeType: string): string {
   if (mimeType === 'image/png') return '.png';
   if (mimeType === 'image/webp') return '.webp';
+  if (mimeType === 'image/heic') return '.heic';
+  if (mimeType === 'image/heif') return '.heif';
   return '.jpg';
 }
+
+/** The formats a photo upload accepts, as one sentence the operator reads when the bytes are not one of them. */
+const ACCEPTED_FORMATS = 'JPEG, PNG, WebP, HEIC ou HEIF';
 
 /**
  * Reports module — Fastify plugin.
@@ -567,18 +587,7 @@ export async function reportsRoutes(fastify: FastifyInstance, opts: ReportsRoute
 
       // Validate MIME declaration and magic bytes. Browser MIME alone is not trusted.
       if (!mimeType || !ALLOWED_MIME_TYPES.includes(mimeType as any)) {
-        // An iPhone can hand the browser a HEIC, and this table's `mime_type` still refuses it at the database
-        // level: saying "invalid format" to a camera photo reads as a broken picker. The message names the case
-        // until the schema revision that widens the column lands.
-        const declared = (mimeType ?? '').toLowerCase();
-        if (declared === 'image/heic' || declared === 'image/heif') {
-          return reply.status(415).send({
-            error:
-              'Fotos HEIC/HEIF ainda não são aceitas em Relatórios. Envie a foto como JPEG, PNG ou WebP.',
-            code: 'REPORT_PHOTO_HEIC_UNSUPPORTED',
-          });
-        }
-        return reply.status(415).send({ error: 'Formato inválido. Envie apenas imagens JPEG, PNG ou WebP.' });
+        return reply.status(415).send({ error: `Formato inválido. Envie apenas imagens ${ACCEPTED_FORMATS}.` });
       }
 
       if (data.length > MAX_PHOTO_SIZE) {
@@ -587,7 +596,9 @@ export async function reportsRoutes(fastify: FastifyInstance, opts: ReportsRoute
 
       const detectedMimeType = detectImageMime(data);
       if (!detectedMimeType || detectedMimeType !== mimeType) {
-        return reply.status(415).send({ error: 'Arquivo inválido. O conteúdo não corresponde a uma imagem JPEG, PNG ou WebP.' });
+        return reply
+          .status(415)
+          .send({ error: `Arquivo inválido. O conteúdo não corresponde a uma imagem ${ACCEPTED_FORMATS}.` });
       }
 
       if (lifecycle.countPhotosByReport(fastify.db, reportId) >= lifecycle.MAX_REPORT_PHOTOS) {

@@ -20,11 +20,13 @@ import type Database from 'better-sqlite3';
  *   `aero_bridge_tickets` (one-use tickets the iOS shortcut redeems for the envelope).
  * - 11: adds the salida (baixa) module — `salida_movements`, `salida_movement_items` and `salida_photos` — and
  *   widens the `aero_bridge_tickets.action` CHECK so the shortcut can be armed for `saida`.
+ * - 12: widens the `report_photos.mime_type` CHECK to admit `image/heic` and `image/heif`, the formats an iPhone
+ *   camera writes. The table is rebuilt because SQLite cannot alter a CHECK in place; it adds no table.
  *
  * Databases created before versioning carry `user_version = 0` and are reported as
  * `unversioned`; nothing about them is assumed, and no startup path rewrites them.
  */
-export const SCHEMA_VERSION = 11;
+export const SCHEMA_VERSION = 12;
 
 /**
  * The tables a database created by revision 1 must contain: the baseline the
@@ -121,6 +123,9 @@ export const SCHEMA_TABLES: readonly string[] = [
  * further is known about it.
  */
 export function requiredTablesFor(version: number): readonly string[] {
+  // Revision 12 widened a CHECK on `report_photos` and added no table, so revisions 11 and 12 are held to the same
+  // inventory. Requiring anything more of revision 11 would classify it `incompatible`, and the migrate command
+  // refuses that verdict without ever opening the file for writing.
   if (version >= 11) return SCHEMA_TABLES;
   // A revision 10 database predates the salida module. Asking it for the three tables would classify it
   // `incompatible`, and the migrate command refuses that verdict without opening the file for writing, so the

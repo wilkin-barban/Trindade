@@ -62,6 +62,46 @@ function makeRevisionSevenShape(db: Database.Database): void {
   db.pragma('user_version = 7');
 }
 
+/**
+ * Build the revision 11 shape of `report_photos`: the table whose `mime_type` CHECK names only JPEG, PNG and WebP.
+ *
+ * SQLite cannot widen a CHECK in place, so revision 12 rebuilds the table, and this fixture is the only way to prove
+ * the rebuild meets the shape production actually has instead of the one `schema.sql` now declares.
+ */
+function makeRevisionElevenPhotosShape(db: Database.Database): void {
+  db.pragma('foreign_keys = OFF');
+  try {
+    db.exec('DROP INDEX IF EXISTS idx_report_photos_report_id');
+    db.exec(`CREATE TABLE report_photos_revision11 (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      report_id    INTEGER NOT NULL REFERENCES reports(id),
+      file_path    TEXT    NOT NULL,
+      file_size    INTEGER NOT NULL,
+      mime_type    TEXT    NOT NULL CHECK(mime_type IN ('image/jpeg','image/png','image/webp')),
+      public_token TEXT    UNIQUE,
+      created_at   TEXT    NOT NULL DEFAULT (datetime('now'))
+    )`);
+    db.exec(`INSERT INTO report_photos_revision11
+      (id, report_id, file_path, file_size, mime_type, public_token, created_at)
+      SELECT id, report_id, file_path, file_size, mime_type, public_token, created_at FROM report_photos`);
+    db.exec('DROP TABLE report_photos');
+    db.exec('ALTER TABLE report_photos_revision11 RENAME TO report_photos');
+    db.exec('CREATE INDEX idx_report_photos_report_id ON report_photos(report_id)');
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
+  db.pragma('user_version = 11');
+}
+
+/** Insert a report and return its id, for cases whose subject is a table that references one. */
+function insertReport(db: Database.Database, userId: number): number {
+  return Number(
+    db
+      .prepare(`INSERT INTO reports (user_id, turno, report_date) VALUES (?, 'tarde', '2026-11-14')`)
+      .run(userId).lastInsertRowid,
+  );
+}
+
 /** Replace report_temperatures with the pre-`reading_index` shape it had before versioning. */function makeLegacyShape(db: Database.Database): void {
   db.pragma('foreign_keys = OFF');
   try {
@@ -556,6 +596,139 @@ describe('schema migration', () => {
     // The same seat twice is the duplicated import this revision exists to prevent.
     assert.throws(() => insert.run('5000', userId, 35937), /UNIQUE constraint failed/);
     assert.deepEqual(db.prepare('SELECT COUNT(*) AS n FROM massa_launches').get(), { n: 3 });
+    db.close();
+  });
+
+  // Revision 12 widens one CHECK on an existing table, which SQLite cannot do in place: the table is rebuilt, every
+  // row copied, and the copy counted before the original is dropped. The case is about the rows that survive it.
+  it('widens report_photos.mime_type for HEIC and keeps every row (revision 12)', () => {
+    const path = join(fixtureRoot(), 'revision-eleven-photos.db');
+    const build = new Database(path);
+    build.exec(schema);
+    build.exec(seed);
+    makeRevisionElevenPhotosShape(build);
+    const userId = insertUser(build, 'revision-twelve');
+    const reportId = insertReport(build, userId);
+    build
+      .prepare(
+        `INSERT INTO report_photos (id, report_id, file_path, file_size, mime_type, public_token, created_at)
+         VALUES (9201, ?, 'kept.jpg', 4096, 'image/jpeg', 'kept-token', '2026-11-14 10:00:00')`,
+      )
+      .run(reportId);
+    // The shape being replaced has to refuse the type, or the case would prove nothing about the rebuild.
+    assert.throws(
+      () =>
+        build
+          .prepare(`INSERT INTO report_photos (report_id, file_path, file_size, mime_type) VALUES (?, 'x.heic', 10, 'image/heic')`)
+          .run(reportId),
+      /CHECK/,
+    );
+    build.close();
+
+    const db = new Database(path);
+    assert.equal(readSchemaReport(db).version, 11);
+    const result = migrateDatabase(db);
+    assert.equal(result.outcome, 'migrated');
+    assert.equal(result.from, 11);
+    assert.equal(result.to, SCHEMA_VERSION);
+    assert.equal(db.pragma('user_version', { simple: true }), SCHEMA_VERSION);
+
+    // The row is the same row: same id, same mime, same size, same token, same timestamps. A rebuilt table that
+    // renumbered it would break every link an operator already has.
+    assert.deepEqual(
+      db.prepare('SELECT id, report_id, file_path, file_size, mime_type, public_token, created_at FROM report_photos').all(),
+      [
+        {
+          id: 9201,
+          report_id: reportId,
+          file_path: 'kept.jpg',
+          file_size: 4096,
+          mime_type: 'image/jpeg',
+          public_token: 'kept-token',
+          created_at: '2026-11-14 10:00:00',
+        },
+      ],
+    );
+
+    // Widened: the two types the iPhone writes are stored as themselves...
+    db.prepare(`INSERT INTO report_photos (report_id, file_path, file_size, mime_type) VALUES (?, 'iphone.heic', 10, 'image/heic')`).run(reportId);
+    db.prepare(`INSERT INTO report_photos (report_id, file_path, file_size, mime_type) VALUES (?, 'iphone.heif', 10, 'image/heif')`).run(reportId);
+    // ...and the CHECK still refuses anything it does not name, which is the half a rebuild can silently lose.
+    assert.throws(
+      () =>
+        db
+          .prepare(`INSERT INTO report_photos (report_id, file_path, file_size, mime_type) VALUES (?, 'bogus.gif', 10, 'image/gif')`)
+          .run(reportId),
+      /CHECK/,
+    );
+
+    // The index the original carried comes back: dropping a table drops its indexes.
+    const indexes = (db.prepare('PRAGMA index_list(report_photos)').all() as { name: string }[]).map((row) => row.name);
+    assert.ok(indexes.includes('idx_report_photos_report_id'), `expected the report_id index, got ${indexes.join(', ')}`);
+
+    // AUTOINCREMENT survives the rename: a new row takes an id above the highest one copied.
+    const heicId = db.prepare("SELECT id FROM report_photos WHERE mime_type = 'image/heic'").pluck().get() as number;
+    assert.ok(heicId > 9201, `a row written after the rebuild must take a fresh id, got ${heicId}`);
+
+    // The unique token is still enforced, so a rebuild did not quietly drop a constraint.
+    assert.throws(
+      () =>
+        db
+          .prepare(`INSERT INTO report_photos (report_id, file_path, file_size, mime_type, public_token) VALUES (?, 'dup.jpg', 1, 'image/jpeg', 'kept-token')`)
+          .run(reportId),
+      /UNIQUE/,
+    );
+
+    assert.equal(readSchemaReport(db).verdict, 'current');
+    db.close();
+  });
+
+  // A crash between the revision-12 stamp and the next step leaves a database stamped 11 whose table already admits
+  // HEIC (`schema.sql` builds it that way). Rebuilding again would rewrite rows for nothing.
+  it('leaves report_photos untouched when the stored CHECK already admits HEIC (revision 12)', () => {
+    const db = new Database(':memory:');
+    db.exec(schema);
+    db.exec(seed);
+    db.pragma('user_version = 11');
+    const reportId = insertReport(db, insertUser(db, 'revision-twelve-reentry'));
+    db.prepare(
+      `INSERT INTO report_photos (id, report_id, file_path, file_size, mime_type, public_token, created_at)
+       VALUES (9301, ?, 'only.png', 512, 'image/png', 'only-token', '2026-11-14 11:00:00')`,
+    ).run(reportId);
+    const ddlBefore = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'report_photos'").pluck().get();
+
+    const result = migrateDatabase(db);
+
+    assert.equal(result.outcome, 'migrated');
+    assert.equal(result.from, 11);
+    assert.equal(result.to, SCHEMA_VERSION);
+    assert.equal(
+      db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'report_photos'").pluck().get(),
+      ddlBefore,
+      'the step rebuilt a table that was already widened',
+    );
+    assert.deepEqual(db.prepare('SELECT id, mime_type, public_token FROM report_photos').all(), [
+      { id: 9301, mime_type: 'image/png', public_token: 'only-token' },
+    ]);
+
+    // And the step is gone for good once stamped.
+    assert.equal(migrateDatabase(db).outcome, 'already-current');
+    db.close();
+  });
+
+  // A fresh installation must not need the rebuild: revision 11's shape plus the two new types, in schema.sql.
+  it('creates report_photos from schema.sql already admitting HEIC, so a fresh install needs no rebuild', () => {
+    const db = new Database(':memory:');
+    db.exec(schema);
+    db.exec(seed);
+    const reportId = insertReport(db, insertUser(db, 'fresh-heic'));
+
+    db.prepare(`INSERT INTO report_photos (report_id, file_path, file_size, mime_type) VALUES (?, 'a.heic', 1, 'image/heic')`).run(reportId);
+    db.prepare(`INSERT INTO report_photos (report_id, file_path, file_size, mime_type) VALUES (?, 'a.heif', 1, 'image/heif')`).run(reportId);
+    assert.throws(
+      () => db.prepare(`INSERT INTO report_photos (report_id, file_path, file_size, mime_type) VALUES (?, 'a.bmp', 1, 'image/bmp')`).run(reportId),
+      /CHECK/,
+    );
     db.close();
   });
 

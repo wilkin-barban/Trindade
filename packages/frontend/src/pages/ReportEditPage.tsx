@@ -51,7 +51,9 @@ interface PendingPhoto {
 
 const MAX_PHOTOS = 5;
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
-const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+// An iPhone camera writes HEIC/HEIF, and the backend stores both since schema revision 12: refusing them here
+// would turn a photo the server accepts into an "invalid format" the operator cannot explain.
+const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
 
 function isEditWindowExpired(reportDate: string): boolean {
   const now = new Date();
@@ -590,7 +592,7 @@ export function ReportEditPage() {
                     <input
                       type="file"
                       multiple
-                      accept="image/jpeg,image/png,image/webp"
+                      accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
                       className="hidden"
                       disabled={uploading || photos.length + pendingPhotos.length >= MAX_PHOTOS}
                       onChange={(e) => {

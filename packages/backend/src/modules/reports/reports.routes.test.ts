@@ -28,6 +28,7 @@ describe('Reports Routes', () => {
   let token: string;
   let workerToken: string;
   let workerUserId: number;
+  let adminUserId: number;
 
   before(async () => {
     const result = await buildTestApp();
@@ -37,6 +38,7 @@ describe('Reports Routes', () => {
     token = await loginAs(app, result.fixtures.admin.username, result.fixtures.admin.password);
     workerToken = await loginAs(app, result.fixtures.worker.username, result.fixtures.worker.password);
     workerUserId = result.fixtures.worker.id;
+    adminUserId = result.fixtures.admin.id;
   });
 
   after(async () => {
@@ -863,47 +865,120 @@ describe('Reports Routes', () => {
     assert.strictEqual(res.statusCode, 415);
   });
 
-  // The table behind this endpoint still constrains `mime_type` to JPEG/PNG/WebP, and SQLite cannot alter a CHECK
-  // without a table rebuild (schema revision 12). Until that revision lands the refusal names the format instead
-  // of telling an iPhone that its camera photo has an "invalid format"; Salida, whose table has no such check,
-  // accepts HEIC today.
-  it('POST /:id/photos refuses a HEIC with 415 and says why, naming the format', async () => {
-    const reportId = await createTestReport();
-    const { body, boundary } = multipartBody('file', 'iphone.HEIC', 'image/heic', fakeHeic);
-
-    const res = await app.inject({
+  /** Upload one photo and hand back the injected response, so the cases below state only the bytes. */
+  async function uploadPhoto(reportId: number, filename: string, mimeType: string, data: Buffer) {
+    const { body, boundary } = multipartBody('file', filename, mimeType, data);
+    return app.inject({
       method: 'POST',
       url: `/api/reports/${reportId}/photos`,
-      headers: {
-        authorization: `Bearer ${token}`,
-        'content-type': `multipart/form-data; boundary=${boundary}`,
-      },
+      headers: { authorization: `Bearer ${token}`, 'content-type': `multipart/form-data; boundary=${boundary}` },
       payload: body,
     });
+  }
 
-    assert.strictEqual(res.statusCode, 415, res.body);
-    const result = JSON.parse(res.body);
-    assert.strictEqual(result.code, 'REPORT_PHOTO_HEIC_UNSUPPORTED');
-    assert.match(result.error, /HEIC\/HEIF/);
-    assert.match(result.error, /JPEG, PNG ou WebP/);
+  /**
+   * A report the admin owns, for a case that needs several in one test.
+   *
+   * `POST /api/reports` allows one report per date and turno — the plant's rule — so a case that uploads ten photos
+   * to ten different reports cannot build them through the route.
+   */
+  function insertReportForPhotos(): number {
+    return Number(
+      db
+        .prepare(`INSERT INTO reports (user_id, turno, report_date, notes) VALUES (?, 'tarde', ?, 'Photo case')`)
+        .run(adminUserId, getSaoPauloDateString()).lastInsertRowid,
+    );
+  }
+
+  // Revision 12 widened `report_photos.mime_type` for exactly this: an iPhone camera hands the browser a HEIC, and
+  // answering it with "invalid format" sends the operator away to convert a photo the server can already read.
+  it('POST /:id/photos accepts an iPhone HEIC, stores it as itself and serves it back as image/heic', async () => {
+    const reportId = await createTestReport();
+    const res = await uploadPhoto(reportId, 'iphone.HEIC', 'image/heic', fakeHeic);
+
+    assert.strictEqual(res.statusCode, 201, res.body);
+    const photo = JSON.parse(res.body).photo;
+    assert.strictEqual(photo.mime_type, 'image/heic');
+    assert.ok(photo.file_path.endsWith('.heic'), `file_path should end with .heic, got ${photo.file_path}`);
+    assert.strictEqual(photo.file_size, fakeHeic.length);
+
+    // The stored type is what the response serves: the bytes come back unchanged, declared as HEIC.
+    const served = await app.inject({
+      method: 'GET',
+      url: `/api/reports/photos/${photo.id}`,
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.strictEqual(served.statusCode, 200);
+    assert.ok(
+      String(served.headers['content-type']).includes('image/heic'),
+      `Content-Type should be image/heic, got ${served.headers['content-type']}`,
+    );
+    assert.deepStrictEqual(served.rawPayload, fakeHeic);
   });
 
-  it('POST /:id/photos refuses a HEIF with the same explicit answer', async () => {
+  it('POST /:id/photos accepts a HEIF, stores it as itself and serves it back as image/heif', async () => {
     const reportId = await createTestReport();
-    const { body, boundary } = multipartBody('file', 'iphone.heif', 'image/heif', isoBmffStill('mif1'));
+    const heif = isoBmffStill('mif1');
+    const res = await uploadPhoto(reportId, 'iphone.heif', 'image/heif', heif);
 
-    const res = await app.inject({
-      method: 'POST',
-      url: `/api/reports/${reportId}/photos`,
-      headers: {
-        authorization: `Bearer ${token}`,
-        'content-type': `multipart/form-data; boundary=${boundary}`,
-      },
-      payload: body,
+    assert.strictEqual(res.statusCode, 201, res.body);
+    const photo = JSON.parse(res.body).photo;
+    assert.strictEqual(photo.mime_type, 'image/heif');
+    assert.ok(photo.file_path.endsWith('.heif'), `file_path should end with .heif, got ${photo.file_path}`);
+
+    const served = await app.inject({
+      method: 'GET',
+      url: `/api/reports/photos/${photo.id}`,
+      headers: { authorization: `Bearer ${token}` },
     });
+    assert.strictEqual(served.statusCode, 200);
+    assert.ok(String(served.headers['content-type']).includes('image/heif'));
+    assert.deepStrictEqual(served.rawPayload, heif);
+  });
 
-    assert.strictEqual(res.statusCode, 415, res.body);
-    assert.strictEqual(JSON.parse(res.body).code, 'REPORT_PHOTO_HEIC_UNSUPPORTED');
+  it('POST /:id/photos accepts every brand of the two families the detector names', async () => {
+    // The brand is the only thing separating the members of each family, so each one is uploaded on its own report:
+    // a detector that recognised `heic` and guessed the rest would pass a single-brand case.
+    const cases: ReadonlyArray<{ brand: string; mime: string; ext: string }> = [
+      { brand: 'heic', mime: 'image/heic', ext: '.heic' },
+      { brand: 'heix', mime: 'image/heic', ext: '.heic' },
+      { brand: 'hevc', mime: 'image/heic', ext: '.heic' },
+      { brand: 'hevx', mime: 'image/heic', ext: '.heic' },
+      { brand: 'heim', mime: 'image/heic', ext: '.heic' },
+      { brand: 'heis', mime: 'image/heic', ext: '.heic' },
+      { brand: 'hevm', mime: 'image/heic', ext: '.heic' },
+      { brand: 'hevs', mime: 'image/heic', ext: '.heic' },
+      { brand: 'mif1', mime: 'image/heif', ext: '.heif' },
+      { brand: 'msf1', mime: 'image/heif', ext: '.heif' },
+    ];
+
+    for (const testCase of cases) {
+      const reportId = insertReportForPhotos();
+      const res = await uploadPhoto(reportId, `still.${testCase.ext}`, testCase.mime, isoBmffStill(testCase.brand));
+
+      assert.strictEqual(res.statusCode, 201, `${testCase.brand}: ${res.body}`);
+      const photo = JSON.parse(res.body).photo;
+      assert.strictEqual(photo.mime_type, testCase.mime, testCase.brand);
+      assert.ok(photo.file_path.endsWith(testCase.ext), `${testCase.brand} should store ${testCase.ext}`);
+    }
+  });
+
+  it('POST /:id/photos keeps JPEG, PNG and WebP working unchanged', async () => {
+    const cases = [
+      { name: 'photo.jpg', mime: 'image/jpeg', data: fakeJpeg, ext: '.jpg' },
+      { name: 'photo.png', mime: 'image/png', data: fakePng, ext: '.png' },
+      { name: 'photo.webp', mime: 'image/webp', data: fakeWebp, ext: '.webp' },
+    ];
+
+    for (const testCase of cases) {
+      const reportId = insertReportForPhotos();
+      const res = await uploadPhoto(reportId, testCase.name, testCase.mime, testCase.data);
+
+      assert.strictEqual(res.statusCode, 201, `${testCase.mime}: ${res.body}`);
+      const photo = JSON.parse(res.body).photo;
+      assert.strictEqual(photo.mime_type, testCase.mime);
+      assert.ok(photo.file_path.endsWith(testCase.ext), `${testCase.mime} should store ${testCase.ext}`);
+    }
   });
 
   it('POST /:id/photos rejects a declared HEIC whose bytes are not ISO-BMFF with 415', async () => {
