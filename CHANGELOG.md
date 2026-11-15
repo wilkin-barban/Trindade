@@ -12,6 +12,19 @@ verificaciones está en [docs/release-android-historial.md](docs/release-android
 
 ## [Unreleased]
 
+### Tercera iteración: sesión y HEIC en Reportes (2026-11-15)
+
+- **Sesión**: un refresh que repite la rotación hecha segundos antes (dos documentos del mismo navegador, o una
+  respuesta perdida y reintentada) ya no responde 401 —se re-autentica con un access token y la cookie queda
+  como está—, que era lo que dejaba al operador en la pantalla de login en medio de una pantalla. Pasada la ventana
+  de gracia, el replay sigue revocando la familia.
+- **Revisión 12 de esquema**: `report_photos.mime_type` admite `image/heic`/`image/heif` mediante reconstrucción de
+  la tabla, copiando y contando las filas antes de soltar la original. Reportes acepta HEIC/HEIF de punta a punta y
+  ambos formularios los ofrecen. La revisión está probada sobre una copia de la base de producción (6 filas, 6
+  filas idénticas) y **queda pendiente de aplicar en producción** hasta la autorización del usuario.
+- **E2E**: el servidor de pruebas gana un reset explícito y el spec del lote lo usa por test; `npm run test:e2e:host`
+  da **118/118** en dos corridas consecutivas.
+
 ### Re-auditoría de la remediación web (2026-11-15)
 
 - **Vitest** vuelve al pool por defecto (un proceso por archivo): el `vmThreads` que silenciaba un warning podía
