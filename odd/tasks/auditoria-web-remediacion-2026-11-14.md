@@ -293,3 +293,52 @@ Al final respondé en el panel con: qué cambió, archivos, commits, tests/E2E, 
 headers/gzip/Playwright/log y pendientes. Si algo te bloquea, no lo dejes silencioso: reportalo y seguí con lo
 demás. No cierres el panel.
 ```
+
+---
+
+## Evidencia de ejecución (2026-11-14)
+
+### Commits
+
+| Commit | Hallazgo | Contenido |
+| --- | --- | --- |
+| `2d0a6210` | H4 | Suite hermética: `AERO_VAULT_KEY` de test explícita en los dos tests que lanzan el servidor, `runtime-config` aislado, `pretest` que construye `dist`, clave efímera en `ci.sh` |
+| `aba3561f` | L2 | Se retira el `lint` no-op; Vitest con `pool: 'vmThreads'` (188/188 en 22 s) |
+| `90ba4468` | H2 + M1 | CSP y headers con `always`, `server_tokens off`, gzip, `immutable` para `/assets`, `no-cache` para HTML, `no-store` para `/api` y `/p` |
+| `19b4e7f1` | D1 | `npm run test:e2e:host`; Playwright ejecutable en Ubuntu 26.04 |
+| `2941beec` | D2 | Redacción de `response`/`error` del log de Aero |
+| `404771ae` | M2 + L1 | Retención de fotos de Salida (90 días configurable), estado «foto no disponible», `trustProxy` con lista explícita |
+| `b59ad044` | M2/L1 (revisión) | Contención de rutas en ambos limpiadores, `julianday` en Reportes, `TRUSTED_PROXY_CIDRS=,` rechazado |
+| `00b67f31` | M5 | Variables nuevas, comandos, `npm audit` y Playwright host en README y guía de despliegue |
+| `e6c7c89d` | H1 | Zod 4.6.7 + zod-to-openapi 9, `npm audit --omit=dev`: 0; gate en CI |
+| `c363d763` | M4 | «Horario de Cargamento» / «Horário de Carregamento» en interfaz, documento y PDF |
+| `a63d25e7` | H3 | Sesión web por cookie `HttpOnly` + access en memoria; Android intacto; contrato regenerado |
+| `8493c5d6` | H3 (corrección) | Renovación sin `Content-Type` vacío, origen público permitido, helper E2E |
+| `8c983e62` | despliegue | El runner copia el `node_modules` anidado del workspace |
+
+### Pruebas
+
+- Backend: **896 → 908** tests, 0 fallos en cada corrida; última corrida completa en verde tras H3.
+- Frontend: node **724 → 727**, vitest **188 → 198**, `npm run typecheck` limpio.
+- Contrato: `verify-openapi-artifact.sh` verde; cliente Kotlin regenerado y `check-android-contract-types.sh` verde tras H3.
+- E2E en el host (`PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-x64`): **117/118** antes de H3, **115/118** en la última corrida completa. Los dos `aero-batch-launch` pasan aislados (3/3) y el de `audit.spec.ts` 6.1 ya fallaba en el `HEAD` previo a esta remediación; los tres quedan reportados, no silenciados.
+
+### Producción (deploy `api` + `web`)
+
+- `docker compose ps`: `api` y `web` healthy; `/api/health` 200.
+- `/salida`, `/salida-history`, `/reports`, `/loading` y `/dashboard` 200; `/api/salida/catalog` sin sesión 401.
+- Headers en el HTML: `Content-Security-Policy` (la política pedida), `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` y `Cache-Control: no-cache`.
+- Asset: `Content-Encoding: gzip`, `Vary: Accept-Encoding`, `Cache-Control: public, max-age=31536000, immutable`.
+- API: `cache-control: no-store` en la respuesta 401 del catálogo; `/api/auth/refresh` cross-site rechazado.
+- `logs/aero-integration.log` escribible por el contenedor (append de cero bytes), 132 KB, formato JSON por línea intacto.
+- Retención: la base tenía **0 fotos de salida y 0 de reporte**, así que el primer barrido no borró nada. Se tomó un `VACUUM INTO` previo (`trindade.pre-web-audit-2026-11-14.db`, 909 KB) dentro del volumen.
+
+### Pendientes y límites declarados
+
+1. `audit.spec.ts` 6.1 («admin can view audit page with log entries») falla desde antes de esta remediación: la página no encuentra texto `registro` con los datos del fixture. Necesita su propio diagnóstico.
+2. `aero-batch-launch` es inestable en la corrida completa (pasa aislado), por estado compartido del servidor E2E; es la clase de fallo que la guía pide corregir en el test.
+3. `Server: nginx/1.27.5` sigue visible: el TLS termina en un nginx del host, fuera del repositorio. Falta `server_tokens off` en ese bloque; el contenedor ya lo tiene.
+4. L1: la lista de proxies confía en `172.16.0.0/12`. Un cliente real dentro de ese rango podría declarar su propia IP; hoy lo mitiga el bind de la API a `127.0.0.1`. Estrechar el rango al bridge real es la mejora pendiente.
+5. H3: un perfil con cookie válida pero `localStorage` borrado vuelve a la pantalla de login; normal al reingresar, queda anotado.
+6. L3: `index` 518.69 kB (160.55 gzip) y `export-vendor` 594.35 kB (177.22 gzip), sin cambios. Con gzip servido (M1) se decide **no** subdividir más: la carga pesada es el exportador, que ya es un chunk aparte y se usa a demanda.
+7. Deuda `any`: 106 usos, concentrados en admin/reportes; no se tocaron en masa y no se introdujeron nuevos en estos cambios.
