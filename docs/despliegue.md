@@ -469,10 +469,11 @@ Variables opcionales que lee `docker-compose.yml`: `API_PORT`, `DATABASE_PATH`, 
   impide arrancar: una ventana en cero borraría la foto en el momento de subirla. La foto de salida dura más
   porque es evidencia de una salida que ya llegó al ERP. Antes del primer arranque con esta política conviene un
   backup del volumen de datos, porque el primer barrido borra lo que ya excedió la ventana.
-- `TRUSTED_PROXY_CIDRS` (`127.0.0.1/8,::1/128,172.16.0.0/12` por defecto): quién puede declarar la IP del cliente
-  con `X-Forwarded-For`. Solo loopback y la red de Docker por defecto; `true`, `*` y `/0` se rechazan con un
-  mensaje. Si el bridge de Docker usa otro rango, declararlo acá: un peer fuera de la lista conserva su propia
-  dirección aunque mande el encabezado.
+- `TRUSTED_PROXY_CIDRS` (el compose declara `127.0.0.1/8,::1/128,172.19.0.0/16`): quién puede declarar la IP del
+  cliente con `X-Forwarded-For`. El valor por defecto del código es solo loopback; el rango del bridge vive en
+  `docker-compose.yml` porque Docker lo asigna al crear la red (`docker network inspect trindade_default`). Si esa
+  red cambia, actualizá la variable: un peer fuera de la lista conserva su propia dirección aunque mande el
+  encabezado. `true`, `*` y `/0` se rechazan siempre.
 
 Para TLS con Nginx del host, usar `docker/nginx-standalone-host.conf.example` en dos pasos: primero HTTP para el
 desafío ACME, luego HTTPS. Certbot:

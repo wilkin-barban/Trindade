@@ -20,11 +20,12 @@ export const DEFAULT_SALIDA_PHOTO_RETENTION_DAYS = 90;
 /**
  * Who may assert a client address through `X-Forwarded-For`.
  *
- * Loopback is nginx on the same host; `172.16.0.0/12` is the private range a Docker/compose bridge allocates
- * from. Nothing wider belongs here: a `/0` or a `*` would let any client name its own address, which is
- * exactly the spoofing the audit IP exists to prevent.
+ * Loopback is the proxy on the same host. The compose bridge is declared in `docker-compose.yml`, not here:
+ * Docker allocates the range when it creates the network, so a value baked into the code would be right until
+ * the next network. Nothing wider belongs in a default: a `/0` or a `*` would let any client name its own
+ * address, which is exactly the spoofing the audit IP exists to prevent.
  */
-export const DEFAULT_TRUSTED_PROXY_CIDRS: readonly string[] = ['127.0.0.1/8', '::1/128', '172.16.0.0/12'];
+export const DEFAULT_TRUSTED_PROXY_CIDRS: readonly string[] = ['127.0.0.1/8', '::1/128'];
 
 export interface RuntimeConfig {
   jwtSecret: string;
@@ -58,13 +59,13 @@ function parseTrustedProxy(raw: string): string {
   const family = address ? isIP(address) : 0;
   if (rest.length > 0 || family === 0) {
     throw new Error(
-      'TRUSTED_PROXY_CIDRS must list IP addresses or CIDR blocks, for example 127.0.0.1/8,172.16.0.0/12',
+      'TRUSTED_PROXY_CIDRS must list IP addresses or CIDR blocks, for example 127.0.0.1/8,172.19.0.0/16',
     );
   }
   // A bare address is a single host and is kept as the narrowest block a client cannot widen.
   if (prefixPart === undefined) return `${address}/${family === 4 ? 32 : 128}`;
   if (!/^\d+$/.test(prefixPart)) {
-    throw new Error('TRUSTED_PROXY_CIDRS must list IP addresses or CIDR blocks, for example 127.0.0.1/8,172.16.0.0/12');
+    throw new Error('TRUSTED_PROXY_CIDRS must list IP addresses or CIDR blocks, for example 127.0.0.1/8,172.19.0.0/16');
   }
   const prefix = Number(prefixPart);
   const widest = family === 4 ? 32 : 128;

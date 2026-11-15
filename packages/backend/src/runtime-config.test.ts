@@ -103,12 +103,15 @@ describe('Runtime configuration', () => {
   });
 
   describe('trusted proxies', () => {
-    // The default is the deployment's own proxy and nothing else: loopback plus the private container bridge.
-    it('trusts loopback and the container bridge, never a wildcard', () => {
+    // The default is the proxy on this host and nothing else. The container bridge is the deployment's business,
+    // declared in `docker-compose.yml` next to the network it belongs to.
+    it('trusts loopback by default, never a wildcard', () => {
       const { trustedProxies } = loadRuntimeConfig({ JWT_SECRET: STRONG_SECRET });
       assert.deepEqual(trustedProxies, [...DEFAULT_TRUSTED_PROXY_CIDRS]);
       assert.ok(trustedProxies.includes('127.0.0.1/8'));
-      assert.ok(trustedProxies.includes('172.16.0.0/12'));
+      // Loopback only: the compose bridge is declared in docker-compose.yml, where the operator can see the range
+      // Docker actually allocated. A default that guessed it would be wrong on the next network.
+      assert.deepEqual(trustedProxies, ['127.0.0.1/8', '::1/128']);
       for (const entry of trustedProxies) assert.doesNotMatch(entry, /^\*$|\/0$/);
     });
 
@@ -132,7 +135,11 @@ describe('Runtime configuration', () => {
 
     // The header is only worth reading when the peer is the proxy; anything else can write it.
     it('reads X-Forwarded-For only from a trusted proxy', async () => {
-      const app = peerIpApp(loadRuntimeConfig({ JWT_SECRET: STRONG_SECRET }).trustedProxies);
+      // The bridge is stated here, not assumed from a default: `docker-compose.yml` is where the deployment
+      // declares the range Docker allocated.
+      const app = peerIpApp(
+        loadRuntimeConfig({ JWT_SECRET: STRONG_SECRET, TRUSTED_PROXY_CIDRS: '172.18.0.0/16,127.0.0.1/8' }).trustedProxies,
+      );
       try {
         const throughProxy = await app.inject({
           method: 'GET',
@@ -155,7 +162,9 @@ describe('Runtime configuration', () => {
     });
 
     it('ignores a spoofed X-Forwarded-For from an untrusted peer', async () => {
-      const app = peerIpApp(loadRuntimeConfig({ JWT_SECRET: STRONG_SECRET }).trustedProxies);
+      const app = peerIpApp(
+        loadRuntimeConfig({ JWT_SECRET: STRONG_SECRET, TRUSTED_PROXY_CIDRS: '172.18.0.0/16' }).trustedProxies,
+      );
       try {
         const spoofed = await app.inject({
           method: 'GET',
