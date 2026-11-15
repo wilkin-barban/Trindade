@@ -8,6 +8,8 @@ import {
   AERO_LOG_MAX_BYTES,
   type AeroLogEntry,
   appendAeroLog,
+  appendLocalAeroLog,
+  redactAeroText,
   resolveAeroLogDir,
 } from './aero.log.service.js';
 
@@ -283,6 +285,137 @@ describe('Aero integration log service', () => {
       assert.equal(parsed.payload.Authorization, undefined);
       assert.equal(parsed.payload.password, undefined);
       assert.equal(parsed.payload.senha, undefined);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('redacts credentials and key-shaped blobs inside the free-text response, keeping the useful message', () => {
+    // The ERP answers in prose, and the prose is whatever the WebService echoes back: an HTML error page, a
+    // stack trace, or the request body it failed to parse. The line is the audit trail, so the useful part has
+    // to survive -- but the credentials a client embedded do not belong on disk.
+    const secrets = {
+      basic: 'dXNlcjpzZWNyZXQ=',
+      senha: 'super-secret',
+      refreshToken: 'rt_live_0123456789abcdef',
+      hex: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08',
+      cookie: 'session=abc123def456',
+    };
+    const response = [
+      'POST /entradasitem -> 200 OK · date=2026-11-14',
+      `Authorization: Basic ${secrets.basic}`,
+      `Cookie: ${secrets.cookie}; theme=dark`,
+      `{"success":true,"message":"Lancamento efetuado","senha":"${secrets.senha}","refreshToken":"${secrets.refreshToken}"}`,
+      `integrity ${secrets.hex}`,
+    ].join('\n');
+
+    const tempDir = mkdtempSync(join(tmpdir(), 'aero-log-test-redact-'));
+    try {
+      appendAeroLog(
+        {
+          ts: '2026-11-14T09:00:00.000Z',
+          event: 'launch_sync',
+          phase: 'result',
+          user: 'wilkin',
+          role: 'Administrador',
+          destinationUrl: 'http://192.168.25.250:1453/api/entradasitem',
+          httpStatus: 200,
+          payload: 'request body was {"senha":"super-secret"}',
+          response,
+          error: null,
+          launchId: 84,
+          note: 'client=web · via=bridge',
+          client: 'web',
+          attemptId: 'attempt-redact-1',
+          durationMs: 940,
+        },
+        tempDir,
+      );
+
+      const logPath = join(tempDir, AERO_LOG_FILE);
+      const content = readFileSync(logPath, 'utf-8');
+
+      for (const [name, secret] of Object.entries(secrets)) {
+        assert.ok(!content.includes(secret), `the ${name} secret reached the log file`);
+      }
+      assert.ok(!content.includes('super-secret'), 'the senha reached the log through the payload');
+      assert.ok(content.includes('[redacted]'), 'the marker is what makes a redaction visible');
+
+      // One JSON object per line, so `tail -f` and `jq` keep working.
+      const lines = content.split('\n').filter(Boolean);
+      assert.equal(lines.length, 1);
+      const parsed = JSON.parse(lines[0]);
+
+      // The audit stays useful: when, what happened, and what the ERP said.
+      assert.equal(typeof parsed.response, 'string');
+      assert.match(parsed.response, /date=2026-11-14/);
+      assert.match(parsed.response, /POST \/entradasitem -> 200 OK/);
+      assert.match(parsed.response, /"success":true/);
+      assert.match(parsed.response, /Lancamento efetuado/);
+      assert.match(parsed.response, /Authorization: Basic \[redacted\]/);
+      assert.match(parsed.response, /"senha":"\[redacted\]"/);
+      assert.match(parsed.response, /"refreshToken":"\[redacted\]"/);
+      assert.match(parsed.response, /integrity \[redacted\]/);
+
+      // A secret embedded in a string payload is redacted too, and the rest of the text stays.
+      assert.match(String(parsed.payload), /^request body was /);
+      assert.ok(!String(parsed.payload).includes('super-secret'));
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('leaves ordinary prose alone and redacts a line only once', () => {
+    const prose =
+      'launch 84 recorded at 2026-11-14 09:00 · the operator confirmed the notification to the plant';
+    assert.equal(redactAeroText(prose), prose);
+
+    const redacted = redactAeroText(
+      'Authorization: Basic dXNlcjpzZWNyZXQ= · "senha":"super-secret" · cookie: a=1; b=2',
+    );
+    assert.equal(
+      redacted,
+      'Authorization: Basic [redacted] · "senha":"[redacted]" · cookie: [redacted]',
+    );
+    assert.equal(redactAeroText(redacted), redacted, 'a second pass must not eat the marker');
+  });
+
+  it('writes a local salida event unchanged by the redaction', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'aero-log-test-local-'));
+    try {
+      appendLocalAeroLog(
+        {
+          event: 'salida_create',
+          user: 'wilkin',
+          role: 'Administrador',
+          destinationUrl: 'local://salida',
+          payload: {
+            movementId: 84,
+            movementDate: '2026-11-09',
+            itemCount: 2,
+            totalUnits: 23,
+            blocks: ['embalagens', 'bobinas'],
+          },
+          note: 'local=salida · action=create',
+        },
+        tempDir,
+      );
+
+      const lines = readFileSync(join(tempDir, AERO_LOG_FILE), 'utf-8').split('\n').filter(Boolean);
+      assert.equal(lines.length, 1);
+      const parsed = JSON.parse(lines[0]);
+
+      assert.equal(parsed.event, 'salida_create');
+      assert.equal(parsed.destinationUrl, 'local://salida');
+      assert.equal(parsed.note, 'local=salida · action=create');
+      assert.equal(parsed.response, null);
+      assert.deepStrictEqual(parsed.payload, {
+        movementId: 84,
+        movementDate: '2026-11-09',
+        itemCount: 2,
+        totalUnits: 23,
+        blocks: ['embalagens', 'bobinas'],
+      });
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }

@@ -8,6 +8,12 @@ const PAYLOAD_MAX_CHARS = 4096;
 const RESPONSE_MAX_CHARS = 2048;
 
 /**
+ * What replaces a secret. Stable on purpose: an operator greps for it once and learns to recognize it, and a
+ * line that says nothing about a credential is more useful than a line that pretends the ERP answered blank.
+ */
+export const AERO_REDACTED = '[redacted]';
+
+/**
  * Structured log entry for Aero32 WebService integration events.
  */
 export interface AeroLogEntry {
@@ -131,10 +137,113 @@ function sanitizePayloadData(data: unknown): unknown {
   return sanitized;
 }
 
+/** A credential field name, wherever it appears and in any casing. */
+const SENSITIVE_KEY_VALUE =
+  /(["']?)([A-Za-z0-9_.-]*(?:authorization|password|senha|passwd|token|secret|credential|api[-_]?key|cookie)[A-Za-z0-9_.-]*)(\1\s*[:=]\s*)("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^\s,;&}\]\[]+)/gi;
+
+/** `Basic <base64>` and `Bearer <token>` wherever a client echoed the header it sent. */
+const SCHEME_TOKEN = /\b(basic|bearer)\s+([A-Za-z0-9._~+/=-]+)/gi;
+
+/**
+ * A `Cookie:`/`Set-Cookie:` header carries several pairs separated by `;`, so the whole line is the value.
+ * The header name and its separator survive; only the pairs are replaced.
+ */
+const COOKIE_HEADER = /\b(set-cookie|cookie)\b(\s*[:=]\s*)([^\n"']+)/gi;
+
+/** A long hex run is a hash, a key or a signature; none of them belong on disk. */
+const HEX_RUN = /\b[0-9a-fA-F]{32,}\b/g;
+
+/** A long base64 run is judged as key material only when it looks random (see `looksLikeKeyMaterial`). */
+const BASE64_RUN = /[A-Za-z0-9+/]{40,}={0,2}/g;
+
+/**
+ * Decides whether a run of base64 characters is a secret rather than a long ordinary word.
+ *
+ * The alphabet of base64 has no underscore and no space, so prose rarely survives 40 characters inside it. The
+ * cases that do -- a long source identifier, a checksum without digits -- are not worth a false redaction, so the
+ * run has to mix cases and carry at least one digit.
+ */
+function looksLikeKeyMaterial(run: string): boolean {
+  const body = run.replace(/=+$/, '');
+  if (body.length < 32) {
+    return false;
+  }
+  return /[A-Z]/.test(body) && /[a-z]/.test(body) && /[0-9]/.test(body);
+}
+
+/** Decides whether the word after `Basic`/`Bearer` is a credential and not the prose word "authentication". */
+function looksLikeCredentialToken(token: string): boolean {
+  if (token.length < 6) {
+    return false;
+  }
+  if (/[0-9]/.test(token) || token.endsWith('=')) {
+    return true;
+  }
+  return token.length >= 16 && /[A-Z]/.test(token) && /[a-z]/.test(token);
+}
+
+/**
+ * Replaces the value of one `key: value` / `key=value` / `"key":"value"` match, keeping its punctuation.
+ * A scheme (`Basic`, `Bearer`) is part of the diagnosis, not part of the secret, so it stays.
+ */
+function redactKeyValue(match: string, quote: string, key: string, separator: string, rawValue: string): string {
+  const quoted = rawValue.startsWith('"') || rawValue.startsWith("'");
+  const value = quoted ? rawValue.slice(1, -1) : rawValue;
+  const scheme = /^(basic|bearer)\s/i.exec(value)?.[1];
+  const marker = scheme ? `${scheme} ${AERO_REDACTED}` : AERO_REDACTED;
+
+  // Already redacted: the value is the scheme whose credential the rule above replaced.
+  if (/^(basic|bearer)$/i.test(value)) {
+    return match;
+  }
+  if (value === AERO_REDACTED || value === marker) {
+    return match;
+  }
+  const q = quoted ? rawValue[0] : '';
+  return `${quote}${key}${separator}${q}${marker}${q}`;
+}
+
+/**
+ * Removes credentials from a free-text field, in place and without removing the sentence around them.
+ *
+ * The ERP answers in prose -- an HTML error page, the request body it refused to parse -- so the secrets arrive
+ * inside a longer string rather than as object keys. The rules therefore work on the text: a sensitive key and
+ * its value, an echoed authorization header, a cookie header, and long hex or base64 runs that are shaped like
+ * keys. Everything else, including the message the operator needs on a Monday, is left alone.
+ */
+export function redactAeroText(text: string): string {
+  return text
+    .replace(SCHEME_TOKEN, (match, scheme: string, token: string) =>
+      looksLikeCredentialToken(token) ? `${scheme} ${AERO_REDACTED}` : match,
+    )
+    .replace(COOKIE_HEADER, (_match, header: string, separator: string) => `${header}${separator}${AERO_REDACTED}`)
+    .replace(SENSITIVE_KEY_VALUE, redactKeyValue)
+    .replace(HEX_RUN, AERO_REDACTED)
+    .replace(BASE64_RUN, (run) => (looksLikeKeyMaterial(run) ? AERO_REDACTED : run));
+}
+
+/** Redacts every string inside a payload, whatever shape the payload has. */
+function redactPayloadStrings(data: unknown): unknown {
+  if (typeof data === 'string') {
+    return redactAeroText(data);
+  }
+  if (Array.isArray(data)) {
+    return data.map(redactPayloadStrings);
+  }
+  if (data !== null && typeof data === 'object') {
+    const redacted: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
+      redacted[key] = redactPayloadStrings(value);
+    }
+    return redacted;
+  }
+  return data;
+}
+
 /**
  * Appends one JSON line to the Aero integration log file.
  * Handles directory creation, single-generation size rotation at 2MB,
- * and length truncation for payload and response fields.
+ * credential redaction, and length truncation for payload and response fields.
  */
 export function appendAeroLog(entry: AeroLogEntry, dir?: string): string {
   const logDir = dir ?? resolveAeroLogDir();
@@ -157,8 +266,8 @@ export function appendAeroLog(entry: AeroLogEntry, dir?: string): string {
     }
   }
 
-  // Sanitize and cap payload
-  let finalPayload = sanitizePayloadData(entry.payload);
+  // Sanitize, redact and cap payload
+  let finalPayload = redactPayloadStrings(sanitizePayloadData(entry.payload));
   if (finalPayload !== undefined && finalPayload !== null) {
     if (typeof finalPayload === 'string') {
       if (finalPayload.length > PAYLOAD_MAX_CHARS) {
@@ -174,8 +283,8 @@ export function appendAeroLog(entry: AeroLogEntry, dir?: string): string {
     finalPayload = null;
   }
 
-  // Cap response
-  let finalResponse = entry.response ?? null;
+  // Redact, then cap response
+  let finalResponse = entry.response == null ? null : redactAeroText(entry.response);
   if (finalResponse && finalResponse.length > RESPONSE_MAX_CHARS) {
     finalResponse = finalResponse.slice(0, RESPONSE_MAX_CHARS) + TRUNCATION_MARKER;
   }
@@ -190,7 +299,7 @@ export function appendAeroLog(entry: AeroLogEntry, dir?: string): string {
     httpStatus: entry.httpStatus ?? null,
     payload: finalPayload,
     response: finalResponse,
-    error: entry.error ?? null,
+    error: entry.error == null ? null : redactAeroText(entry.error),
     launchId: entry.launchId ?? null,
     note: entry.note ?? null,
     client: entry.client ?? null,
