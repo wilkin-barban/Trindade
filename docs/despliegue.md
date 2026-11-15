@@ -307,6 +307,10 @@ otros escritores de la base durante la ventana.
 - [ ] `make db-status` (o el comando equivalente en el contenedor) sale 0 con `current` en la revisión 11.
 - [ ] `docker logs --tail 30 trindade-api-1` no muestra errores ni rechazos no manejados.
 - [ ] La descarga del APK responde (`GET /api/app/download-apk`) y la versión publicada es la esperada.
+- [ ] `curl -I https://trindademasas.duckdns.org/` devuelve `Content-Security-Policy`, `X-Content-Type-Options`,
+      `X-Frame-Options`, `Referrer-Policy` y `Cache-Control: no-cache`; `Server` no muestra la versión (§15).
+- [ ] Un asset de `/assets/` viaja con `Content-Encoding: gzip` y `Cache-Control: public, max-age=31536000, immutable`.
+- [ ] `curl -I https://trindademasas.duckdns.org/api/health` devuelve `Cache-Control: no-store` (§15).
 
 ## 9. Rollback
 
@@ -547,3 +551,77 @@ guardar la contraseña deja el cofre ilegible.
   (Administrador). No se pierde ningún otro dato: la contraseña no se reutiliza en Trindade.
 - **Deuda declarada:** no hay rotación multi-clave. `key_version = 1` está preparado para una rotación futura por
   generaciones, que esta entrega no implementa.
+
+## 15. Headers, compresión y caché del origen web
+
+Todo el tráfico público entra por `docker/nginx.conf`: assets, la SPA, el API proxeado y las páginas de error del
+proxy. Ese bloque es el único dueño de la política de seguridad.
+
+### 15.1 Headers
+
+| Header | Valor | Por qué |
+| --- | --- | --- |
+| `Content-Security-Policy` | `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'` | Corta el XSS como cadena explotable de un token robado |
+| `X-Content-Type-Options` | `nosniff` | El navegador no reinterpreta una respuesta como otro tipo |
+| `X-Frame-Options` | `DENY` | La app no se embebe nunca; `frame-ancestors` lo repite para navegadores modernos |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | No filtra rutas internas al sitio externo que se abra |
+| `Permissions-Policy` | `camera=(), microphone=(), geolocation=()` | La app no pide esas capacidades |
+| `server_tokens` | `off` | `Server: nginx`, sin versión |
+
+Todos se emiten con `add_header ... always`, así que también viajan en `4xx`/`5xx`.
+
+La CSP se verificó contra lo que la app hace de verdad: el bundle no tiene scripts inline ni `eval`, Tailwind llega
+como una hoja más atributos `style` (`'unsafe-inline'`), los QR son `data:` y las previsualizaciones de fotos son
+`blob:`, todas las peticiones son del mismo origen, no hay fuentes web ni `<object>`, y los enlaces de WhatsApp y
+App Store son navegaciones (CSP no las restringe).
+
+**Trampa de nginx:** `add_header` no se hereda en una `location` que declara su propio `add_header`. Por eso el
+bloque de seguridad está repetido literalmente en `location /assets/` y `location /`, que necesitan
+`Cache-Control`. Si se agrega un header, hay que agregarlo en los tres lugares.
+
+**No se duplican en el API a propósito.** nginx agrega el header del upstream en vez de reemplazarlo, y
+`X-Frame-Options: DENY, DENY` o `nosniff, nosniff` es un valor que ningún navegador acepta: duplicarlos debilitaría
+la protección. El API solo aporta la política de caché (`Cache-Control: no-store`).
+
+**HSTS:** el TLS termina en el host, no en este contenedor; sobre HTTP el header no tiene efecto. Si se agrega,
+va en el bloque TLS del host con `max-age` creciente, nunca aquí.
+
+### 15.2 Compresión y caché
+
+- `gzip on`, `gzip_vary on`, `gzip_proxied any`, `gzip_min_length 1024`, `gzip_types text/plain text/css
+  application/javascript application/json image/svg+xml`. `text/html` siempre se comprime; no se lista. El
+  bundle de entrada baja de ~519 kB a ~161 kB.
+- Brotli **no** está habilitado: la imagen oficial `nginx:alpine` no trae `ngx_brotli` y este repositorio no agrega
+  módulos a la imagen.
+- `/assets/`: `Cache-Control: public, max-age=31536000, immutable`, porque Vite nombra cada archivo por su
+  contenido. Un asset ausente responde `404` y no cae al `index.html`.
+- `index.html` y el fallback de la SPA: `Cache-Control: no-cache`. La cáscara nombra el bundle vigente; cachearla
+  dejaría la app apuntando a assets que ya no existen. `no-cache` sigue permitiendo el `304`.
+- JSON autenticado: `Cache-Control: no-store` lo pone el API (`server.ts`) y no el proxy, para que la política
+  valga en cualquier despliegue. Un `401` también lo lleva.
+- Fotos: las rutas autenticadas y los enlaces con token declaran su propio `private, no-store`; el valor por
+  defecto del API no lo pisa. `/p/:token` conserva así su semántica.
+
+### 15.3 Verificación
+
+```bash
+# Cáscara: headers y no-cache
+curl -sSI https://trindademasas.duckdns.org/ | grep -iE 'content-security-policy|x-frame-options|x-content-type-options|referrer-policy|cache-control|^server'
+
+# Asset hasheado: gzip + immutable (tomar el nombre real del index.html)
+curl -sSI -H 'Accept-Encoding: gzip, br' https://trindademasas.duckdns.org/assets/<asset>.js | grep -iE 'content-encoding|cache-control'
+
+# JSON del API: no-store, también detrás del proxy
+curl -sSI https://trindademasas.duckdns.org/api/health | grep -i cache-control
+```
+
+Antes de desplegar, la configuración se valida sin levantar la pila:
+
+```bash
+docker compose config -q
+docker run --rm --add-host api:127.0.0.1 \
+  -v "$PWD/docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro" nginx:1.27-alpine nginx -t
+```
+
+El `--add-host` es necesario porque `proxy_pass http://api:3000` solo resuelve dentro de la red de compose; sin
+él, `nginx -t` falla con `host not found in upstream "api"` y no es un problema de sintaxis.

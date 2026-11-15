@@ -36,6 +36,18 @@ const server = Fastify({
   },
 });
 
+// Everything under `/api/` and `/p/` answers with the session or with a token that stands for one, so no
+// browser or intermediary may keep a copy: after a logout, or after another operator signs in on the same
+// machine, a cached body would hand over the previous session's data. The policy lives here, not in the
+// proxy, so it travels with the API in every deployment (compose, standalone, a test rig). It only fills
+// the gap: a route that publishes something on purpose -- the public photo links -- sets its own value
+// later in the request and that value wins, which is why nothing is overridden here.
+server.addHook('onRequest', async (request, reply) => {
+  const url = request.raw.url ?? '';
+  if (!url.startsWith('/api/') && !url.startsWith('/p/')) return;
+  reply.header('Cache-Control', 'no-store');
+});
+
 if (!aeroVaultKeyConfigured) {
   // Development only: in production the call above already refused to boot. Saying it once beats a 503 that looks
   // like a broken route when the panel is opened for the first time.
