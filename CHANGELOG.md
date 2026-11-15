@@ -20,8 +20,9 @@ verificaciones está en [docs/release-android-historial.md](docs/release-android
   de gracia, el replay sigue revocando la familia.
 - **Revisión 12 de esquema**: `report_photos.mime_type` admite `image/heic`/`image/heif` mediante reconstrucción de
   la tabla, copiando y contando las filas antes de soltar la original. Reportes acepta HEIC/HEIF de punta a punta y
-  ambos formularios los ofrecen. La revisión está probada sobre una copia de la base de producción (6 filas, 6
-  filas idénticas) y **queda pendiente de aplicar en producción** hasta la autorización del usuario.
+  ambos formularios los ofrecen. Aplicada en producción el 2026-11-15 con backup previo
+  (`trindade.pre-revision12-20261115T114641Z.db`): `user_version = 12`, integridad `ok`, **6 filas antes y 6 después,
+  idénticas campo por campo**, y ninguna de las otras 22 tablas cambió.
 - **E2E**: el servidor de pruebas gana un reset explícito y el spec del lote lo usa por test; `npm run test:e2e:host`
   da **118/118** en dos corridas consecutivas.
 
