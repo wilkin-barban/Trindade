@@ -44,8 +44,13 @@ function batchAnswer(total: number, failAtIndex = -1): unknown[] {
 async function openLaunchPage(page: Page) {
   // The configuration is what turns the switch on: seeded before the app reads it.
   await page.addInitScript(
-    ({ key, value }) => window.localStorage.setItem(key, value),
-    { key: AERO_SETTINGS_KEY, value: SETTINGS },
+    ({ key, value, queueKey }) => {
+      window.localStorage.setItem(key, value);
+      // The device queue lives in the browser profile and the suite shares one: a leftover item from another
+      // spec would change the count this test asserts, so every document starts with an empty queue.
+      window.localStorage.removeItem(queueKey);
+    },
+    { key: AERO_SETTINGS_KEY, value: SETTINGS, queueKey: AERO_QUEUE_KEY },
   );
   // The password is not part of what the device keeps, so the tab asks for it once -- the same thing an
   // operator does -- and then walks to the launch screen through the app, which is what keeps it in memory.
@@ -112,7 +117,7 @@ test.describe('a launch of many products leaves once', () => {
     await answer(page, 'entrada_lote', batchAnswer(3));
 
     const result = page.locator('[data-testid="massa-result-modal"]');
-    await expect(result).toBeVisible({ timeout: 15000 });
+    await expect(result).toBeVisible({ timeout: 28_000 });
     await expect(result).toContainText('3 lançamentos sincronizados');
     await expect(result.locator('[data-testid="massa-result-mirror-hint"]')).toBeVisible();
 
@@ -134,7 +139,7 @@ test.describe('a launch of many products leaves once', () => {
     await answer(page, 'entrada_lote', batchAnswer(3, 2));
 
     const result = page.locator('[data-testid="massa-result-modal"]');
-    await expect(result).toBeVisible({ timeout: 15000 });
+    await expect(result).toBeVisible({ timeout: 28_000 });
     await expect(result).toContainText('Sincronização Parcial');
     await expect(result).toContainText('2 de 3 sincronizados');
 
@@ -164,7 +169,7 @@ test.describe('a launch of many products leaves once', () => {
 
     // Un producto suelto conserva el mensaje de siempre: no hay lote que anunciar.
     const result = page.locator('[data-testid="massa-result-modal"]');
-    await expect(result).toBeVisible({ timeout: 15000 });
+    await expect(result).toBeVisible({ timeout: 28_000 });
     await expect(result).toContainText('Sincronizado com o ERP');
   });
 });

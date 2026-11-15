@@ -28,8 +28,11 @@ test.describe('Audit Page (Phase 6)', () => {
     await expect(page.getByRole('columnheader', { name: 'Ação' })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Entidade' })).toBeVisible();
 
-    // Should show total count
-    await expect(page.locator('text=registro')).toBeVisible();
+    // The total is stated twice on purpose -- the header says how much is registered and the footer repeats it
+    // next to the pagination -- so a text locator matches two elements and strict mode rejects it. The header
+    // carries its own test id; that is the element this test is about.
+    await expect(page.getByTestId('audit-total-logs')).toBeVisible();
+    await expect(page.getByTestId('audit-total-logs')).not.toBeEmpty();
   });
 
   test('6.2 admin can filter audit logs by action', async ({ page }) => {
