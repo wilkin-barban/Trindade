@@ -8579,7 +8579,7 @@
       },
       "post": {
         "summary": "Attach a photo to a report",
-        "description": "Multipart with the file in a field named \"file\". Only JPEG, PNG and WebP are accepted, the declared type must match the file content, and a report accepts at most five photos.",
+        "description": "Multipart with the file in a field named \"file\". Only JPEG, PNG, WebP, HEIC and HEIF are accepted, the declared type must match the file content, and a report accepts at most five photos.",
         "tags": [
           "reports"
         ],
@@ -8683,7 +8683,7 @@
             }
           },
           "415": {
-            "description": "The file is not JPEG, PNG or WebP, or its content does not match the declared type",
+            "description": "The file is not JPEG, PNG, WebP, HEIC or HEIF, or its content does not match the declared type",
             "content": {
               "application/json": {
                 "schema": {
@@ -10617,7 +10617,7 @@
       },
       "post": {
         "summary": "Attach one optional photo to a movement",
-        "description": "Beta privada: only the account `wilkin` is admitted. A missing or invalid token answers 401, and any other account -- a Trabalhador or another Administrador -- answers 403, because the guard is the username. Uploaded after the movement exists, so a launch is never held back by a camera. The file must be JPEG, PNG or WebP both in what it declares and in what its bytes are, at most 5 MB, and a movement carries at most three: without photos it is still a valid movement.",
+        "description": "Beta privada: only the account `wilkin` is admitted. A missing or invalid token answers 401, and any other account -- a Trabalhador or another Administrador -- answers 403, because the guard is the username. Uploaded after the movement exists, so a launch is never held back by a camera. The file must be JPEG, PNG, WebP, HEIC or HEIF both in what it declares and in what its bytes are, at most 5 MB, and a movement carries at most three: without photos it is still a valid movement.",
         "tags": [
           "salida"
         ],
@@ -10721,7 +10721,7 @@
             }
           },
           "415": {
-            "description": "The file is not JPEG, PNG or WebP, or its content does not match the declared type",
+            "description": "The file is not JPEG, PNG, WebP, HEIC or HEIF, or its content does not match the declared type",
             "content": {
               "application/json": {
                 "schema": {

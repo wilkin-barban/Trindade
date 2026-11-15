@@ -1117,7 +1117,7 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
     path: '/api/reports/{id}/photos',
     summary: 'Attach a photo to a report',
     description:
-      'Multipart with the file in a field named "file". Only JPEG, PNG and WebP are accepted, the declared ' +
+      'Multipart with the file in a field named "file". Only JPEG, PNG, WebP, HEIC and HEIF are accepted, the declared ' +
       'type must match the file content, and a report accepts at most five photos.',
     tags: ['reports'],
     request: {
@@ -1142,7 +1142,7 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
       404: errorResponse('No such report'),
       409: errorResponse('The report already carries five photos'),
       413: errorResponse('The file exceeds the 5 MB limit'),
-      415: errorResponse('The file is not JPEG, PNG or WebP, or its content does not match the declared type'),
+      415: errorResponse('The file is not JPEG, PNG, WebP, HEIC or HEIF, or its content does not match the declared type'),
     },
   });
 
@@ -1753,7 +1753,7 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
     summary: 'Attach one optional photo to a movement',
     description:
       `${SALIDA_BETA_ONLY} Uploaded after the movement exists, so a launch is never held back by a camera. The ` +
-      'file must be JPEG, PNG or WebP both in what it declares and in what its bytes are, at most 5 MB, and a ' +
+      'file must be JPEG, PNG, WebP, HEIC or HEIF both in what it declares and in what its bytes are, at most 5 MB, and a ' +
       'movement carries at most three: without photos it is still a valid movement.',
     tags: ['salida'],
     request: {
@@ -1778,7 +1778,7 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
       404: errorResponse('No such movement (`SALIDA_NOT_FOUND`)'),
       409: errorResponse('The movement already carries three photos (`SALIDA_PHOTO_LIMIT`)'),
       413: errorResponse('The file exceeds the 5 MB limit'),
-      415: errorResponse('The file is not JPEG, PNG or WebP, or its content does not match the declared type'),
+      415: errorResponse('The file is not JPEG, PNG, WebP, HEIC or HEIF, or its content does not match the declared type'),
     },
   });
 
