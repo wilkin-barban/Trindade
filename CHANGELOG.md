@@ -12,6 +12,23 @@ verificaciones está en [docs/release-android-historial.md](docs/release-android
 
 ## [Unreleased]
 
+### Re-auditoría de la remediación web (2026-11-15)
+
+- **Vitest** vuelve al pool por defecto (un proceso por archivo): el `vmThreads` que silenciaba un warning podía
+  romper la suite entera en otra máquina. `test:unit` 200/200.
+- **Cookie de sesión**: el fixture de test declara HTTP plano (`Secure` ya no se hereda del shell) y la producción
+  resuelve el flag una vez al registrar las rutas. Backend 917/917 también con `NODE_ENV=production`.
+- **Sesión web**: se renueva desde la cookie aunque `localStorage` esté vacío, con tests de recarga, segunda pestaña
+  y logout; un login en vuelo ya no puede quedar deslogueado por el fallo de la renovación.
+- **HEIC**: Salida acepta `image/heic`/`image/heif` con detección ISO-BMFF y tests; Reportes responde 415 con
+  `REPORT_PHOTO_HEIC_UNSUPPORTED` hasta la revisión 12 de esquema (decisión pendiente).
+- **HSTS** servido desde el contenedor y verificado en producción; `Server: nginx/<versión>` depende del borde TLS
+  externo y quedó documentado.
+- **Proxies de confianza**: el default es loopback y el bridge se declara en `docker-compose.yml`
+  (`172.19.0.0/16`), en lugar de confiar en todo `172.16.0.0/12`.
+- **E2E**: `audit.spec` usa un locator específico; `aero-batch-launch` gana productos propios por test, espera del
+  ticket y presupuesto de 60 s, pero sigue siendo intermitente en la corrida completa (reportado).
+
 ### Remediación de la auditoría web (2026-11-14)
 
 #### Seguridad
