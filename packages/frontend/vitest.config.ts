@@ -12,8 +12,10 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['src/**/*.test.tsx'],
     setupFiles: ['./src/test/setup.ts'],
-    // jsdom is expensive to build and each file used to get its own copy. Sharing one environment per worker
-    // removes that cost without letting a test see another test's globals: files still get a fresh module graph.
-    pool: 'vmThreads',
+    // No pool override, deliberately. `pool: 'vmThreads'` was an attempt to make the `jsdom was created 25 times`
+    // warning go away, and the re-audit found it breaking the whole suite on another machine before it ever
+    // helped here: an environment that is shared to save a warning is an environment that leaks React state
+    // between files. The default pool isolates each file in its own process, which is what a component suite
+    // needs; the warning is the price of that and it is the honest one.
   },
 });
