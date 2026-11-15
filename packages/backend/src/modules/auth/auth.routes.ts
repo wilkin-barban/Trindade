@@ -289,11 +289,19 @@ export async function authRoutes(fastify: FastifyInstance, options: AuthRoutesOp
 
       if (result.outcome !== 'rotated') {
         if (result.outcome === 'reused-within-grace') {
-          // A retry of a rotation whose response was lost, or a double-submitted refresh. The
-          // family is left alone on purpose: this device authenticates again, and no other
-          // device is signed out by a transient network failure.
-          request.log.warn('Refresh token presented shortly after rotation; treated as a retry');
-          return reply.status(401).send({ error: 'Invalid or expired session' });
+          // A retry of a rotation whose response was lost, or two documents of the same browser refreshing at
+          // once. The family is left alone and this caller is re-authenticated with an access token: refusing it
+          // with 401 is indistinguishable from an expired session on the client, which then signs the operator
+          // out in the middle of a screen. No refresh token is returned and the cookie is not touched -- the
+          // winning request already stored the live one.
+          request.log.warn('Refresh token presented shortly after rotation; re-authenticating the caller');
+          const retried = jwt.sign(
+            { sub: result.userId, username: result.username, role: result.role,
+              security_version: result.securityVersion },
+            options.jwtSecret,
+            { expiresIn: ACCESS_TOKEN_TTL_SECONDS },
+          );
+          return reply.send({ token: retried, expiresIn: ACCESS_TOKEN_TTL_SECONDS });
         }
         // Every failure answers identically so a caller cannot probe whether a token
         // existed, had expired, or had been revoked. The reason is logged, not written to

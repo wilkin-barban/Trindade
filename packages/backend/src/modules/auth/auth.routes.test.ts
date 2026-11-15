@@ -381,13 +381,18 @@ describe('Auth Routes', () => {
       assert.strictEqual(body.expiresIn, 7200);
     });
 
-    it('rejects a refresh token that was already rotated away', async () => {
+    it('re-authenticates a refresh that repeats the rotation it just made', async () => {
+      // Two documents of the same browser refresh at once, or a response is lost and retried: the losing request
+      // presents a token that was rotated seconds ago. It gets an access token and keeps the session -- refusing
+      // it with 401 is indistinguishable from expiry on the client, which then signs the operator out.
       const session = await loginWithSession(fixtures.admin.username, fixtures.admin.password);
       assert.strictEqual((await refresh(session.refreshToken)).statusCode, 200);
 
-      const replay = await refresh(session.refreshToken);
-      assert.strictEqual(replay.statusCode, 401);
-      assert.strictEqual(JSON.parse(replay.body).error, 'Invalid or expired session');
+      const retry = await refresh(session.refreshToken);
+      assert.strictEqual(retry.statusCode, 200);
+      const retried = JSON.parse(retry.body);
+      assert.ok(typeof retried.token === 'string' && retried.token.length > 0, 'the retry got no access token');
+      assert.strictEqual(retried.refreshToken, undefined, 'a retry must not mint a second refresh token');
     });
 
     it('refuses a refresh that presents no credential at all', async () => {

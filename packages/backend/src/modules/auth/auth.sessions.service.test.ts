@@ -135,7 +135,14 @@ describe('auth session service', () => {
     const rotated = rotateSession(db, first, 30);
     if (rotated.outcome !== 'rotated') assert.fail('the first rotation did not succeed');
 
-    assert.deepEqual(rotateSession(db, first, 30), { outcome: 'reused-within-grace' });
+    const retried = rotateSession(db, first, 30);
+    assert.equal(retried.outcome, 'reused-within-grace');
+    // The retry carries the session's authority so the route can re-authenticate it: a bare outcome would force
+    // the caller to be refused, which is what signed a browser out mid-screen.
+    if (retried.outcome !== 'reused-within-grace') assert.fail('the retry did not identify the session');
+    assert.equal(retried.userId, adminId);
+    assert.ok(retried.username.length > 0, 'the retry did not name the user');
+    assert.ok(retried.role.length > 0, 'the retry did not name the role');
     assert.equal(liveSessionCount(db), 1, 'a retry signed the user out of their other devices');
     assert.equal(
       rotateSession(db, rotated.refreshToken, 30).outcome,

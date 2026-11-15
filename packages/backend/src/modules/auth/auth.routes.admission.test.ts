@@ -117,7 +117,18 @@ describe('auth route admission (isolated limiter)', () => {
     assert.equal(blocked.headers['retry-after'], '2');
     // A different token still reaches credential validation, not the per-token limiter.
     assert.equal((await refresh('not-a-valid-session')).statusCode, 401);
+    // The limiter's window closed: the same token is admitted again, and because it was rotated seconds ago the
+    // answer is an access token (a retry of a lost response), not a refusal.
     now = 2_000;
+    const retried = await refresh(token);
+    assert.equal(retried.statusCode, 200);
+    assert.equal(retried.json().refreshToken, undefined);
+    // Past the grace window the same token is a replay, and the family goes with it. The window is measured by the
+    // database's clock, so the test moves the rotation that far back instead of advancing a fake clock.
+    (app as unknown as { db: { prepare: (sql: string) => { run: (...args: unknown[]) => unknown } } }).db
+      .prepare("UPDATE auth_sessions SET revoked_at = datetime('now', '-2 hours') WHERE revoked_at IS NOT NULL")
+      .run();
+    limiter.reset();
     assert.equal((await refresh(token)).statusCode, 401);
   });
 });

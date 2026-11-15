@@ -35,7 +35,13 @@ export type RotateSessionResult =
   | { outcome: 'unknown' }
   | { outcome: 'expired' }
   | { outcome: 'reused' }
-  | { outcome: 'reused-within-grace' }
+  /**
+   * The token was rotated moments ago: a retry whose response was lost, or two documents of the same browser
+   * refreshing at once. The family stays alive, and the caller is re-authenticated from the session's own
+   * authority -- refusing it with 401 is what signed a browser out in the middle of a screen, because the
+   * losing request of a double refresh looked exactly like a stolen token.
+   */
+  | { outcome: 'reused-within-grace'; userId: number; username: string; role: string; securityVersion: number }
   | { outcome: 'revoked' }
   | { outcome: 'inactive-user' };
 
@@ -160,7 +166,25 @@ export function rotateSession(
     // double-submitted refresh, produces this same state, and only age separates a retry from a
     // replay. Inside the window the caller re-authenticates and every other device keeps working.
     if (row.revoked_at !== null && row.replaced_by !== null) {
-      if (row.is_recently_rotated) return { outcome: 'reused-within-grace' };
+      if (row.is_recently_rotated) {
+        // The retry gets an access token and no new refresh token: the successor is the live session, and the
+        // caller keeps whatever cookie the winning request already stored.
+        const retried = db.prepare(`SELECT u.is_active, u.username, u.security_version, r.name AS role
+          FROM users u JOIN roles r ON r.id = u.role_id WHERE u.id = ?`).get(row.user_id) as
+          | { is_active: number; username: string; security_version: number; role: string }
+          | undefined;
+        if (!retried || retried.is_active !== 1 || retried.security_version <= 0) {
+          revokeFamily(db, row.family_id);
+          return { outcome: 'inactive-user' };
+        }
+        return {
+          outcome: 'reused-within-grace',
+          userId: row.user_id,
+          username: retried.username,
+          role: retried.role,
+          securityVersion: retried.security_version,
+        };
+      }
       revokeFamily(db, row.family_id);
       return { outcome: 'reused' };
     }
