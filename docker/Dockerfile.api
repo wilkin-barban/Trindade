@@ -23,6 +23,12 @@ COPY packages/backend/tsconfig.json packages/backend/tsconfig.build.json package
 
 RUN npm ci
 
+# npm hoists most of the tree to /app/node_modules, but it nests a package under its workspace when the
+# resolution calls for it -- `zod` lives in `packages/backend/node_modules` today. The runner copies the root
+# tree only, so the nested one has to be copied too or the API boots with ERR_MODULE_NOT_FOUND. `mkdir -p`
+# keeps the COPY valid on a tree that happens to hoist everything.
+RUN mkdir -p packages/backend/node_modules
+
 # Copy backend source
 COPY packages/backend/src packages/backend/src/
 
@@ -42,6 +48,7 @@ WORKDIR /app
 
 # Copy compiled output and runtime dependencies
 COPY --from=builder /app/node_modules /app/node_modules
+COPY --from=builder /app/packages/backend/node_modules /app/packages/backend/node_modules
 COPY --from=builder /app/packages/backend/dist /app/packages/backend/dist
 
 # The signed APK the project ships. It is served from disk (`/api/app/download-apk`) so the Share screen
