@@ -28,6 +28,15 @@ run_step() {
 run_step 'Install dependencies' npm ci
 run_step 'Build all workspaces' npm run build
 run_step 'Typecheck backend and frontend' npm run typecheck
+
+# The two startup tests spawn the built server and it refuses to boot without a vault key. The key is generated
+# here, per run, and never read from a secret: a CI step that depends on an undeclared variable is a step that
+# passes on one machine and dies with `VaultKeyError` on the next. It is ephemeral and never touches a database.
+expected_vault_key_bytes=32
+export AERO_VAULT_KEY
+AERO_VAULT_KEY="$(node -e "process.stdout.write(require('node:crypto').randomBytes(${expected_vault_key_bytes}).toString('base64'))")"
+printf 'Exported an ephemeral test AERO_VAULT_KEY for the backend suite\n'
+
 run_step 'Run backend tests' npm run test --workspace=packages/backend
 run_step 'Run frontend unit tests' npm run test --workspace=packages/frontend
 run_step 'Verify the built schema CLIs' bash scripts/verify-schema-clis.sh

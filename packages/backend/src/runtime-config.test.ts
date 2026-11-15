@@ -6,7 +6,12 @@ const STRONG_SECRET = 'unique-runtime-secret-32-bytes-minimum';
 
 describe('Runtime configuration', () => {
   it('rejects missing and blank JWT secrets', () => {
-    assert.throws(() => requireJwtSecret(undefined), /required/);
+    // The empty environment is passed explicitly: `requireJwtSecret()` with no argument falls back to
+    // `process.env.JWT_SECRET`, so on a machine with a real `.env` this assertion read that secret instead of the
+    // absence it means to test and went red only there. A configuration test that depends on the shell is not a
+    // test of the configuration.
+    assert.throws(() => loadRuntimeConfig({}), /required/);
+    assert.throws(() => requireJwtSecret(''), /required/);
     assert.throws(() => requireJwtSecret('   '), /required/);
   });
 

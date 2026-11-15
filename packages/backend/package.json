@@ -12,6 +12,7 @@
     "db:migrate": "tsx src/db/migrate.ts",
     "db:provision-admin": "tsx src/db/provision-admin.ts",
     "contracts:generate": "tsx src/contracts/generate.ts ../contracts/openapi.json",
+    "pretest": "npm run build",
     "test": "node --test --import tsx \"src/**/*.test.ts\"",
     "test:e2e:server": "tsx src/e2e-server.ts"
   },

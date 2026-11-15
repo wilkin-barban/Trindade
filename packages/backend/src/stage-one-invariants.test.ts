@@ -9,6 +9,7 @@ import Database from 'better-sqlite3';
 import { openDatabase } from './db/index.js';
 import { stampSchemaVersion } from './db/schema-version.js';
 import { captureRecoverySet, verifyIsolatedRestore } from './recovery.js';
+import { TEST_VAULT_KEY } from './test-helper.js';
 
 const digest = (path: string) => createHash('sha256').update(readFileSync(path)).digest('hex');
 
@@ -85,6 +86,7 @@ describe('stage-one installation invariants', () => {
       cwd: join(import.meta.dirname, '..'),
       env: {
         ...serverEnv,
+        AERO_VAULT_KEY: TEST_VAULT_KEY,
         DATABASE_PATH: join(dataDir, 'trindade.db'),
         PHOTOS_DIR: photosDir,
         JWT_SECRET: 'startup-order-invariant-secret-32-bytes',

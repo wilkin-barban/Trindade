@@ -8,6 +8,7 @@ import Database from 'better-sqlite3';
 import bcrypt from 'bcryptjs';
 import { openDatabase } from './index.js';
 import { stampSchemaVersion } from './schema-version.js';
+import { TEST_VAULT_KEY } from '../test-helper.js';
 
 describe('safe database startup', () => {
   const directories: string[] = [];
@@ -86,7 +87,9 @@ describe('safe database startup', () => {
     const serverPath = join(import.meta.dirname, '../../dist/server.js');
     const child = spawn(process.execPath, [serverPath], {
       cwd: join(import.meta.dirname, '../../'),
-      env: { ...serverEnv, DATABASE_PATH: path, JWT_SECRET: 'existing-install-test-secret-32-bytes', HOST: '127.0.0.1', PORT: String(port), PHOTOS_DIR: photosDir },
+      // The vault key is stated, never inherited: a child that reads the developer's shell would make this test
+      // pass on one machine and die with `VaultKeyError` on a clean clone.
+      env: { ...serverEnv, AERO_VAULT_KEY: TEST_VAULT_KEY, DATABASE_PATH: path, JWT_SECRET: 'existing-install-test-secret-32-bytes', HOST: '127.0.0.1', PORT: String(port), PHOTOS_DIR: photosDir },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let logs = '';
