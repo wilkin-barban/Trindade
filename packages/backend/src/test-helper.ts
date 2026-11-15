@@ -69,19 +69,16 @@ function assertTemperatureTasks(tasks: { name_pt: string }[]): asserts tasks is 
   if (tasks.length === 0) throw new Error('Test fixture requires at least one active temperature task');
 }
 
-export async function buildTestApp(options: Pick<AuthRoutesOptions, 'authAdmissionLimiter'> = {}): Promise<{
-  app: import('fastify').FastifyInstance;
-  db: import('better-sqlite3').Database;
-  photosDir: string;
-  fixtures: TestFixtures;
-}> {
-  const db = new Database(':memory:');
-  db.pragma('foreign_keys = ON');
-
-  // Overwrite, never default: a test run must not be able to reach a real vault key through the shell.
-  process.env.AERO_VAULT_KEY = TEST_VAULT_KEY;
-
-  // Load schema + seed
+/**
+ * Puts a database into the state every test starts from: the shipped schema, the seed, the fixture rows the app
+ * expects and the identities the suite logs in with.
+ *
+ * It is a function rather than the body of `buildTestApp` because the e2e server resets between spec files: the
+ * suite shares one server for the whole run, so a spec that asserts an exact count of what exists cannot inherit
+ * the previous file's rows. The identities are passed in, not generated, so a reset reproduces the same logins the
+ * run already handed out through `/__test_fixtures`.
+ */
+export async function seedTestDatabase(db: Database.Database, fixtures: TestFixtures): Promise<void> {
   const schemaPath = join(import.meta.dirname, 'db/schema.sql');
   const seedPath = join(import.meta.dirname, 'db/seed.sql');
   db.exec(readFileSync(schemaPath, 'utf-8'));
@@ -95,11 +92,6 @@ export async function buildTestApp(options: Pick<AuthRoutesOptions, 'authAdmissi
     INSERT OR IGNORE INTO vehicles (id, description, license_plate) VALUES (2, 'Casa BDG', 'BDG');
   `);
 
-  const fixtures: TestFixtures = {
-    admin: { id: 0, username: `admin-${randomUUID()}`, password: randomUUID(), role: 'Administrador' },
-    worker: { id: 0, username: `worker-${randomUUID()}`, password: randomUUID(), role: 'Trabalhador' },
-    jwtSecret: randomUUID(),
-  };
   const insertUser = db.prepare(
     'INSERT INTO users (username, password_hash, display_name, role_id, is_active) VALUES (?, ?, ?, ?, 1)'
   );
@@ -117,6 +109,26 @@ export async function buildTestApp(options: Pick<AuthRoutesOptions, 'authAdmissi
   // quedaba con el id 1, que los fixtures dan por sentado, y la regla «solo el creador edita»
   // compara por user_id. Entra por la MISMA semilla que el arranque de producción.
   ensureGuestUser(db);
+}
+
+export async function buildTestApp(options: Pick<AuthRoutesOptions, 'authAdmissionLimiter'> = {}): Promise<{
+  app: import('fastify').FastifyInstance;
+  db: import('better-sqlite3').Database;
+  photosDir: string;
+  fixtures: TestFixtures;
+}> {
+  const db = new Database(':memory:');
+  db.pragma('foreign_keys = ON');
+
+  // Overwrite, never default: a test run must not be able to reach a real vault key through the shell.
+  process.env.AERO_VAULT_KEY = TEST_VAULT_KEY;
+
+  const fixtures: TestFixtures = {
+    admin: { id: 0, username: `admin-${randomUUID()}`, password: randomUUID(), role: 'Administrador' },
+    worker: { id: 0, username: `worker-${randomUUID()}`, password: randomUUID(), role: 'Trabalhador' },
+    jwtSecret: randomUUID(),
+  };
+  await seedTestDatabase(db, fixtures);
 
   const app = Fastify({ logger: false });
 
@@ -211,6 +223,23 @@ app.get('/api/users/options', { preHandler: [app.authenticate] }, async (_reques
     admin: fixtures.admin,
     worker: fixtures.worker,
   }));
+
+  // Drop every table and seed the database again, so a spec file starts from the state a single-file run sees.
+  // Mounted only by this helper -- `server.ts` never imports it -- and it answers 204 instead of describing what
+  // it removed. The identities are the same ones `/__test_fixtures` already handed out, so a spec's credentials
+  // keep working after the reset.
+  app.post('/__test_reset', async (_request, reply) => {
+    db.pragma('foreign_keys = OFF');
+    const tables = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
+      .all() as { name: string }[];
+    db.transaction(() => {
+      for (const table of tables) db.prepare(`DROP TABLE IF EXISTS "${table.name}"`).run();
+    })();
+    db.pragma('foreign_keys = ON');
+    await seedTestDatabase(db, fixtures);
+    return reply.status(204).send();
+  });
 
   await app.ready();
 

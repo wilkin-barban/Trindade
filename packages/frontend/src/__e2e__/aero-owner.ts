@@ -103,6 +103,19 @@ export async function openErpSession(page: Page, password = 'senha'): Promise<vo
   await expect(page.getByText(/Configuración guardada|Configuração salva/)).toBeVisible();
 }
 
+/**
+ * Puts the e2e server back to the state a single-file run starts from.
+ *
+ * The suite shares one server and one database for the whole run, so a spec that asserts an exact count of what
+ * exists -- how many products left, how many rows the day holds -- inherits whatever the previous file wrote. The
+ * e2e app mounts a test-only reset that drops and reseeds its in-memory database, and the identities already
+ * handed out keep working because the reset re-creates the same users.
+ */
+export async function resetE2eServer(page: Page): Promise<void> {
+  const response = await page.request.post('http://localhost:3099/__test_reset');
+  expect(response.status()).toBe(204);
+}
+
 /** Leaves the current screen for another one of the app, without a reload: the app's own navigation. */
 export async function navigateInApp(page: Page, href: string): Promise<void> {
   const openSidebar = page.getByRole('button', { name: /Abrir men/ });

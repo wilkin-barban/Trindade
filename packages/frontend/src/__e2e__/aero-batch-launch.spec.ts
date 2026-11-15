@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { IPHONE_UA } from './auth-helpers';
-import { loginAsAeroOwner, navigateInApp, openErpSession } from './aero-owner';
+import { loginAsAeroOwner, navigateInApp, openErpSession, resetE2eServer } from './aero-owner';
 
 /**
  * Three products, one trip out of the page.
@@ -107,6 +107,13 @@ test.use({ viewport: { width: 375, height: 667 }, userAgent: IPHONE_UA });
 test.describe.configure({ timeout: 60_000 });
 
 test.describe('a launch of many products leaves once', () => {
+  // Each test owns the server's day. The suite shares one database for the whole run, so without this a test
+  // asserts counts that the previous file already moved -- which is why this spec passed alone and failed in the
+  // suite. The reset drops and reseeds the in-memory database; the identities handed out at boot survive it.
+  test.beforeEach(async ({ page }) => {
+    await resetE2eServer(page);
+  });
+
 
   test('three products travel in one envelope and come back in one dialog', async ({ page }) => {
     await loginAsAeroOwner(page);
