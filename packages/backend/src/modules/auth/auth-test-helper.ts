@@ -61,7 +61,10 @@ export async function buildAuthTestApp(options: {
     prefix: '/api/auth',
     jwtSecret: fixtures.jwtSecret,
     refreshTokenTtlDays: options.refreshTokenTtlDays,
-    cookieSecure: options.cookieSecure,
+    // Stated, never inherited: this fixture is a plain-HTTP install, and `authRoutes` would otherwise resolve the
+    // flag from `NODE_ENV`/`PUBLIC_APP_URL` in the shell -- which is how a suite that passes on one machine failed
+    // with a `Secure` cookie on a machine that exports NODE_ENV=production.
+    cookieSecure: options.cookieSecure ?? false,
   });
   await app.register(bootstrapRoutes, { prefix: '/api/auth' });
   app.get('/__test_admin_only', { preHandler: [app.authenticate, requireRole('Administrador')] }, async () => 'ok');

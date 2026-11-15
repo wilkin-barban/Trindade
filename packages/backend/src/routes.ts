@@ -5,6 +5,7 @@ import type { FastifyInstance } from 'fastify';
 import { authRoutes } from './modules/auth/auth.routes.js';
 import { bootstrapRoutes } from './modules/auth/bootstrap.routes.js';
 import { APPROVED_WEB_ORIGINS } from './cors-policy.js';
+import { resolveRefreshCookieSecure } from './modules/auth/auth.cookies.js';
 import { dashboardRoutes } from './modules/dashboard/dashboard.routes.js';
 import { reportsRoutes } from './modules/reports/reports.routes.js';
 import { getPhotoByPublicToken } from './modules/reports/reports.lifecycle.service.js';
@@ -61,6 +62,13 @@ export async function registerApiRoutes(
     // The origin the SPA is served from is the one a browser puts in `Origin`, and behind a dev proxy the API's
     // own Host is the upstream: comparing only against that would refuse every renewal in development.
     allowedOrigins: [options.publicBaseUrl, ...APPROVED_WEB_ORIGINS],
+    // Resolved here, from the deployment's own URL, instead of leaving the plugin to read the environment: the
+    // cookie's `Secure` flag is a property of the install, and a flag read deeper can drift from it.
+    cookieSecure: resolveRefreshCookieSecure({
+      appUrl: options.publicBaseUrl,
+      nodeEnv: process.env.NODE_ENV,
+      allowInsecure: process.env.AUTH_COOKIE_INSECURE,
+    }),
   });
   await fastify.register(bootstrapRoutes, { prefix: '/api/auth' });
   await fastify.register(dashboardRoutes, { prefix: '/api/dashboard' });
