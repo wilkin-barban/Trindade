@@ -524,6 +524,24 @@ En la fábrica:
 | Bajas de stock `/saidasitem` | Implementada en `/salida` y `/salida-history` (beta de `wilkin`); el alta local y la foto se auditan en `logs/aero-integration.log` con `salida_create`/`salida_photo` |
 | Escritura directa en Firebird | Descartada; se usa el WebService |
 
+## 13. Cómo se recibe la respuesta del puente
+
+El puente (app Atajos de iPhone) **no** devuelve la respuesta del ERP dentro de la URL. Desde la revisión 14:
+
+1. La web arma un ticket con la acción y los cuerpos; el canje (`POST /bridge-tickets/redeem`) le entrega al script
+   la URL del ERP, los encabezados, los cuerpos y un `resultUrl`.
+2. El script envía al ERP y **postea la respuesta** a `resultUrl` con el ticket en `X-Trindade-Ticket`.
+3. El script abre el callback corto: `…?aero_action=<acción>&aero_result=stored`.
+4. La página canjea ese marcador con `GET /bridge-tickets/last-result?action=<acción>`, que devuelve el último
+   resultado del propio usuario dentro de 10 minutos.
+
+La razón es concreta: el diseño anterior abría `callback + encodeURIComponent(respuesta)` y un día con muchas filas
+superaba el límite de una línea de encabezado del proxy, que respondía `414 Request-URI Too Large`. Con la respuesta
+en el servidor, el tamaño del ERP deja de importar.
+
+Un iPhone con el script anterior sigue funcionando: la web acepta `aero_data` como antes. El script servido en
+`/Aero32Bridge.js` es el nuevo y la app muestra los pasos para reinstalarlo.
+
 ## 13. Referencias
 
 - [registro-integracion-aero-webservice.md](registro-integracion-aero-webservice.md) — contratos JSON completos.
