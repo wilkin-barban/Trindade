@@ -23,6 +23,7 @@
 
 package com.trindade.app.contract.models
 
+import com.trindade.app.contract.models.SalidaMovementErp
 import com.trindade.app.contract.models.SalidaMovementItemsInner
 import com.trindade.app.contract.models.SalidaMovementPhotosInner
 import com.trindade.app.contract.models.SalidaMovementReconciliation
@@ -44,6 +45,7 @@ import kotlinx.serialization.Contextual
  * @param photos 
  * @param totalUnits 
  * @param reconciliation 
+ * @param erp 
  */
 @Serializable
 
@@ -77,7 +79,10 @@ data class SalidaCreateResponseMovement (
     val totalUnits: kotlin.Int,
 
     @SerialName(value = "reconciliation")
-    val reconciliation: SalidaMovementReconciliation
+    val reconciliation: SalidaMovementReconciliation,
+
+    @SerialName(value = "erp")
+    val erp: SalidaMovementErp?
 
 ) {
 

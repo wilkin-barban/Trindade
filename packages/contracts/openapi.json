@@ -5536,6 +5536,34 @@
         ],
         "additionalProperties": false
       },
+      "SalidaErp": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "sent",
+              "partial",
+              "failed"
+            ]
+          },
+          "message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sentAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "message",
+          "sentAt"
+        ],
+        "additionalProperties": false
+      },
       "SalidaMovement": {
         "type": "object",
         "properties": {
@@ -5669,6 +5697,37 @@
               "matched_item_ids"
             ],
             "additionalProperties": false
+          },
+          "erp": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "sent",
+                  "partial",
+                  "failed"
+                ]
+              },
+              "message": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "sentAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "status",
+              "message",
+              "sentAt"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -5681,7 +5740,8 @@
           "items",
           "photos",
           "total_units",
-          "reconciliation"
+          "reconciliation",
+          "erp"
         ],
         "additionalProperties": false
       },
@@ -5853,6 +5913,37 @@
                   "matched_item_ids"
                 ],
                 "additionalProperties": false
+              },
+              "erp": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "sent",
+                      "partial",
+                      "failed"
+                    ]
+                  },
+                  "message": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "sentAt": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "status",
+                  "message",
+                  "sentAt"
+                ],
+                "additionalProperties": false
               }
             },
             "required": [
@@ -5865,7 +5956,222 @@
               "items",
               "photos",
               "total_units",
-              "reconciliation"
+              "reconciliation",
+              "erp"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "movement"
+        ],
+        "additionalProperties": false
+      },
+      "SalidaErpResultRequest": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "sent",
+              "partial",
+              "failed"
+            ]
+          },
+          "message": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 512
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "SalidaErpResultResponse": {
+        "type": "object",
+        "properties": {
+          "movement": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "movement_date": {
+                "type": "string"
+              },
+              "user_id": {
+                "type": "integer"
+              },
+              "username": {
+                "type": "string"
+              },
+              "display_name": {
+                "type": "string"
+              },
+              "created_at": {
+                "type": "string"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "product_code": {
+                      "type": "string"
+                    },
+                    "product_name": {
+                      "type": "string"
+                    },
+                    "block": {
+                      "type": "string",
+                      "enum": [
+                        "embalagens",
+                        "bobinas",
+                        "materia-prima"
+                      ]
+                    },
+                    "quantity": {
+                      "type": "integer"
+                    },
+                    "position": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "product_code",
+                    "product_name",
+                    "block",
+                    "quantity",
+                    "position"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "photos": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "file_path": {
+                      "type": "string"
+                    },
+                    "file_size": {
+                      "type": "integer"
+                    },
+                    "mime_type": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "publicUrl": {
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "file_path",
+                    "file_size",
+                    "mime_type",
+                    "url",
+                    "publicUrl",
+                    "created_at"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "total_units": {
+                "type": "integer"
+              },
+              "reconciliation": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "reconciled",
+                      "partial",
+                      "pending"
+                    ]
+                  },
+                  "ent_lans": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "matched_item_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "required": [
+                  "status",
+                  "ent_lans",
+                  "matched_item_ids"
+                ],
+                "additionalProperties": false
+              },
+              "erp": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "sent",
+                      "partial",
+                      "failed"
+                    ]
+                  },
+                  "message": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "sentAt": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "status",
+                  "message",
+                  "sentAt"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "movement_date",
+              "user_id",
+              "username",
+              "display_name",
+              "created_at",
+              "items",
+              "photos",
+              "total_units",
+              "reconciliation",
+              "erp"
             ],
             "additionalProperties": false
           }
@@ -6017,6 +6323,37 @@
                     "matched_item_ids"
                   ],
                   "additionalProperties": false
+                },
+                "erp": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "sent",
+                        "partial",
+                        "failed"
+                      ]
+                    },
+                    "message": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sentAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "message",
+                    "sentAt"
+                  ],
+                  "additionalProperties": false
                 }
               },
               "required": [
@@ -6029,7 +6366,8 @@
                 "items",
                 "photos",
                 "total_units",
-                "reconciliation"
+                "reconciliation",
+                "erp"
               ],
               "additionalProperties": false
             }
@@ -6190,6 +6528,37 @@
                           "matched_item_ids"
                         ],
                         "additionalProperties": false
+                      },
+                      "erp": {
+                        "type": [
+                          "object",
+                          "null"
+                        ],
+                        "properties": {
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "sent",
+                              "partial",
+                              "failed"
+                            ]
+                          },
+                          "message": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "sentAt": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "status",
+                          "message",
+                          "sentAt"
+                        ],
+                        "additionalProperties": false
                       }
                     },
                     "required": [
@@ -6202,7 +6571,8 @@
                       "items",
                       "photos",
                       "total_units",
-                      "reconciliation"
+                      "reconciliation",
+                      "erp"
                     ],
                     "additionalProperties": false
                   }
@@ -10534,6 +10904,86 @@
           },
           "403": {
             "description": "Beta privada: only the account `wilkin` is admitted, so any other account answers 403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/salida/{id}/erp-result": {
+      "post": {
+        "summary": "Record the ERP transmission verdict of one movement",
+        "description": "Beta privada: only the account `wilkin` is admitted. A missing or invalid token answers 401, and any other account -- a Trabalhador or another Administrador -- answers 403, because the guard is the username. Records the result of sending the movement to the ERP as its own state, independent of whether the ERP seat has been mirrored into Trindade yet. Calling this again overwrites the previous verdict, which is what a relaunch is.",
+        "tags": [
+          "salida"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalidaErpResultRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated movement with its ERP transmission verdict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalidaErpResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The identifier is not a valid number, or the body is invalid (`SALIDA_INVALID_ID` or `SALIDA_INVALID_ERP_RESULT`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, or expired credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Beta privada: only the account `wilkin` is admitted, so any other account answers 403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such movement (`SALIDA_NOT_FOUND`)",
             "content": {
               "application/json": {
                 "schema": {
