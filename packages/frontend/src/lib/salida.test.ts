@@ -28,6 +28,7 @@ import {
   salidaSummaryText,
   salidaTodayLine,
   salidaTotalUnits,
+  SALIDA_WHATSAPP_URL_MAX,
   shareSalida,
   submitSalida,
   takeSalidaTrip,
@@ -865,4 +866,33 @@ describe('salida i18n parity', () => {
       assert.ok((es.get(key) ?? '').trim().length > 0, `es is missing ${key}`);
     }
   });
+  it('refuses a WhatsApp deep link longer than the network accepts and falls back to copying', async () => {
+    // A day of many movements makes a long message, and a deep link that long comes back as a 414 page the
+    // operator cannot act on. The share answers `copied` and the text is on the clipboard instead.
+    const windowLike = globalThis as unknown as { window?: { open?: (url: string) => unknown } };
+    const originalWindow = windowLike.window;
+    const opened: string[] = [];
+    const written: string[] = [];
+    windowLike.window = { open: (url: string) => { opened.push(url); return {}; } };
+    // `navigator` is a getter on the global object: it is replaced by descriptor, and restored the same way.
+    const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+    Object.defineProperty(globalThis, 'navigator', {
+      configurable: true,
+      value: { clipboard: { writeText: async (value: string) => { written.push(value); } } },
+    });
+
+    try {
+      const longText = 'x'.repeat(SALIDA_WHATSAPP_URL_MAX + 100);
+      const outcome = await shareSalida({ text: longText });
+
+      assert.equal(outcome, 'copied');
+      assert.deepEqual(opened, [], 'a link that long must not be opened');
+      assert.deepEqual(written, [longText]);
+    } finally {
+      windowLike.window = originalWindow;
+      if (originalNavigator) Object.defineProperty(globalThis, 'navigator', originalNavigator);
+      else delete (globalThis as { navigator?: unknown }).navigator;
+    }
+  });
+
 });

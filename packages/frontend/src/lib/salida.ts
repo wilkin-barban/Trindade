@@ -727,6 +727,9 @@ export const SALIDA_WHATSAPP_ENDPOINT = 'https://api.whatsapp.com/send?text=';
  * A blocked popup returns `null` (or throws), and a `null` here is the signal that the text still has to go
  * somewhere: the caller copies it instead of leaving the operator with a button that did nothing.
  */
+/** What a WhatsApp deep link can carry before the other end answers `414 Request-URI Too Large`. */
+export const SALIDA_WHATSAPP_URL_MAX = 7000;
+
 function openWhatsApp(text: string, phone?: string): boolean {
   const windowLike = (globalThis as { window?: { open?: (url: string, target?: string) => unknown } }).window;
   if (typeof windowLike?.open !== 'function') return false;
@@ -735,7 +738,12 @@ function openWhatsApp(text: string, phone?: string): boolean {
     const endpoint = rawDigits
       ? `https://api.whatsapp.com/send?phone=${rawDigits}&text=`
       : SALIDA_WHATSAPP_ENDPOINT;
-    return Boolean(windowLike.open(`${endpoint}${encodeURIComponent(text)}`, '_blank'));
+    const url = `${endpoint}${encodeURIComponent(text)}`;
+    // A day of many movements is a long message, and a deep link that long is refused by the other end with a
+    // `414` page the operator cannot act on. Answering `false` sends the caller down its copy path, which is the
+    // same text, ready to paste.
+    if (url.length > SALIDA_WHATSAPP_URL_MAX) return false;
+    return Boolean(windowLike.open(url, '_blank'));
   } catch {
     return false;
   }
