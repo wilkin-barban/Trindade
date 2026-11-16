@@ -469,6 +469,20 @@ Variables opcionales que lee `docker-compose.yml`: `API_PORT`, `DATABASE_PATH`, 
   impide arrancar: una ventana en cero borraría la foto en el momento de subirla. La foto de salida dura más
   porque es evidencia de una salida que ya llegó al ERP. Antes del primer arranque con esta política conviene un
   backup del volumen de datos, porque el primer barrido borra lo que ya excedió la ventana.
+### Tamaño de la URI que vuelve del puente
+
+«Conferir no ERP» no trae los asientos por una API: el puente abre el callback con la respuesta del ERP entera
+codificada en `aero_data`. Un día con muchas filas supera el límite de una línea de encabezado y el proxy que la
+recibe responde **`414 Request-URI Too Large`**.
+
+- El nginx de este repositorio (`docker/nginx.conf`) permite 256 kB (`large_client_header_buffers 8 256k`) y 32 kB
+  de primer buffer.
+- El proxy del borde tiene que permitir **lo mismo o más**. Si se queda en su valor por defecto (~64 kB), es el
+  borde el que corta: el contenedor ya no es el límite. Verificación: pedir `/salida-history?aero_data=` con 70 000
+  y 250 000 caracteres y esperar `200`, no `414`.
+- `docker/nginx-host-trindademasas.conf` y `docker/nginx-standalone-host.conf.example` llevan el bloque listo para
+  copiar en ese borde.
+
 ### El borde TLS y la cabecera `Server`
 
 El certificado y el puerto 443 no los sirve el contenedor `web` de este repositorio: los termina otro nginx

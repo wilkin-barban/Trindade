@@ -58,6 +58,11 @@ server {
 # 
 #     # Maximum upload size for report photos (must match backend limit)
 #     client_max_body_size 10M;
+# # The Aero bridge returns through a GET whose `aero_data` carries the ERP's whole answer URL-encoded, and a
+# # day of movements is tens of kilobytes of JSON inflated again by `encodeURIComponent`. Without these buffers
+# # this proxy is the one that answers `414 Request-URI Too Large` before the app's own nginx ever sees it.
+# client_header_buffer_size 32k;
+# large_client_header_buffers 8 256k;
 # 
 #     # Reverse proxy to Trindade Web container (listening on 127.0.0.1:8080)
 #     location / {
