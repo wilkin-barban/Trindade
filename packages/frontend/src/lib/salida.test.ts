@@ -33,6 +33,13 @@ import {
   takeSalidaTrip,
   writeSalidaLastMovement,
   writeSalidaOutbox,
+  salidaBatchToDialogOutcome,
+  salidaBatchToErpStatus,
+  salidaPrimaryStatus,
+  canRelaunchSalida,
+  filterSessionMovements,
+  salidaClassifyError,
+  salidaActionableErrorMessage,
   SALIDA_FALLBACK_PRODUCTS,
   SALIDA_MAX_PHOTOS,
   type SalidaMovement,
@@ -456,6 +463,176 @@ describe('the movement the return dialog shows', () => {
     assert.equal(read?.total_units, 25);
     clearSalidaLastMovement(storage);
     assert.equal(readSalidaLastMovement(storage), null);
+  });
+});
+
+describe('batch verdict and erp mapping (T1)', () => {
+  it('maps batch outcome states to dialog outcomes', () => {
+    assert.equal(salidaBatchToDialogOutcome('complete'), 'ok');
+    assert.equal(salidaBatchToDialogOutcome('partial'), 'partial');
+    assert.equal(salidaBatchToDialogOutcome('failed'), 'error');
+    assert.equal(salidaBatchToDialogOutcome('unreadable'), 'unreadable');
+    assert.equal(salidaBatchToDialogOutcome('legacy', 1, 1), 'ok');
+    assert.equal(salidaBatchToDialogOutcome('legacy', 0, 1), 'error');
+  });
+
+  it('maps batch outcome states to erp status for backend persistence', () => {
+    assert.equal(salidaBatchToErpStatus('complete'), 'sent');
+    assert.equal(salidaBatchToErpStatus('partial'), 'partial');
+    assert.equal(salidaBatchToErpStatus('failed'), 'failed');
+    assert.equal(salidaBatchToErpStatus('unreadable'), 'failed');
+    assert.equal(salidaBatchToErpStatus('legacy', 1, 1), 'sent');
+    assert.equal(salidaBatchToErpStatus('legacy', 0, 1), 'failed');
+  });
+
+  it('persists currentTripPayloads in outbox across navigation', () => {
+    const storage = memoryStorage();
+    writeSalidaOutbox(
+      {
+        movementId: 99,
+        date: '2026-11-16',
+        trips: [{ action: 'saida', payloads: [{ PRO_COD: '1474' }, { PRO_COD: '1473' }] }],
+        startedAt: '2026-11-16T15:13:55.000Z',
+        currentTripPayloads: 2,
+      },
+      storage,
+    );
+    const read = readSalidaOutbox(storage);
+    assert.equal(read?.currentTripPayloads, 2);
+  });
+});
+
+describe('movement primary status and relaunch rules (T3)', () => {
+  it('follows the strict order of truth: sent > reconciled > partial > pending', () => {
+    // 1. Sent to ERP wins first
+    assert.equal(
+      salidaPrimaryStatus({
+        erp: { status: 'sent', message: 'OK', sentAt: '2026-11-16T15:14:00Z' },
+        reconciliation: { status: 'pending', ent_lans: [], matched_item_ids: [] },
+      }),
+      'sent',
+    );
+    assert.equal(
+      salidaPrimaryStatus({
+        erp: { status: 'sent', message: 'OK', sentAt: '2026-11-16T15:14:00Z' },
+        reconciliation: { status: 'reconciled', ent_lans: [123], matched_item_ids: [1] },
+      }),
+      'sent',
+    );
+
+    // 2. Conciliado when reconciliation is reconciled and erp is not sent
+    assert.equal(
+      salidaPrimaryStatus({
+        erp: null,
+        reconciliation: { status: 'reconciled', ent_lans: [123], matched_item_ids: [1] },
+      }),
+      'reconciled',
+    );
+
+    // 3. Parcial for either partial
+    assert.equal(
+      salidaPrimaryStatus({
+        erp: { status: 'partial', message: 'Item 2 falhou', sentAt: '2026-11-16T15:14:00Z' },
+        reconciliation: { status: 'pending', ent_lans: [], matched_item_ids: [] },
+      }),
+      'partial',
+    );
+    assert.equal(
+      salidaPrimaryStatus({
+        erp: null,
+        reconciliation: { status: 'partial', ent_lans: [123], matched_item_ids: [1] },
+      }),
+      'partial',
+    );
+
+    // 4. Pendente otherwise
+    assert.equal(
+      salidaPrimaryStatus({
+        erp: { status: 'failed', message: 'Erro', sentAt: '2026-11-16T15:14:00Z' },
+        reconciliation: { status: 'pending', ent_lans: [], matched_item_ids: [] },
+      }),
+      'pending',
+    );
+    assert.equal(
+      salidaPrimaryStatus({
+        erp: null,
+        reconciliation: { status: 'pending', ent_lans: [], matched_item_ids: [] },
+      }),
+      'pending',
+    );
+  });
+
+  it('offers relaunch only for null or failed erp, and never for accepted movements', () => {
+    // Can relaunch:
+    assert.equal(canRelaunchSalida({ erp: null, reconciliation: { status: 'pending', ent_lans: [], matched_item_ids: [] } }), true);
+    assert.equal(
+      canRelaunchSalida({
+        erp: { status: 'failed', message: 'Falha', sentAt: '2026-11-16T15:14:00Z' },
+        reconciliation: { status: 'pending', ent_lans: [], matched_item_ids: [] },
+      }),
+      true,
+    );
+
+    // Must NOT offer relaunch:
+    assert.equal(
+      canRelaunchSalida({
+        erp: { status: 'sent', message: 'OK', sentAt: '2026-11-16T15:14:00Z' },
+        reconciliation: { status: 'pending', ent_lans: [], matched_item_ids: [] },
+      }),
+      false,
+    );
+    assert.equal(
+      canRelaunchSalida({
+        erp: null,
+        reconciliation: { status: 'reconciled', ent_lans: [100], matched_item_ids: [1] },
+      }),
+      false,
+    );
+    assert.equal(
+      canRelaunchSalida({
+        erp: { status: 'partial', message: 'Parcial', sentAt: '2026-11-16T15:14:00Z' },
+        reconciliation: { status: 'pending', ent_lans: [], matched_item_ids: [] },
+      }),
+      false,
+    );
+  });
+
+  it('filters movements to session user only when multiple operators are present', () => {
+    const mov1 = movement({ id: 1, username: 'wilkin' });
+    const mov2 = movement({ id: 2, username: 'wilkin' });
+    const mov3 = movement({ id: 3, username: 'jaime' });
+
+    // Single operator: returns all
+    assert.deepEqual(filterSessionMovements([mov1, mov2], 'wilkin'), [mov1, mov2]);
+    // Multiple operators: returns only session user
+    assert.deepEqual(filterSessionMovements([mov1, mov2, mov3], 'wilkin'), [mov1, mov2]);
+    assert.deepEqual(filterSessionMovements([mov1, mov2, mov3], 'jaime'), [mov3]);
+  });
+});
+
+describe('connectivity error classification (T4)', () => {
+  it('classifies all 5 error categories accurately', () => {
+    assert.equal(salidaClassifyError('wifi_required'), 'wifi');
+    assert.equal(salidaClassifyError('AERO_UNREACHABLE', 'sem conexao com o host'), 'wifi');
+    assert.equal(salidaClassifyError('timeout'), 'timeout');
+    assert.equal(salidaClassifyError('AERO_TIMEOUT', 'timed out waiting for reply'), 'timeout');
+    assert.equal(salidaClassifyError('blocked_mixed_content'), 'mixed_content');
+    assert.equal(salidaClassifyError('AERO_BLOCKED_MIXED_CONTENT'), 'mixed_content');
+    assert.equal(salidaClassifyError('ticket_expired'), 'expired_ticket');
+    assert.equal(salidaClassifyError('SALIDA_TICKET_REFUSED'), 'expired_ticket');
+    assert.equal(salidaClassifyError('bridge_unreadable'), 'unreadable');
+    assert.equal(salidaClassifyError('AERO_BRIDGE_UNREADABLE'), 'unreadable');
+    assert.equal(salidaClassifyError('other_error'), 'generic');
+  });
+
+  it('returns actionable sentences via i18n lookup', () => {
+    const mockT = (key: string) => `key:${key}`;
+    assert.equal(salidaActionableErrorMessage('wifi_required', null, mockT), 'key:salida.errorWifi');
+    assert.equal(salidaActionableErrorMessage('timeout', null, mockT), 'key:salida.errorTimeout');
+    assert.equal(salidaActionableErrorMessage('blocked_mixed_content', null, mockT), 'key:salida.errorMixedContent');
+    assert.equal(salidaActionableErrorMessage('ticket_expired', null, mockT), 'key:salida.errorExpiredTicket');
+    assert.equal(salidaActionableErrorMessage('bridge_unreadable', null, mockT), 'key:salida.errorUnreadable');
+    assert.equal(salidaActionableErrorMessage('unknown', 'Erro desconhecido', mockT), 'Erro desconhecido');
   });
 });
 

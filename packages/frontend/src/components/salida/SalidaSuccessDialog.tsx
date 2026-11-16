@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Copy, MessageCircle, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { Dialog } from '../ui/dialog';
 import { formatDateLabel } from '../../lib/date';
 import { Button } from '../ui/button';
@@ -8,24 +8,19 @@ import {
   SALIDA_BLOCKS,
   salidaProductsByBlock,
   salidaQuantity,
-  salidaSummaryText,
   salidaTotalUnits,
-  salidaPhotoFiles,
-  shareSalida,
   type SalidaBlock,
+  type SalidaErpOutcome,
   type SalidaMovement,
 } from '../../lib/salida';
 
-/** What the ERP said, as the page already understood it. */
-export type SalidaErpOutcome = 'ok' | 'error' | 'pending';
+export type { SalidaErpOutcome };
 
 /**
- * The confirmation the operator reads after a launch.
+ * The confirmation the operator reads after a launch (T1, T3).
  *
- * The ERP answer is drawn first because it is the part that cannot be guessed: a movement that Trindade stored
- * and the company never received is a pending movement, not a successful launch. Everything else -- the day, the
- * operator, the blocks, the products, the total and the photos -- is the record the operator can forward, and it
- * is drawn from the movement itself so a resend or a reload shows the same thing.
+ * The ERP answer is drawn first with its honest verdict. After a launch, the operator sees the verdict
+ * and the photos; the day summary and WhatsApp sharing belong to the history.
  */
 export function SalidaSuccessDialog({
   open,
@@ -41,7 +36,6 @@ export function SalidaSuccessDialog({
   erpMessage?: string | null;
 }) {
   const { t } = useTranslation();
-  const [note, setNote] = useState('');
 
   const labels = useMemo<Record<SalidaBlock, string>>(
     () => ({
@@ -50,11 +44,6 @@ export function SalidaSuccessDialog({
       'materia-prima': t('salida.blocks.materia-prima'),
     }),
     [t],
-  );
-
-  const text = useMemo(
-    () => (movement ? salidaSummaryText(movement, labels) : ''),
-    [movement, labels],
   );
 
   const grouped = useMemo(
@@ -72,31 +61,24 @@ export function SalidaSuccessDialog({
   );
 
   const erpLine =
-    erp === 'ok' ? t('salida.erpAccepted') : erp === 'error' ? t('salida.erpRejected') : t('salida.erpNoAnswer');
+    erp === 'ok'
+      ? t('salida.erpAccepted')
+      : erp === 'partial'
+        ? t('salida.erpPartialResult')
+        : erp === 'unreadable'
+          ? t('salida.erpUnreadable')
+          : erp === 'error'
+            ? t('salida.erpRejected')
+            : t('salida.erpNoAnswer');
 
-  /**
-   * The photos as files the sheet can carry.
-   *
-   * They are downloaded from the record's own paths, never from a URL this page invented: a photo that cannot be
-   * fetched is simply left out, and the same photo stays available as its own link under the grid.
-   */
-
-
-  const handleCopy = async () => {
-    if (!text) return;
-    const outcome = await shareSalida({ text });
-    if (outcome === 'copied' || outcome === 'shared') setNote(t('salida.copiedSummary'));
-  };
-
-  const handleShare = async () => {
-    if (!text) return;
-    setNote('');
-    const outcome = await shareSalida({ text, photos: await salidaPhotoFiles(movement?.photos ?? []) });
-    // A sheet that cannot carry files is not a failure: the text was copied instead, and the photos stay as
-    // their own links under the summary.
-    if (outcome === 'copied' || outcome === 'shared') setNote(t('salida.copiedSummary'));
-    if (outcome === 'failed') setNote(t('salida.shareFailed'));
-  };
+  const toneClass =
+    erp === 'ok'
+      ? 'border-green-200 bg-green-50 text-green-800'
+      : erp === 'partial' || erp === 'unreadable'
+        ? 'border-amber-200 bg-amber-50 text-amber-800'
+        : erp === 'error'
+          ? 'border-red-200 bg-red-50 text-red-800'
+          : 'border-gray-200 bg-gray-50 text-gray-800';
 
   return (
     <Dialog open={open} onClose={onClose} labelledBy="salida-success-title" panelTestId="salida-success-dialog">
@@ -113,16 +95,7 @@ export function SalidaSuccessDialog({
           </Button>
         </div>
 
-        <div
-          className={`rounded-lg border p-3 text-sm font-medium ${
-            erp === 'ok'
-              ? 'border-green-200 bg-green-50 text-green-800'
-              : erp === 'error'
-                ? 'border-red-200 bg-red-50 text-red-800'
-                : 'border-amber-200 bg-amber-50 text-amber-800'
-          }`}
-          data-testid="salida-erp-answer"
-        >
+        <div className={`rounded-lg border p-3 text-sm font-medium ${toneClass}`} data-testid="salida-erp-answer">
           <p className="text-[11px] font-semibold uppercase tracking-wide">{t('salida.erpAnswer')}</p>
           <p>{erpMessage?.trim() ? erpMessage : erpLine}</p>
         </div>
@@ -146,8 +119,6 @@ export function SalidaSuccessDialog({
                       );
                       return (
                         <li key={product.code} className="flex items-baseline justify-between gap-3 text-sm">
-                          {/* The record says name + quantity; the code stays in the accessible name and in the
-                              summary that goes out over WhatsApp. */}
                           <span
                             className="min-w-0 break-words text-gray-800"
                             aria-label={`${product.code} ${product.name}`}
@@ -195,33 +166,11 @@ export function SalidaSuccessDialog({
           </div>
         )}
 
-        <div className="mt-5 flex flex-col gap-2 sm:flex-row">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => void handleCopy()}
-            className="min-h-[44px] flex-1"
-            data-testid="salida-copy-summary"
-          >
-            <Copy className="h-4 w-4" />
-            {t('salida.copySummary')}
-          </Button>
-          <Button
-            type="button"
-            onClick={() => void handleShare()}
-            className="min-h-[44px] flex-1 bg-green-600 text-white hover:bg-green-700"
-            data-testid="salida-share-whatsapp"
-          >
-            <MessageCircle className="h-4 w-4" />
-            {t('salida.shareWhatsApp')}
+        <div className="mt-5 flex justify-end">
+          <Button type="button" onClick={onClose} className="min-h-[44px] w-full sm:w-auto" data-testid="salida-success-close">
+            {t('salida.close')}
           </Button>
         </div>
-
-        {note && (
-          <p role="status" className="mt-2 text-sm text-gray-600">
-            {note}
-          </p>
-        )}
       </div>
     </Dialog>
   );

@@ -415,7 +415,7 @@ describe('SalidaLaunchPage', () => {
     expectNoCredential(audit);
   });
 
-  it('shows the ERP answer with the summary and the share fallback when the bridge returns', async () => {
+  it('shows the ERP answer with the summary and photos without share buttons when the bridge returns', async () => {
     writeSalidaLastMovement(MOVEMENT);
     const data = encodeURIComponent(JSON.stringify({ success: true, message: 'Saidas enviadas' }));
 
@@ -425,17 +425,51 @@ describe('SalidaLaunchPage', () => {
     expect(answer.textContent).toContain('Saidas enviadas');
     expect(screen.getByTestId('salida-success-total').textContent).toContain('25');
 
-    const written: string[] = [];
-    Object.defineProperty(globalThis.navigator, 'share', { configurable: true, value: undefined });
-    Object.defineProperty(globalThis.navigator, 'clipboard', {
-      configurable: true,
-      value: { writeText: async (value: string) => void written.push(value) },
+    // T3: The dialog loses the copySummary and shareWhatsApp buttons; sharing lives in the history.
+    expect(screen.queryByTestId('salida-share-whatsapp')).toBeNull();
+    expect(screen.queryByTestId('salida-copy-summary')).toBeNull();
+    expect(screen.getByTestId('salida-success-close')).toBeInTheDocument();
+  });
+
+  it('correctly reads a multi-product batch response array from the bridge and records erp-result (T1)', async () => {
+    writeSalidaLastMovement({ ...MOVEMENT, expectedPayloads: 4 });
+    const batchAnswer = [
+      { success: true, message: 'Item 1 OK' },
+      { success: true, message: 'Item 2 OK' },
+      { success: true, message: 'Item 3 OK' },
+      { success: true, message: 'Item 4 OK' },
+    ];
+    const data = encodeURIComponent(JSON.stringify(batchAnswer));
+
+    await renderReady(`/salida?aero_action=saida&aero_data=${data}`);
+
+    const answer = await screen.findByTestId('salida-erp-answer');
+    expect(answer.textContent).toContain(i18n.t('salida.erpAccepted'));
+
+    // Verified that erp-result was posted to backend
+    expect(post).toHaveBeenCalledWith('/salida/12/erp-result', {
+      status: 'sent',
+      message: null,
     });
 
-    fireEvent.click(screen.getByTestId('salida-share-whatsapp'));
+    const result = lineOf('result');
+    expect(result.httpStatus).toBe(200);
+    expect(result.error).toBeNull();
+  });
 
-    await waitFor(() => expect(written.length).toBe(1));
-    expect(written[0]).toContain('1474 EMBALAG. NHOQUE 1kg — 20 un');
+  it('renders honest unreadable verdict when the bridge answer is corrupted', async () => {
+    writeSalidaLastMovement({ ...MOVEMENT, expectedPayloads: 2 });
+    const data = encodeURIComponent('corrupted-data');
+
+    await renderReady(`/salida?aero_action=saida&aero_data=${data}`);
+
+    const answer = await screen.findByTestId('salida-erp-answer');
+    expect(answer.textContent).toContain(i18n.t('salida.erpUnreadable'));
+
+    expect(post).toHaveBeenCalledWith('/salida/12/erp-result', {
+      status: 'failed',
+      message: null,
+    });
   });
 
   it('hides the product code in the success dialog and keeps it readable for a screen reader', async () => {

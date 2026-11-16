@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, ClipboardX, MessageCircle } from 'lucide-react';
+import { ArrowLeft, ClipboardX } from 'lucide-react';
 import { api } from '../../api/client';
+import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../../components/ui/button';
 import { LoadingSpinner } from '../../components/ui/loading-spinner';
 import { HistoryDayPanel, type HistoryDay } from '../../components/ui/HistoryDayPanel';
 import { ModuleHelpModal, type HelpSection } from '../../components/ui/ModuleHelpModal';
 import { SalidaBlockFilter, SalidaMovementCard } from '../../components/salida/SalidaMovementCard';
+import { SalidaWhatsAppShare } from '../../components/salida/SalidaWhatsAppShare';
 import {
   SalidaSuccessDialog,
   type SalidaErpOutcome,
@@ -19,9 +21,9 @@ import {
   buildAeroMovementsSnapshot,
   buildMovimentoItemPayload,
   parseAeroCallback,
-  readAeroBridgeResult,
   readAeroMovements,
 } from '../../lib/aero-integration';
+import { readAeroBatchResult } from '../../lib/aero-feedback';
 import { markAeroBridgePending } from '../../lib/aero-watchdog';
 import { clearAeroPendingAttempt, loadAeroPendingAttempt, saveAeroPendingAttempt } from '../../lib/aero-pending-attempt';
 import { aeroAttemptHeaders, newAeroAttempt, postAeroAuditEvent } from '../../lib/aero-audit';
@@ -33,16 +35,22 @@ import {
   buildSalidaTrips,
   clearSalidaLastMovement,
   clearSalidaOutbox,
+  filterSessionMovements,
   readSalidaLastMovement,
   readSalidaOutbox,
-  salidaReadRequestedEvent,
-  salidaReadResultEvent,
-  salidaSyncRequestedEvent,
-  salidaSyncResultEvent,
+  recordSalidaErpResult,
+  salidaActionableErrorMessage,
+  salidaBatchToDialogOutcome,
+  salidaBatchToErpStatus,
+  salidaDateLine,
   salidaDaySummaryText,
   salidaPhotoFiles,
-  salidaReconciliationStatus,
+  salidaPrimaryStatus,
+  salidaReadRequestedEvent,
+  salidaReadResultEvent,
   salidaSummaryText,
+  salidaSyncRequestedEvent,
+  salidaSyncResultEvent,
   salidaTimeLabel,
   shareSalida,
   writeSalidaLastMovement,
@@ -66,8 +74,17 @@ export interface SalidaHistoryDay {
  * stores the answer as the mirror of the day, and `Reenviar ao ERP`, which only a movement the ERP never
  * confirmed offers. Nothing here edits or deletes: an exit that reached Trindade is a record.
  */
+function useOptionalAuth() {
+  try {
+    return useAuth();
+  } catch {
+    return { user: null };
+  }
+}
+
 export function SalidaHistoryPage() {
   const { t } = useTranslation();
+  const { user } = useOptionalAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [params, setParams] = useSearchParams();
@@ -90,6 +107,25 @@ export function SalidaHistoryPage() {
     erp: SalidaErpOutcome;
     message: string | null;
   } | null>(null);
+
+  const SALIDA_PHONE_STORAGE_KEY = 'trindade.salida.whatsapp-phone.v1';
+  const [phone, setPhoneState] = useState<string>(() => {
+    try {
+      return localStorage.getItem(SALIDA_PHONE_STORAGE_KEY) ?? '';
+    } catch {
+      return '';
+    }
+  });
+  const [copyNote, setCopyNote] = useState('');
+
+  const setPhone = useCallback((val: string) => {
+    setPhoneState(val);
+    try {
+      localStorage.setItem(SALIDA_PHONE_STORAGE_KEY, val);
+    } catch {
+      /* storage blocked */
+    }
+  }, []);
 
   const asked = params.get('date');
   const date = asked && /^\d{4}-\d{2}-\d{2}$/.test(asked) ? asked : (days.list[0]?.date ?? today);
@@ -134,11 +170,17 @@ export function SalidaHistoryPage() {
     [days.list],
   );
 
+  // The day shows only the session user's movements when the API returns more than one operator's (T3).
+  // No worker filter is added.
+  const dayMovements = useMemo(() => {
+    const raw = day?.movements ?? [];
+    return filterSessionMovements(raw, user?.username);
+  }, [day, user?.username]);
+
   const visibleMovements = useMemo(() => {
-    const movements = day?.movements ?? [];
-    if (block === 'all') return movements;
-    return movements.filter((movement) => movement.items.some((item) => item.block === block));
-  }, [day, block]);
+    if (block === 'all') return dayMovements;
+    return dayMovements.filter((movement) => movement.items.some((item) => item.block === block));
+  }, [dayMovements, block]);
 
   const setDate = (next: string) => {
     setParams(next === today ? {} : { date: next }, { replace: true });
@@ -272,18 +314,60 @@ export function SalidaHistoryPage() {
       const attempt = loadAeroPendingAttempt('saida');
       if (attempt) clearAeroPendingAttempt();
 
-      const result = readAeroBridgeResult(callback.data);
-      void postAeroAuditEvent(
-        salidaSyncResultEvent({ attempt, outcome: result.status, message: result.message }),
-      );
+      const queued = readSalidaOutbox();
+      const lastMovement = readSalidaLastMovement();
+      const expectedTripPayloads =
+        queued?.currentTripPayloads ??
+        queued?.trips[0]?.payloads.length ??
+        lastMovement?.expectedPayloads ??
+        lastMovement?.items.length ??
+        1;
 
-      setSuccess({ movement: readSalidaLastMovement(), erp: result.status, message: result.message });
-      if (result.status === 'ok') {
+      const batchResult = readAeroBatchResult(callback.data, expectedTripPayloads);
+      const erpOutcome = salidaBatchToDialogOutcome(batchResult.state, batchResult.ok, batchResult.total);
+      const erpStatus = salidaBatchToErpStatus(batchResult.state, batchResult.ok, batchResult.total);
+
+      const movementId = lastMovement?.id ?? queued?.movementId;
+      if (movementId) {
+        void recordSalidaErpResult(movementId, { status: erpStatus, message: batchResult.message }, attempt);
+      }
+
+      const isComplete =
+        batchResult.state === 'complete' ||
+        (batchResult.state === 'legacy' && batchResult.ok === batchResult.total);
+
+      if (isComplete) {
+        void postAeroAuditEvent(
+          salidaSyncResultEvent({ attempt, outcome: 'ok', message: batchResult.message }),
+        );
+      } else {
+        const errorCode =
+          batchResult.message ??
+          (batchResult.state === 'unreadable'
+            ? 'bridge_unreadable'
+            : batchResult.state === 'partial'
+              ? 'batch_partial'
+              : 'batch_failed');
+        void postAeroAuditEvent(
+          salidaSyncResultEvent({
+            attempt,
+            outcome: 'error',
+            error: errorCode,
+            message: batchResult.message,
+          }),
+        );
+      }
+
+      setSuccess({ movement: lastMovement, erp: erpOutcome, message: batchResult.message });
+      if (isComplete) {
         clearSalidaOutbox();
         clearSalidaLastMovement();
         setOutbox(null);
       } else {
         // The movement is still owed: the outbox and the card keep saying pending.
+        if (queued) {
+          writeSalidaOutbox({ ...queued, currentTripPayloads: undefined });
+        }
         setOutbox(readSalidaOutbox());
       }
       void load();
@@ -294,6 +378,16 @@ export function SalidaHistoryPage() {
       if (readAttempt || syncAttempt) clearAeroPendingAttempt();
 
       if (syncAttempt) {
+        const lastMovement = readSalidaLastMovement();
+        const queued = readSalidaOutbox();
+        const movementId = lastMovement?.id ?? queued?.movementId;
+        if (movementId) {
+          void recordSalidaErpResult(
+            movementId,
+            { status: 'failed', message: callback.message || callback.code },
+            syncAttempt,
+          );
+        }
         void postAeroAuditEvent(
           salidaSyncResultEvent({
             attempt: syncAttempt,
@@ -313,7 +407,7 @@ export function SalidaHistoryPage() {
           }),
         );
       }
-      setCheckError(callback.message || t('salida.erpCheckError'));
+      setCheckError(salidaActionableErrorMessage(callback.code, callback.message, t));
     }
 
     setParams({ date: answeredDate }, { replace: true });
@@ -351,18 +445,20 @@ export function SalidaHistoryPage() {
         date: movement.movement_date,
         trips,
         startedAt: new Date().toISOString(),
+        currentTripPayloads: trips[0]?.payloads.length,
       });
       setOutbox(readSalidaOutbox());
 
       const trip = trips[0]!;
       const tripRef = { index: 1, total: trips.length };
-      const ticket = await requestAeroBridgeTicket({
-        action: 'saida',
-        payloads: trip.payloads,
-        callbackPath: aeroBridgeCallbackFor('saida', '/salida-history'),
-      }).catch(() => null);
-
-      if (!ticket) {
+      let ticket: { ticket: string; ticketUrl: string } | null = null;
+      try {
+        ticket = await requestAeroBridgeTicket({
+          action: 'saida',
+          payloads: trip.payloads,
+          callbackPath: aeroBridgeCallbackFor('saida', `/salida-history?date=${date}`),
+        });
+      } catch (err) {
         // Nothing left the page and nothing is owed a result: one requested line carries the refusal.
         void postAeroAuditEvent(
           salidaSyncRequestedEvent({
@@ -372,7 +468,10 @@ export function SalidaHistoryPage() {
             note: `trip ${tripRef.index}/${tripRef.total} · batch ${trip.payloads.length} not sent`,
           }),
         );
-        setNotice({ type: 'error', message: t('salida.pendingBody') });
+        setNotice({
+          type: 'error',
+          message: salidaActionableErrorMessage(SALIDA_TICKET_REFUSED, err instanceof Error ? err.message : null, t),
+        });
         return;
       }
 
@@ -383,11 +482,14 @@ export function SalidaHistoryPage() {
       void postAeroAuditEvent(salidaSyncRequestedEvent({ payloads: trip.payloads, trip: tripRef, attempt }));
 
       // The movement travels with the session: the dialog the return shows is drawn from it.
-      writeSalidaLastMovement(movement);
+      writeSalidaLastMovement({ ...movement, expectedPayloads: trip.payloads.length });
       markAeroBridgePending({ action: 'saida', date: movement.movement_date });
       window.location.href = buildAeroBridgeTriggerUrl({ ticket: ticket.ticket, ticketUrl: ticket.ticketUrl });
-    } catch {
-      setNotice({ type: 'error', message: t('salida.pendingBody') });
+    } catch (err) {
+      setNotice({
+        type: 'error',
+        message: salidaActionableErrorMessage('error', err instanceof Error ? err.message : null, t),
+      });
     } finally {
       setResendingId(null);
     }
@@ -407,13 +509,12 @@ export function SalidaHistoryPage() {
     // The movement's own photos travel with the message; a photo that cannot be fetched is left out rather
     // than failing the share.
     const photos = await salidaPhotoFiles(movement.photos);
-    reportShareOutcome(await shareSalida({ text, photos }));
+    reportShareOutcome(await shareSalida({ text, photos, phone }));
   };
 
-  const shareDay = async () => {
-    if (visibleMovements.length === 0) return;
-    setNotice(null);
-    const text = salidaDaySummaryText(visibleMovements, {
+  const previewMessage = useMemo(() => {
+    if (visibleMovements.length === 0) return '';
+    return salidaDaySummaryText(visibleMovements, {
       date,
       labels: {
         title: t('salida.dayShareTitle'),
@@ -426,18 +527,46 @@ export function SalidaHistoryPage() {
           'materia-prima': t('salida.blocks.materia-prima'),
         },
         status: {
-          reconciled: t('salida.erpOk'),
+          reconciled: t('salida.reconciled'),
           partial: t('salida.erpPartial'),
           pending: t('salida.erpPending'),
+          sent: t('salida.erpSent'),
         },
       },
     });
+  }, [visibleMovements, date, t]);
+
+  const handleOpenWhatsApp = async () => {
+    if (visibleMovements.length === 0) return;
+    setNotice(null);
+    setCopyNote('');
     const photos = (await Promise.all(visibleMovements.map((movement) => salidaPhotoFiles(movement.photos)))).flat();
-    reportShareOutcome(await shareSalida({ text, photos }));
+    const outcome = await shareSalida({ text: previewMessage, photos, phone });
+    if (outcome === 'copied' || outcome === 'shared') {
+      setCopyNote(t('salida.copiedSummary'));
+      setNotice({ type: 'success', message: t('salida.copiedSummary') });
+    } else if (outcome === 'failed') {
+      setCopyNote(t('salida.shareFailed'));
+      setNotice({ type: 'error', message: t('salida.shareFailed') });
+    }
+  };
+
+  const handleCopyReport = async () => {
+    if (visibleMovements.length === 0) return;
+    setNotice(null);
+    setCopyNote('');
+    const outcome = await shareSalida({ text: previewMessage });
+    if (outcome === 'copied' || outcome === 'shared') {
+      setCopyNote(t('salida.copiedSummary'));
+      setNotice({ type: 'success', message: t('salida.copiedSummary') });
+    } else {
+      setCopyNote(t('salida.shareFailed'));
+      setNotice({ type: 'error', message: t('salida.shareFailed') });
+    }
   };
 
   const pendingCount = visibleMovements.filter(
-    (movement) => salidaReconciliationStatus(movement) !== 'reconciled',
+    (movement) => salidaPrimaryStatus(movement) === 'pending',
   ).length;
 
   if (days.loading) {
@@ -526,26 +655,8 @@ export function SalidaHistoryPage() {
             >
               {checking ? t('salida.confering') : t('salida.conferir')}
             </Button>
-            {/* El resumen del día es la acción que el operario no encontraba: vive acá, junto a los filtros, y
-                queda visible aunque no haya nada: sin movimientos está deshabilitado y dice por qué. */}
-            <Button
-              type="button"
-              onClick={() => void shareDay()}
-              disabled={visibleMovements.length === 0}
-              className="min-h-[44px] w-full bg-green-600 text-white hover:bg-green-700 sm:w-auto"
-              data-testid="salida-share-day"
-            >
-              <MessageCircle className="h-4 w-4" />
-              {t('salida.shareDay')}
-            </Button>
           </div>
         </div>
-
-        {visibleMovements.length === 0 && (
-          <p className="text-xs text-gray-500" data-testid="salida-share-day-empty">
-            {t('salida.shareDayEmpty')}
-          </p>
-        )}
 
         {checkError && (
           <p role="alert" className="text-sm text-red-700" data-testid="salida-check-error">
@@ -594,6 +705,24 @@ export function SalidaHistoryPage() {
           ))}
         </div>
       )}
+
+      {/* WhatsApp share block modelled on MassasWhatsAppShare (T3) */}
+      <div className="space-y-2">
+        <SalidaWhatsAppShare
+          phone={phone}
+          onPhoneChange={setPhone}
+          previewMessage={previewMessage}
+          onOpenWhatsApp={() => void handleOpenWhatsApp()}
+          onCopy={() => void handleCopyReport()}
+          copyNote={copyNote}
+          disabled={visibleMovements.length === 0}
+        />
+        {visibleMovements.length === 0 && (
+          <p className="text-xs text-gray-500" data-testid="salida-share-day-empty">
+            {t('salida.shareDayEmpty')}
+          </p>
+        )}
+      </div>
 
       {outbox && (
         <p className="text-xs text-amber-800" data-testid="salida-history-outbox">

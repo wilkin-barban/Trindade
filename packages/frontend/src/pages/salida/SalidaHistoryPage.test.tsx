@@ -41,6 +41,16 @@ vi.mock('../../lib/aero-vault', () => ({
   requestAeroBridgeTicket: (...args: unknown[]) => ticket(...args),
 }));
 
+vi.mock('../../contexts/AuthContext', () => ({
+  useAuth: () => ({
+    user: { id: 1, username: 'wilkin', role: 'Administrador' },
+    token: 'token',
+    isLoading: false,
+    login: vi.fn(),
+    logout: vi.fn(),
+  }),
+}));
+
 const { SalidaHistoryPage } = await import('./SalidaHistoryPage');
 
 function movement(overrides: Partial<SalidaMovement> & { id: number }): SalidaMovement {
@@ -166,7 +176,7 @@ describe('SalidaHistoryPage', () => {
   it('shows the reconciliation state and the ENT_LAN of each card', async () => {
     await renderReady();
 
-    expect(screen.getByTestId('salida-badge-1').textContent).toBe('ERP OK');
+    expect(screen.getByTestId('salida-badge-1').textContent).toBe('Conciliado');
     expect(screen.getByTestId('salida-entlan-1').textContent).toContain('4242');
     expect(screen.getByTestId('salida-badge-2').textContent).toBe('Pendente');
   });
@@ -609,5 +619,73 @@ describe('SalidaHistoryPage — a photo the retention window already removed', (
     expect(screen.getByTestId('salida-photo-72')).not.toBeNull();
     expect(within(card).getAllByRole('img')).toHaveLength(1);
     expect(within(card).getByTestId(`salida-total-7`).textContent).toContain('20');
+  });
+});
+
+describe('SalidaHistoryPage — T3 per-movement state, relaunch, operator filtering and WhatsApp', () => {
+  it('renders Enviado ao ERP badge when movement has erp status sent and does not offer relaunch', async () => {
+    const sentMovement = movement({
+      id: 50,
+      erp: { status: 'sent', message: 'OK', sentAt: '2026-11-13T12:00:00Z' },
+      reconciliation: { status: 'pending', ent_lans: [], matched_item_ids: [] },
+    });
+
+    get.mockImplementation(async (url: string) =>
+      url === '/salida/history'
+        ? { days: [{ date: '2026-11-13', total_units: 20, movements: [sentMovement] }] }
+        : {},
+    );
+
+    await renderReady('/salida-history?date=2026-11-13');
+
+    const badge = screen.getByTestId('salida-badge-50');
+    expect(badge.textContent).toBe('Enviado ao ERP');
+    expect(screen.queryByTestId('salida-resend-50')).toBeNull();
+  });
+
+  it('filters movements to session user when multiple operators are present in the day, with no worker filter', async () => {
+    const wilkinMovement = movement({ id: 101, username: 'wilkin' });
+    const jaimeMovement = movement({ id: 102, username: 'jaime' });
+
+    get.mockImplementation(async (url: string) =>
+      url === '/salida/history'
+        ? { days: [{ date: '2026-11-13', total_units: 40, movements: [wilkinMovement, jaimeMovement] }] }
+        : {},
+    );
+
+    await renderReady('/salida-history?date=2026-11-13');
+
+    // Shows only wilkin's movement (session user)
+    expect(screen.getByTestId('salida-movement-101')).toBeInTheDocument();
+    expect(screen.queryByTestId('salida-movement-102')).toBeNull();
+
+    // No worker filter UI exists
+    expect(screen.queryByTestId('salida-worker-filter')).toBeNull();
+    expect(screen.queryByRole('combobox', { name: /operador|trabajador/i })).toBeNull();
+  });
+
+  it('persists phone number to storage and displays live message preview', async () => {
+    get.mockImplementation(async (url: string) =>
+      url === '/salida/history'
+        ? { days: [{ date: '2026-11-13', total_units: 20, movements: [RECONCILED] }] }
+        : {},
+    );
+
+    await renderReady('/salida-history?date=2026-11-13');
+
+    const phoneInput = screen.getByTestId('salida-phone-input') as HTMLInputElement;
+    fireEvent.change(phoneInput, { target: { value: '11988887777' } });
+
+    expect(phoneInput.value).toBe('(11) 98888-7777');
+    expect(localStorage.getItem('trindade.salida.whatsapp-phone.v1')).toBe('(11) 98888-7777');
+
+    const preview = screen.getByTestId('salida-preview-message');
+    expect(preview.textContent).toContain('Salidas del día — 13/11/2026');
+    expect(preview.textContent).toContain('EMBALAG. NHOQUE 1kg');
+
+    // Copy action
+    fireEvent.click(screen.getByTestId('salida-copy-day'));
+    await waitFor(() => expect(screen.getByTestId('salida-share-note')).toBeInTheDocument());
+    expect(screen.getByTestId('salida-share-note').textContent).toBe(i18n.t('salida.copiedSummary'));
   });
 });

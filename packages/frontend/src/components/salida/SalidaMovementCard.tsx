@@ -6,11 +6,12 @@ import { Button } from '../ui/button';
 import { formatDateLabel } from '../../lib/date';
 import {
   SALIDA_BLOCKS,
+  canRelaunchSalida,
   salidaEntLans,
+  salidaPrimaryStatus,
+  salidaPrimaryStatusLabelKey,
   salidaProductsByBlock,
   salidaQuantity,
-  salidaReconciliationLabelKey,
-  salidaReconciliationStatus,
   salidaTotalUnits,
   type SalidaBlock,
   type SalidaMovement,
@@ -44,13 +45,19 @@ export function SalidaMovementCard({
   const [unavailablePhotos, setUnavailablePhotos] = useState<ReadonlySet<number>>(() => new Set());
   const markPhotoUnavailable = (photoId: number) =>
     setUnavailablePhotos((current) => new Set(current).add(photoId));
-  const status = salidaReconciliationStatus(movement);
+  const status = salidaPrimaryStatus(movement);
   const entLans = salidaEntLans(movement);
   const blocks = SALIDA_BLOCKS.filter((block) => movement.items.some((item) => item.block === block));
-  const grouped = salidaProductsByBlock(
-    movement.items.map((item) => ({ code: item.product_code, name: item.product_name, block: item.block })),
-  );
   const label = (block: SalidaBlock): string => t(`salida.blocks.${block}`);
+
+  const badgeToneClass =
+    status === 'sent'
+      ? 'border-blue-200 bg-blue-50 text-blue-800'
+      : status === 'reconciled'
+        ? 'border-green-200 bg-green-50 text-green-800'
+        : status === 'partial'
+          ? 'border-amber-200 bg-amber-50 text-amber-800'
+          : 'border-gray-300 bg-gray-100 text-gray-700';
 
   return (
     <Card className="border-gray-200 shadow-sm" data-testid={`salida-movement-${movement.id}`}>
@@ -74,16 +81,10 @@ export function SalidaMovementCard({
             </p>
           </div>
           <span
-            className={`inline-flex shrink-0 items-center rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${
-              status === 'reconciled'
-                ? 'border-green-200 bg-green-50 text-green-800'
-                : status === 'partial'
-                  ? 'border-amber-200 bg-amber-50 text-amber-800'
-                  : 'border-gray-300 bg-gray-100 text-gray-700'
-            }`}
+            className={`inline-flex shrink-0 items-center rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${badgeToneClass}`}
             data-testid={`salida-badge-${movement.id}`}
           >
-            {t(salidaReconciliationLabelKey(status))}
+            {t(salidaPrimaryStatusLabelKey(status))}
           </span>
         </div>
 
@@ -180,7 +181,7 @@ export function SalidaMovementCard({
             <MessageCircle className="h-4 w-4" />
             {t('salida.shareWhatsApp')}
           </Button>
-          {status === 'pending' && onResend && (
+          {canRelaunchSalida(movement) && onResend && (
             <Button
               type="button"
               variant="outline"

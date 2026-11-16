@@ -16,8 +16,8 @@ import {
   aeroBridgeCallbackFor,
   buildAeroBridgeTriggerUrl,
   parseAeroCallback,
-  readAeroBridgeResult,
 } from '../../lib/aero-integration';
+import { readAeroBatchResult } from '../../lib/aero-feedback';
 import { markAeroBridgePending } from '../../lib/aero-watchdog';
 import { clearAeroPendingAttempt, loadAeroPendingAttempt, saveAeroPendingAttempt } from '../../lib/aero-pending-attempt';
 import { newAeroAttempt, postAeroAuditEvent } from '../../lib/aero-audit';
@@ -33,6 +33,10 @@ import {
   clearSalidaOutbox,
   readSalidaLastMovement,
   readSalidaOutbox,
+  recordSalidaErpResult,
+  salidaActionableErrorMessage,
+  salidaBatchToDialogOutcome,
+  salidaBatchToErpStatus,
   salidaDateLine,
   salidaItemsFromQuantities,
   salidaPhotoRejection,
@@ -141,7 +145,7 @@ export function SalidaLaunchPage() {
    */
   const sendNextTrip = useCallback(async (): Promise<boolean> => {
     const queued = readSalidaOutbox();
-    const { trip, rest } = takeSalidaTrip(queued);
+    const { trip } = takeSalidaTrip(queued);
     if (!trip) {
       clearSalidaOutbox();
       setOutbox(null);
@@ -158,7 +162,7 @@ export function SalidaLaunchPage() {
         payloads: trip.payloads,
         callbackPath: aeroBridgeCallbackFor('saida', '/salida'),
       });
-    } catch {
+    } catch (err) {
       // Nothing left the page: the movement stays pending, the queue stays where it was, and the log says the
       // vault refused to arm the trip instead of leaving a silence where a launch should be.
       setOutbox(readSalidaOutbox());
@@ -170,12 +174,21 @@ export function SalidaLaunchPage() {
           note: `trip ${tripRef.index}/${tripRef.total} · batch ${trip.payloads.length} not sent`,
         }),
       );
+      setNotice({
+        type: 'error',
+        message: salidaActionableErrorMessage(SALIDA_TICKET_REFUSED, err instanceof Error ? err.message : null, t),
+      });
       return false;
     }
 
-    if (rest) writeSalidaOutbox(rest);
-    else clearSalidaOutbox();
-    setOutbox(rest);
+    // Record how many payloads this trip carries so the batch verdict can verify the exact batch size on return.
+    // The outbox is NOT cleared before leaving; it clears only on complete.
+    if (queued) {
+      writeSalidaOutbox({
+        ...queued,
+        currentTripPayloads: trip.payloads.length,
+      });
+    }
 
     // The attempt is written down before leaving: the shortcut comes back to a fresh document, and the
     // identifier that pairs this line with the answer has to survive the trip.
@@ -186,7 +199,7 @@ export function SalidaLaunchPage() {
     markAeroBridgePending({ action: 'saida', date });
     window.location.href = buildAeroBridgeTriggerUrl({ ticket: ticket.ticket, ticketUrl: ticket.ticketUrl });
     return true;
-  }, [date]);
+  }, [date, t]);
 
   const sendToErp = useCallback(
     async (movement: SalidaMovement, payloads: ReturnType<typeof buildSalidaPayloads>): Promise<boolean> => {
@@ -194,8 +207,14 @@ export function SalidaLaunchPage() {
       if (trips.length === 0) return false;
       // The movement travels with the session: the shortcut leaves the page, and the dialog the operator sees on
       // return needs the record it is confirming.
-      writeSalidaLastMovement(movement);
-      writeSalidaOutbox({ movementId: movement.id, date, trips, startedAt: new Date().toISOString() });
+      writeSalidaLastMovement({ ...movement, expectedPayloads: trips[0]?.payloads.length });
+      writeSalidaOutbox({
+        movementId: movement.id,
+        date,
+        trips,
+        startedAt: new Date().toISOString(),
+        currentTripPayloads: trips[0]?.payloads.length,
+      });
       setOutbox(readSalidaOutbox());
       return sendNextTrip();
     },
@@ -214,26 +233,89 @@ export function SalidaLaunchPage() {
       const attempt = loadAeroPendingAttempt('saida');
       if (attempt) clearAeroPendingAttempt();
 
-      const result = readAeroBridgeResult(callback.data);
-      void postAeroAuditEvent(
-        salidaSyncResultEvent({ attempt, outcome: result.status, message: result.message }),
-      );
-      setSuccess({
-        movement: readSalidaLastMovement(),
-        erp: result.status,
-        message: result.message,
-      });
-      if (result.status === 'ok') {
-        clearSalidaLastMovement();
-        clearSalidaOutbox();
-        setOutbox(null);
+      const queued = readSalidaOutbox();
+      const lastMovement = readSalidaLastMovement();
+      const expectedTripPayloads =
+        queued?.currentTripPayloads ??
+        queued?.trips[0]?.payloads.length ??
+        lastMovement?.expectedPayloads ??
+        lastMovement?.items.length ??
+        1;
+
+      const batchResult = readAeroBatchResult(callback.data, expectedTripPayloads);
+      const erpOutcome = salidaBatchToDialogOutcome(batchResult.state, batchResult.ok, batchResult.total);
+      const erpStatus = salidaBatchToErpStatus(batchResult.state, batchResult.ok, batchResult.total);
+
+      const movementId = lastMovement?.id ?? queued?.movementId;
+      if (movementId) {
+        void recordSalidaErpResult(movementId, { status: erpStatus, message: batchResult.message }, attempt);
+      }
+
+      const isComplete =
+        batchResult.state === 'complete' ||
+        (batchResult.state === 'legacy' && batchResult.ok === batchResult.total);
+
+      if (isComplete) {
+        void postAeroAuditEvent(
+          salidaSyncResultEvent({ attempt, outcome: 'ok', message: batchResult.message }),
+        );
       } else {
+        const errorCode =
+          batchResult.message ??
+          (batchResult.state === 'unreadable'
+            ? 'bridge_unreadable'
+            : batchResult.state === 'partial'
+              ? 'batch_partial'
+              : 'batch_failed');
+        void postAeroAuditEvent(
+          salidaSyncResultEvent({
+            attempt,
+            outcome: 'error',
+            error: errorCode,
+            message: batchResult.message,
+          }),
+        );
+      }
+
+      setSuccess({
+        movement: lastMovement,
+        erp: erpOutcome,
+        message: batchResult.message,
+      });
+
+      // The outbox clears only on complete (T1).
+      if (isComplete) {
+        if (queued && queued.trips.length > 1) {
+          const remainingTrips = queued.trips.slice(1);
+          writeSalidaOutbox({ ...queued, trips: remainingTrips, currentTripPayloads: undefined });
+          setOutbox(readSalidaOutbox());
+        } else {
+          clearSalidaLastMovement();
+          clearSalidaOutbox();
+          setOutbox(null);
+        }
+      } else {
+        if (queued) {
+          writeSalidaOutbox({ ...queued, currentTripPayloads: undefined });
+        }
         setOutbox(readSalidaOutbox());
       }
     } else if (callback.kind === 'error') {
       // The phone came back without the plant: no seat was written, and the line says so with the code.
       const attempt = loadAeroPendingAttempt('saida');
       if (attempt) clearAeroPendingAttempt();
+
+      const lastMovement = readSalidaLastMovement();
+      const queued = readSalidaOutbox();
+      const movementId = lastMovement?.id ?? queued?.movementId;
+      if (movementId) {
+        void recordSalidaErpResult(
+          movementId,
+          { status: 'failed', message: callback.message || callback.code },
+          attempt,
+        );
+      }
+
       void postAeroAuditEvent(
         salidaSyncResultEvent({
           attempt,
@@ -242,7 +324,7 @@ export function SalidaLaunchPage() {
           message: callback.message,
         }),
       );
-      setNotice({ type: 'error', message: callback.message || t('salida.launchError') });
+      setNotice({ type: 'error', message: salidaActionableErrorMessage(callback.code, callback.message, t) });
       setOutbox(readSalidaOutbox());
     }
 
@@ -366,7 +448,12 @@ export function SalidaLaunchPage() {
     setNotice(null);
     const sent = await sendNextTrip();
     setErpSending(false);
-    if (!sent) setNotice({ type: 'error', message: t('salida.pendingBody') });
+    if (!sent) {
+      setNotice({
+        type: 'error',
+        message: salidaActionableErrorMessage(SALIDA_TICKET_REFUSED, null, t),
+      });
+    }
   };
 
   if (!catalog) {

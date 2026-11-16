@@ -14,8 +14,9 @@
 import { saoPauloToday, formatDateLabel } from './date';
 import { AERO_BATCH_MAX } from './aero-batch';
 import { buildSaidaItemPayload, type AeroSaidaPayload, type StorageLike } from './aero-integration';
-import type { AeroAuditEvent } from './aero-audit';
+import { postAeroAuditEvent, type AeroAuditEvent } from './aero-audit';
 import type { ShareOutcome } from './whatsapp';
+import { api } from '../api/client';
 
 // ---- Catalogue (S1) ----
 
@@ -247,6 +248,14 @@ export interface SalidaReconciliation {
   matched_item_ids: number[];
 }
 
+export type SalidaErpTransmissionStatus = 'sent' | 'partial' | 'failed';
+
+export interface SalidaMovementErp {
+  status: SalidaErpTransmissionStatus;
+  message: string | null;
+  sentAt: string;
+}
+
 export interface SalidaMovementItem {
   id: number;
   product_code: string;
@@ -279,6 +288,221 @@ export interface SalidaMovement {
   photos: SalidaPhoto[];
   total_units: number;
   reconciliation?: SalidaReconciliation | null;
+  erp?: SalidaMovementErp | null;
+}
+
+/** The primary state of a movement card, following the strict order of truth (T3). */
+export type SalidaCardStatus = 'sent' | 'reconciled' | 'partial' | 'pending';
+
+export function salidaPrimaryStatus(
+  movement: Pick<SalidaMovement, 'erp' | 'reconciliation'> | null | undefined,
+): SalidaCardStatus {
+  if (movement?.erp?.status === 'sent') return 'sent';
+  if (movement?.reconciliation?.status === 'reconciled') return 'reconciled';
+  if (movement?.erp?.status === 'partial' || movement?.reconciliation?.status === 'partial') return 'partial';
+  return 'pending';
+}
+
+export function salidaPrimaryStatusLabelKey(status: SalidaCardStatus): string {
+  if (status === 'sent') return 'salida.erpSent';
+  if (status === 'reconciled') return 'salida.reconciled';
+  if (status === 'partial') return 'salida.erpPartial';
+  return 'salida.erpPending';
+}
+
+/**
+ * Whether a movement can be relaunched to the ERP.
+ *
+ * Only movements whose transmission is null or failed, and whose seats the company has not accepted.
+ * A movement the ERP already accepted (sent or reconciled) must not be offered for relaunch.
+ */
+export function canRelaunchSalida(
+  movement: Pick<SalidaMovement, 'erp' | 'reconciliation'> | null | undefined,
+): boolean {
+  if (!movement) return false;
+  if (movement.reconciliation?.status === 'reconciled' || movement.reconciliation?.status === 'partial') {
+    return false;
+  }
+  if (movement.erp?.status === 'sent' || movement.erp?.status === 'partial') {
+    return false;
+  }
+  return movement.erp === null || movement.erp === undefined || movement.erp.status === 'failed';
+}
+
+/**
+ * Filters movements to the session user when more than one operator's movements are present in the day.
+ *
+ * If the day contains only one operator's work (or is empty), all movements are preserved.
+ */
+export function filterSessionMovements(
+  movements: readonly SalidaMovement[],
+  currentUsername?: string | null,
+): SalidaMovement[] {
+  const distinctUsers = new Set(movements.map((m) => String(m.username ?? '').trim().toLowerCase()));
+  if (distinctUsers.size <= 1) return [...movements];
+  const target = String(currentUsername ?? '').trim().toLowerCase();
+  return movements.filter((m) => String(m.username ?? '').trim().toLowerCase() === target);
+}
+
+/** What the ERP sync dialog renders (T1). */
+export type SalidaErpOutcome = 'ok' | 'partial' | 'error' | 'unreadable' | 'pending';
+
+export function salidaBatchToDialogOutcome(
+  state: 'complete' | 'partial' | 'failed' | 'unreadable' | 'legacy',
+  okCount = 0,
+  total = 0,
+): SalidaErpOutcome {
+  if (state === 'complete') return 'ok';
+  if (state === 'legacy') return okCount === total && total > 0 ? 'ok' : 'error';
+  if (state === 'partial') return 'partial';
+  if (state === 'unreadable') return 'unreadable';
+  return 'error';
+}
+
+export function salidaBatchToErpStatus(
+  state: 'complete' | 'partial' | 'failed' | 'unreadable' | 'legacy',
+  okCount = 0,
+  total = 0,
+): SalidaErpTransmissionStatus {
+  if (state === 'complete') return 'sent';
+  if (state === 'legacy') return okCount === total && total > 0 ? 'sent' : 'failed';
+  if (state === 'partial') return 'partial';
+  return 'failed';
+}
+
+export interface SalidaErpResultBody {
+  status: SalidaErpTransmissionStatus;
+  message?: string | null;
+}
+
+/**
+ * Posts the ERP verdict to `POST /api/salida/:id/erp-result` (best effort).
+ *
+ * A failure to record it must not change what the operator sees, but logs an audit event.
+ */
+export async function recordSalidaErpResult(
+  movementId: number,
+  body: SalidaErpResultBody,
+  attempt?: SalidaAttemptRef | null,
+): Promise<SalidaMovement | null> {
+  try {
+    const res = await api.post<{ movement: SalidaMovement }>(`/salida/${movementId}/erp-result`, body);
+    return res?.movement ?? null;
+  } catch (error) {
+    void postAeroAuditEvent({
+      event: 'salida_sync',
+      phase: 'result',
+      destinationUrl: `/api/salida/${movementId}/erp-result`,
+      error: 'AERO_ERP_RESULT_RECORD_FAILED',
+      note: `record erp-result failed: ${error instanceof Error ? error.message : String(error)}`,
+      ...(attempt ? { attemptId: attempt.attemptId, startedAt: attempt.startedAt } : {}),
+    });
+    return null;
+  }
+}
+
+/** Categories of connectivity/bridge failures for actionable operator sentences (T4). */
+export type SalidaConnectivityError =
+  | 'wifi'
+  | 'timeout'
+  | 'mixed_content'
+  | 'expired_ticket'
+  | 'unreadable'
+  | 'generic';
+
+export function salidaClassifyError(
+  code?: string | null,
+  message?: string | null,
+): SalidaConnectivityError {
+  const normalizedCode = (code ?? '').trim().toLowerCase();
+  const normalizedMsg = (message ?? '').trim().toLowerCase();
+  const text = `${normalizedCode} ${normalizedMsg}`;
+
+  if (
+    normalizedCode === 'wifi_required' ||
+    normalizedCode === 'aero_wifi_required' ||
+    normalizedCode === 'unreachable' ||
+    normalizedCode === 'aero_unreachable' ||
+    text.includes('wifi') ||
+    text.includes('sem rede') ||
+    text.includes('sem conex') ||
+    text.includes('sin conex') ||
+    text.includes('unreachable') ||
+    text.includes('failed to fetch') ||
+    text.includes('network') ||
+    text.includes('econn')
+  ) {
+    return 'wifi';
+  }
+
+  if (
+    normalizedCode === 'timeout' ||
+    normalizedCode === 'aero_timeout' ||
+    text.includes('timeout') ||
+    text.includes('timed out') ||
+    text.includes('tempo esgotado')
+  ) {
+    return 'timeout';
+  }
+
+  if (
+    normalizedCode === 'blocked_mixed_content' ||
+    normalizedCode === 'aero_blocked_mixed_content' ||
+    normalizedCode === 'mixed_content' ||
+    text.includes('mixed') ||
+    text.includes('bloque')
+  ) {
+    return 'mixed_content';
+  }
+
+  if (
+    normalizedCode === 'ticket_expired' ||
+    normalizedCode === 'expired_ticket' ||
+    normalizedCode === 'aero_ticket_expired' ||
+    normalizedCode === 'salida_ticket_refused' ||
+    normalizedCode === 'aero_ticket_refused' ||
+    text.includes('ticket') ||
+    text.includes('expir') ||
+    text.includes('vencid')
+  ) {
+    return 'expired_ticket';
+  }
+
+  if (
+    normalizedCode === 'bridge_unreadable' ||
+    normalizedCode === 'aero_bridge_unreadable' ||
+    normalizedCode === 'unreadable' ||
+    normalizedCode === 'movements_unreadable' ||
+    normalizedCode === 'aero_movements_unreadable' ||
+    text.includes('unreadable') ||
+    text.includes('ileg')
+  ) {
+    return 'unreadable';
+  }
+
+  return 'generic';
+}
+
+export function salidaActionableErrorMessage(
+  code: string | null | undefined,
+  message: string | null | undefined,
+  t: (key: string) => string,
+): string {
+  const category = salidaClassifyError(code, message);
+  switch (category) {
+    case 'wifi':
+      return t('salida.errorWifi');
+    case 'timeout':
+      return t('salida.errorTimeout');
+    case 'mixed_content':
+      return t('salida.errorMixedContent');
+    case 'expired_ticket':
+      return t('salida.errorExpiredTicket');
+    case 'unreadable':
+      return t('salida.errorUnreadable');
+    default:
+      return message?.trim() ? message.trim() : t('salida.errorGeneric');
+  }
 }
 
 /** The status of a movement whose reconciliation the server never answered reads as pending, not as agreed. */
@@ -393,7 +617,7 @@ export interface SalidaDaySummaryLabels {
   total: string;
   operator: string;
   blocks: Record<SalidaBlock, string>;
-  status: Record<'reconciled' | 'partial' | 'pending', string>;
+  status: Record<'reconciled' | 'partial' | 'pending', string> & { sent?: string };
 }
 
 /** One movement as the day summary reads it: what left, who launched it and what the company answered. */
@@ -443,10 +667,14 @@ export function salidaDaySummaryText(
     lines.push(`*${index + 1}. ${String(movement.username ?? '').toUpperCase()} — ${units} un*`);
     lines.push(`${labels.operator}: ${String(movement.display_name ?? movement.username ?? '')}`);
     lines.push(...productsOf(movement.items, labels.blocks));
-    const status = salidaReconciliationStatus({ reconciliation: movement.reconciliation });
+    const status = salidaPrimaryStatus(movement);
+    const labelStatus =
+      (labels.status as Record<string, string>)[status] ??
+      labels.status[salidaReconciliationStatus({ reconciliation: movement.reconciliation })] ??
+      status;
     const entLans = salidaEntLans({ reconciliation: movement.reconciliation });
     const suffix = entLans.length > 0 ? ` (ENT_LAN ${entLans.join(', ')})` : '';
-    lines.push(`*${labels.status[status]}*${suffix}`);
+    lines.push(`*${labelStatus}*${suffix}`);
     lines.push('');
   });
 
@@ -503,11 +731,15 @@ export const SALIDA_WHATSAPP_ENDPOINT = 'https://api.whatsapp.com/send?text=';
  * A blocked popup returns `null` (or throws), and a `null` here is the signal that the text still has to go
  * somewhere: the caller copies it instead of leaving the operator with a button that did nothing.
  */
-function openWhatsApp(text: string): boolean {
+function openWhatsApp(text: string, phone?: string): boolean {
   const windowLike = (globalThis as { window?: { open?: (url: string, target?: string) => unknown } }).window;
   if (typeof windowLike?.open !== 'function') return false;
   try {
-    return Boolean(windowLike.open(`${SALIDA_WHATSAPP_ENDPOINT}${encodeURIComponent(text)}`, '_blank'));
+    const rawDigits = (phone ?? '').replace(/\D/g, '');
+    const endpoint = rawDigits
+      ? `https://api.whatsapp.com/send?phone=${rawDigits}&text=`
+      : SALIDA_WHATSAPP_ENDPOINT;
+    return Boolean(windowLike.open(`${endpoint}${encodeURIComponent(text)}`, '_blank'));
   } catch {
     return false;
   }
@@ -516,6 +748,7 @@ function openWhatsApp(text: string): boolean {
 export async function shareSalida(args: {
   text: string;
   photos?: readonly File[];
+  phone?: string;
 }): Promise<ShareOutcome> {
   const navigatorLike = (globalThis as { navigator?: Navigator }).navigator;
   const photos = args.photos ?? [];
@@ -544,7 +777,7 @@ export async function shareSalida(args: {
 
   // No sheet, or a sheet that refused the text: WhatsApp is where the plant sends it, and the link is the only
   // way to hand a message to that app from a desktop browser.
-  if (openWhatsApp(args.text)) return 'shared';
+  if (openWhatsApp(args.text, args.phone)) return 'shared';
 
   const clipboard = navigatorLike?.clipboard;
   if (!clipboard) return 'failed';
@@ -805,6 +1038,7 @@ export interface SalidaOutbox {
   date: string;
   trips: SalidaTrip[];
   startedAt: string;
+  currentTripPayloads?: number;
 }
 
 function safeStorage(): StorageLike | null {
@@ -850,11 +1084,19 @@ export function readSalidaOutbox(storage: StorageLike | null = safeStorage()): S
   const kept = trips.filter(isTrip);
   if (kept.length === 0) return null;
 
+  const currentTripPayloads =
+    typeof record.currentTripPayloads === 'number' &&
+    Number.isInteger(record.currentTripPayloads) &&
+    record.currentTripPayloads > 0
+      ? record.currentTripPayloads
+      : undefined;
+
   return {
     movementId,
     date,
     trips: kept,
     startedAt: typeof record.startedAt === 'string' ? record.startedAt : new Date().toISOString(),
+    ...(currentTripPayloads !== undefined ? { currentTripPayloads } : {}),
   };
 }
 
@@ -899,8 +1141,12 @@ export function takeSalidaTrip(outbox: SalidaOutbox | null): {
  * then React has no memory of the movement it just wrote. The dialog the operator sees on return needs that
  * movement -- its summary and its photos -- so it travels with the session and is dropped once shown.
  */
+export interface SalidaLastMovement extends SalidaMovement {
+  expectedPayloads?: number;
+}
+
 export function writeSalidaLastMovement(
-  movement: SalidaMovement,
+  movement: SalidaMovement & { expectedPayloads?: number },
   storage: StorageLike | null = safeStorage(),
 ): void {
   if (!storage) return;
@@ -913,7 +1159,7 @@ export function writeSalidaLastMovement(
 
 export function readSalidaLastMovement(
   storage: StorageLike | null = safeStorage(),
-): SalidaMovement | null {
+): SalidaLastMovement | null {
   if (!storage) return null;
   let raw: string | null = null;
   try {
@@ -923,12 +1169,13 @@ export function readSalidaLastMovement(
   }
   if (!raw) return null;
   try {
-    const parsed = JSON.parse(raw) as SalidaMovement;
+    const parsed = JSON.parse(raw) as SalidaLastMovement;
     if (typeof parsed?.id !== 'number' || !Array.isArray(parsed.items)) return null;
     return {
       ...parsed,
       photos: Array.isArray(parsed.photos) ? parsed.photos : [],
       total_units: typeof parsed.total_units === 'number' ? parsed.total_units : salidaTotalUnits(parsed.items),
+      ...(typeof parsed.expectedPayloads === 'number' ? { expectedPayloads: parsed.expectedPayloads } : {}),
     };
   } catch {
     return null;
