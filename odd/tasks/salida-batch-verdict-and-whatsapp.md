@@ -161,3 +161,33 @@ El código del producto (`1356`, `1900`) no aparece, y hay un test que lo prohí
 Evidencia: Vitest **208/208**, node **737/737**, typecheck limpio, build verde, E2E **118/118**. Deploy de `web`
 (`index-BT-toTM6.js`): el bundle servido ya no contiene ningún `salida-copy*`, el histórico trae el control de fotos
 y el lanzamiento trae `salida-nav-history`.
+
+## El 414 de «Conferir no ERP» y la opción B (2026-11-16)
+
+**Síntoma**: `414 Request-URI Too Large` al consultar los asientos del día.
+
+**Causa**: `Aero32Bridge.js` devolvía con `Safari.open(callback + encodeURIComponent(resultado))`, así que la
+respuesta entera del ERP viajaba en el query string. Un día con muchas filas supera el límite de una línea de
+encabezado del proxy.
+
+**Medición**: contenedor de Trindade con 64 kB → 414 desde 70 000 caracteres; subido a 256 kB, el contenedor acepta
+250 000 y el **borde** (`portfolio-nginx`) sigue cortando en ~64 kB. El techo, entonces, era de diseño.
+
+**Opción B implementada** (autorizada por el usuario, preferida sobre subir buffers del borde):
+
+- **Revisión 14**: `aero_bridge_tickets` gana `result` y `result_at` (ALTER aditivos, `SCHEMA_VERSION = 14`).
+- **`POST /api/integration/aero/bridge-tickets/result`**: sin sesión, el ticket es la credencial
+  (`X-Trindade-Ticket`), guarda `{ data }` aunque el ticket ya esté consumido; 401/404/413 con códigos.
+- **`GET /api/integration/aero/bridge-tickets/last-result?action=`**: con sesión, devuelve el último resultado del
+  propio usuario dentro de 10 minutos.
+- **Envelope de `redeem`**: incluye `resultUrl`, así el script no hardcodea rutas.
+- **Script**: POSTea `JSON.parse(resultado)` (o el texto si el ERP respondió una frase) a `resultUrl` y abre el
+  callback corto `&aero_result=stored`. Sin `resultUrl` (servidor viejo) mantiene el comportamiento anterior.
+- **Web**: `resolveAeroCallback` resuelve ese marcador contra `last-result` y devuelve la misma forma que antes;
+  las cinco superficies que leen callbacks lo usan. Un iPhone con el script viejo sigue funcionando por `aero_data`.
+
+**Evidencia**: backend **958/958**, frontend **209/209**, node **748/748**, typecheck y build limpios, E2E
+**118/118**, contrato OpenAPI y cliente Kotlin regenerados. Deploy `api` + `web` con migración 14 (`user_version 14`,
+`integrity ok`, 23 tablas, 3 movimientos y los tickets intactos) y backup `backups/trindade.post-revision14.db`.
+Producción: health 200, rutas 200, catálogo 401, `result` sin ticket 401, `last-result` sin sesión 401, y el script
+servido contiene `aero_result=stored` y `resultUrl`.

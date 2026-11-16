@@ -12,6 +12,16 @@ verificaciones está en [docs/release-android-historial.md](docs/release-android
 
 ## [Unreleased]
 
+### Aero: la respuesta del puente deja de viajar en la URL (2026-11-16)
+
+- **Corregido el `414 Request-URI Too Large`** de «Conferir no ERP»: la respuesta del ERP viajaba codificada en el
+  query del callback y un día con muchas filas superaba el límite del proxy.
+- **Revisión 14**: `aero_bridge_tickets` guarda `result`/`result_at`; `POST /bridge-tickets/result` (autenticado por
+  el ticket) y `GET /bridge-tickets/last-result` (por sesión, 10 minutos) mueven la respuesta al servidor.
+- **Script `Aero32Bridge`**: postea el resultado y abre un callback corto (`aero_result=stored`); los iPhone con el
+  script anterior siguen funcionando. La app muestra los pasos de actualización y el enlace al script.
+
+
 ### Salida/Baja: fotos en el histórico y vista previa real (2026-11-16)
 
 - **Fotos (opcional) se movieron** de `/salida` al histórico: se adjuntan sobre un movimiento existente (máximo 3),
