@@ -8,7 +8,7 @@ import { apiError } from '../../utils/api-error.js';
 import { requireUsername } from '../auth/auth.middleware.js';
 import { getSaoPauloDateString } from '../../utils/date.js';
 import { SALIDA_PRODUCTS, findSalidaProduct } from './salida.catalog.js';
-import { CreateSalidaBodySchema, SALIDA_ERROR_CODES } from './salida.schema.js';
+import { CreateSalidaBodySchema, SALIDA_ERROR_CODES, SalidaErpResultBodySchema } from './salida.schema.js';
 import * as service from './salida.service.js';
 import { appendLocalAeroLog } from '../integration/aero.log.service.js';
 
@@ -192,6 +192,48 @@ export async function salidaRoutes(fastify: FastifyInstance, options: SalidaRout
    */
   fastify.get('/history', { preHandler: betaGuard }, async (_request: FastifyRequest, reply: FastifyReply) => {
     return reply.send({ days: service.salidaHistory(fastify.db, { publicBaseUrl }) });
+  });
+
+  /**
+   * POST /:id/erp-result
+   *
+   * Records the outcome of sending this movement to the ERP.
+   *
+   * The trip to the ERP is its own state, separate from whether the ERP seat has been mirrored yet.
+   * Persists erp_status, erp_message, and erp_sent_at. Idempotent: relaunching overwrites with the newer verdict.
+   */
+  fastify.post('/:id/erp-result', { preHandler: betaGuard }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const movementId = parseId((request.params as { id: string }).id);
+    if (movementId === null) return invalidId(reply);
+    if (!service.salidaMovementExists(fastify.db, movementId)) {
+      return reply.status(404).send(apiError('Movimento não encontrado', SALIDA_ERROR_CODES.NOT_FOUND));
+    }
+
+    const parsed = SalidaErpResultBodySchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply
+        .status(400)
+        .send(
+          apiError(
+            'Dados inválidos: informe status válido (sent, partial, failed)',
+            SALIDA_ERROR_CODES.INVALID_ERP_RESULT,
+            parsed.error.flatten(),
+          ),
+        );
+    }
+
+    const movement = service.recordSalidaErpResult(fastify.db, {
+      movementId,
+      status: parsed.data.status,
+      message: parsed.data.message,
+      publicBaseUrl,
+    });
+
+    if (!movement) {
+      return reply.status(404).send(apiError('Movimento não encontrado', SALIDA_ERROR_CODES.NOT_FOUND));
+    }
+
+    return reply.status(200).send({ movement });
   });
 
   // ---- Photos ----

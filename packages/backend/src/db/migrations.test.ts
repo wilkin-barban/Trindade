@@ -93,6 +93,17 @@ function makeRevisionElevenPhotosShape(db: Database.Database): void {
   db.pragma('user_version = 11');
 }
 
+/**
+ * Build the revision 12 shape: salida_movements without the three erp columns.
+ */
+function makeRevisionTwelveShape(db: Database.Database): void {
+  const cols = (db.prepare('PRAGMA table_info(salida_movements)').all() as { name: string }[]).map((c) => c.name);
+  if (cols.includes('erp_status')) db.exec('ALTER TABLE salida_movements DROP COLUMN erp_status');
+  if (cols.includes('erp_message')) db.exec('ALTER TABLE salida_movements DROP COLUMN erp_message');
+  if (cols.includes('erp_sent_at')) db.exec('ALTER TABLE salida_movements DROP COLUMN erp_sent_at');
+  db.pragma('user_version = 12');
+}
+
 /** Insert a report and return its id, for cases whose subject is a table that references one. */
 function insertReport(db: Database.Database, userId: number): number {
   return Number(
@@ -732,12 +743,57 @@ describe('schema migration', () => {
     db.close();
   });
 
+  it('adds erp_status, erp_message and erp_sent_at to salida_movements and keeps every row (revision 13)', () => {
+    const path = join(fixtureRoot(), 'revision-twelve.db');
+    const build = new Database(path);
+    build.exec(schema);
+    build.exec(seed);
+    makeRevisionTwelveShape(build);
+    const userId = insertUser(build, 'revision-thirteen');
+    build
+      .prepare(
+        `INSERT INTO salida_movements (id, movement_date, user_id, created_at)
+         VALUES (42, '2026-11-16', ?, '2026-11-16T12:00:00.000Z')`,
+      )
+      .run(userId);
+    build.close();
+
+    const db = new Database(path);
+    assert.equal(readSchemaReport(db).version, 12);
+    const result = migrateDatabase(db);
+    assert.equal(result.outcome, 'migrated');
+    assert.equal(result.from, 12);
+    assert.equal(result.to, SCHEMA_VERSION);
+    assert.equal(SCHEMA_VERSION, 13);
+    assert.equal(db.pragma('user_version', { simple: true }), 13);
+
+    const columns = (db.prepare('PRAGMA table_info(salida_movements)').all() as { name: string }[]).map((c) => c.name);
+    assert.ok(columns.includes('erp_status'));
+    assert.ok(columns.includes('erp_message'));
+    assert.ok(columns.includes('erp_sent_at'));
+
+    const row = db.prepare('SELECT id, movement_date, user_id, created_at, erp_status, erp_message, erp_sent_at FROM salida_movements WHERE id = 42').get() as any;
+    assert.deepEqual(row, {
+      id: 42,
+      movement_date: '2026-11-16',
+      user_id: userId,
+      created_at: '2026-11-16T12:00:00.000Z',
+      erp_status: null,
+      erp_message: null,
+      erp_sent_at: null,
+    });
+
+    assert.equal(migrateDatabase(db).outcome, 'already-current');
+    db.close();
+  });
+
   // Guards the stepwise list against drifting from SCHEMA_VERSION: a build that supports
   // a revision its steps cannot reach would leave every migrated database stamped low.
   it('leaves every lower revision stamped at exactly the supported revision', () => {
     const cases: ReadonlyArray<{ from: number; prepare: (db: Database.Database) => void }> = [
       { from: 0, prepare: (db) => { db.exec('ALTER TABLE users DROP COLUMN security_version'); withoutDriverPhone(db); db.pragma('user_version = 0'); } },
       { from: 1, prepare: (db) => { makeRevisionOneShape(db); } },
+      { from: 12, prepare: (db) => { makeRevisionTwelveShape(db); } },
     ];
 
     for (const testCase of cases) {

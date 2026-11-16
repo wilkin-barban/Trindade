@@ -19,6 +19,7 @@ export const SALIDA_ERROR_CODES = {
   PHOTO_LIMIT: 'SALIDA_PHOTO_LIMIT',
   INVALID_PHOTO: 'SALIDA_INVALID_PHOTO',
   PHOTO_TOO_LARGE: 'SALIDA_PHOTO_TOO_LARGE',
+  INVALID_ERP_RESULT: 'SALIDA_INVALID_ERP_RESULT',
 } as const;
 
 export type SalidaErrorCode = (typeof SALIDA_ERROR_CODES)[keyof typeof SALIDA_ERROR_CODES];
@@ -100,6 +101,17 @@ export const SalidaReconciliationSchema = z
   })
   .strict();
 
+export const SalidaErpStatusSchema = z.enum(['sent', 'partial', 'failed']);
+
+/** The ERP transmission state of one movement, separate from seat reconciliation. */
+export const SalidaErpSchema = z
+  .object({
+    status: SalidaErpStatusSchema,
+    message: z.string().nullable(),
+    sentAt: z.string(),
+  })
+  .strict();
+
 export const SalidaMovementSchema = z
   .object({
     id: z.number().int(),
@@ -112,10 +124,25 @@ export const SalidaMovementSchema = z
     photos: z.array(SalidaPhotoSchema),
     total_units: z.number().int(),
     reconciliation: SalidaReconciliationSchema,
+    erp: SalidaErpSchema.nullable(),
   })
   .strict();
 
 export const SalidaCreateResponseSchema = z.object({ movement: SalidaMovementSchema }).strict();
+
+/**
+ * Body of `POST /api/salida/:id/erp-result`: what the ERP sync reported.
+ *
+ * Strict schema: no extra fields allowed; message max 512 characters.
+ */
+export const SalidaErpResultBodySchema = z
+  .object({
+    status: SalidaErpStatusSchema,
+    message: z.string().max(512).nullable().optional(),
+  })
+  .strict();
+
+export const SalidaErpResultResponseSchema = z.object({ movement: SalidaMovementSchema }).strict();
 
 export const SalidaListResponseSchema = z
   .object({
@@ -145,5 +172,8 @@ export type CreateSalidaBody = z.infer<typeof CreateSalidaBodySchema>;
 export type SalidaItem = z.infer<typeof SalidaItemSchema>;
 export type SalidaPhoto = z.infer<typeof SalidaPhotoSchema>;
 export type SalidaReconciliation = z.infer<typeof SalidaReconciliationSchema>;
+export type SalidaErpStatus = z.infer<typeof SalidaErpStatusSchema>;
+export type SalidaErp = z.infer<typeof SalidaErpSchema>;
+export type SalidaErpResultBody = z.infer<typeof SalidaErpResultBodySchema>;
 export type SalidaMovement = z.infer<typeof SalidaMovementSchema>;
 export type SalidaHistoryDay = z.infer<typeof SalidaHistoryDaySchema>;

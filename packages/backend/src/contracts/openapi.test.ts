@@ -81,6 +81,7 @@ const EXPECTED_PATHS = [
   '/api/salida/history',
   '/api/salida/photos/public/{token}',
   '/api/salida/photos/{photoId}',
+  '/api/salida/{id}/erp-result',
   '/api/salida/{id}/photos',
   '/api/stock',
   '/api/stock/add-entry',

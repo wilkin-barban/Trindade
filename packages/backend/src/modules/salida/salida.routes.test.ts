@@ -287,6 +287,7 @@ describe('salida routes', () => {
         [
           'created_at',
           'display_name',
+          'erp',
           'id',
           'items',
           'movement_date',
@@ -505,6 +506,7 @@ describe('salida routes', () => {
       { method: 'POST', url: '/api/salida', payload: { items: [{ code: '1474', quantity: 1 }] } },
       { method: 'GET', url: '/api/salida' },
       { method: 'GET', url: '/api/salida/history' },
+      { method: 'POST', url: '/api/salida/1/erp-result', payload: { status: 'sent' } },
       { method: 'POST', url: '/api/salida/1/photos' },
       { method: 'GET', url: '/api/salida/1/photos' },
       { method: 'GET', url: '/api/salida/photos/1' },
@@ -531,6 +533,151 @@ describe('salida routes', () => {
     it('answers 404 instead of 401 for a photo id that does not exist', async () => {
       const response = await app.inject({ method: 'GET', url: '/api/salida/photos/999999', headers: wilkin() });
       assert.equal(response.statusCode, 404);
+    });
+  });
+
+  describe('recording ERP result: POST /api/salida/:id/erp-result', () => {
+    it('answers 404 for an unknown movement', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/salida/999999/erp-result',
+        headers: wilkin(),
+        payload: { status: 'sent' },
+      });
+      assert.equal(response.statusCode, 404, response.body);
+    });
+
+    it('answers 400 for an invalid id', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/salida/not-an-id/erp-result',
+        headers: wilkin(),
+        payload: { status: 'sent' },
+      });
+      assert.equal(response.statusCode, 400, response.body);
+    });
+
+    it('answers 400 for an invalid body: missing status', async () => {
+      const movementId = await launchOne('1474', 5);
+      const response = await app.inject({
+        method: 'POST',
+        url: `/api/salida/${movementId}/erp-result`,
+        headers: wilkin(),
+        payload: {},
+      });
+      assert.equal(response.statusCode, 400, response.body);
+    });
+
+    it('answers 400 for an invalid body: unknown status', async () => {
+      const movementId = await launchOne('1474', 5);
+      const response = await app.inject({
+        method: 'POST',
+        url: `/api/salida/${movementId}/erp-result`,
+        headers: wilkin(),
+        payload: { status: 'bogus' },
+      });
+      assert.equal(response.statusCode, 400, response.body);
+    });
+
+    it('answers 400 for an invalid body: extra properties (strict)', async () => {
+      const movementId = await launchOne('1474', 5);
+      const response = await app.inject({
+        method: 'POST',
+        url: `/api/salida/${movementId}/erp-result`,
+        headers: wilkin(),
+        payload: { status: 'sent', extra: 'forbidden' },
+      });
+      assert.equal(response.statusCode, 400, response.body);
+    });
+
+    it('answers 400 for an invalid body: message exceeds 512 characters', async () => {
+      const movementId = await launchOne('1474', 5);
+      const response = await app.inject({
+        method: 'POST',
+        url: `/api/salida/${movementId}/erp-result`,
+        headers: wilkin(),
+        payload: { status: 'failed', message: 'e'.repeat(513) },
+      });
+      assert.equal(response.statusCode, 400, response.body);
+    });
+
+    it('records sent verdict and reflects it in list and history', async () => {
+      const movementId = await launchOne('1474', 5);
+      const response = await app.inject({
+        method: 'POST',
+        url: `/api/salida/${movementId}/erp-result`,
+        headers: wilkin(),
+        payload: { status: 'sent' },
+      });
+      assert.equal(response.statusCode, 200, response.body);
+      const { movement } = JSON.parse(response.body);
+      assert.equal(movement.id, movementId);
+      assert.deepEqual(movement.erp, {
+        status: 'sent',
+        message: null,
+        sentAt: movement.erp.sentAt,
+      });
+      assert.ok(movement.erp.sentAt);
+
+      // Shows in GET /api/salida
+      const listRes = await app.inject({
+        method: 'GET',
+        url: '/api/salida',
+        headers: wilkin(),
+      });
+      assert.equal(listRes.statusCode, 200);
+      const { movements } = JSON.parse(listRes.body);
+      const foundInList = movements.find((m: { id: number }) => m.id === movementId);
+      assert.equal(foundInList.erp.status, 'sent');
+
+      // Shows in GET /api/salida/history
+      const historyRes = await app.inject({
+        method: 'GET',
+        url: '/api/salida/history',
+        headers: wilkin(),
+      });
+      assert.equal(historyRes.statusCode, 200);
+      const { days } = JSON.parse(historyRes.body);
+      const allHistoryMovements = days.flatMap((d: { movements: any[] }) => d.movements);
+      const foundInHistory = allHistoryMovements.find((m: { id: number }) => m.id === movementId);
+      assert.equal(foundInHistory.erp.status, 'sent');
+    });
+
+    it('records failed verdict with message', async () => {
+      const movementId = await launchOne('1474', 8);
+      const response = await app.inject({
+        method: 'POST',
+        url: `/api/salida/${movementId}/erp-result`,
+        headers: wilkin(),
+        payload: { status: 'failed', message: 'AERO_BRIDGE_UNREADABLE' },
+      });
+      assert.equal(response.statusCode, 200, response.body);
+      const { movement } = JSON.parse(response.body);
+      assert.equal(movement.erp.status, 'failed');
+      assert.equal(movement.erp.message, 'AERO_BRIDGE_UNREADABLE');
+    });
+
+    it('overwrites on relaunch (idempotent)', async () => {
+      const movementId = await launchOne('1474', 12);
+      const first = await app.inject({
+        method: 'POST',
+        url: `/api/salida/${movementId}/erp-result`,
+        headers: wilkin(),
+        payload: { status: 'failed', message: 'Host unreachable' },
+      });
+      assert.equal(first.statusCode, 200);
+      assert.equal(JSON.parse(first.body).movement.erp.status, 'failed');
+
+      const second = await app.inject({
+        method: 'POST',
+        url: `/api/salida/${movementId}/erp-result`,
+        headers: wilkin(),
+        payload: { status: 'sent' },
+      });
+      assert.equal(second.statusCode, 200);
+      const { movement } = JSON.parse(second.body);
+      assert.equal(movement.erp.status, 'sent');
+      assert.equal(movement.erp.message, null);
     });
   });
 

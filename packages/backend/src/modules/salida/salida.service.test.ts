@@ -16,6 +16,7 @@ import {
   getSalidaPhotoById,
   getSalidaPhotoByPublicToken,
   listSalidaMovements,
+  recordSalidaErpResult,
   salidaHistory,
   saveSalidaPhoto,
 } from './salida.service.js';
@@ -210,6 +211,97 @@ describe('salida service', () => {
       const first = days.find((day) => day.date === '2026-11-03')!;
       assert.equal(first.total_units, 20);
       assert.equal(first.movements.length, 1);
+    });
+  });
+
+  describe('ERP verdict and transmission state', () => {
+    it('sets erp to null on newly launched movement', () => {
+      const movement = createSalidaMovement(db, {
+        items: [{ code: '1474', quantity: 10 }],
+        userId,
+      });
+      assert.equal(movement.erp, null);
+    });
+
+    it('records erp result with sent status', () => {
+      const movement = createSalidaMovement(db, {
+        items: [{ code: '1474', quantity: 5 }],
+        userId,
+      });
+      const updated = recordSalidaErpResult(db, {
+        movementId: movement.id,
+        status: 'sent',
+      });
+      assert.ok(updated);
+      assert.equal(updated.erp?.status, 'sent');
+      assert.equal(updated.erp?.message, null);
+      assert.ok(updated.erp?.sentAt);
+    });
+
+    it('records erp result with failed status and message', () => {
+      const movement = createSalidaMovement(db, {
+        items: [{ code: '1474', quantity: 5 }],
+        userId,
+      });
+      const updated = recordSalidaErpResult(db, {
+        movementId: movement.id,
+        status: 'failed',
+        message: 'AERO_BRIDGE_UNREADABLE',
+      });
+      assert.ok(updated);
+      assert.equal(updated.erp?.status, 'failed');
+      assert.equal(updated.erp?.message, 'AERO_BRIDGE_UNREADABLE');
+      assert.ok(updated.erp?.sentAt);
+    });
+
+    it('overwrites the verdict on relaunch (idempotent)', () => {
+      const movement = createSalidaMovement(db, {
+        items: [{ code: '1474', quantity: 5 }],
+        userId,
+      });
+      recordSalidaErpResult(db, {
+        movementId: movement.id,
+        status: 'failed',
+        message: 'Network error',
+      });
+      const relaunched = recordSalidaErpResult(db, {
+        movementId: movement.id,
+        status: 'sent',
+      });
+      assert.ok(relaunched);
+      assert.equal(relaunched.erp?.status, 'sent');
+      assert.equal(relaunched.erp?.message, null);
+    });
+
+    it('returns null for an unknown movement id', () => {
+      const result = recordSalidaErpResult(db, {
+        movementId: 999999,
+        status: 'sent',
+      });
+      assert.equal(result, null);
+    });
+
+    it('maps erp state in listSalidaMovements and salidaHistory', () => {
+      const movement = createSalidaMovement(db, {
+        items: [{ code: '1474', quantity: 3 }],
+        userId,
+        date: '2026-11-17',
+      });
+      recordSalidaErpResult(db, {
+        movementId: movement.id,
+        status: 'partial',
+        message: 'partial sync',
+      });
+
+      const list = listSalidaMovements(db, { date: '2026-11-17' });
+      const foundInList = list.find((m) => m.id === movement.id);
+      assert.equal(foundInList?.erp?.status, 'partial');
+      assert.equal(foundInList?.erp?.message, 'partial sync');
+
+      const history = salidaHistory(db);
+      const day = history.find((d) => d.date === '2026-11-17');
+      const foundInHistory = day?.movements.find((m) => m.id === movement.id);
+      assert.equal(foundInHistory?.erp?.status, 'partial');
     });
   });
 

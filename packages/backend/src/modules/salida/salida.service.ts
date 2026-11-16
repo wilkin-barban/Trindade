@@ -43,6 +43,9 @@ interface MovementRow {
   created_at: string;
   username: string;
   display_name: string;
+  erp_status: 'sent' | 'partial' | 'failed' | null;
+  erp_message: string | null;
+  erp_sent_at: string | null;
 }
 
 interface ItemRow {
@@ -128,7 +131,8 @@ function seatsForDate(db: Database.Database, date: string) {
 function readMovementsOfDate(db: Database.Database, date: string, publicBaseUrl?: string): SalidaMovement[] {
   const movements = db
     .prepare(
-      `SELECT m.id, m.movement_date, m.user_id, m.created_at, u.username, u.display_name
+      `SELECT m.id, m.movement_date, m.user_id, m.created_at, u.username, u.display_name,
+              m.erp_status, m.erp_message, m.erp_sent_at
          FROM salida_movements m
          JOIN users u ON u.id = m.user_id
         WHERE m.movement_date = ?
@@ -190,6 +194,14 @@ function readMovementsOfDate(db: Database.Database, date: string, publicBaseUrl?
       seats,
     });
 
+    const erp = movement.erp_status
+      ? {
+          status: movement.erp_status,
+          message: movement.erp_message ?? null,
+          sentAt: movement.erp_sent_at ?? '',
+        }
+      : null;
+
     return {
       id: movement.id,
       movement_date: movement.movement_date,
@@ -205,6 +217,7 @@ function readMovementsOfDate(db: Database.Database, date: string, publicBaseUrl?
         ent_lans: reconciliation.entLans,
         matched_item_ids: reconciliation.matchedItemIds,
       },
+      erp,
     };
   });
 }
@@ -228,6 +241,36 @@ export function readSalidaMovement(
     | undefined;
   if (!row) return null;
   return readMovementsOfDate(db, row.movement_date, publicBaseUrl).find(({ id }) => id === movementId) ?? null;
+}
+
+/**
+ * Persist the ERP transmission verdict of a movement.
+ *
+ * Sets erp_status, erp_message, and erp_sent_at. Idempotent: relaunching overwrites with the newer verdict.
+ * Returns the updated movement, or null when the movement does not exist.
+ */
+export function recordSalidaErpResult(
+  db: Database.Database,
+  input: {
+    movementId: number;
+    status: 'sent' | 'partial' | 'failed';
+    message?: string | null;
+    sentAt?: string;
+    publicBaseUrl?: string;
+  },
+): SalidaMovement | null {
+  if (!salidaMovementExists(db, input.movementId)) return null;
+
+  const sentAt = input.sentAt ?? new Date().toISOString();
+  const message = input.message ?? null;
+
+  db.prepare(
+    `UPDATE salida_movements
+        SET erp_status = ?, erp_message = ?, erp_sent_at = ?
+      WHERE id = ?`,
+  ).run(input.status, message, sentAt, input.movementId);
+
+  return readSalidaMovement(db, input.movementId, input.publicBaseUrl);
 }
 
 /**

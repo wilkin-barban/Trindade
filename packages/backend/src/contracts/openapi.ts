@@ -110,6 +110,9 @@ import {
   CreateSalidaBodySchema,
   SalidaCatalogResponseSchema,
   SalidaCreateResponseSchema,
+  SalidaErpResultBodySchema,
+  SalidaErpResultResponseSchema,
+  SalidaErpSchema,
   SalidaHistoryResponseSchema,
   SalidaListResponseSchema,
   SalidaPhotoResponseSchema,
@@ -466,9 +469,12 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
   registerComponent(registry, 'SalidaItem', SalidaItemSchema);
   registerComponent(registry, 'SalidaPhoto', SalidaPhotoSchema);
   registerComponent(registry, 'SalidaReconciliation', SalidaReconciliationSchema);
+  registerComponent(registry, 'SalidaErp', SalidaErpSchema);
   registerComponent(registry, 'SalidaMovement', SalidaMovementSchema);
   registerComponent(registry, 'SalidaCreateRequest', CreateSalidaBodySchema);
   registerComponent(registry, 'SalidaCreateResponse', SalidaCreateResponseSchema);
+  registerComponent(registry, 'SalidaErpResultRequest', SalidaErpResultBodySchema);
+  registerComponent(registry, 'SalidaErpResultResponse', SalidaErpResultResponseSchema);
   registerComponent(registry, 'SalidaListResponse', SalidaListResponseSchema);
   registerComponent(registry, 'SalidaHistoryResponse', SalidaHistoryResponseSchema);
   registerComponent(registry, 'SalidaPhotoResponse', SalidaPhotoResponseSchema);
@@ -1726,6 +1732,30 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
       200: jsonResponse('The days with movements, newest first', SalidaHistoryResponseSchema),
       401: UNAUTHORIZED,
       403: SALIDA_FORBIDDEN,
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/salida/{id}/erp-result',
+    summary: 'Record the ERP transmission verdict of one movement',
+    description:
+      `${SALIDA_BETA_ONLY} Records the result of sending the movement to the ERP as its own state, ` +
+      'independent of whether the ERP seat has been mirrored into Trindade yet. Calling this again overwrites ' +
+      'the previous verdict, which is what a relaunch is.',
+    tags: ['salida'],
+    request: {
+      params: SALIDA_ID_PARAMS,
+      ...jsonRequest(SalidaErpResultBodySchema),
+    },
+    responses: {
+      200: jsonResponse('The updated movement with its ERP transmission verdict', SalidaErpResultResponseSchema),
+      400: errorResponse(
+        'The identifier is not a valid number, or the body is invalid (`SALIDA_INVALID_ID` or `SALIDA_INVALID_ERP_RESULT`)',
+      ),
+      401: UNAUTHORIZED,
+      403: SALIDA_FORBIDDEN,
+      404: errorResponse('No such movement (`SALIDA_NOT_FOUND`)'),
     },
   });
 

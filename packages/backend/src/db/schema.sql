@@ -336,7 +336,10 @@ CREATE TABLE IF NOT EXISTS salida_movements (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   movement_date TEXT    NOT NULL,
   user_id       INTEGER NOT NULL REFERENCES users(id),
-  created_at    TEXT    NOT NULL
+  created_at    TEXT    NOT NULL,
+  erp_status    TEXT NULL,
+  erp_message   TEXT NULL,
+  erp_sent_at   TEXT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_salida_movements_date ON salida_movements(movement_date);
 

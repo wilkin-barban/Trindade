@@ -81,6 +81,33 @@ export function widenReportPhotoMimeCheck(db: Database.Database): boolean {
 }
 
 /**
+ * Revision 12 → 13: the separate ERP trip verdict for salida movements.
+ *
+ * Adds `erp_status`, `erp_message`, and `erp_sent_at` to `salida_movements`.
+ * The columns are additive and nullable: existing rows stay untouched with null values,
+ * and SQLite alters the table in place without rebuild.
+ *
+ * Re-entering the step is a no-op: PRAGMA table_info guards each ADD COLUMN.
+ */
+export function migrateSalidaErpStatus(db: Database.Database): void {
+  db.transaction(() => {
+    const columns = (db.prepare('PRAGMA table_info(salida_movements)').all() as { name: string }[]).map(
+      (row) => row.name,
+    );
+    if (!columns.includes('erp_status')) {
+      db.exec('ALTER TABLE salida_movements ADD COLUMN erp_status TEXT NULL');
+    }
+    if (!columns.includes('erp_message')) {
+      db.exec('ALTER TABLE salida_movements ADD COLUMN erp_message TEXT NULL');
+    }
+    if (!columns.includes('erp_sent_at')) {
+      db.exec('ALTER TABLE salida_movements ADD COLUMN erp_sent_at TEXT NULL');
+    }
+    stampSchemaVersion(db, 13);
+  }).immediate();
+}
+
+/**
  * Bring an existing database up to the supported revision, once, and never at
  * startup. This is the sanctioned write path that the Production Immutability Gate
  * leaves to an explicit operator decision: the caller opens the file read-write only
@@ -151,6 +178,12 @@ export function migrateDatabase(db: Database.Database): MigrateResult {
       apply: () => {
         widenReportPhotoMimeCheck(db);
         stampSchemaVersion(db, 12);
+      },
+    },
+    {
+      to: 13,
+      apply: () => {
+        migrateSalidaErpStatus(db);
       },
     },
   ];
