@@ -129,3 +129,35 @@ botón de relanzar **no** ofrezca duplicar 21 013 unidades en el ERP:
 - `/api/health` 200; `/salida`, `/salida-history`, `/reports`, `/loading` 200; catálogo 401;
   `POST /api/salida/2/erp-result` sin sesión 401; CSP y HSTS presentes; asset con gzip e `immutable`; log escribible;
   el bundle servido contiene `salida-whatsapp` en el histórico y `salida.erpSent` en los estados.
+
+## Ajustes del 2026-11-16 (segunda tanda)
+
+Pedido del usuario tras usar el módulo en la planta:
+
+1. **Sin botón de copiar** en el bloque «Compartilhar por WhatsApp» del histórico: la acción es enviar.
+2. **Fotos (opcional) se movieron al histórico**: cada tarjeta de movimiento muestra sus miniaturas, permite borrar y
+   agregar (máximo 3, 5 MB, JPEG/PNG/WebP/HEIC) contra `POST /api/salida/:id/photos` y
+   `DELETE /api/salida/photos/:photoId`; con tres fotos la tarjeta lo dice. La pantalla de lanzamiento ya no pide
+   fotos: la evidencia se adjunta cuando el movimiento existe.
+3. **Botón de lanzamiento a su histórico**: `salida-nav-history`, 44 px, navega a `/salida-history`.
+4. **Previsualización reescrita al estilo de los otros módulos**: emojis, sin códigos de producto, el operador solo
+   con su nombre (sin unidades al lado), sin línea de estado y sin línea de total.
+
+Formato resultante (verificado con el constructor real):
+
+```text
+🚛 *Salidas del día — 16/11/2026*
+Movimientos: 1
+
+👤 *WILKIN*
+*📦 Embalajes*
+• EMBALAG. DISCO 400g — 6000 un
+*🧵 Bobinas*
+• BOBINA ROLO — 13 un
+```
+
+El código del producto (`1356`, `1900`) no aparece, y hay un test que lo prohíbe explícitamente.
+
+Evidencia: Vitest **208/208**, node **737/737**, typecheck limpio, build verde, E2E **118/118**. Deploy de `web`
+(`index-BT-toTM6.js`): el bundle servido ya no contiene ningún `salida-copy*`, el histórico trae el control de fotos
+y el lanzamiento trae `salida-nav-history`.

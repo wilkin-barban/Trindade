@@ -12,6 +12,15 @@ verificaciones está en [docs/release-android-historial.md](docs/release-android
 
 ## [Unreleased]
 
+### Salida/Baja: fotos en el histórico y vista previa real (2026-11-16)
+
+- **Fotos (opcional) se movieron** de `/salida` al histórico: se adjuntan sobre un movimiento existente (máximo 3),
+  con borrado y aviso al llegar al límite. El lanzamiento ya no pide evidencia antes de existir.
+- **Sin botón de copiar** en el bloque de WhatsApp del histórico; queda la acción de enviar.
+- **Botón al histórico desde el lanzamiento** (`salida-nav-history`).
+- **Previsualización reescrita**: emojis, sin códigos de producto, el operador solo con su nombre, sin línea de estado
+  y sin total del día.
+
 ### Salida/Baja: veredicto real del lote y compartir en el histórico (2026-11-16)
 
 - **Corregido el falso «no se lanzó»**: un movimiento de varios productos viaja como varios cuerpos en un ticket y el
