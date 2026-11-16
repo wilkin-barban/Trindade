@@ -225,18 +225,18 @@ describe('SalidaLaunchPage', () => {
     expect(screen.getByTestId('salida-summary-units').textContent).toContain('25');
   });
 
-  it('refuses a fourth photo', async () => {
+  it('does not render any photo picker or photo section on the launch screen', async () => {
     await renderReady();
-    const input = screen.getByTestId('salida-photo-input');
+    expect(screen.queryByTestId('salida-photo-input')).toBeNull();
+    expect(screen.queryByText(i18n.t('salida.photosTitle'))).toBeNull();
+  });
 
-    fireEvent.change(input, {
-      target: { files: [photoFile('a.jpg'), photoFile('b.jpg'), photoFile('c.jpg')] },
-    });
-    expect(screen.getAllByTestId(/salida-photo-remove-/)).toHaveLength(3);
-
-    fireEvent.change(input, { target: { files: [photoFile('d.jpg')] } });
-    expect(screen.getByTestId('salida-photo-error')).toBeInTheDocument();
-    expect(screen.getAllByTestId(/salida-photo-remove-/)).toHaveLength(3);
+  it('renders a 44px-high control that navigates to salida history', async () => {
+    await renderReady();
+    const historyBtn = screen.getByTestId('salida-nav-history');
+    expect(historyBtn).toBeInTheDocument();
+    expect(historyBtn.textContent).toMatch(/Histórico de Saídas|Histórico de Salidas/);
+    expect(historyBtn.className).toContain('min-h-[44px]');
   });
 
   it('writes the movement in Trindade before asking the ERP, and keeps it pending when the trip is refused', async () => {
@@ -250,10 +250,6 @@ describe('SalidaLaunchPage', () => {
       order.push(`post:${path}`);
       return { movement: MOVEMENT };
     });
-    upload.mockImplementation(async () => {
-      order.push('upload');
-      return { photo: { id: 1 } };
-    });
     ticket.mockImplementation(async () => {
       order.push('ticket');
       throw new Error('ticket refused');
@@ -262,14 +258,12 @@ describe('SalidaLaunchPage', () => {
     await renderReady();
 
     fireEvent.change(screen.getByTestId('salida-quantity-1474'), { target: { value: '20' } });
-    fireEvent.change(screen.getByTestId('salida-photo-input'), { target: { files: [photoFile('a.jpg')] } });
     fireEvent.click(screen.getByTestId('salida-launch'));
 
     await waitFor(() => expect(screen.getByTestId('salida-erp-answer')).toBeInTheDocument());
 
-    expect(order).toEqual(['post:/salida', 'upload', 'ticket']);
+    expect(order).toEqual(['post:/salida', 'ticket']);
     expect(post).toHaveBeenCalledWith('/salida', { items: [{ code: '1474', quantity: 20 }] });
-    expect(upload.mock.calls[0]?.[0]).toBe('/salida/12/photos');
     expect(ticket.mock.calls[0]?.[0]).toMatchObject({ action: 'saida' });
 
     // The movement is not lost: the dialog says the ERP has not answered and the outbox offers a resend.

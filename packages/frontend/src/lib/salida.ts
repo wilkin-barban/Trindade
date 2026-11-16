@@ -71,6 +71,13 @@ export const SALIDA_BLOCK_LABELS_PT: Record<SalidaBlock, string> = {
   'materia-prima': 'Matéria-Prima',
 };
 
+/** Emojis for each block in WhatsApp summary messages. */
+export const SALIDA_BLOCK_EMOJIS: Record<SalidaBlock, string> = {
+  embalagens: '📦',
+  bobinas: '🧵',
+  'materia-prima': '🌾',
+};
+
 /** The products of each block, keeping the catalogue order the server sent. */
 export function salidaProductsByBlock(
   products: readonly SalidaProduct[],
@@ -581,10 +588,11 @@ export function salidaPhotoRejection(
 export function salidaSummaryText(
   movement: Pick<SalidaMovement, 'movement_date' | 'username' | 'display_name' | 'items'>,
   labels: Record<SalidaBlock, string> = SALIDA_BLOCK_LABELS_PT,
+  title = 'Salida / Baixa',
 ): string {
   const lines: string[] = [];
-  lines.push(`*Salida / Baixa — ${formatDateLabel(movement.movement_date)}*`);
-  lines.push(`Operador: ${String(movement.username ?? '').toUpperCase()}`);
+  lines.push(`🚛 *${title} — ${formatDateLabel(movement.movement_date)}*`);
+  lines.push(`👤 *${String(movement.username ?? '').toUpperCase()}*`);
   lines.push('');
 
   const grouped = salidaProductsByBlock(
@@ -599,14 +607,13 @@ export function salidaSummaryText(
   for (const block of SALIDA_BLOCKS) {
     const products = grouped[block];
     if (products.length === 0) continue;
-    lines.push(`*${labels[block]}*`);
+    lines.push(`*${SALIDA_BLOCK_EMOJIS[block]} ${labels[block]}*`);
     for (const product of products) {
-      lines.push(`• ${product.code} ${product.name} — ${salidaQuantity(quantities.get(product.code))} un`);
+      lines.push(`• ${product.name} — ${salidaQuantity(quantities.get(product.code))} un`);
     }
     lines.push('');
   }
 
-  lines.push(`Total: ${salidaTotalUnits(movement.items)} un`);
   return lines.join('\n').trimEnd();
 }
 
@@ -614,10 +621,10 @@ export function salidaSummaryText(
 export interface SalidaDaySummaryLabels {
   title: string;
   movements: string;
-  total: string;
-  operator: string;
+  total?: string;
+  operator?: string;
   blocks: Record<SalidaBlock, string>;
-  status: Record<'reconciled' | 'partial' | 'pending', string> & { sent?: string };
+  status?: Record<'reconciled' | 'partial' | 'pending', string> & { sent?: string };
 }
 
 /** One movement as the day summary reads it: what left, who launched it and what the company answered. */
@@ -635,9 +642,9 @@ function productsOf(items: SalidaDayShareMovement['items'], labels: Record<Salid
   for (const block of SALIDA_BLOCKS) {
     const products = grouped[block];
     if (products.length === 0) continue;
-    lines.push(`*${labels[block]}*`);
+    lines.push(`*${SALIDA_BLOCK_EMOJIS[block]} ${labels[block]}*`);
     for (const product of products) {
-      lines.push(`• ${product.code} ${product.name} — ${salidaQuantity(quantities.get(product.code))} un`);
+      lines.push(`• ${product.name} — ${salidaQuantity(quantities.get(product.code))} un`);
     }
   }
   return lines;
@@ -645,10 +652,7 @@ function productsOf(items: SalidaDayShareMovement['items'], labels: Record<Salid
 
 /**
  * The whole day in one message: the date, how many movements it holds, each of them with its operator, its
- * blocks, its products and its state, and the total units at the end.
- *
- * The total is computed from the items and not from a field: the day summary is the operator's account of what
- * left, and a total that disagrees with the lines below it is worse than no total.
+ * blocks, and its products without product codes, status lines, or total line.
  */
 export function salidaDaySummaryText(
   movements: readonly SalidaDayShareMovement[],
@@ -656,29 +660,21 @@ export function salidaDaySummaryText(
 ): string {
   const { labels } = args;
   const lines: string[] = [];
-  lines.push(`*${labels.title} — ${formatDateLabel(args.date)}*`);
+  lines.push(`🚛 *${labels.title} — ${formatDateLabel(args.date)}*`);
   lines.push(`${labels.movements}: ${movements.length}`);
+
+  if (movements.length === 0) {
+    return lines.join('\n');
+  }
+
   lines.push('');
 
-  let total = 0;
   movements.forEach((movement, index) => {
-    const units = movement.items.reduce((sum, item) => sum + salidaQuantity(item.quantity), 0);
-    total += units;
-    lines.push(`*${index + 1}. ${String(movement.username ?? '').toUpperCase()} — ${units} un*`);
-    lines.push(`${labels.operator}: ${String(movement.display_name ?? movement.username ?? '')}`);
+    if (index > 0) lines.push('');
+    lines.push(`👤 *${String(movement.username ?? '').toUpperCase()}*`);
     lines.push(...productsOf(movement.items, labels.blocks));
-    const status = salidaPrimaryStatus(movement);
-    const labelStatus =
-      (labels.status as Record<string, string>)[status] ??
-      labels.status[salidaReconciliationStatus({ reconciliation: movement.reconciliation })] ??
-      status;
-    const entLans = salidaEntLans({ reconciliation: movement.reconciliation });
-    const suffix = entLans.length > 0 ? ` (ENT_LAN ${entLans.join(', ')})` : '';
-    lines.push(`*${labelStatus}*${suffix}`);
-    lines.push('');
   });
 
-  lines.push(`${labels.total}: ${total} un`);
   return lines.join('\n').trimEnd();
 }
 

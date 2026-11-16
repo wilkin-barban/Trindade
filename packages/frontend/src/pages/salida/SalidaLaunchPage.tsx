@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { History } from 'lucide-react';
 import { api } from '../../api/client';
 import { useAuth } from '../../contexts/AuthContext';
 import { Card, CardContent } from '../../components/ui/card';
@@ -8,7 +9,6 @@ import { Button } from '../../components/ui/button';
 import { LoadingSpinner } from '../../components/ui/loading-spinner';
 import { ModuleHelpModal, type HelpSection } from '../../components/ui/ModuleHelpModal';
 import { SalidaBlockSwitch, SalidaProductGrid } from '../../components/salida/SalidaBlocks';
-import { SalidaPhotoPicker, type SalidaPendingPhoto } from '../../components/salida/SalidaPhotoPicker';
 import { SalidaSummaryBar } from '../../components/salida/SalidaSummaryBar';
 import { SalidaSuccessDialog, type SalidaErpOutcome } from '../../components/salida/SalidaSuccessDialog';
 import { saoPauloToday } from '../../lib/date';
@@ -25,7 +25,6 @@ import { requestAeroBridgeTicket } from '../../lib/aero-vault';
 import {
   SALIDA_BLOCKS,
   SALIDA_FALLBACK_PRODUCTS,
-  SALIDA_MAX_PHOTOS,
   SALIDA_TICKET_REFUSED,
   buildSalidaPayloads,
   buildSalidaTrips,
@@ -39,7 +38,6 @@ import {
   salidaBatchToErpStatus,
   salidaDateLine,
   salidaItemsFromQuantities,
-  salidaPhotoRejection,
   salidaProductsByBlock,
   salidaSyncRequestedEvent,
   salidaSyncResultEvent,
@@ -77,8 +75,6 @@ export function SalidaLaunchPage() {
   const [catalogFailed, setCatalogFailed] = useState(false);
   const [activeBlocks, setActiveBlocks] = useState<SalidaBlock[]>([...SALIDA_BLOCKS]);
   const [quantities, setQuantities] = useState<Record<string, string>>({});
-  const [photos, setPhotos] = useState<SalidaPendingPhoto[]>([]);
-  const [photoError, setPhotoError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState<{ type: 'error' | 'info'; message: string } | null>(null);
   const [success, setSuccess] = useState<{
@@ -131,10 +127,6 @@ export function SalidaLaunchPage() {
     [quantities, catalog, activeBlocks],
   );
   const totalUnits = salidaTotalUnits(items);
-
-  const revokePhotos = useCallback((list: readonly SalidaPendingPhoto[]) => {
-    for (const photo of list) URL.revokeObjectURL(photo.previewUrl);
-  }, []);
 
   /**
    * Drives one trip to the ERP and answers whether the page handed it over.
@@ -352,42 +344,6 @@ export function SalidaLaunchPage() {
     setQuantities((current) => ({ ...current, [code]: raw }));
   };
 
-  const handleAddPhotos = (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    const list = Array.from(files);
-    const rejection = salidaPhotoRejection(
-      list.map((file) => ({ size: file.size, type: file.type })),
-      photos.length,
-    );
-    if (rejection) {
-      setPhotoError(
-        rejection === 'count'
-          ? t('salida.photoCountError', { max: SALIDA_MAX_PHOTOS })
-          : rejection === 'size'
-            ? t('salida.photoSizeError')
-            : t('salida.photoTypeError'),
-      );
-      return;
-    }
-    setPhotoError('');
-    setPhotos((current) => [
-      ...current,
-      ...list.map((file) => ({
-        id: `${file.name}-${file.lastModified}-${Math.random().toString(36).slice(2)}`,
-        file,
-        previewUrl: URL.createObjectURL(file),
-      })),
-    ]);
-  };
-
-  const handleRemovePhoto = (id: string) => {
-    setPhotos((current) => {
-      const removed = current.find((photo) => photo.id === id);
-      if (removed) URL.revokeObjectURL(removed.previewUrl);
-      return current.filter((photo) => photo.id !== id);
-    });
-  };
-
   const handleLaunch = async () => {
     if (items.length === 0) {
       setNotice({ type: 'error', message: t('salida.emptySelection') });
@@ -396,7 +352,6 @@ export function SalidaLaunchPage() {
 
     setSubmitting(true);
     setNotice(null);
-    const pending = [...photos];
     const payloads = buildSalidaPayloads(items, {
       date,
       username: user?.username ?? '',
@@ -407,13 +362,6 @@ export function SalidaLaunchPage() {
       create: async (list) => {
         const body = await api.post<{ movement: SalidaMovement }>('/salida', { items: list });
         return body.movement;
-      },
-      uploadPhotos: async (movement) => {
-        for (const photo of pending) {
-          const form = new FormData();
-          form.append('file', photo.file);
-          await api.upload(`/salida/${movement.id}/photos`, form);
-        }
       },
       sendToErp: (movement) => sendToErp(movement, payloads),
     });
@@ -430,10 +378,6 @@ export function SalidaLaunchPage() {
 
     // The movement is in Trindade: the form empties so the same quantities cannot be filed twice.
     setQuantities({});
-    revokePhotos(photos);
-    setPhotos([]);
-
-    if (outcome.photoError) setNotice({ type: 'error', message: t('salida.photoUploadError') });
 
     if (outcome.erp === 'sent') return;
 
@@ -484,6 +428,18 @@ export function SalidaLaunchPage() {
               </div>
             </div>
             <p className="mt-1 text-sm text-gray-500">{t('salida.subtitle')}</p>
+          </div>
+          <div className="flex w-full items-center gap-2 sm:w-auto sm:shrink-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate('/salida-history')}
+              className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 text-sm font-semibold sm:w-auto"
+              data-testid="salida-nav-history"
+            >
+              <History className="h-4 w-4" />
+              {t('salida.navHistory')}
+            </Button>
           </div>
         </div>
 
@@ -570,18 +526,6 @@ export function SalidaLaunchPage() {
               );
             })}
           </div>
-        </CardContent>
-      </Card>
-
-      <Card className="border-gray-200 shadow-sm">
-        <CardContent className="p-4 sm:p-6">
-          <SalidaPhotoPicker
-            photos={photos}
-            onAdd={handleAddPhotos}
-            onRemove={handleRemovePhoto}
-            error={photoError}
-            disabled={submitting}
-          />
         </CardContent>
       </Card>
 

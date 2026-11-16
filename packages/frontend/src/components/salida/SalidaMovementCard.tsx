@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ImageOff, MessageCircle, RefreshCw } from 'lucide-react';
+import { ImageOff, MessageCircle, RefreshCw, Trash2 } from 'lucide-react';
 import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import { formatDateLabel } from '../../lib/date';
 import {
   SALIDA_BLOCKS,
+  SALIDA_MAX_PHOTOS,
   canRelaunchSalida,
   salidaEntLans,
+  salidaPhotoRejection,
   salidaPrimaryStatus,
   salidaPrimaryStatusLabelKey,
   salidaProductsByBlock,
@@ -16,6 +18,8 @@ import {
   type SalidaBlock,
   type SalidaMovement,
 } from '../../lib/salida';
+import { SalidaPhotoPicker } from './SalidaPhotoPicker';
+import { api } from '../../api/client';
 
 /**
  * One movement of the history, as a card: what left, when, by whom, and whether the company agreed.
@@ -30,12 +34,14 @@ export function SalidaMovementCard({
   timeLabel,
   onShare,
   onResend,
+  onRefresh,
   resending = false,
 }: {
   movement: SalidaMovement;
   timeLabel: string;
   onShare: (movement: SalidaMovement) => void;
   onResend?: (movement: SalidaMovement) => void;
+  onRefresh?: () => void;
   resending?: boolean;
 }) {
   const { t } = useTranslation();
@@ -43,8 +49,59 @@ export function SalidaMovementCard({
   // bytes the server no longer has. The ids it answered 404 for are remembered so the tile can say so instead of
   // leaving the browser's broken-image glyph where a photo used to be.
   const [unavailablePhotos, setUnavailablePhotos] = useState<ReadonlySet<number>>(() => new Set());
+  const [uploading, setUploading] = useState(false);
+  const [deletingPhotoId, setDeletingPhotoId] = useState<number | null>(null);
+  const [photoError, setPhotoError] = useState('');
+
   const markPhotoUnavailable = (photoId: number) =>
     setUnavailablePhotos((current) => new Set(current).add(photoId));
+
+  const handleDeletePhoto = async (photoId: number) => {
+    setDeletingPhotoId(photoId);
+    setPhotoError('');
+    try {
+      await api.del(`/salida/photos/${photoId}`);
+      onRefresh?.();
+    } catch {
+      setPhotoError(t('salida.photoDeleteError'));
+    } finally {
+      setDeletingPhotoId(null);
+    }
+  };
+
+  const handleAddPhoto = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const fileList = Array.from(files);
+    const rejection = salidaPhotoRejection(
+      fileList.map((f) => ({ size: f.size, type: f.type })),
+      movement.photos.length,
+    );
+    if (rejection) {
+      setPhotoError(
+        rejection === 'count'
+          ? t('salida.photoCountError', { max: SALIDA_MAX_PHOTOS })
+          : rejection === 'size'
+            ? t('salida.photoSizeError')
+            : t('salida.photoTypeError'),
+      );
+      return;
+    }
+    setPhotoError('');
+    setUploading(true);
+    try {
+      for (const file of fileList) {
+        const form = new FormData();
+        form.append('file', file);
+        await api.upload(`/salida/${movement.id}/photos`, form);
+      }
+      onRefresh?.();
+    } catch {
+      setPhotoError(t('salida.photoUploadError'));
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const status = salidaPrimaryStatus(movement);
   const entLans = salidaEntLans(movement);
   const blocks = SALIDA_BLOCKS.filter((block) => movement.items.some((item) => item.block === block));
@@ -132,31 +189,52 @@ export function SalidaMovementCard({
                 unavailablePhotos.has(photo.id) ? (
                   <div
                     key={photo.id}
-                    className="flex aspect-square flex-col items-center justify-center gap-1 rounded-md border border-dashed border-gray-300 bg-gray-50 p-1 text-center"
+                    className="relative flex aspect-square flex-col items-center justify-center gap-1 rounded-md border border-dashed border-gray-300 bg-gray-50 p-1 text-center"
                     data-testid={`salida-photo-unavailable-${photo.id}`}
                   >
                     <ImageOff className="h-5 w-5 text-gray-400" aria-hidden="true" />
                     <span className="text-[11px] font-semibold leading-tight text-gray-700">
                       {t('salida.photoUnavailable')}
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => void handleDeletePhoto(photo.id)}
+                      disabled={deletingPhotoId === photo.id}
+                      className="absolute right-1 top-1 inline-flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white shadow hover:bg-red-700 disabled:opacity-50"
+                      aria-label={t('salida.photoRemove')}
+                      data-testid={`salida-photo-delete-${photo.id}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
                 ) : (
-                  <a
-                    key={photo.id}
-                    href={photo.publicUrl || photo.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block aspect-square overflow-hidden rounded-md border border-gray-200"
-                    title={t('salida.photoDownload')}
-                    data-testid={`salida-photo-${photo.id}`}
-                  >
-                    <img
-                      src={photo.publicUrl || photo.url}
-                      alt={t('salida.photoDownload')}
-                      className="h-full w-full object-cover"
-                      onError={() => markPhotoUnavailable(photo.id)}
-                    />
-                  </a>
+                  <div key={photo.id} className="relative aspect-square overflow-hidden rounded-md border border-gray-200">
+                    <a
+                      href={photo.publicUrl || photo.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block h-full w-full"
+                      title={t('salida.photoDownload')}
+                      data-testid={`salida-photo-${photo.id}`}
+                    >
+                      <img
+                        src={photo.publicUrl || photo.url}
+                        alt={t('salida.photoDownload')}
+                        className="h-full w-full object-cover"
+                        onError={() => markPhotoUnavailable(photo.id)}
+                      />
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => void handleDeletePhoto(photo.id)}
+                      disabled={deletingPhotoId === photo.id}
+                      className="absolute right-1 top-1 inline-flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white shadow hover:bg-red-700 disabled:opacity-50"
+                      aria-label={t('salida.photoRemove')}
+                      data-testid={`salida-photo-delete-${photo.id}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 ),
               )}
             </div>
@@ -168,6 +246,23 @@ export function SalidaMovementCard({
           </div>
         ) : (
           <p className="mt-3 text-xs text-gray-400">{t('salida.noPhotos')}</p>
+        )}
+
+        {movement.photos.length >= SALIDA_MAX_PHOTOS ? (
+          <p className="mt-2 text-xs font-medium text-gray-500" data-testid={`salida-photos-max-${movement.id}`}>
+            {t('salida.photosMaxReached')}
+          </p>
+        ) : (
+          <div className="mt-2">
+            <SalidaPhotoPicker
+              photos={[]}
+              onAdd={(files) => void handleAddPhoto(files)}
+              error={photoError}
+              disabled={uploading}
+              compact
+              existingCount={movement.photos.length}
+            />
+          </div>
         )}
 
         <div className="mt-3 flex flex-wrap gap-2">

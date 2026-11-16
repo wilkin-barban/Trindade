@@ -23,6 +23,8 @@ import {
  */
 const get = vi.fn();
 const post = vi.fn();
+const upload = vi.fn();
+const del = vi.fn();
 const ticket = vi.fn();
 
 /** Every audit line this page posted, in order. */
@@ -32,6 +34,8 @@ vi.mock('../../api/client', () => ({
   api: {
     get: (...args: unknown[]) => get(...args),
     post: (...args: unknown[]) => post(...args),
+    upload: (...args: unknown[]) => upload(...args),
+    del: (...args: unknown[]) => del(...args),
   },
   apiUrl: (path: string) => path,
   ApiClientError: class ApiClientError extends Error {},
@@ -508,7 +512,7 @@ describe('SalidaHistoryPage — iPhone share and layout', () => {
     const args = shareSalidaMock.mock.calls[0]![0];
     expect(args.text).toContain('Movimientos: 2');
     expect(args.text).toContain('EMBALAG. NHOQUE 1kg');
-    expect(args.text).toContain('Total: 40 un');
+    expect(args.text).not.toContain('Total:');
     expect(args.photos?.length).toBe(2);
     expect(args.photos?.[0]).toBeInstanceOf(File);
   });
@@ -664,7 +668,7 @@ describe('SalidaHistoryPage — T3 per-movement state, relaunch, operator filter
     expect(screen.queryByRole('combobox', { name: /operador|trabajador/i })).toBeNull();
   });
 
-  it('persists phone number to storage and displays live message preview', async () => {
+  it('persists phone number to storage, displays live message preview, and has no copy report button', async () => {
     get.mockImplementation(async (url: string) =>
       url === '/salida/history'
         ? { days: [{ date: '2026-11-13', total_units: 20, movements: [RECONCILED] }] }
@@ -683,9 +687,70 @@ describe('SalidaHistoryPage — T3 per-movement state, relaunch, operator filter
     expect(preview.textContent).toContain('Salidas del día — 13/11/2026');
     expect(preview.textContent).toContain('EMBALAG. NHOQUE 1kg');
 
-    // Copy action
-    fireEvent.click(screen.getByTestId('salida-copy-day'));
-    await waitFor(() => expect(screen.getByTestId('salida-share-note')).toBeInTheDocument());
-    expect(screen.getByTestId('salida-share-note').textContent).toBe(i18n.t('salida.copiedSummary'));
+    // The copy button was removed per user request: only WhatsApp send button remains
+    expect(screen.queryByTestId('salida-copy-day')).toBeNull();
+    expect(screen.getByTestId('salida-share-day')).toBeInTheDocument();
+  });
+
+  it('allows adding a photo to a movement card with fewer than 3 photos and deletes existing photo', async () => {
+    const singlePhotoMovement = movement({
+      id: 50,
+      photos: [
+        {
+          id: 501,
+          file_path: '501.jpg',
+          file_size: 1024,
+          mime_type: 'image/jpeg',
+          url: '/api/salida/photos/501',
+          publicUrl: 'https://example.test/api/salida/photos/public/501',
+          created_at: '2026-11-13T12:00:00.000Z',
+        },
+      ],
+    });
+
+    get.mockImplementation(async (url: string) =>
+      url === '/salida/history'
+        ? { days: [{ date: '2026-11-13', total_units: 20, movements: [singlePhotoMovement] }] }
+        : {},
+    );
+    upload.mockResolvedValue({ photo: { id: 502 } });
+    del.mockResolvedValue({ success: true });
+
+    await renderReady('/salida-history?date=2026-11-13');
+
+    // Delete existing photo
+    const deleteBtn = screen.getByTestId('salida-photo-delete-501');
+    expect(deleteBtn).toBeInTheDocument();
+    fireEvent.click(deleteBtn);
+    await waitFor(() => expect(del).toHaveBeenCalledWith('/salida/photos/501'));
+
+    // Add photo
+    const photoInput = screen.getByTestId('salida-photo-input');
+    expect(photoInput).toBeInTheDocument();
+    const newFile = new File(['image-bytes'], 'test.jpg', { type: 'image/jpeg' });
+    fireEvent.change(photoInput, { target: { files: [newFile] } });
+    await waitFor(() => expect(upload).toHaveBeenCalledWith('/salida/50/photos', expect.any(FormData)));
+  });
+
+  it('shows max photos reached notice when a movement already has 3 photos and hides add control', async () => {
+    const fullPhotosMovement = movement({
+      id: 60,
+      photos: [
+        { id: 601, file_path: '1.jpg', file_size: 100, mime_type: 'image/jpeg', url: '/api/salida/photos/601', created_at: '' },
+        { id: 602, file_path: '2.jpg', file_size: 100, mime_type: 'image/jpeg', url: '/api/salida/photos/602', created_at: '' },
+        { id: 603, file_path: '3.jpg', file_size: 100, mime_type: 'image/jpeg', url: '/api/salida/photos/603', created_at: '' },
+      ],
+    });
+
+    get.mockImplementation(async (url: string) =>
+      url === '/salida/history'
+        ? { days: [{ date: '2026-11-13', total_units: 20, movements: [fullPhotosMovement] }] }
+        : {},
+    );
+
+    await renderReady('/salida-history?date=2026-11-13');
+
+    expect(screen.getByTestId('salida-photos-max-60')).toBeInTheDocument();
+    expect(screen.queryByTestId('salida-photo-input')).toBeNull();
   });
 });

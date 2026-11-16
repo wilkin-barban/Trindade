@@ -19,32 +19,39 @@ export interface SalidaPendingPhoto {
  * page.
  */
 export function SalidaPhotoPicker({
-  photos,
+  photos = [],
   onAdd,
   onRemove,
-  error,
+  error = '',
   disabled = false,
+  compact = false,
+  existingCount = 0,
 }: {
-  photos: readonly SalidaPendingPhoto[];
+  photos?: readonly SalidaPendingPhoto[];
   onAdd: (files: FileList | null) => void;
-  onRemove: (id: string) => void;
-  error: string;
+  onRemove?: (id: string) => void;
+  error?: string;
   disabled?: boolean;
+  compact?: boolean;
+  existingCount?: number;
 }) {
   const { t } = useTranslation();
-  const full = photos.length >= SALIDA_MAX_PHOTOS;
+  const totalCount = existingCount + photos.length;
+  const full = totalCount >= SALIDA_MAX_PHOTOS;
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="text-base font-semibold text-gray-900">{t('salida.photosTitle')}</h2>
-          <p className="text-xs text-gray-500">{t('salida.photosSubtitle')}</p>
+    <div className={compact ? 'space-y-2' : 'space-y-3'}>
+      {!compact && (
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold text-gray-900">{t('salida.photosTitle')}</h2>
+            <p className="text-xs text-gray-500">{t('salida.photosSubtitle')}</p>
+          </div>
+          <span className="shrink-0 text-xs font-semibold tabular-nums text-gray-500">
+            {totalCount}/{SALIDA_MAX_PHOTOS}
+          </span>
         </div>
-        <span className="shrink-0 text-xs font-semibold tabular-nums text-gray-500">
-          {photos.length}/{SALIDA_MAX_PHOTOS}
-        </span>
-      </div>
+      )}
 
       {photos.length > 0 && (
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
@@ -54,17 +61,19 @@ export function SalidaPhotoPicker({
               className="relative aspect-square overflow-hidden rounded-lg border border-gray-200"
             >
               <img src={photo.previewUrl} alt={photo.file.name} className="h-full w-full object-cover" />
-              <button
-                type="button"
-                onClick={() => onRemove(photo.id)}
-                className="absolute right-1 top-1 inline-flex h-11 w-11 items-start justify-end rounded-full"
-                aria-label={t('salida.photoRemove')}
-                data-testid={`salida-photo-remove-${photo.id}`}
-              >
-                <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-red-600 text-white shadow">
-                  <Trash2 className="h-4 w-4" />
-                </span>
-              </button>
+              {onRemove && (
+                <button
+                  type="button"
+                  onClick={() => onRemove(photo.id)}
+                  className="absolute right-1 top-1 inline-flex h-11 w-11 items-start justify-end rounded-full"
+                  aria-label={t('salida.photoRemove')}
+                  data-testid={`salida-photo-remove-${photo.id}`}
+                >
+                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-red-600 text-white shadow">
+                    <Trash2 className="h-4 w-4" />
+                  </span>
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -93,7 +102,7 @@ export function SalidaPhotoPicker({
           />
         </label>
         <p className="text-[11px] text-gray-500">
-          {t('salida.photoHelp', { count: photos.length, max: SALIDA_MAX_PHOTOS })}
+          {t('salida.photoHelp', { count: totalCount, max: SALIDA_MAX_PHOTOS })}
         </p>
       </div>
 

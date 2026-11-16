@@ -2,16 +2,15 @@ import { useTranslation } from 'react-i18next';
 import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { Send, Copy } from 'lucide-react';
+import { Send } from 'lucide-react';
 import { formatPhoneMask } from '../../lib/phone';
 
 interface SalidaWhatsAppShareProps {
   phone: string;
   onPhoneChange: (val: string) => void;
   previewMessage: string;
-  onCopy: () => void;
   onOpenWhatsApp: () => void;
-  copyNote: string;
+  copyNote?: string;
   disabled?: boolean;
 }
 
@@ -19,9 +18,8 @@ export function SalidaWhatsAppShare({
   phone,
   onPhoneChange,
   previewMessage,
-  onCopy,
   onOpenWhatsApp,
-  copyNote,
+  copyNote = '',
   disabled = false,
 }: SalidaWhatsAppShareProps) {
   const { t } = useTranslation();
@@ -56,27 +54,16 @@ export function SalidaWhatsAppShare({
               </span>
             </div>
 
-            <div className="flex flex-col gap-3 pt-2 sm:flex-row">
+            <div className="pt-2">
               <Button
                 type="button"
                 onClick={onOpenWhatsApp}
                 disabled={disabled}
-                className="flex-1 bg-green-600 font-semibold text-white hover:bg-green-700"
+                className="w-full bg-green-600 font-semibold text-white hover:bg-green-700 sm:w-auto"
                 data-testid="salida-share-day"
               >
                 <Send className="mr-2 h-4 w-4" />
                 {t('salida.openWhatsApp')}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onCopy}
-                disabled={disabled}
-                className="flex-1 font-semibold"
-                data-testid="salida-copy-day"
-              >
-                <Copy className="mr-2 h-4 w-4" />
-                {t('salida.copyReport')}
               </Button>
             </div>
 

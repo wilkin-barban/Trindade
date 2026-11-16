@@ -551,20 +551,6 @@ export function SalidaHistoryPage() {
     }
   };
 
-  const handleCopyReport = async () => {
-    if (visibleMovements.length === 0) return;
-    setNotice(null);
-    setCopyNote('');
-    const outcome = await shareSalida({ text: previewMessage });
-    if (outcome === 'copied' || outcome === 'shared') {
-      setCopyNote(t('salida.copiedSummary'));
-      setNotice({ type: 'success', message: t('salida.copiedSummary') });
-    } else {
-      setCopyNote(t('salida.shareFailed'));
-      setNotice({ type: 'error', message: t('salida.shareFailed') });
-    }
-  };
-
   const pendingCount = visibleMovements.filter(
     (movement) => salidaPrimaryStatus(movement) === 'pending',
   ).length;
@@ -700,6 +686,7 @@ export function SalidaHistoryPage() {
               timeLabel={salidaTimeLabel(movement.created_at)}
               onShare={(target) => void shareMovement(target)}
               onResend={(target) => void resendToErp(target)}
+              onRefresh={() => void load()}
               resending={resendingId === movement.id}
             />
           ))}
@@ -713,7 +700,6 @@ export function SalidaHistoryPage() {
           onPhoneChange={setPhone}
           previewMessage={previewMessage}
           onOpenWhatsApp={() => void handleOpenWhatsApp()}
-          onCopy={() => void handleCopyReport()}
           copyNote={copyNote}
           disabled={visibleMovements.length === 0}
         />

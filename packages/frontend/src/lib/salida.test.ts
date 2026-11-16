@@ -337,14 +337,35 @@ describe('photos', () => {
 describe('the summary an operator forwards', () => {
   const text = salidaSummaryText(movement());
 
-  it('names the day, the operator, every block, every product and the total', () => {
-    assert.match(text, /13\/11\/2026/);
-    assert.match(text, /WILKIN/);
-    assert.match(text, /Embalagens/);
-    assert.match(text, /Matéria-Prima/);
-    assert.match(text, /1474 EMBALAG\. NHOQUE 1kg — 20 un/);
-    assert.match(text, /1673 GORDURA VEGETAL — 5 un/);
-    assert.match(text, /Total: 25 un/);
+  it('names the day with module emoji, the operator alone with emoji, blocks with emojis, and products without codes or total', () => {
+    assert.match(text, /🚛 \*Salida \/ Baixa — 13\/11\/2026\*/);
+    assert.match(text, /👤 \*WILKIN\*/);
+    assert.match(text, /📦 Embalagens/);
+    assert.match(text, /🌾 Matéria-Prima/);
+    assert.match(text, /• EMBALAG\. NHOQUE 1kg — 20 un/);
+    assert.match(text, /• GORDURA VEGETAL — 5 un/);
+    assert.doesNotMatch(text, /Operador:/);
+    assert.doesNotMatch(text, /Total:/);
+  });
+
+  it('never contains a product code like 1356 or 1474 in the message', () => {
+    const textWith1356 = salidaSummaryText({
+      movement_date: '2026-11-13',
+      username: 'wilkin',
+      items: [
+        {
+          id: 1,
+          product_code: '1356',
+          product_name: 'EMBALAG. DISCO 400g',
+          block: 'embalagens',
+          quantity: 10,
+          position: 0,
+        },
+      ],
+    });
+    assert.doesNotMatch(textWith1356, /\b1356\b/);
+    assert.doesNotMatch(text, /\b1474\b/);
+    assert.doesNotMatch(text, /\b1673\b/);
   });
 
   it('translates the block titles when the screen passes its dictionary', () => {

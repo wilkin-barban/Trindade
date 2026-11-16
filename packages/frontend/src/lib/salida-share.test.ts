@@ -44,7 +44,7 @@ const labels = {
 } as const;
 
 describe('salidaDaySummaryText', () => {
-  it('names the day, how many movements it holds and their total', () => {
+  it('names the day, how many movements it holds and products without codes or total', () => {
     const text = salidaDaySummaryText(
       [movement({ id: 1 }), movement({ id: 2, total_units: 5, items: [{
         id: 20,
@@ -57,18 +57,20 @@ describe('salidaDaySummaryText', () => {
       { date: '2026-11-14', labels },
     );
 
-    assert.match(text, /Salidas del día/);
+    assert.match(text, /🚛 \*Salidas del día/);
     assert.match(text, /14\/11\/2026/);
     assert.match(text, /Movimientos: 2/);
     // The products keep their Portuguese names; only the labels come from the dictionary.
     assert.match(text, /EMBALAG\. NHOQUE 1kg/);
     assert.match(text, /BOBINA ROLO/);
-    assert.match(text, /Embalajes/);
-    assert.match(text, /Bobinas/);
-    assert.match(text, /Total: 25 un/);
+    assert.match(text, /📦 Embalajes/);
+    assert.match(text, /🧵 Bobinas/);
+    assert.doesNotMatch(text, /Total:/);
+    assert.doesNotMatch(text, /\b1474\b/);
+    assert.doesNotMatch(text, /\b1900\b/);
   });
 
-  it('carries the operator and the reconciliation state of each movement', () => {
+  it('carries the operator alone with emoji and no status line', () => {
     const text = salidaDaySummaryText(
       [
         movement({ id: 1, reconciliation: { status: 'reconciled', ent_lans: [4242], matched_item_ids: [10] } }),
@@ -77,16 +79,17 @@ describe('salidaDaySummaryText', () => {
       { date: '2026-11-14', labels },
     );
 
-    assert.match(text, /WILKIN/);
-    assert.match(text, /ERP OK/);
-    assert.match(text, /Parcial/);
-    assert.match(text, /4242/);
+    assert.match(text, /👤 \*WILKIN\*/);
+    assert.doesNotMatch(text, /ERP OK/);
+    assert.doesNotMatch(text, /Parcial/);
+    assert.doesNotMatch(text, /4242/);
+    assert.doesNotMatch(text, /Operador:/);
   });
 
-  it('answers an empty day with a text that says so instead of a bare total', () => {
+  it('answers an empty day with movements count 0 and no total line', () => {
     const text = salidaDaySummaryText([], { date: '2026-11-14', labels });
     assert.match(text, /Movimientos: 0/);
-    assert.match(text, /Total: 0 un/);
+    assert.doesNotMatch(text, /Total:/);
   });
 });
 
