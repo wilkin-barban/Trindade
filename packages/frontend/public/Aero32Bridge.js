@@ -106,5 +106,40 @@ for (let indice = 0; indice < cuerpos.length; indice += 1) {
 // exactamente lo que la página ya sabe leer.
 const resultado = respuestas.length === 1 ? respuestas[0] : '[' + respuestas.join(',') + ']';
 
-Safari.open(sobre.callback + encodeURIComponent(resultado));
+// Si el servidor soporta almacenar el resultado en el cofre, se envía por POST con el ticket para
+// que la URL de retorno no desborde el límite de encabezados del proxy.
+if (sobre.resultUrl) {
+  let datoResultado = resultado;
+  try {
+    datoResultado = JSON.parse(resultado);
+  } catch (error) {
+    datoResultado = resultado;
+  }
+
+  let urlResultado = sobre.resultUrl;
+  if (!/^https?:\/\//i.test(urlResultado)) {
+    const origen = (ticketUrl.match(/^(https?:\/\/[^\/]+)/) || [])[1] || '';
+    urlResultado = origen + (urlResultado.startsWith('/') ? '' : '/') + urlResultado;
+  }
+
+  try {
+    const envioResultado = new Request(urlResultado);
+    envioResultado.method = 'POST';
+    envioResultado.headers = {
+      'X-Trindade-Ticket': ticket,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    };
+    envioResultado.body = JSON.stringify({ data: datoResultado });
+    envioResultado.allowInsecureRequest = true;
+    envioResultado.timeoutInterval = TIEMPO_LIMITE;
+    await envioResultado.loadString();
+  } catch (error) {
+    // Si el guardado falla, la página leerá el estado no disponible en el servidor.
+  }
+
+  Safari.open(sobre.callback + '&aero_result=stored');
+} else {
+  Safari.open(sobre.callback + encodeURIComponent(resultado));
+}
 Script.complete();

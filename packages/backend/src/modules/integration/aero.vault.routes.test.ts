@@ -403,9 +403,10 @@ describe('ERP vault and bridge tickets', () => {
       assert.equal(redeemed.statusCode, 200);
       assert.equal(redeemed.headers['cache-control'], 'no-store');
       const envelope = redeemed.json() as Record<string, unknown>;
-      assert.deepEqual(Object.keys(envelope).sort(), ['body', 'callback', 'headers', 'method', 'url']);
+      assert.deepEqual(Object.keys(envelope).sort(), ['body', 'callback', 'headers', 'method', 'resultUrl', 'url']);
       assert.equal(envelope.url, 'http://192.168.25.250:1453/api/entradasitem');
       assert.equal(envelope.method, 'POST');
+      assert.equal(envelope.resultUrl, '/api/integration/aero/bridge-tickets/result');
       assert.deepEqual(envelope.headers, {
         Authorization: `Basic ${Buffer.from('WILKIN:senha-do-erp').toString('base64')}`,
         'Content-Type': 'application/json',
@@ -600,6 +601,200 @@ describe('ERP vault and bridge tickets', () => {
         .get() as { n: number };
       assert.equal(audited.n, 0);
       assert.equal(TEST_VAULT_KEY.length > 0, true);
+    });
+
+    it('includes resultUrl in the redeemed envelope', async () => {
+      await configure();
+      const issued = await app.inject({
+        method: 'POST',
+        url: '/api/integration/aero/bridge-tickets',
+        headers: auth(wilkinToken),
+        payload: { action: 'test', payloads: [{}] },
+      });
+      const redeemed = await app.inject({
+        method: 'POST',
+        url: '/api/integration/aero/bridge-tickets/redeem',
+        headers: { 'x-trindade-ticket': (issued.json() as { ticket: string }).ticket },
+      });
+      assert.equal(redeemed.statusCode, 200);
+      assert.equal(redeemed.json().resultUrl, '/api/integration/aero/bridge-tickets/result');
+    });
+  });
+
+  describe('bridge ticket results', () => {
+    before(async () => {
+      await configure();
+    });
+
+    it('POST /bridge-tickets/result requires the x-trindade-ticket header (401)', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/integration/aero/bridge-tickets/result',
+        payload: { data: { success: true } },
+      });
+      assert.equal(response.statusCode, 401);
+      assert.equal(response.json().code, 'AERO_TICKET_MISSING');
+    });
+
+    it('POST /bridge-tickets/result answers 404 for an unknown ticket', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/integration/aero/bridge-tickets/result',
+        headers: { 'x-trindade-ticket': 'unknown-token-12345' },
+        payload: { data: { success: true } },
+      });
+      assert.equal(response.statusCode, 404);
+      assert.equal(response.json().code, 'AERO_TICKET_NOT_FOUND');
+    });
+
+    it('POST /bridge-tickets/result answers 413 when data exceeds 2 MB', async () => {
+      const issued = await app.inject({
+        method: 'POST',
+        url: '/api/integration/aero/bridge-tickets',
+        headers: auth(wilkinToken),
+        payload: { action: 'test', payloads: [{}] },
+      });
+      const ticket = (issued.json() as { ticket: string }).ticket;
+
+      const largeString = 'a'.repeat(2 * 1024 * 1024 + 10);
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/integration/aero/bridge-tickets/result',
+        headers: { 'x-trindade-ticket': ticket },
+        payload: { data: largeString },
+      });
+      assert.equal(response.statusCode, 413);
+      assert.equal(response.json().code, 'AERO_TICKET_TOO_LARGE');
+    });
+
+    it('POST /bridge-tickets/result stores result for a consumed ticket and is idempotent', async () => {
+      const issued = await app.inject({
+        method: 'POST',
+        url: '/api/integration/aero/bridge-tickets',
+        headers: auth(wilkinToken),
+        payload: { action: 'entrada', payloads: [{ PRO_COD: '000001' }] },
+      });
+      const ticket = (issued.json() as { ticket: string }).ticket;
+
+      // Consume the ticket
+      const redeemed = await app.inject({
+        method: 'POST',
+        url: '/api/integration/aero/bridge-tickets/redeem',
+        headers: { 'x-trindade-ticket': ticket },
+      });
+      assert.equal(redeemed.statusCode, 200);
+
+      // Store result on consumed ticket
+      const firstPost = await app.inject({
+        method: 'POST',
+        url: '/api/integration/aero/bridge-tickets/result',
+        headers: { 'x-trindade-ticket': ticket },
+        payload: { data: { lancamento: 100 } },
+      });
+      assert.equal(firstPost.statusCode, 200);
+      assert.deepEqual(firstPost.json(), { ok: true });
+      assert.equal(firstPost.headers['cache-control'], 'no-store');
+
+      // Post again (idempotent overwrite)
+      const secondPost = await app.inject({
+        method: 'POST',
+        url: '/api/integration/aero/bridge-tickets/result',
+        headers: { 'x-trindade-ticket': ticket },
+        payload: { data: { lancamento: 200, updated: true } },
+      });
+      assert.equal(secondPost.statusCode, 200);
+      assert.deepEqual(secondPost.json(), { ok: true });
+
+      // Verify GET last-result returns updated result
+      const lastResult = await app.inject({
+        method: 'GET',
+        url: '/api/integration/aero/bridge-tickets/last-result?action=entrada',
+        headers: auth(wilkinToken),
+      });
+      assert.equal(lastResult.statusCode, 200);
+      assert.deepEqual(lastResult.json(), { data: { lancamento: 200, updated: true } });
+    });
+
+    it('GET /bridge-tickets/last-result requires session authentication (401)', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/integration/aero/bridge-tickets/last-result?action=entrada',
+      });
+      assert.equal(response.statusCode, 401);
+    });
+
+    it('GET /bridge-tickets/last-result validates action query parameter (400)', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/integration/aero/bridge-tickets/last-result?action=invalid_action',
+        headers: auth(wilkinToken),
+      });
+      assert.equal(response.statusCode, 400);
+    });
+
+    it('GET /bridge-tickets/last-result returns 404 when result is outside 10-minute window', async () => {
+      const issued = await app.inject({
+        method: 'POST',
+        url: '/api/integration/aero/bridge-tickets',
+        headers: auth(wilkinToken),
+        payload: { action: 'movimentos', payloads: [{ ENTSAI: 'E' }] },
+      });
+      const ticket = (issued.json() as { ticket: string }).ticket;
+
+      await app.inject({
+        method: 'POST',
+        url: '/api/integration/aero/bridge-tickets/result',
+        headers: { 'x-trindade-ticket': ticket },
+        payload: { data: { seat: 'old' } },
+      });
+
+      // Age the result beyond 10 minutes
+      db.prepare("UPDATE aero_bridge_tickets SET result_at = datetime('now', '-11 minutes')").run();
+
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/integration/aero/bridge-tickets/last-result?action=movimentos',
+        headers: auth(wilkinToken),
+      });
+      assert.equal(response.statusCode, 404);
+      assert.equal(response.json().code, 'AERO_TICKET_RESULT_NOT_FOUND');
+    });
+
+    it('GET /bridge-tickets/last-result never returns another user result', async () => {
+      await configureAs(workerToken, 'WORKER');
+
+      const issued = await app.inject({
+        method: 'POST',
+        url: '/api/integration/aero/bridge-tickets',
+        headers: auth(workerToken),
+        payload: { action: 'test', payloads: [{}] },
+      });
+      const ticket = (issued.json() as { ticket: string }).ticket;
+
+      await app.inject({
+        method: 'POST',
+        url: '/api/integration/aero/bridge-tickets/result',
+        headers: { 'x-trindade-ticket': ticket },
+        payload: { data: { secretWorkerData: true } },
+      });
+
+      // Wilkin requests the result for action test
+      const wilkinResponse = await app.inject({
+        method: 'GET',
+        url: '/api/integration/aero/bridge-tickets/last-result?action=test',
+        headers: auth(wilkinToken),
+      });
+      assert.equal(wilkinResponse.statusCode, 404);
+      assert.equal(wilkinResponse.json().code, 'AERO_TICKET_RESULT_NOT_FOUND');
+
+      // Worker requests their own result
+      const workerResponse = await app.inject({
+        method: 'GET',
+        url: '/api/integration/aero/bridge-tickets/last-result?action=test',
+        headers: auth(workerToken),
+      });
+      assert.equal(workerResponse.statusCode, 200);
+      assert.deepEqual(workerResponse.json(), { data: { secretWorkerData: true } });
     });
   });
 });

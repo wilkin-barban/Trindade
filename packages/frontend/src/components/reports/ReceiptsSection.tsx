@@ -13,6 +13,7 @@ import {
   loadAeroSettings,
   parseAeroCallback,
   readAeroMovements,
+  resolveAeroCallback,
 } from '../../lib/aero-integration';
 import { triggerAeroMovementsSync } from '../../lib/aero-mirror';
 import { clearAeroBridgePending } from '../../lib/aero-watchdog';
@@ -171,25 +172,27 @@ export function ReceiptsSection({
 
   useEffect(() => {
     if (callbackHandled.current) return;
-    const parsed = parseAeroCallback(window.location.search);
-    if (!parsed) return;
-    if (parsed.kind === 'error') {
-      // El teléfono volvió sin la planta: no hubo asientos, así que no hay espejo que tocar ni día vacío que
-      // mostrar. El aviso dice qué revisar y el botón queda libre para el próximo intento.
+    void (async () => {
+      const parsed = await resolveAeroCallback(window.location.search);
+      if (!parsed) return;
+      if (parsed.kind === 'error') {
+        // El teléfono volvió sin la planta: no hubo asientos, así que no hay espejo que tocar ni día vacío que
+        // mostrar. El aviso dice qué revisar y el botón queda libre para el próximo intento.
+        callbackHandled.current = true;
+        window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`);
+        clearAeroBridgePending();
+        setBridgeError({
+          message: parsed.code === 'wifi_required' ? t('massas.aero.wifiRequired') : t('massas.aero.bridgeError'),
+          hint: parsed.message,
+        });
+        return;
+      }
+      if (parsed.kind !== 'bridge' || parsed.action !== 'movimentos') return;
       callbackHandled.current = true;
       window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`);
       clearAeroBridgePending();
-      setBridgeError({
-        message: parsed.code === 'wifi_required' ? t('massas.aero.wifiRequired') : t('massas.aero.bridgeError'),
-        hint: parsed.message,
-      });
-      return;
-    }
-    if (parsed.kind !== 'bridge' || parsed.action !== 'movimentos') return;
-    callbackHandled.current = true;
-    window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`);
-    clearAeroBridgePending();
-    void finishSync(parsed.data);
+      void finishSync(parsed.data);
+    })();
   }, [finishSync, t]);
 
   const handleSync = useCallback(() => {

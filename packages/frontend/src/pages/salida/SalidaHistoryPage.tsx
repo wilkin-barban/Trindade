@@ -16,12 +16,13 @@ import {
 } from '../../components/salida/SalidaSuccessDialog';
 import { saoPauloDaysAgo, saoPauloToday } from '../../lib/date';
 import {
+  AERO_SCRIPTABLE_CODE_PATH,
   aeroBridgeCallbackFor,
   buildAeroBridgeTriggerUrl,
   buildAeroMovementsSnapshot,
   buildMovimentoItemPayload,
-  parseAeroCallback,
   readAeroMovements,
+  resolveAeroCallback,
 } from '../../lib/aero-integration';
 import { readAeroBatchResult } from '../../lib/aero-feedback';
 import { markAeroBridgePending } from '../../lib/aero-watchdog';
@@ -250,31 +251,32 @@ export function SalidaHistoryPage() {
   // The shortcut comes back with the ERP's answer in the query. The seats are stored in the same mirror the other
   // screens read, and the day is reloaded so every card shows what the company actually has.
   useEffect(() => {
-    const callback = parseAeroCallback(location.search);
-    if (!callback) return;
+    let cancelled = false;
+    void (async () => {
+      const callback = await resolveAeroCallback(location.search);
+      if (!callback || cancelled) return;
 
-    const answered = new URLSearchParams(location.search).get('date');
-    const answeredDate = answered && /^\d{4}-\d{2}-\d{2}$/.test(answered) ? answered : date;
+      const answered = new URLSearchParams(location.search).get('date');
+      const answeredDate = answered && /^\d{4}-\d{2}-\d{2}$/.test(answered) ? answered : date;
 
-    if (callback.kind === 'bridge' && callback.action === 'movimentos') {
-      // The attempt this trip wrote before leaving pairs the answer with the request; it is read once here and
-      // forgotten, because the document that wrote it no longer exists.
-      const attempt = loadAeroPendingAttempt('movimentos');
-      if (attempt) clearAeroPendingAttempt();
+      if (callback.kind === 'bridge' && callback.action === 'movimentos') {
+        // The attempt this trip wrote before leaving pairs the answer with the request; it is read once here and
+        // forgotten, because the document that wrote it no longer exists.
+        const attempt = loadAeroPendingAttempt('movimentos');
+        if (attempt) clearAeroPendingAttempt();
 
-      const read = readAeroMovements(callback.data);
-      if (read.status === 'error') {
-        void postAeroAuditEvent(
-          salidaReadResultEvent({
-            date: answeredDate,
-            attempt,
-            seats: null,
-            error: read.message ?? 'movements_unreadable',
-          }),
-        );
-        setCheckError(read.message || t('salida.erpCheckError'));
-      } else {
-        void (async () => {
+        const read = readAeroMovements(callback.data);
+        if (read.status === 'error') {
+          void postAeroAuditEvent(
+            salidaReadResultEvent({
+              date: answeredDate,
+              attempt,
+              seats: null,
+              error: read.message ?? 'movements_unreadable',
+            }),
+          );
+          setCheckError(read.message || t('salida.erpCheckError'));
+        } else {
           try {
             await api.post(
               '/integration/aero/movements',
@@ -307,110 +309,114 @@ export function SalidaHistoryPage() {
             );
             setCheckError(t('salida.erpCheckError'));
           }
-        })();
-      }
-    } else if (callback.kind === 'bridge' && callback.action === 'saida') {
-      // A resend comes back here, not to the launch screen: same dialog, same trail, same attempt.
-      const attempt = loadAeroPendingAttempt('saida');
-      if (attempt) clearAeroPendingAttempt();
-
-      const queued = readSalidaOutbox();
-      const lastMovement = readSalidaLastMovement();
-      const expectedTripPayloads =
-        queued?.currentTripPayloads ??
-        queued?.trips[0]?.payloads.length ??
-        lastMovement?.expectedPayloads ??
-        lastMovement?.items.length ??
-        1;
-
-      const batchResult = readAeroBatchResult(callback.data, expectedTripPayloads);
-      const erpOutcome = salidaBatchToDialogOutcome(batchResult.state, batchResult.ok, batchResult.total);
-      const erpStatus = salidaBatchToErpStatus(batchResult.state, batchResult.ok, batchResult.total);
-
-      const movementId = lastMovement?.id ?? queued?.movementId;
-      if (movementId) {
-        void recordSalidaErpResult(movementId, { status: erpStatus, message: batchResult.message }, attempt);
-      }
-
-      const isComplete =
-        batchResult.state === 'complete' ||
-        (batchResult.state === 'legacy' && batchResult.ok === batchResult.total);
-
-      if (isComplete) {
-        void postAeroAuditEvent(
-          salidaSyncResultEvent({ attempt, outcome: 'ok', message: batchResult.message }),
-        );
-      } else {
-        const errorCode =
-          batchResult.message ??
-          (batchResult.state === 'unreadable'
-            ? 'bridge_unreadable'
-            : batchResult.state === 'partial'
-              ? 'batch_partial'
-              : 'batch_failed');
-        void postAeroAuditEvent(
-          salidaSyncResultEvent({
-            attempt,
-            outcome: 'error',
-            error: errorCode,
-            message: batchResult.message,
-          }),
-        );
-      }
-
-      setSuccess({ movement: lastMovement, erp: erpOutcome, message: batchResult.message });
-      if (isComplete) {
-        clearSalidaOutbox();
-        clearSalidaLastMovement();
-        setOutbox(null);
-      } else {
-        // The movement is still owed: the outbox and the card keep saying pending.
-        if (queued) {
-          writeSalidaOutbox({ ...queued, currentTripPayloads: undefined });
         }
-        setOutbox(readSalidaOutbox());
-      }
-      void load();
-    } else if (callback.kind === 'error') {
-      // The phone came back without the plant. Whichever trip it was, its result line is written with the code.
-      const readAttempt = loadAeroPendingAttempt('movimentos');
-      const syncAttempt = readAttempt ? null : loadAeroPendingAttempt('saida');
-      if (readAttempt || syncAttempt) clearAeroPendingAttempt();
+      } else if (callback.kind === 'bridge' && callback.action === 'saida') {
+        // A resend comes back here, not to the launch screen: same dialog, same trail, same attempt.
+        const attempt = loadAeroPendingAttempt('saida');
+        if (attempt) clearAeroPendingAttempt();
 
-      if (syncAttempt) {
-        const lastMovement = readSalidaLastMovement();
         const queued = readSalidaOutbox();
+        const lastMovement = readSalidaLastMovement();
+        const expectedTripPayloads =
+          queued?.currentTripPayloads ??
+          queued?.trips[0]?.payloads.length ??
+          lastMovement?.expectedPayloads ??
+          lastMovement?.items.length ??
+          1;
+
+        const batchResult = readAeroBatchResult(callback.data, expectedTripPayloads);
+        const erpOutcome = salidaBatchToDialogOutcome(batchResult.state, batchResult.ok, batchResult.total);
+        const erpStatus = salidaBatchToErpStatus(batchResult.state, batchResult.ok, batchResult.total);
+
         const movementId = lastMovement?.id ?? queued?.movementId;
         if (movementId) {
-          void recordSalidaErpResult(
-            movementId,
-            { status: 'failed', message: callback.message || callback.code },
-            syncAttempt,
+          void recordSalidaErpResult(movementId, { status: erpStatus, message: batchResult.message }, attempt);
+        }
+
+        const isComplete =
+          batchResult.state === 'complete' ||
+          (batchResult.state === 'legacy' && batchResult.ok === batchResult.total);
+
+        if (isComplete) {
+          void postAeroAuditEvent(
+            salidaSyncResultEvent({ attempt, outcome: 'ok', message: batchResult.message }),
+          );
+        } else {
+          const errorCode =
+            batchResult.message ??
+            (batchResult.state === 'unreadable'
+              ? 'bridge_unreadable'
+              : batchResult.state === 'partial'
+                ? 'batch_partial'
+                : 'batch_failed');
+          void postAeroAuditEvent(
+            salidaSyncResultEvent({
+              attempt,
+              outcome: 'error',
+              error: errorCode,
+              message: batchResult.message,
+            }),
           );
         }
-        void postAeroAuditEvent(
-          salidaSyncResultEvent({
-            attempt: syncAttempt,
-            outcome: 'error',
-            error: callback.code,
-            message: callback.message,
-          }),
-        );
-      } else {
-        void postAeroAuditEvent(
-          salidaReadResultEvent({
-            date: answeredDate,
-            attempt: readAttempt,
-            seats: null,
-            error: callback.code,
-            message: callback.message,
-          }),
-        );
-      }
-      setCheckError(salidaActionableErrorMessage(callback.code, callback.message, t));
-    }
 
-    setParams({ date: answeredDate }, { replace: true });
+        setSuccess({ movement: lastMovement, erp: erpOutcome, message: batchResult.message });
+        if (isComplete) {
+          clearSalidaOutbox();
+          clearSalidaLastMovement();
+          setOutbox(null);
+        } else {
+          // The movement is still owed: the outbox and the card keep saying pending.
+          if (queued) {
+            writeSalidaOutbox({ ...queued, currentTripPayloads: undefined });
+          }
+          setOutbox(readSalidaOutbox());
+        }
+        void load();
+      } else if (callback.kind === 'error') {
+        // The phone came back without the plant. Whichever trip it was, its result line is written with the code.
+        const readAttempt = loadAeroPendingAttempt('movimentos');
+        const syncAttempt = readAttempt ? null : loadAeroPendingAttempt('saida');
+        if (readAttempt || syncAttempt) clearAeroPendingAttempt();
+
+        if (syncAttempt) {
+          const lastMovement = readSalidaLastMovement();
+          const queued = readSalidaOutbox();
+          const movementId = lastMovement?.id ?? queued?.movementId;
+          if (movementId) {
+            void recordSalidaErpResult(
+              movementId,
+              { status: 'failed', message: callback.message || callback.code },
+              syncAttempt,
+            );
+          }
+          void postAeroAuditEvent(
+            salidaSyncResultEvent({
+              attempt: syncAttempt,
+              outcome: 'error',
+              error: callback.code,
+              message: callback.message,
+            }),
+          );
+        } else {
+          void postAeroAuditEvent(
+            salidaReadResultEvent({
+              date: answeredDate,
+              attempt: readAttempt,
+              seats: null,
+              error: callback.code,
+              message: callback.message,
+            }),
+          );
+        }
+        setCheckError(salidaActionableErrorMessage(callback.code, callback.message, t));
+      }
+
+      setParams({ date: answeredDate }, { replace: true });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [location.search, date, load, setParams, t]);
 
   /**
@@ -655,6 +661,24 @@ export function SalidaHistoryPage() {
             {t('salida.erpPending')}: {pendingCount}
           </p>
         )}
+
+        <div
+          data-testid="salida-bridge-update-notice"
+          className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"
+        >
+          <p className="font-semibold">{t('massas.aero.bridgeUpdateTitle')}</p>
+          <p className="mt-1 text-amber-800 leading-relaxed">
+            {t('massas.aero.bridgeUpdateSteps')}{' '}
+            <a
+              href={AERO_SCRIPTABLE_CODE_PATH}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium underline hover:text-amber-950 inline-flex items-center gap-1"
+            >
+              /Aero32Bridge.js
+            </a>
+          </p>
+        </div>
       </div>
 
       {visibleMovements.length === 0 ? (

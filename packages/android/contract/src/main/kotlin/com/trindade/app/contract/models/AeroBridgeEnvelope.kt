@@ -36,6 +36,7 @@ import kotlinx.serialization.Contextual
  * @param headers 
  * @param body 
  * @param callback 
+ * @param resultUrl 
  * @param bodies 
  */
 @Serializable
@@ -56,6 +57,9 @@ data class AeroBridgeEnvelope (
 
     @SerialName(value = "callback")
     val callback: kotlin.String,
+
+    @SerialName(value = "resultUrl")
+    val resultUrl: kotlin.String,
 
     @SerialName(value = "bodies")
     val bodies: kotlin.collections.List<kotlin.String>? = null

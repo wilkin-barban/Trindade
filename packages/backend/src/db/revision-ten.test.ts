@@ -148,6 +148,8 @@ describe('schema revision 10', () => {
       'expires_at',
       'used_at',
       'created_at',
+      'result',
+      'result_at',
     ]);
 
     // One vault row per owner, one ticket per token hash: both are enforced by the database, not by the service.

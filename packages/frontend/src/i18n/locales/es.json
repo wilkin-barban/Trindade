@@ -656,7 +656,9 @@
       "passwordNotStored": "No hay contraseña guardada: escribila una vez y queda cifrada en el servidor.",
       "passwordKeepPlaceholder": "Dejá vacío para conservar la guardada",
       "passwordNeeded": "La contraseña del ERP no está guardada en el servidor: abrí Admin → Integración y guardala para continuar.",
-      "bridgeError": "El puente devolvió un error. Revisá la conexión y reintentá."
+      "bridgeError": "El puente devolvió un error. Revisá la conexión y reintentá.",
+      "bridgeUpdateTitle": "Actualizar puente Aero32",
+      "bridgeUpdateSteps": "El puente debe actualizarse: abrí /Aero32Bridge.js en el navegador, copiá todo el código, Scriptable → + → pegá y renombrá a Aero32Bridge."
     },
     "historyShort": "Historial",
     "todayShort": "Hoy",

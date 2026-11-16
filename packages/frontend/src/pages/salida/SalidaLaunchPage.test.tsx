@@ -359,6 +359,34 @@ describe('SalidaLaunchPage', () => {
     expectNoCredential(audit);
   });
 
+  it('resolves stored bridge result via GET last-result when aero_result=stored', async () => {
+    writeSalidaLastMovement(MOVEMENT);
+    saveAeroPendingAttempt({
+      action: 'saida',
+      attemptId: 'attempt-saida-stored-1',
+      startedAt: 1_700_000_000_000,
+      date: '2026-11-13',
+    });
+    get.mockImplementation(async (url: string) => {
+      if (url === '/salida/catalog') return { products: [...SALIDA_FALLBACK_PRODUCTS] };
+      if (url === '/integration/aero/bridge-tickets/last-result?action=saida') {
+        return { data: { success: true, message: 'Saidas gravadas do cofre' } };
+      }
+      return {};
+    });
+
+    await renderReady('/salida?aero_action=saida&aero_result=stored');
+
+    await screen.findByTestId('salida-erp-answer');
+    await waitFor(() => expect(audit.length).toBeGreaterThan(0));
+
+    const result = lineOf('result');
+    expect(result.attemptId).toBe('attempt-saida-stored-1');
+    expect(result.httpStatus).toBe(200);
+    expect(result.response).toBe('Saidas gravadas do cofre');
+    expect(result.error).toBeNull();
+  });
+
   it('reports a refused ERP answer with no invented HTTP status', async () => {
     saveAeroPendingAttempt({
       action: 'saida',

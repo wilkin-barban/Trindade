@@ -40,6 +40,7 @@ import {
   purgeLegacyAeroPassword,
   readAeroBridgeResult,
   readAeroTestResult,
+  resolveAeroCallback,
   saveAeroPendingSync,
   saveAeroSettings,
   type AeroPendingSync,
@@ -962,6 +963,35 @@ describe('aero-integration: bridge callbacks', () => {
     });
   });
 
+  it('recognises aero_result=stored and exposes resultRef with data absent', () => {
+    const parsed = parseAeroCallback('?aero_action=entrada&aero_data=&aero_result=stored');
+    assert.deepEqual(parsed, {
+      kind: 'bridge',
+      action: 'entrada',
+      resultRef: 'stored',
+      raw: '',
+    });
+    assert.equal('data' in (parsed ?? {}), false);
+  });
+
+  it('recognises aero_result=stored for test and other bridge actions', () => {
+    const testParsed = parseAeroCallback('?aero_action=test&aero_data=&aero_result=stored');
+    assert.deepEqual(testParsed, {
+      kind: 'bridge',
+      action: 'test',
+      resultRef: 'stored',
+      raw: '',
+    });
+
+    const saidaParsed = parseAeroCallback('?aero_action=saida&aero_result=stored');
+    assert.deepEqual(saidaParsed, {
+      kind: 'bridge',
+      action: 'saida',
+      resultRef: 'stored',
+      raw: '',
+    });
+  });
+
   it('reads a batch answer as the array the shortcut sent, in the order it was sent', () => {
     const answers = [
       { success: true, message: 'Gravado 1' },
@@ -1002,6 +1032,140 @@ describe('aero-integration: bridge callbacks', () => {
     // Retrocompatibilidad: un teléfono que todavía tiene los atajos viejos sigue funcionando igual.
     assert.deepEqual(parseAeroCallback('?aero_sync=ok'), { kind: 'sync', status: 'ok', message: null });
     assert.deepEqual(parseAeroCallback('?aero_test=true'), { kind: 'test', verdict: 'ok', raw: 'true' });
+  });
+});
+
+describe('aero-integration: resolveAeroCallback', () => {
+  it('returns parsed result directly when resultRef is not stored', async () => {
+    const raw = JSON.stringify({ success: true, message: 'Gravado' });
+    const result = await resolveAeroCallback(`?aero_action=entrada&aero_data=${encodeURIComponent(raw)}`);
+    assert.deepEqual(result, {
+      kind: 'bridge',
+      action: 'entrada',
+      data: { success: true, message: 'Gravado' },
+      raw,
+    });
+  });
+
+  it('fetches last-result when resultRef is stored and fills data', async () => {
+    const mockClient = {
+      get: async <T>(path: string): Promise<T> => {
+        assert.equal(path, '/integration/aero/bridge-tickets/last-result?action=entrada');
+        return { data: { success: true, message: 'Gravado via servidor' } } as T;
+      },
+    };
+
+    const result = await resolveAeroCallback('?aero_action=entrada&aero_result=stored', mockClient);
+    assert.deepEqual(result, {
+      kind: 'bridge',
+      action: 'entrada',
+      data: { success: true, message: 'Gravado via servidor' },
+      raw: JSON.stringify({ success: true, message: 'Gravado via servidor' }),
+    });
+  });
+
+  it('handles string data returned by last-result endpoint', async () => {
+    const jsonStr = '{"success":true,"message":"Gravado string"}';
+    const mockClient = {
+      get: async <T>(path: string): Promise<T> => {
+        assert.equal(path, '/integration/aero/bridge-tickets/last-result?action=saida');
+        return { data: jsonStr } as T;
+      },
+    };
+
+    const result = await resolveAeroCallback('?aero_action=saida&aero_result=stored', mockClient);
+    assert.deepEqual(result, {
+      kind: 'bridge',
+      action: 'saida',
+      data: { success: true, message: 'Gravado string' },
+      raw: jsonStr,
+    });
+  });
+
+  it('resolves action=test stored result to test kind with verdict', async () => {
+    const testData = { success: true, data: { CODIGO: 12, NOME: 'WILKIN' } };
+    const mockClient = {
+      get: async <T>(path: string): Promise<T> => {
+        assert.equal(path, '/integration/aero/bridge-tickets/last-result?action=test');
+        return { data: testData } as T;
+      },
+    };
+
+    const result = await resolveAeroCallback('?aero_action=test&aero_result=stored', mockClient);
+    assert.deepEqual(result, {
+      kind: 'test',
+      verdict: 'ok',
+      raw: JSON.stringify(testData),
+    });
+  });
+
+  it('produces the unreadable outcome on 404 or network failure without throwing', async () => {
+    const mockClient = {
+      get: async <T>(_path: string): Promise<T> => {
+        throw new Error('404 Not Found');
+      },
+    };
+
+    const result = await resolveAeroCallback('?aero_action=saida&aero_result=stored', mockClient);
+    assert.deepEqual(result, {
+      kind: 'bridge',
+      action: 'saida',
+      data: null,
+      raw: '',
+    });
+
+    const testResult = await resolveAeroCallback('?aero_action=test&aero_result=stored', mockClient);
+    assert.deepEqual(testResult, {
+      kind: 'test',
+      verdict: 'error',
+      raw: '',
+    });
+  });
+
+  it('yields an array for a stored batch answer', async () => {
+    const batchAnswers = [
+      { success: true, message: 'Gravado 1' },
+      { success: true, message: 'Gravado 2' },
+    ];
+    const mockClient = {
+      get: async <T>(path: string): Promise<T> => {
+        assert.equal(path, '/integration/aero/bridge-tickets/last-result?action=entrada_lote');
+        return { data: batchAnswers } as T;
+      },
+    };
+
+    const result = await resolveAeroCallback('?aero_action=entrada_lote&aero_result=stored', mockClient);
+    assert.deepEqual(result, {
+      kind: 'bridge',
+      action: 'entrada_lote',
+      data: batchAnswers,
+      raw: JSON.stringify(batchAnswers),
+    });
+    assert.ok(Array.isArray(result?.kind === 'bridge' ? result.data : null));
+  });
+
+  it('resolves a stored plain string as a string', async () => {
+    const plainError = 'Could not connect to the server';
+    const mockClient = {
+      get: async <T>(path: string): Promise<T> => {
+        assert.equal(path, '/integration/aero/bridge-tickets/last-result?action=entrada_lote');
+        return { data: plainError } as T;
+      },
+    };
+
+    const result = await resolveAeroCallback('?aero_action=entrada_lote&aero_result=stored', mockClient);
+    assert.deepEqual(result, {
+      kind: 'bridge',
+      action: 'entrada_lote',
+      data: plainError,
+      raw: plainError,
+    });
+    assert.equal(typeof (result?.kind === 'bridge' ? result.data : null), 'string');
+  });
+
+  it('returns null when query has no callback', async () => {
+    const result = await resolveAeroCallback('');
+    assert.equal(result, null);
   });
 });
 

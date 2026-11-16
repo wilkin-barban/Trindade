@@ -104,6 +104,16 @@ function makeRevisionTwelveShape(db: Database.Database): void {
   db.pragma('user_version = 12');
 }
 
+/**
+ * Build the revision 13 shape: aero_bridge_tickets without result and result_at.
+ */
+function makeRevisionThirteenShape(db: Database.Database): void {
+  const cols = (db.prepare('PRAGMA table_info(aero_bridge_tickets)').all() as { name: string }[]).map((c) => c.name);
+  if (cols.includes('result')) db.exec('ALTER TABLE aero_bridge_tickets DROP COLUMN result');
+  if (cols.includes('result_at')) db.exec('ALTER TABLE aero_bridge_tickets DROP COLUMN result_at');
+  db.pragma('user_version = 13');
+}
+
 /** Insert a report and return its id, for cases whose subject is a table that references one. */
 function insertReport(db: Database.Database, userId: number): number {
   return Number(
@@ -764,8 +774,7 @@ describe('schema migration', () => {
     assert.equal(result.outcome, 'migrated');
     assert.equal(result.from, 12);
     assert.equal(result.to, SCHEMA_VERSION);
-    assert.equal(SCHEMA_VERSION, 13);
-    assert.equal(db.pragma('user_version', { simple: true }), 13);
+    assert.equal(db.pragma('user_version', { simple: true }), SCHEMA_VERSION);
 
     const columns = (db.prepare('PRAGMA table_info(salida_movements)').all() as { name: string }[]).map((c) => c.name);
     assert.ok(columns.includes('erp_status'));
@@ -787,6 +796,46 @@ describe('schema migration', () => {
     db.close();
   });
 
+  it('adds result and result_at to aero_bridge_tickets and keeps every row (revision 14)', () => {
+    const path = join(fixtureRoot(), 'revision-thirteen.db');
+    const build = new Database(path);
+    build.exec(schema);
+    build.exec(seed);
+    makeRevisionThirteenShape(build);
+    const userId = insertUser(build, 'revision-fourteen');
+    build
+      .prepare(
+        `INSERT INTO aero_bridge_tickets (token_hash, user_id, action, endpoint, body, callback_url, expires_at, created_at)
+         VALUES ('token-hash-14', ?, 'entrada', 'entradasitem', '{}', 'https://example.test', '2026-11-16T12:00:00.000Z', '2026-11-16T11:58:00.000Z')`,
+      )
+      .run(userId);
+    build.close();
+
+    const db = new Database(path);
+    assert.equal(readSchemaReport(db).version, 13);
+    const result = migrateDatabase(db);
+    assert.equal(result.outcome, 'migrated');
+    assert.equal(result.from, 13);
+    assert.equal(result.to, SCHEMA_VERSION);
+    assert.equal(SCHEMA_VERSION, 14);
+    assert.equal(db.pragma('user_version', { simple: true }), 14);
+
+    const columns = (db.prepare('PRAGMA table_info(aero_bridge_tickets)').all() as { name: string }[]).map((c) => c.name);
+    assert.ok(columns.includes('result'));
+    assert.ok(columns.includes('result_at'));
+
+    const row = db.prepare('SELECT token_hash, user_id, result, result_at FROM aero_bridge_tickets WHERE token_hash = ?').get('token-hash-14') as any;
+    assert.deepEqual(row, {
+      token_hash: 'token-hash-14',
+      user_id: userId,
+      result: null,
+      result_at: null,
+    });
+
+    assert.equal(migrateDatabase(db).outcome, 'already-current');
+    db.close();
+  });
+
   // Guards the stepwise list against drifting from SCHEMA_VERSION: a build that supports
   // a revision its steps cannot reach would leave every migrated database stamped low.
   it('leaves every lower revision stamped at exactly the supported revision', () => {
@@ -794,6 +843,7 @@ describe('schema migration', () => {
       { from: 0, prepare: (db) => { db.exec('ALTER TABLE users DROP COLUMN security_version'); withoutDriverPhone(db); db.pragma('user_version = 0'); } },
       { from: 1, prepare: (db) => { makeRevisionOneShape(db); } },
       { from: 12, prepare: (db) => { makeRevisionTwelveShape(db); } },
+      { from: 13, prepare: (db) => { makeRevisionThirteenShape(db); } },
     ];
 
     for (const testCase of cases) {

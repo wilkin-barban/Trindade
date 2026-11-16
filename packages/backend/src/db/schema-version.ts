@@ -24,11 +24,13 @@ import type Database from 'better-sqlite3';
  *   camera writes. The table is rebuilt because SQLite cannot alter a CHECK in place; it adds no table.
  * - 13: adds `erp_status`, `erp_message`, and `erp_sent_at` to `salida_movements`. The trip to the ERP is its own
  *   state, separate from reconciliation with mirrored seats. The columns are additive and nullable (no rebuild).
+ * - 14: adds `result` and `result_at` to `aero_bridge_tickets`. The shortcut POSTs the ERP response
+ *   back to the server so large payloads don't exceed URL limits. The columns are additive and nullable (no rebuild).
  *
  * Databases created before versioning carry `user_version = 0` and are reported as
  * `unversioned`; nothing about them is assumed, and no startup path rewrites them.
  */
-export const SCHEMA_VERSION = 13;
+export const SCHEMA_VERSION = 14;
 
 /**
  * The tables a database created by revision 1 must contain: the baseline the
@@ -125,9 +127,10 @@ export const SCHEMA_TABLES: readonly string[] = [
  * further is known about it.
  */
 export function requiredTablesFor(version: number): readonly string[] {
-  // Revisions 11, 12 and 13 carry the same table inventory: revision 12 widened a CHECK on `report_photos` and
-  // revision 13 added nullable columns to `salida_movements`. Requiring anything more of revision 11 or 12 would
-  // classify them `incompatible`, and the migrate command refuses that verdict without opening the file for writing.
+  // Revisions 11, 12, 13 and 14 carry the same table inventory: revision 12 widened a CHECK on `report_photos`,
+  // revision 13 added nullable columns to `salida_movements`, and revision 14 added nullable columns to
+  // `aero_bridge_tickets`. Requiring anything more of revision 11, 12 or 13 would classify them `incompatible`,
+  // and the migrate command refuses that verdict without opening the file for writing.
   if (version >= 11) return SCHEMA_TABLES;
   // A revision 10 database predates the salida module. Asking it for the three tables would classify it
   // `incompatible`, and the migrate command refuses that verdict without opening the file for writing, so the

@@ -7,6 +7,7 @@
 
 import { clearAeroAutoRead } from './aero-auto-read';
 import { aeroTestVerdictFromToken, type AeroTestVerdict } from './aero-test';
+import { api } from '../api/client';
 
 export const AERO_SETTINGS_STORAGE_KEY = 'trindade.aero.integration.v1';
 export const AERO_PENDING_SYNC_STORAGE_KEY = 'trindade.aero.pending-sync.v1';
@@ -1061,8 +1062,8 @@ export function aeroBridgeCallbackFor(action: AeroBridgeAction, path?: string): 
  * phone that has not rebuilt its bridge keeps working for a while.
  */
 export type AeroCallbackResult =
-  | { kind: 'bridge'; action: AeroBridgeAction; data: unknown; raw: string }
-  | { kind: 'test'; verdict: AeroTestVerdict; raw: string }
+  | { kind: 'bridge'; action: AeroBridgeAction; data?: unknown; raw: string; resultRef?: 'stored' }
+  | { kind: 'test'; verdict: AeroTestVerdict; raw: string; resultRef?: 'stored' }
   | { kind: 'sync'; status: 'ok' | 'error'; message: string | null }
   | { kind: 'error'; code: string; message: string | null };
 
@@ -1121,6 +1122,16 @@ export function parseAeroCallback(search: string): AeroCallbackResult | null {
 
   const action = params.get('aero_action');
   if (action !== null && isAeroBridgeAction(action)) {
+    const isStored = params.get('aero_result') === 'stored';
+    if (isStored) {
+      return {
+        kind: 'bridge',
+        action,
+        resultRef: 'stored',
+        raw: '',
+      };
+    }
+
     const raw = params.get('aero_data') ?? '';
     const data = readAeroBridgeData(raw);
     if (action === 'test') {
@@ -1143,6 +1154,73 @@ export function parseAeroCallback(search: string): AeroCallbackResult | null {
     status,
     message: params.get('aero_msg'),
   };
+}
+
+/**
+ * Resolves query parameters returning from the iOS shortcut callback.
+ *
+ * Parses the query, and when `resultRef === 'stored'` fetches the answer stored on the server via
+ * GET /integration/aero/bridge-tickets/last-result?action=<action> and returns the completed shape
+ * with `data` filled. A 404 or network failure yields the existing unreadable outcome, never a crash.
+ */
+export async function resolveAeroCallback(
+  rawOrSearch: string,
+  client: { get: <T>(path: string) => Promise<T> } = api,
+): Promise<AeroCallbackResult | null> {
+  const parsed = parseAeroCallback(rawOrSearch);
+  if (!parsed) return null;
+
+  if (parsed.kind !== 'bridge' || parsed.resultRef !== 'stored') {
+    return parsed;
+  }
+
+  const { action } = parsed;
+
+  try {
+    const res = await client.get<{ data: unknown }>(
+      `/integration/aero/bridge-tickets/last-result?action=${encodeURIComponent(action)}`,
+    );
+    let data: unknown = res?.data;
+    let raw = '';
+    if (typeof data === 'string') {
+      raw = data;
+      const parsedJson = readAeroBridgeData(data);
+      if (parsedJson !== null) {
+        data = parsedJson;
+      }
+    } else if (data !== null && data !== undefined) {
+      raw = JSON.stringify(data);
+    }
+
+    if (action === 'test') {
+      return {
+        kind: 'test',
+        verdict: readAeroTestResult(data).ok ? 'ok' : 'error',
+        raw,
+      };
+    }
+
+    return {
+      kind: 'bridge',
+      action,
+      data,
+      raw,
+    };
+  } catch {
+    if (action === 'test') {
+      return {
+        kind: 'test',
+        verdict: 'error',
+        raw: '',
+      };
+    }
+    return {
+      kind: 'bridge',
+      action,
+      data: null,
+      raw: '',
+    };
+  }
 }
 
 /**

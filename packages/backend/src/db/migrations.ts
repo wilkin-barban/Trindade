@@ -108,6 +108,30 @@ export function migrateSalidaErpStatus(db: Database.Database): void {
 }
 
 /**
+ * Revision 13 → 14: store bridge ticket results on the server instead of callback URL.
+ *
+ * Adds `result` and `result_at` to `aero_bridge_tickets`.
+ * The columns are additive and nullable: existing rows stay untouched with null values,
+ * and SQLite alters the table in place without rebuild.
+ *
+ * Re-entering the step is a no-op: PRAGMA table_info guards each ADD COLUMN.
+ */
+export function migrateAeroBridgeTicketResult(db: Database.Database): void {
+  db.transaction(() => {
+    const columns = (db.prepare('PRAGMA table_info(aero_bridge_tickets)').all() as { name: string }[]).map(
+      (row) => row.name,
+    );
+    if (!columns.includes('result')) {
+      db.exec('ALTER TABLE aero_bridge_tickets ADD COLUMN result TEXT NULL');
+    }
+    if (!columns.includes('result_at')) {
+      db.exec('ALTER TABLE aero_bridge_tickets ADD COLUMN result_at TEXT NULL');
+    }
+    stampSchemaVersion(db, 14);
+  }).immediate();
+}
+
+/**
  * Bring an existing database up to the supported revision, once, and never at
  * startup. This is the sanctioned write path that the Production Immutability Gate
  * leaves to an explicit operator decision: the caller opens the file read-write only
@@ -184,6 +208,12 @@ export function migrateDatabase(db: Database.Database): MigrateResult {
       to: 13,
       apply: () => {
         migrateSalidaErpStatus(db);
+      },
+    },
+    {
+      to: 14,
+      apply: () => {
+        migrateAeroBridgeTicketResult(db);
       },
     },
   ];

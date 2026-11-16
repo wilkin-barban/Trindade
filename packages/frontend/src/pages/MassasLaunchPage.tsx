@@ -49,6 +49,7 @@ import {
   parseAeroCallback,
   readAeroBridgeResult,
   readAeroMovements,
+  resolveAeroCallback,
   saveAeroSettings,
   type AeroSettings,
 } from '../lib/aero-integration';
@@ -980,10 +981,11 @@ export function MassasLaunchPage() {
    */
   useEffect(() => {
     if (aeroCallbackHandled.current) return;
-    const parsed = parseAeroCallback(window.location.search);
-    if (!parsed) return;
-    aeroCallbackHandled.current = true;
-    window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`);
+    void (async () => {
+      const parsed = await resolveAeroCallback(window.location.search);
+      if (!parsed) return;
+      aeroCallbackHandled.current = true;
+      window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`);
     // Cualquier respuesta termina la espera: la marca describe un viaje, y el viaje ya volvió. Se limpia acá,
     // donde se limpia la query, para que ni el aviso ni un refresh puedan reabrir un resultado ya leído.
     clearAeroBridgePending();
@@ -1195,6 +1197,7 @@ export function MassasLaunchPage() {
         ? { type: 'success', message: parsed.message ?? t('massas.aero.syncConfirmYes') }
         : { type: 'error', message: parsed.message ?? t('massas.aero.syncConfirmNo') },
     );
+    })();
   }, [aeroDestination, aeroSettings.wsUrl, date, disarmBridgeWatchdog, handleMovementsCallback, t, triggerAeroSync]);
 
   /**

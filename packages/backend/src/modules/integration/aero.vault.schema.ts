@@ -38,6 +38,8 @@ export const AERO_TICKET_ERROR_CODES = {
   MISSING: 'AERO_TICKET_MISSING',
   NOT_FOUND: 'AERO_TICKET_NOT_FOUND',
   UNUSABLE: 'AERO_TICKET_UNUSABLE',
+  TOO_LARGE: 'AERO_TICKET_TOO_LARGE',
+  RESULT_NOT_FOUND: 'AERO_TICKET_RESULT_NOT_FOUND',
 } as const;
 
 export type AeroTicketErrorCode = (typeof AERO_TICKET_ERROR_CODES)[keyof typeof AERO_TICKET_ERROR_CODES];
@@ -99,6 +101,7 @@ export const AERO_BRIDGE_PAYLOAD_RANGE: Record<AeroBridgeActionName, { min: numb
 };
 
 export const AERO_BRIDGE_MAX_SERIALIZED_BYTES = 32 * 1024;
+export const AERO_BRIDGE_RESULT_MAX_BYTES = 2 * 1024 * 1024;
 
 export const AeroBridgeActionSchema = z.enum(AERO_BRIDGE_ACTIONS);
 
@@ -178,3 +181,46 @@ export function parseAeroBridgeTicketRequest(
 
   return { ok: true, request: { action: rawAction, payloads: payloads as Record<string, unknown>[], callbackPath } };
 }
+
+/**
+ * Body of `POST /bridge-tickets/result`.
+ * Unauthenticated: the ticket in the header is the credential.
+ */
+export const AeroBridgeTicketResultBodySchema = z
+  .object({
+    data: z.unknown().refine((val) => val !== undefined, {
+      message: 'data is required',
+    }),
+  })
+  .strict();
+
+export type AeroBridgeTicketResultBody = z.infer<typeof AeroBridgeTicketResultBodySchema>;
+
+/**
+ * Response of `GET /bridge-tickets/last-result`.
+ */
+export const AeroBridgeTicketLastResultResponseSchema = z
+  .object({
+    data: z.unknown(),
+  })
+  .strict();
+
+export type AeroBridgeTicketLastResultResponse = z.infer<typeof AeroBridgeTicketLastResultResponseSchema>;
+
+/**
+ * What the iPhone shortcut receives on redemption. `resultUrl` tells the script where to POST
+ * the result without hardcoding a path.
+ */
+export const AeroBridgeEnvelopeSchema = z
+  .object({
+    url: z.string().min(1),
+    method: z.literal('POST'),
+    headers: z.record(z.string(), z.string()),
+    body: z.string(),
+    bodies: z.array(z.string()).optional(),
+    callback: z.string().min(1),
+    resultUrl: z.string().min(1),
+  })
+  .strict();
+
+export type AeroBridgeEnvelopeContract = z.infer<typeof AeroBridgeEnvelopeSchema>;

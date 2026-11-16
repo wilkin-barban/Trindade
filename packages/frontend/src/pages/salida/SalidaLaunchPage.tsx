@@ -15,7 +15,7 @@ import { saoPauloToday } from '../../lib/date';
 import {
   aeroBridgeCallbackFor,
   buildAeroBridgeTriggerUrl,
-  parseAeroCallback,
+  resolveAeroCallback,
 } from '../../lib/aero-integration';
 import { readAeroBatchResult } from '../../lib/aero-feedback';
 import { markAeroBridgePending } from '../../lib/aero-watchdog';
@@ -216,111 +216,118 @@ export function SalidaLaunchPage() {
   // The answer of the shortcut comes back as query parameters. It is read once, the dialog is shown, and the
   // parameters are dropped so a reload does not confirm a movement twice.
   useEffect(() => {
-    const callback = parseAeroCallback(location.search);
-    if (!callback) return;
+    let cancelled = false;
+    void (async () => {
+      const callback = await resolveAeroCallback(location.search);
+      if (!callback || cancelled) return;
 
-    if (callback.kind === 'bridge' && callback.action === 'saida') {
-      // The attempt this trip wrote before leaving is the only thing that can pair the answer: it is read once
-      // and forgotten, and an attempt of another action is left alone so a launch in flight keeps its id.
-      const attempt = loadAeroPendingAttempt('saida');
-      if (attempt) clearAeroPendingAttempt();
+      if (callback.kind === 'bridge' && callback.action === 'saida') {
+        // The attempt this trip wrote before leaving is the only thing that can pair the answer: it is read once
+        // and forgotten, and an attempt of another action is left alone so a launch in flight keeps its id.
+        const attempt = loadAeroPendingAttempt('saida');
+        if (attempt) clearAeroPendingAttempt();
 
-      const queued = readSalidaOutbox();
-      const lastMovement = readSalidaLastMovement();
-      const expectedTripPayloads =
-        queued?.currentTripPayloads ??
-        queued?.trips[0]?.payloads.length ??
-        lastMovement?.expectedPayloads ??
-        lastMovement?.items.length ??
-        1;
+        const queued = readSalidaOutbox();
+        const lastMovement = readSalidaLastMovement();
+        const expectedTripPayloads =
+          queued?.currentTripPayloads ??
+          queued?.trips[0]?.payloads.length ??
+          lastMovement?.expectedPayloads ??
+          lastMovement?.items.length ??
+          1;
 
-      const batchResult = readAeroBatchResult(callback.data, expectedTripPayloads);
-      const erpOutcome = salidaBatchToDialogOutcome(batchResult.state, batchResult.ok, batchResult.total);
-      const erpStatus = salidaBatchToErpStatus(batchResult.state, batchResult.ok, batchResult.total);
+        const batchResult = readAeroBatchResult(callback.data, expectedTripPayloads);
+        const erpOutcome = salidaBatchToDialogOutcome(batchResult.state, batchResult.ok, batchResult.total);
+        const erpStatus = salidaBatchToErpStatus(batchResult.state, batchResult.ok, batchResult.total);
 
-      const movementId = lastMovement?.id ?? queued?.movementId;
-      if (movementId) {
-        void recordSalidaErpResult(movementId, { status: erpStatus, message: batchResult.message }, attempt);
-      }
+        const movementId = lastMovement?.id ?? queued?.movementId;
+        if (movementId) {
+          void recordSalidaErpResult(movementId, { status: erpStatus, message: batchResult.message }, attempt);
+        }
 
-      const isComplete =
-        batchResult.state === 'complete' ||
-        (batchResult.state === 'legacy' && batchResult.ok === batchResult.total);
+        const isComplete =
+          batchResult.state === 'complete' ||
+          (batchResult.state === 'legacy' && batchResult.ok === batchResult.total);
 
-      if (isComplete) {
-        void postAeroAuditEvent(
-          salidaSyncResultEvent({ attempt, outcome: 'ok', message: batchResult.message }),
-        );
-      } else {
-        const errorCode =
-          batchResult.message ??
-          (batchResult.state === 'unreadable'
-            ? 'bridge_unreadable'
-            : batchResult.state === 'partial'
-              ? 'batch_partial'
-              : 'batch_failed');
+        if (isComplete) {
+          void postAeroAuditEvent(
+            salidaSyncResultEvent({ attempt, outcome: 'ok', message: batchResult.message }),
+          );
+        } else {
+          const errorCode =
+            batchResult.message ??
+            (batchResult.state === 'unreadable'
+              ? 'bridge_unreadable'
+              : batchResult.state === 'partial'
+                ? 'batch_partial'
+                : 'batch_failed');
+          void postAeroAuditEvent(
+            salidaSyncResultEvent({
+              attempt,
+              outcome: 'error',
+              error: errorCode,
+              message: batchResult.message,
+            }),
+          );
+        }
+
+        setSuccess({
+          movement: lastMovement,
+          erp: erpOutcome,
+          message: batchResult.message,
+        });
+
+        // The outbox clears only on complete (T1).
+        if (isComplete) {
+          if (queued && queued.trips.length > 1) {
+            const remainingTrips = queued.trips.slice(1);
+            writeSalidaOutbox({ ...queued, trips: remainingTrips, currentTripPayloads: undefined });
+            setOutbox(readSalidaOutbox());
+          } else {
+            clearSalidaLastMovement();
+            clearSalidaOutbox();
+            setOutbox(null);
+          }
+        } else {
+          if (queued) {
+            writeSalidaOutbox({ ...queued, currentTripPayloads: undefined });
+          }
+          setOutbox(readSalidaOutbox());
+        }
+      } else if (callback.kind === 'error') {
+        // The phone came back without the plant: no seat was written, and the line says so with the code.
+        const attempt = loadAeroPendingAttempt('saida');
+        if (attempt) clearAeroPendingAttempt();
+
+        const lastMovement = readSalidaLastMovement();
+        const queued = readSalidaOutbox();
+        const movementId = lastMovement?.id ?? queued?.movementId;
+        if (movementId) {
+          void recordSalidaErpResult(
+            movementId,
+            { status: 'failed', message: callback.message || callback.code },
+            attempt,
+          );
+        }
+
         void postAeroAuditEvent(
           salidaSyncResultEvent({
             attempt,
             outcome: 'error',
-            error: errorCode,
-            message: batchResult.message,
+            error: callback.code,
+            message: callback.message,
           }),
         );
-      }
-
-      setSuccess({
-        movement: lastMovement,
-        erp: erpOutcome,
-        message: batchResult.message,
-      });
-
-      // The outbox clears only on complete (T1).
-      if (isComplete) {
-        if (queued && queued.trips.length > 1) {
-          const remainingTrips = queued.trips.slice(1);
-          writeSalidaOutbox({ ...queued, trips: remainingTrips, currentTripPayloads: undefined });
-          setOutbox(readSalidaOutbox());
-        } else {
-          clearSalidaLastMovement();
-          clearSalidaOutbox();
-          setOutbox(null);
-        }
-      } else {
-        if (queued) {
-          writeSalidaOutbox({ ...queued, currentTripPayloads: undefined });
-        }
+        setNotice({ type: 'error', message: salidaActionableErrorMessage(callback.code, callback.message, t) });
         setOutbox(readSalidaOutbox());
       }
-    } else if (callback.kind === 'error') {
-      // The phone came back without the plant: no seat was written, and the line says so with the code.
-      const attempt = loadAeroPendingAttempt('saida');
-      if (attempt) clearAeroPendingAttempt();
 
-      const lastMovement = readSalidaLastMovement();
-      const queued = readSalidaOutbox();
-      const movementId = lastMovement?.id ?? queued?.movementId;
-      if (movementId) {
-        void recordSalidaErpResult(
-          movementId,
-          { status: 'failed', message: callback.message || callback.code },
-          attempt,
-        );
-      }
+      navigate(location.pathname, { replace: true });
+    })();
 
-      void postAeroAuditEvent(
-        salidaSyncResultEvent({
-          attempt,
-          outcome: 'error',
-          error: callback.code,
-          message: callback.message,
-        }),
-      );
-      setNotice({ type: 'error', message: salidaActionableErrorMessage(callback.code, callback.message, t) });
-      setOutbox(readSalidaOutbox());
-    }
-
-    navigate(location.pathname, { replace: true });
+    return () => {
+      cancelled = true;
+    };
   }, [location.search, location.pathname, navigate, t]);
 
   const toggleBlock = (block: SalidaBlock, enabled: boolean) => {

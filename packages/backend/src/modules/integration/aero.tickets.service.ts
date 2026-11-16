@@ -2,8 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import type Database from 'better-sqlite3';
 import { decryptSecret } from './vault.crypto.js';
 import { aeroVaultSettingsRow, type AeroVaultSettingsRow } from './aero.settings.service.js';
-import type { AeroBridgeActionName } from './aero.vault.schema.js';
-import type { AeroBridgeEnvelopeContract } from './aero.vault.contract.js';
+import type { AeroBridgeActionName, AeroBridgeEnvelopeContract } from './aero.vault.schema.js';
 
 /**
  * One-use bridge tickets: the credential the iPhone shortcut redeems for an envelope it does not build.
@@ -55,6 +54,8 @@ export interface AeroBridgeTicketRow {
   expires_at: string;
   used_at: string | null;
   created_at: string;
+  result: string | null;
+  result_at: string | null;
 }
 
 export interface IssuedBridgeTicket {
@@ -128,7 +129,11 @@ export function hashBridgeTicket(token: string): string {
  * Live tickets are still never touched across owners -- that is what `dropOldestPendingTickets` scopes.
  */
 function dropDeadTickets(db: Database.Database, nowIso: string): void {
-  db.prepare(`DELETE FROM ${TABLE} WHERE used_at IS NOT NULL OR expires_at <= ?`).run(nowIso);
+  db.prepare(`
+    DELETE FROM ${TABLE}
+    WHERE (result IS NULL AND expires_at <= ?)
+       OR (result IS NOT NULL AND result_at <= datetime(?, '-10 minutes'))
+  `).run(nowIso, nowIso);
 }
 
 function dropOldestPendingTickets(db: Database.Database, userId: number, count: number): void {
@@ -229,6 +234,7 @@ function buildBridgeEnvelope(
     },
     body: ticket.body,
     callback: ticket.callback_url,
+    resultUrl: '/api/integration/aero/bridge-tickets/result',
   };
   if (ticket.bodies !== null) {
     envelope.bodies = JSON.parse(ticket.bodies) as string[];
@@ -285,4 +291,70 @@ export function redeemBridgeTicket(
 
     return { ok: true, envelope: buildBridgeEnvelope(ticket, settings, password) };
   })();
+}
+
+/**
+ * Store the result of executing an ERP request through the bridge ticket.
+ *
+ * Unauthenticated: the token is the credential. Finds the ticket even if already consumed,
+ * stores the serialized JSON data and stamps result_at with datetime('now').
+ * Idempotent: repeating the call overwrites the previous result.
+ */
+export function storeBridgeTicketResult(
+  db: Database.Database,
+  token: string,
+  data: unknown,
+): { ok: true } | { ok: false; code: 'AERO_TICKET_NOT_FOUND' } {
+  const tokenHash = hashBridgeTicket(token);
+  const serialized = JSON.stringify(data);
+
+  return db.transaction((): { ok: true } | { ok: false; code: 'AERO_TICKET_NOT_FOUND' } => {
+    const ticket = db.prepare(`SELECT id FROM ${TABLE} WHERE token_hash = ?`).get(tokenHash) as
+      | { id: number }
+      | undefined;
+    if (!ticket) {
+      return { ok: false, code: 'AERO_TICKET_NOT_FOUND' };
+    }
+
+    db.prepare(`UPDATE ${TABLE} SET result = ?, result_at = datetime('now') WHERE id = ?`).run(
+      serialized,
+      ticket.id,
+    );
+    return { ok: true };
+  })();
+}
+
+/**
+ * Read the newest result for a given action owned by the user within the last 10 minutes.
+ *
+ * Never returns another user's result. Answers 404 when no result is found or when the
+ * result is older than 10 minutes.
+ */
+export function readLastBridgeTicketResult(
+  db: Database.Database,
+  userId: number,
+  action: AeroBridgeActionName,
+): { ok: true; data: unknown } | { ok: false; code: 'AERO_TICKET_RESULT_NOT_FOUND' } {
+  const row = db
+    .prepare(
+      `SELECT result FROM ${TABLE}
+       WHERE user_id = ?
+         AND action = ?
+         AND result IS NOT NULL
+         AND result_at IS NOT NULL
+         AND result_at >= datetime('now', '-10 minutes')
+       ORDER BY result_at DESC, id DESC
+       LIMIT 1`,
+    )
+    .get(userId, action) as { result: string } | undefined;
+
+  if (!row) {
+    return { ok: false, code: 'AERO_TICKET_RESULT_NOT_FOUND' };
+  }
+
+  try {
+    return { ok: true, data: JSON.parse(row.result) };
+  } catch {
+    return { ok: false, code: 'AERO_TICKET_RESULT_NOT_FOUND' };
+  }
 }

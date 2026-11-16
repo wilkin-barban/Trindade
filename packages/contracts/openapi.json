@@ -2367,6 +2367,10 @@
           "callback": {
             "type": "string",
             "minLength": 1
+          },
+          "resultUrl": {
+            "type": "string",
+            "minLength": 1
           }
         },
         "required": [
@@ -2374,8 +2378,26 @@
           "method",
           "headers",
           "body",
-          "callback"
+          "callback",
+          "resultUrl"
         ],
+        "additionalProperties": false
+      },
+      "AeroBridgeTicketResultBody": {
+        "type": "object",
+        "properties": {
+          "data": {}
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "AeroBridgeTicketLastResultResponse": {
+        "type": "object",
+        "properties": {
+          "data": {}
+        },
         "additionalProperties": false
       },
       "AeroMovement": {
@@ -12172,6 +12194,155 @@
           },
           "410": {
             "description": "The ticket was already used or has expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integration/aero/bridge-tickets/result": {
+      "post": {
+        "summary": "Store the result of a bridge ticket execution",
+        "description": "Unauthenticated by design: the ticket IS the credential. Present it in the `X-Trindade-Ticket` header. Finds the ticket by token hash even if already consumed, stores JSON-serialized data in result and the current timestamp in result_at. Overwrites previous result idempotently. Body must not exceed 2 MB.",
+        "tags": [
+          "integration"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "x-trindade-ticket",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AeroBridgeTicketResultBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The result was stored successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The body is malformed or missing data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The ticket header is missing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No ticket matches that token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The result exceeds the 2 MB limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integration/aero/bridge-tickets/last-result": {
+      "get": {
+        "summary": "Read the newest result for a bridge action belonging to the current user within 10 minutes",
+        "description": "Authenticated per operator: returns the newest stored result for the specified action from a ticket owned by the caller whose result was recorded within the last 10 minutes. Returns 404 otherwise.",
+        "tags": [
+          "integration"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "entrada",
+                "entrada_lote",
+                "saida",
+                "movimentos",
+                "test"
+              ]
+            },
+            "required": true,
+            "name": "action",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The parsed result data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AeroBridgeTicketLastResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The action parameter is invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, or expired credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No result found within the last 10 minutes",
             "content": {
               "application/json": {
                 "schema": {

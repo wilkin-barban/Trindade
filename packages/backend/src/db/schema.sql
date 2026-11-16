@@ -322,7 +322,9 @@ CREATE TABLE IF NOT EXISTS aero_bridge_tickets (
   callback_url TEXT    NOT NULL,
   expires_at   TEXT    NOT NULL,
   used_at      TEXT,
-  created_at   TEXT    NOT NULL
+  created_at   TEXT    NOT NULL,
+  result       TEXT NULL,
+  result_at    TEXT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_aero_bridge_tickets_user ON aero_bridge_tickets(user_id);
 CREATE INDEX IF NOT EXISTS idx_aero_bridge_tickets_expires ON aero_bridge_tickets(expires_at);

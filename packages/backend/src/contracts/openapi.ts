@@ -142,12 +142,17 @@ import {
   AeroLogResponseSchema,
 } from '../modules/integration/aero.schema.js';
 import {
-  AeroBridgeEnvelopeSchema,
   AeroBridgeTicketRequestSchema,
   AeroBridgeTicketResponseSchema,
   AeroVaultSettingsRequestSchema,
   AeroVaultSettingsResponseSchema,
 } from '../modules/integration/aero.vault.contract.js';
+import {
+  AeroBridgeActionSchema,
+  AeroBridgeEnvelopeSchema,
+  AeroBridgeTicketLastResultResponseSchema,
+  AeroBridgeTicketResultBodySchema,
+} from '../modules/integration/aero.vault.schema.js';
 import {
   AeroMovementSchema,
   AeroMovementsBodySchema,
@@ -377,6 +382,8 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
   registerComponent(registry, 'AeroBridgeTicketRequest', AeroBridgeTicketRequestSchema);
   registerComponent(registry, 'AeroBridgeTicketResponse', AeroBridgeTicketResponseSchema);
   registerComponent(registry, 'AeroBridgeEnvelope', AeroBridgeEnvelopeSchema);
+  registerComponent(registry, 'AeroBridgeTicketResultBody', AeroBridgeTicketResultBodySchema);
+  registerComponent(registry, 'AeroBridgeTicketLastResultResponse', AeroBridgeTicketLastResultResponseSchema);
   registerComponent(registry, 'AeroMovement', AeroMovementSchema);
   registerComponent(registry, 'AeroMovementsBody', AeroMovementsBodySchema);
   registerComponent(registry, 'AeroMovementsListResponse', AeroMovementsListResponseSchema);
@@ -2123,6 +2130,49 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
       401: jsonResponse('The ticket header is missing', ErrorEnvelopeSchema),
       404: jsonResponse('No ticket matches that token', ErrorEnvelopeSchema),
       410: jsonResponse('The ticket was already used or has expired', ErrorEnvelopeSchema),
+    },
+  });
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/integration/aero/bridge-tickets/result',
+    summary: 'Store the result of a bridge ticket execution',
+    description:
+      'Unauthenticated by design: the ticket IS the credential. Present it in the `X-Trindade-Ticket` header. ' +
+      'Finds the ticket by token hash even if already consumed, stores JSON-serialized data in result and the ' +
+      'current timestamp in result_at. Overwrites previous result idempotently. Body must not exceed 2 MB.',
+    tags: ['integration'],
+    request: {
+      headers: z.object({ 'x-trindade-ticket': z.string().min(1) }),
+      ...jsonRequest(AeroBridgeTicketResultBodySchema),
+    },
+    responses: {
+      200: jsonResponse('The result was stored successfully', SuccessResponseSchema),
+      400: jsonResponse('The body is malformed or missing data', ErrorEnvelopeSchema),
+      401: jsonResponse('The ticket header is missing', ErrorEnvelopeSchema),
+      404: jsonResponse('No ticket matches that token', ErrorEnvelopeSchema),
+      413: jsonResponse('The result exceeds the 2 MB limit', ErrorEnvelopeSchema),
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/api/integration/aero/bridge-tickets/last-result',
+    summary: 'Read the newest result for a bridge action belonging to the current user within 10 minutes',
+    description:
+      'Authenticated per operator: returns the newest stored result for the specified action from a ticket ' +
+      'owned by the caller whose result was recorded within the last 10 minutes. Returns 404 otherwise.',
+    tags: ['integration'],
+    request: {
+      query: z.object({
+        action: AeroBridgeActionSchema,
+      }),
+    },
+    responses: {
+      200: jsonResponse('The parsed result data', AeroBridgeTicketLastResultResponseSchema),
+      400: jsonResponse('The action parameter is invalid', ErrorEnvelopeSchema),
+      401: UNAUTHORIZED,
+      404: jsonResponse('No result found within the last 10 minutes', ErrorEnvelopeSchema),
     },
   });
 

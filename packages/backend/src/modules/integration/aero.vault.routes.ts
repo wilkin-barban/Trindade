@@ -4,8 +4,11 @@ import { requireRole } from '../auth/auth.middleware.js';
 import { optionalVaultKey } from './vault.crypto.js';
 import {
   AERO_BRIDGE_ERROR_CODES,
+  AERO_BRIDGE_RESULT_MAX_BYTES,
   AERO_TICKET_ERROR_CODES,
   AERO_VAULT_ERROR_CODES,
+  AeroBridgeTicketResultBodySchema,
+  isBridgeAction,
   parseAeroBridgeTicketRequest,
 } from './aero.vault.schema.js';
 import {
@@ -17,9 +20,11 @@ import {
 import {
   BRIDGE_TICKET_HEADER,
   issueBridgeTicket,
+  readLastBridgeTicketResult,
   redeemBridgeTicket,
   resolveBridgeCallbackUrl,
   resolvePublicAppUrl,
+  storeBridgeTicketResult,
   type RedeemBridgeTicketResult,
 } from './aero.tickets.service.js';
 
@@ -288,4 +293,97 @@ export async function aeroVaultRoutes(fastify: FastifyInstance) {
 
     return reply.send(redeemed.envelope);
   });
+
+  /**
+   * POST /bridge-tickets/result
+   *
+   * Unauthenticated by design: the ticket is the credential, presented in the X-Trindade-Ticket header.
+   * Finds the ticket by token hash even if already consumed, stores JSON.stringify(data) in result and
+   * datetime('now') in result_at. Overwrites previous result idempotently. Maximum body size 2 MB.
+   */
+  fastify.post(
+    '/bridge-tickets/result',
+    {
+      bodyLimit: 3 * 1024 * 1024,
+      errorHandler: (error, _request, reply) => {
+        if (error.statusCode === 413 || (error as { code?: string }).code === 'FST_ERR_CTP_BODY_TOO_LARGE') {
+          return reply
+            .status(413)
+            .send(apiError('El resultado supera el límite de 2 MB.', AERO_TICKET_ERROR_CODES.TOO_LARGE));
+        }
+        throw error;
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      reply.header('Cache-Control', 'no-store');
+
+      const token = bridgeTicketFromHeaders(request.headers);
+      if (token === null) {
+        return reply.status(401).send(apiError(TICKET_MISSING_MESSAGE, AERO_TICKET_ERROR_CODES.MISSING));
+      }
+
+      const parsed = AeroBridgeTicketResultBodySchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply
+          .status(400)
+          .send(apiError('El cuerpo debe incluir el campo data.', AERO_BRIDGE_ERROR_CODES.INVALID_PAYLOADS));
+      }
+
+      let serialized: string;
+      try {
+        serialized = JSON.stringify(parsed.data.data);
+      } catch {
+        return reply
+          .status(400)
+          .send(apiError('El cuerpo no se puede serializar a JSON.', AERO_BRIDGE_ERROR_CODES.INVALID_PAYLOADS));
+      }
+
+      if (Buffer.byteLength(serialized, 'utf8') > AERO_BRIDGE_RESULT_MAX_BYTES) {
+        return reply
+          .status(413)
+          .send(apiError('El resultado supera el límite de 2 MB.', AERO_TICKET_ERROR_CODES.TOO_LARGE));
+      }
+
+      const stored = storeBridgeTicketResult(fastify.db, token, parsed.data.data);
+      if (!stored.ok) {
+        return reply.status(404).send(apiError(TICKET_NOT_FOUND_MESSAGE, AERO_TICKET_ERROR_CODES.NOT_FOUND));
+      }
+
+      return reply.send({ ok: true });
+    },
+  );
+
+  /**
+   * GET /bridge-tickets/last-result?action=<AeroBridgeAction>
+   *
+   * Authenticated per operator: answers the newest result for the requested action recorded within the
+   * last 10 minutes for tickets owned by request.user.sub. Never returns another user's result.
+   */
+  fastify.get(
+    '/bridge-tickets/last-result',
+    { preHandler: operatorGuard },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      reply.header('Cache-Control', 'no-store');
+
+      const query = request.query as { action?: string };
+      const rawAction = typeof query?.action === 'string' ? query.action.trim() : '';
+      if (!isBridgeAction(rawAction)) {
+        return reply.status(400).send(apiError(INVALID_ACTION_MESSAGE, AERO_BRIDGE_ERROR_CODES.INVALID_ACTION));
+      }
+
+      const result = readLastBridgeTicketResult(fastify.db, request.user!.sub, rawAction);
+      if (!result.ok) {
+        return reply
+          .status(404)
+          .send(
+            apiError(
+              'No se encontró ningún resultado para esta acción dentro de los últimos 10 minutos.',
+              AERO_TICKET_ERROR_CODES.RESULT_NOT_FOUND,
+            ),
+          );
+      }
+
+      return reply.send({ data: result.data });
+    },
+  );
 }

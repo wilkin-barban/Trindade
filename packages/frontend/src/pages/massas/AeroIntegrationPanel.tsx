@@ -5,6 +5,7 @@ import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import {
+  AERO_SCRIPTABLE_CODE_PATH,
   aeroBridgeCallbackFor,
   aeroEndpoint,
   aeroMissingSetup,
@@ -14,6 +15,7 @@ import {
   DEFAULT_AERO_SETTINGS,
   normalizeAeroWsUrl,
   parseAeroCallback,
+  resolveAeroCallback,
   saveAeroSettings,
   type AeroSettings,
 } from '../../lib/aero-integration';
@@ -309,39 +311,42 @@ export function AeroIntegrationPanel({
    */
   useEffect(() => {
     if (callbackHandled.current) return;
-    const parsed = parseAeroCallback(window.location.search);
-    if (!parsed) return;
+    void (async () => {
+      // parseAeroCallback(window.location.search) wrapped by resolveAeroCallback
+      const parsed = await resolveAeroCallback(window.location.search);
+      if (!parsed) return;
 
-    // Un error de red del puente no es una credencial inválida. Se reclama una sola vez -- la consulta se
-    // limpia antes de cualquier trabajo asíncrono -- y se responde con el aviso accionable: sin esto el panel
-    // se queda con `busy` en `test`, el intento pendiente sigue vivo y el operario no lee nada.
-    if (parsed.kind === 'error') {
+      // Un error de red del puente no es una credencial inválida. Se reclama una sola vez -- la consulta se
+      // limpia antes de cualquier trabajo asíncrono -- y se responde con el aviso accionable: sin esto el panel
+      // se queda con `busy` en `test`, el intento pendiente sigue vivo y el operario no lee nada.
+      if (parsed.kind === 'error') {
+        callbackHandled.current = true;
+        window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`);
+        clearAeroPendingTest();
+        clearAeroBridgePending();
+        setBusy(null);
+        const text = parsed.code === 'wifi_required' ? t('massas.aero.wifiRequired') : t('massas.aero.bridgeError');
+        const title = t('massas.aero.wifiRequiredTitle');
+        setNotice({ tone: 'error', text });
+        setTestResult({ tone: 'error', message: text, title });
+        scrollToNotice.current = true;
+        return;
+      }
+
+      if (parsed.kind !== 'test') return;
       callbackHandled.current = true;
       window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`);
+
+      const pending = loadAeroPendingTest();
+      const destinationUrl = pending?.destinationUrl ?? destination;
       clearAeroPendingTest();
+      // El puente volvió: la marca del viaje ya no tiene nada que vigilar.
       clearAeroBridgePending();
-      setBusy(null);
-      const text = parsed.code === 'wifi_required' ? t('massas.aero.wifiRequired') : t('massas.aero.bridgeError');
-      const title = t('massas.aero.wifiRequiredTitle');
-      setNotice({ tone: 'error', text });
-      setTestResult({ tone: 'error', message: text, title });
-      scrollToNotice.current = true;
-      return;
-    }
-
-    if (parsed.kind !== 'test') return;
-    callbackHandled.current = true;
-    window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`);
-
-    const pending = loadAeroPendingTest();
-    const destinationUrl = pending?.destinationUrl ?? destination;
-    clearAeroPendingTest();
-    // El puente volvió: la marca del viaje ya no tiene nada que vigilar.
-    clearAeroBridgePending();
-    void postAeroAuditEvent(
-      aeroTestResultEvent({ verdict: parsed.verdict, raw: parsed.raw, destinationUrl }),
-    );
-    setStoredOutcome({ verdict: parsed.verdict, raw: parsed.raw, destinationUrl });
+      void postAeroAuditEvent(
+        aeroTestResultEvent({ verdict: parsed.verdict, raw: parsed.raw, destinationUrl }),
+      );
+      setStoredOutcome({ verdict: parsed.verdict, raw: parsed.raw, destinationUrl });
+    })();
   }, [destination, t]);
 
   /**
@@ -621,6 +626,25 @@ export function AeroIntegrationPanel({
           >
             {t('massas.aero.clear')}
           </Button>
+        </div>
+
+        {/* Aviso de actualización del puente si el operador aún tiene la versión previa */}
+        <div
+          data-testid="aero-bridge-update-notice"
+          className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"
+        >
+          <p className="font-semibold">{t('massas.aero.bridgeUpdateTitle')}</p>
+          <p className="mt-1 text-amber-800 leading-relaxed">
+            {t('massas.aero.bridgeUpdateSteps')}{' '}
+            <a
+              href={AERO_SCRIPTABLE_CODE_PATH}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium underline hover:text-amber-950 inline-flex items-center gap-1"
+            >
+              /Aero32Bridge.js
+            </a>
+          </p>
         </div>
 
         {/* El proceso nativo se instala una vez, en dos pasos: la app y el código. Se explica debajo de las
