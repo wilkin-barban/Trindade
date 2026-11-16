@@ -12,6 +12,21 @@ verificaciones está en [docs/release-android-historial.md](docs/release-android
 
 ## [Unreleased]
 
+### Salida/Baja: veredicto real del lote y compartir en el histórico (2026-11-16)
+
+- **Corregido el falso «no se lanzó»**: un movimiento de varios productos viaja como varios cuerpos en un ticket y el
+  puente responde un arreglo; la página lo leía como un solo objeto y lo clasificaba como ilegible aunque el ERP
+  hubiera registrado todos los asientos. Ahora lee el lote y dice completo/parcial/fallido/ilegible.
+- **Revisión 13**: `salida_movements` guarda `erp_status`/`erp_message`/`erp_sent_at` y
+  `POST /api/salida/:id/erp-result` registra el veredicto. «Enviado al ERP» es un estado propio, distinto de
+  «conciliado con el asiento».
+- **Vista de WhatsApp en el histórico**: bloque con teléfono, previsualización del día y botón de compartir, sin
+  filtros de trabajador y solo con los movimientos de la sesión; el diálogo de éxito ya no muestra compartir.
+- **Estados y relanzar**: Enviado / Conciliado / Parcial / Pendiente por tarjeta, con relanzar solo cuando el ERP no
+  aceptó.
+- **Errores de conexión**: mensajes accionables para falta de wifi de la empresa, host inalcanzable, timeout, contenido
+  mixto, ticket vencido y respuesta ilegible.
+
 ### Tercera iteración: sesión y HEIC en Reportes (2026-11-15)
 
 - **Sesión**: un refresh que repite la rotación hecha segundos antes (dos documentos del mismo navegador, o una
