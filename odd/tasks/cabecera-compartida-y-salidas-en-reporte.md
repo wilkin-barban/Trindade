@@ -120,7 +120,22 @@ iphone
 | T3 — sin compartir por tarjeta en días pasados, en los dos históricos | hecho | `32fd90ce` | `SalidaMovementCard` (`!readOnly`) y el equivalente de Masas; el compartir del día queda |
 | T4 — bloque de Salidas/Baixa en el reporte | hecho | `cff68334` | `salidaReportDayView`, `GET /api/reports/day/salidas`, sección `📤 *SAÍDAS / BAIXA*` en el texto, `SalidaReportSection` en `/reports/:id` y en `/reports` |
 | T5 — paridad Android actualizada | hecho | `7bf2877f` | `docs/paridad-android-web.md`, sección nueva con cabecera, sin selector, históricos y bloque del reporte |
-| T6 — cierre | en curso | — | suites, build, E2E, deploy y verificación |
+| T6 — cierre | hecho | `97e2dd5c` + deploy | build verde, E2E **118/118**, deploy `api`+`web` y producción verificada |
 
 Números al cerrar el código: backend **969/969**, Vitest **219/219** (29 archivos), node **749/749**, typecheck limpio,
 contrato OpenAPI al día y cliente Kotlin regenerado (195 archivos).
+
+### T6 — cierre (2026-11-16)
+
+- **Suites**: backend **969/969**, Vitest **219/219** (29 archivos), node **749/749**, `tsc` sin errores.
+- **Build**: `✓ built in 16.28s`.
+- **E2E completo**: **118/118** (7m 06s).
+- **Contrato**: `verify-openapi-artifact.sh` al día; cliente Kotlin regenerado (195 archivos) y
+  `check-android-contract-types.sh` verde.
+- **Deploy**: `docker compose up -d --build api web`; `api` y `web` healthy.
+- **Producción verificada**: `/api/health` 200; `/salida`, `/salida-history`, `/massas-launch`, `/massas-history` y
+  `/reports` 200; `GET /api/reports/day/salidas?date=` sin sesión **401**; el `export.service` desplegado contiene
+  `SAÍDAS / BAIXA` y el servicio `salida-report` está en la imagen; el bundle web sirve `salida-report-section` con
+  `salida-report-operator-` y `salida-report-total`, y el chunk de lanzamiento de Masas monta `DaySessionHeader` con
+  **cero** inputs de fecha; CSP y HSTS presentes, asset gzip + `immutable`, log escribible.
+- **Árbol**: `.vitest/` eliminado y agregado a `.gitignore` (`97e2dd5c`); sin artefactos sin trackear.
