@@ -77,7 +77,7 @@ export function SalidaReportSection({
   const operators = day?.operators ?? [];
 
   return (
-    <Card className="border-gray-200 shadow-sm" data-testid="salida-report-section">
+    <Card className="mb-6 border-gray-200 shadow-sm" data-testid="salida-report-section">
       <CardContent className="pt-6">
         <div className="mb-3 flex items-center justify-between gap-2">
           <h3 className="text-base font-semibold text-gray-800">{t('salida.title')}</h3>

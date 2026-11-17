@@ -331,10 +331,11 @@ export function ReportViewPage() {
       <Card className="mb-4" data-testid="report-massas-card">
         <CardContent className="pt-6">
           <MassasReportSection date={report.report_date} />
-          {/* The day's exits, for the same date the report covers: what left the plant belongs in the report. */}
-          <SalidaReportSection date={report.report_date} />
         </CardContent>
       </Card>
+
+      {/* The day's exits, for the same date the report covers: their own card, so two records never read as one. */}
+      <SalidaReportSection date={report.report_date} />
 
 
 

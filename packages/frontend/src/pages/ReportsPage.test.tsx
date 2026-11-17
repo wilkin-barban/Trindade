@@ -203,4 +203,17 @@ describe('ReportsPage — the phone, 390 px', () => {
     fireEvent.click(remove);
     expect(screen.queryByTestId('remove-pending-photo-btn')).not.toBeInTheDocument();
   });
+  it('keeps the day of salidas in its own card, outside the ERP movements card', async () => {
+    // Two records, two cards: inside the massas block the exit list read as part of "Massas do dia" and the
+    // phone layout stacked a third section into a block that already had two.
+    renderPage();
+
+    // The categories arrive asynchronously: the ERP card only exists once the page knows where to place it.
+    const salidaCard = await screen.findByTestId('salida-report-section');
+
+    const massasBlock = screen.getByTestId('massas-block');
+    expect(massasBlock.contains(salidaCard)).toBe(false);
+    expect(screen.getByTestId('report-massas-card').contains(salidaCard)).toBe(false);
+  });
+
 });

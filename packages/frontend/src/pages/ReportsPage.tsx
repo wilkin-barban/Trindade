@@ -334,6 +334,12 @@ export function ReportsPage() {
     }
   }
 
+  // The day's exits are their own card: sharing the massas block made two different records read as one list and
+  // broke the layout on a phone, where the block is already two stacked sections.
+  const salidaCard = (
+    <SalidaReportSection date={reportDate} hideRefresh refetchKey={movementsRefreshKey} />
+  );
+
   // ---- Loading / Error states ----
   // S5, S6, S8: Movimentações do ERP (Massas e Recebimento) num só card com botão de sincronização único.
   const massasCard = (
@@ -370,7 +376,6 @@ export function ReportsPage() {
         */}
         <div className="rounded-xl border border-gray-100 bg-white p-3 sm:p-4" data-testid="massas-block">
           <MassasReportSection date={reportDate} hideRefresh refetchKey={movementsRefreshKey} />
-          <SalidaReportSection date={reportDate} hideRefresh refetchKey={movementsRefreshKey} />
         </div>
         {usesErpReceipts(reportDate) && (
           <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-3 sm:p-4" data-testid="receipts-block">
@@ -462,7 +467,12 @@ export function ReportsPage() {
         {/* Dynamic category sections. A produção do dia entra logo abaixo de Temperaturas: é a última coisa
             que o operador lê antes de contar quanto saiu, e separá-las obrigava a subir e descer a página
             para conferir a mesma manhã duas vezes. */}
-        {massasAfterCategoryId === null && massasCard}
+        {massasAfterCategoryId === null && (
+          <>
+            {massasCard}
+            {salidaCard}
+          </>
+        )}
 
         {categories.filter((cat) => !cat.parent_category_id).map((cat) => {
           const children = categories.filter((child) => child.parent_category_id === cat.id);
@@ -503,7 +513,12 @@ export function ReportsPage() {
                   )}
                 </CardContent>
               </Card>
-              {cat.id === massasAfterCategoryId && massasCard}
+              {cat.id === massasAfterCategoryId && (
+                <>
+                  {massasCard}
+                  {salidaCard}
+                </>
+              )}
             </Fragment>
           );
         })}
