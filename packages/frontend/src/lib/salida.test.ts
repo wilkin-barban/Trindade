@@ -39,6 +39,7 @@ import {
   salidaPrimaryStatus,
   canRelaunchSalida,
   filterSessionMovements,
+  isSalidaReadOnly,
   salidaClassifyError,
   salidaActionableErrorMessage,
   SALIDA_FALLBACK_PRODUCTS,
@@ -622,6 +623,17 @@ describe('movement primary status and relaunch rules (T3)', () => {
       }),
       false,
     );
+  });
+
+  it('identifies earlier days as read-only and today as manageable (S9)', () => {
+    assert.equal(isSalidaReadOnly('2026-11-12', '2026-11-13'), true);
+    assert.equal(isSalidaReadOnly('2026-11-13', '2026-11-13'), false);
+  });
+
+  it('canRelaunchSalida respects isToday if provided (S9)', () => {
+    const pendingMov = { erp: null, reconciliation: { status: 'pending' as const, ent_lans: [], matched_item_ids: [] } };
+    assert.equal(canRelaunchSalida(pendingMov, true), true);
+    assert.equal(canRelaunchSalida(pendingMov, false), false);
   });
 
   it('filters movements to session user only when multiple operators are present', () => {

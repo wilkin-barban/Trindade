@@ -5,6 +5,7 @@ import i18n from '../../i18n/config';
 import {
   SALIDA_AUDIT_DESTINATION,
   SALIDA_OUTBOX_KEY,
+  writeSalidaLastMovement,
   type SalidaMovement,
 } from '../../lib/salida';
 import {
@@ -53,6 +54,11 @@ vi.mock('../../contexts/AuthContext', () => ({
     login: vi.fn(),
     logout: vi.fn(),
   }),
+}));
+
+vi.mock('../../lib/date', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/date')>()),
+  saoPauloToday: () => '2026-11-13',
 }));
 
 const { SalidaHistoryPage } = await import('./SalidaHistoryPage');
@@ -230,6 +236,55 @@ describe('SalidaHistoryPage', () => {
 
     await waitFor(() => expect(screen.getByTestId('salida-movement-3')).toBeInTheDocument());
     expect(screen.getByTestId('salida-badge-3').textContent).toBe('Parcial');
+  });
+
+  it('shows read-only note and hides relaunch and photo controls on an earlier day (S9)', async () => {
+    get.mockImplementation(async (url: string) =>
+      url === '/salida/history'
+        ? {
+            days: [
+              { date: '2026-11-13', total_units: 20, movements: [PENDING_BOBINA] },
+              {
+                date: '2026-11-12',
+                total_units: 20,
+                movements: [
+                  movement({
+                    id: 88,
+                    movement_date: '2026-11-12',
+                    photos: [
+                      {
+                        id: 881,
+                        file_path: '881.jpg',
+                        file_size: 100,
+                        mime_type: 'image/jpeg',
+                        url: '/api/salida/photos/881',
+                        publicUrl: 'https://example.test/api/salida/photos/public/881',
+                        created_at: '',
+                      },
+                    ],
+                  }),
+                ],
+              },
+            ],
+          }
+        : {},
+    );
+
+    // Today (2026-11-13): manageable
+    await renderReady('/salida-history?date=2026-11-13');
+    expect(screen.queryByTestId('salida-history-readonly-note')).toBeNull();
+    expect(screen.getByTestId('salida-resend-2')).toBeInTheDocument();
+
+    // Earlier day (2026-11-12): read-only
+    fireEvent.click(screen.getByTestId('salida-history-day-2026-11-12'));
+    await waitFor(() => expect(screen.getByTestId('salida-history-readonly-note')).toBeInTheDocument());
+
+    expect(screen.getByTestId('salida-history-readonly-note').textContent).toBe(i18n.t('history.readOnly'));
+    expect(screen.queryByTestId('salida-resend-88')).toBeNull();
+    expect(screen.queryByTestId('salida-photo-input')).toBeNull();
+    expect(screen.queryByTestId('salida-photo-delete-881')).toBeNull();
+    expect(screen.getByTestId('salida-photo-881')).toBeInTheDocument();
+    expect(screen.getByTestId('salida-share-88')).toBeInTheDocument();
   });
 
   it('hands the movement summary to the share helper from the card action', async () => {
@@ -429,6 +484,68 @@ describe('SalidaHistoryPage', () => {
     expect(screen.getByTestId('salida-erp-answer').textContent).toContain('Saida enviada');
     expect(get).toHaveBeenCalledWith('/salida/history');
     expectNoCredential(audit);
+  });
+
+  it('opens verdict dialog on return from launch to /salida-history and records erp result (S2)', async () => {
+    writeSalidaLastMovement(PENDING_BOBINA);
+    saveAeroPendingAttempt({
+      action: 'saida',
+      attemptId: 'attempt-launch-s2',
+      startedAt: 1_700_000_000_000,
+      date: '2026-11-13',
+    });
+    const data = encodeURIComponent(JSON.stringify({ success: true, message: 'Saida gravada com sucesso' }));
+
+    await renderReady(`/salida-history?aero_action=saida&aero_data=${data}`);
+
+    await waitFor(() => expect(screen.getByTestId('salida-erp-answer')).toBeInTheDocument());
+    expect(screen.getByTestId('salida-erp-answer').textContent).toContain('Saida gravada com sucesso');
+    expect(screen.getByTestId('salida-success-dialog')).toBeInTheDocument();
+
+    expect(post).toHaveBeenCalledWith('/salida/2/erp-result', {
+      status: 'sent',
+      message: 'Saida gravada com sucesso',
+    });
+
+    const result = lineOf('result', 'salida_sync');
+    expect(result.attemptId).toBe('attempt-launch-s2');
+    expect(result.httpStatus).toBe(200);
+    expect(result.response).toBe('Saida gravada com sucesso');
+    expect(localStorage.getItem(AERO_PENDING_ATTEMPT_STORAGE_KEY)).toBeNull();
+  });
+
+  it('correctly reads a multi-product batch response on return in SalidaHistoryPage (S2)', async () => {
+    writeSalidaLastMovement({ ...PENDING_BOBINA, expectedPayloads: 2 });
+    const batchAnswer = [
+      { success: true, message: 'Item 1 OK' },
+      { success: true, message: 'Item 2 OK' },
+    ];
+    const data = encodeURIComponent(JSON.stringify(batchAnswer));
+
+    await renderReady(`/salida-history?aero_action=saida&aero_data=${data}`);
+
+    const answer = await screen.findByTestId('salida-erp-answer');
+    expect(answer.textContent).toContain(i18n.t('salida.erpAccepted'));
+
+    expect(post).toHaveBeenCalledWith('/salida/2/erp-result', {
+      status: 'sent',
+      message: null,
+    });
+  });
+
+  it('renders honest unreadable verdict when bridge answer is corrupted on return in SalidaHistoryPage (S2)', async () => {
+    writeSalidaLastMovement({ ...PENDING_BOBINA, expectedPayloads: 2 });
+    const data = encodeURIComponent('corrupted-batch-data');
+
+    await renderReady(`/salida-history?aero_action=saida&aero_data=${data}`);
+
+    const answer = await screen.findByTestId('salida-erp-answer');
+    expect(answer.textContent).toContain(i18n.t('salida.erpUnreadable'));
+
+    expect(post).toHaveBeenCalledWith('/salida/2/erp-result', {
+      status: 'failed',
+      message: null,
+    });
   });
 });
 

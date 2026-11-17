@@ -316,6 +316,15 @@ export function salidaPrimaryStatusLabelKey(status: SalidaCardStatus): string {
 }
 
 /**
+ * Whether a day in the history is read-only.
+ *
+ * Today on the plant's clock (São Paulo) is manageable; any earlier day is read-only.
+ */
+export function isSalidaReadOnly(date: string, today: string = saoPauloToday()): boolean {
+  return date !== today;
+}
+
+/**
  * Whether a movement can be relaunched to the ERP.
  *
  * Only movements whose transmission is null or failed, and whose seats the company has not accepted.
@@ -323,7 +332,9 @@ export function salidaPrimaryStatusLabelKey(status: SalidaCardStatus): string {
  */
 export function canRelaunchSalida(
   movement: Pick<SalidaMovement, 'erp' | 'reconciliation'> | null | undefined,
+  isToday = true,
 ): boolean {
+  if (!isToday) return false;
   if (!movement) return false;
   if (movement.reconciliation?.status === 'reconciled' || movement.reconciliation?.status === 'partial') {
     return false;

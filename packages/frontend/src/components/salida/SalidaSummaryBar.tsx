@@ -60,6 +60,7 @@ export function SalidaSummaryBar({
         >
           <Send className="h-4 w-4" />
           {submitting ? t('salida.launching') : t('salida.launch')}
+          {productCount > 0 && ` (${productCount})`}
         </Button>
       </div>
     </div>

@@ -229,6 +229,37 @@ describe('SalidaLaunchPage', () => {
     expect(screen.getByTestId('salida-summary-units').textContent).toContain('25');
   });
 
+  it('renders product count in launch button when products are loaded and no count in zero (S1)', async () => {
+    await renderReady();
+
+    const launchBtn = screen.getByTestId('salida-launch');
+    expect(launchBtn.textContent).toBe('Lanzar salida');
+
+    fireEvent.change(screen.getByTestId('salida-quantity-1357'), { target: { value: '20' } });
+    expect(launchBtn.textContent).toBe('Lanzar salida (1)');
+
+    fireEvent.change(screen.getByTestId('salida-quantity-1673'), { target: { value: '5' } });
+    expect(launchBtn.textContent).toBe('Lanzar salida (2)');
+
+    fireEvent.change(screen.getByTestId('salida-quantity-1357'), { target: { value: '' } });
+    fireEvent.change(screen.getByTestId('salida-quantity-1673'), { target: { value: '' } });
+    expect(launchBtn.textContent).toBe('Lanzar salida');
+  });
+
+  it('sends saida trip with callbackPath targeting /salida-history (S2)', async () => {
+    ticket.mockImplementation(async () => ({ ticket: 't-1', ticketUrl: 'https://app.example/t/1', expiresAt: '' }));
+
+    await renderReady();
+    fireEvent.change(screen.getByTestId('salida-quantity-1357'), { target: { value: '20' } });
+    fireEvent.click(screen.getByTestId('salida-launch'));
+
+    await waitFor(() => expect(ticket).toHaveBeenCalledTimes(1));
+    expect(ticket.mock.calls[0]?.[0]).toMatchObject({
+      action: 'saida',
+      callbackPath: expect.stringContaining('/salida-history'),
+    });
+  });
+
   it('does not render any photo picker or photo section on the launch screen', async () => {
     await renderReady();
     expect(screen.queryByTestId('salida-photo-input')).toBeNull();
@@ -336,179 +367,14 @@ describe('SalidaLaunchPage', () => {
     expectNoCredential(audit);
   });
 
-  it('closes the trip with a result line that carries the same attempt', async () => {
-    writeSalidaLastMovement(MOVEMENT);
-    saveAeroPendingAttempt({
-      action: 'saida',
-      attemptId: 'attempt-saida-42',
-      startedAt: 1_700_000_000_000,
-      date: '2026-11-13',
-    });
-    const data = encodeURIComponent(JSON.stringify({ success: true, message: 'Saidas enviadas' }));
-
-    await renderReady(`/salida?aero_action=saida&aero_data=${data}`);
-
-    await screen.findByTestId('salida-erp-answer');
-    await waitFor(() => expect(audit.length).toBeGreaterThan(0));
-
-    const result = lineOf('result');
-    expect(result.event).toBe('salida_sync');
-    expect(result.phase).toBe('result');
-    expect(result.client).toBe('web');
-    expect(result.attemptId).toBe('attempt-saida-42');
-    expect(result.httpStatus).toBe(200);
-    expect(result.response).toBe('Saidas enviadas');
-    expect(result.error).toBeNull();
-    expect(localStorage.getItem(AERO_PENDING_ATTEMPT_STORAGE_KEY)).toBeNull();
-    expectNoCredential(audit);
-  });
-
-  it('resolves stored bridge result via GET last-result when aero_result=stored', async () => {
-    writeSalidaLastMovement(MOVEMENT);
-    saveAeroPendingAttempt({
-      action: 'saida',
-      attemptId: 'attempt-saida-stored-1',
-      startedAt: 1_700_000_000_000,
-      date: '2026-11-13',
-    });
-    get.mockImplementation(async (url: string) => {
-      if (url === '/salida/catalog') return { products: [...SALIDA_FALLBACK_PRODUCTS] };
-      if (url === '/integration/aero/bridge-tickets/last-result?action=saida') {
-        return { data: { success: true, message: 'Saidas gravadas do cofre' } };
-      }
-      return {};
-    });
-
-    await renderReady('/salida?aero_action=saida&aero_result=stored');
-
-    await screen.findByTestId('salida-erp-answer');
-    await waitFor(() => expect(audit.length).toBeGreaterThan(0));
-
-    const result = lineOf('result');
-    expect(result.attemptId).toBe('attempt-saida-stored-1');
-    expect(result.httpStatus).toBe(200);
-    expect(result.response).toBe('Saidas gravadas do cofre');
-    expect(result.error).toBeNull();
-  });
-
-  it('reports a refused ERP answer with no invented HTTP status', async () => {
-    saveAeroPendingAttempt({
-      action: 'saida',
-      attemptId: 'attempt-saida-43',
-      startedAt: 1_700_000_000_000,
-      date: '2026-11-13',
-    });
-    const data = encodeURIComponent(JSON.stringify({ success: false, message: 'Produto inexistente' }));
-
-    await renderReady(`/salida?aero_action=saida&aero_data=${data}`);
-
-    await screen.findByTestId('salida-erp-answer');
-    await waitFor(() => expect(audit.length).toBeGreaterThan(0));
-
-    const result = lineOf('result');
-    expect(result.attemptId).toBe('attempt-saida-43');
-    expect(result.httpStatus).toBeNull();
-    expect(String(result.error ?? '')).toMatch(/^AERO_/);
-    expect(String(result.error ?? '')).toContain('Produto inexistente');
-  });
-
-  it('pairs the request and the answer of one trip across the round trip to the shortcut', async () => {
-    ticket.mockImplementation(async () => ({ ticket: 't-9', ticketUrl: 'https://app.example/t/9', expiresAt: '' }));
-
-    const first = await renderReady();
-    fireEvent.change(screen.getByTestId('salida-quantity-1357'), { target: { value: '20' } });
-    fireEvent.click(screen.getByTestId('salida-launch'));
-
-    await waitFor(() => expect(audit.length).toBeGreaterThan(0));
-    const requested = lineOf('requested');
-    const stored = JSON.parse(localStorage.getItem(AERO_PENDING_ATTEMPT_STORAGE_KEY) ?? 'null') as {
-      attemptId: string;
-    } | null;
-    expect(stored?.attemptId).toBe(requested.attemptId);
-
-    // The shortcut leaves the page and comes back to a fresh document with the ERP's answer.
-    first.unmount();
-    const data = encodeURIComponent(JSON.stringify({ success: true, message: 'Saida enviada' }));
-    await renderReady(`/salida?aero_action=saida&aero_data=${data}`);
-
-    await waitFor(() => expect(lineOf('result').attemptId).toBe(requested.attemptId));
-    const result = lineOf('result');
-    expect(result.event).toBe('salida_sync');
-    expect(result.httpStatus).toBe(200);
-    expect(result.response).toBe('Saida enviada');
-    // Both lines are joined by the attempt, which is the whole point of writing it down before leaving.
-    expect([requested.attemptId, result.attemptId]).toEqual([stored?.attemptId, requested.attemptId]);
-    expectNoCredential(audit);
-  });
-
-  it('shows the ERP answer with the summary and photos without share buttons when the bridge returns', async () => {
+  it('does not render success dialog when bridge parameters arrive on launch page (S2)', async () => {
     writeSalidaLastMovement(MOVEMENT);
     const data = encodeURIComponent(JSON.stringify({ success: true, message: 'Saidas enviadas' }));
 
     await renderReady(`/salida?aero_action=saida&aero_data=${data}`);
 
-    const answer = await screen.findByTestId('salida-erp-answer');
-    expect(answer.textContent).toContain('Saidas enviadas');
-    expect(screen.getByTestId('salida-success-total').textContent).toContain('25');
-
-    // T3: The dialog loses the copySummary and shareWhatsApp buttons; sharing lives in the history.
-    expect(screen.queryByTestId('salida-share-whatsapp')).toBeNull();
-    expect(screen.queryByTestId('salida-copy-summary')).toBeNull();
-    expect(screen.getByTestId('salida-success-close')).toBeInTheDocument();
-  });
-
-  it('correctly reads a multi-product batch response array from the bridge and records erp-result (T1)', async () => {
-    writeSalidaLastMovement({ ...MOVEMENT, expectedPayloads: 4 });
-    const batchAnswer = [
-      { success: true, message: 'Item 1 OK' },
-      { success: true, message: 'Item 2 OK' },
-      { success: true, message: 'Item 3 OK' },
-      { success: true, message: 'Item 4 OK' },
-    ];
-    const data = encodeURIComponent(JSON.stringify(batchAnswer));
-
-    await renderReady(`/salida?aero_action=saida&aero_data=${data}`);
-
-    const answer = await screen.findByTestId('salida-erp-answer');
-    expect(answer.textContent).toContain(i18n.t('salida.erpAccepted'));
-
-    // Verified that erp-result was posted to backend
-    expect(post).toHaveBeenCalledWith('/salida/12/erp-result', {
-      status: 'sent',
-      message: null,
-    });
-
-    const result = lineOf('result');
-    expect(result.httpStatus).toBe(200);
-    expect(result.error).toBeNull();
-  });
-
-  it('renders honest unreadable verdict when the bridge answer is corrupted', async () => {
-    writeSalidaLastMovement({ ...MOVEMENT, expectedPayloads: 2 });
-    const data = encodeURIComponent('corrupted-data');
-
-    await renderReady(`/salida?aero_action=saida&aero_data=${data}`);
-
-    const answer = await screen.findByTestId('salida-erp-answer');
-    expect(answer.textContent).toContain(i18n.t('salida.erpUnreadable'));
-
-    expect(post).toHaveBeenCalledWith('/salida/12/erp-result', {
-      status: 'failed',
-      message: null,
-    });
-  });
-
-  it('hides the product code in the success dialog and keeps it readable for a screen reader', async () => {
-    writeSalidaLastMovement(MOVEMENT);
-    const data = encodeURIComponent(JSON.stringify({ success: true, message: 'Saidas enviadas' }));
-
-    await renderReady(`/salida?aero_action=saida&aero_data=${data}`);
-    const dialog = await screen.findByTestId('salida-success-dialog');
-
-    expect(dialog.textContent).toContain('EMBALAG. DISCO 200g');
-    expect(dialog.textContent).not.toContain('1357');
-    // The code survives where it is read, not where it is drawn.
-    expect(dialog.querySelector('[aria-label*="1357"]')).not.toBeNull();
+    expect(screen.queryByTestId('salida-success-dialog')).toBeNull();
+    expect(screen.queryByTestId('salida-erp-answer')).toBeNull();
   });
 
   it('falls back to the fixed catalogue when the server does not answer', async () => {

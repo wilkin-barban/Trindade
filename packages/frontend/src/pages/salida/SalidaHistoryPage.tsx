@@ -37,6 +37,7 @@ import {
   clearSalidaLastMovement,
   clearSalidaOutbox,
   filterSessionMovements,
+  isSalidaReadOnly,
   readSalidaLastMovement,
   readSalidaOutbox,
   recordSalidaErpResult,
@@ -130,6 +131,7 @@ export function SalidaHistoryPage() {
 
   const asked = params.get('date');
   const date = asked && /^\d{4}-\d{2}-\d{2}$/.test(asked) ? asked : (days.list[0]?.date ?? today);
+  const isReadOnly = isSalidaReadOnly(date, today);
 
   const labels = useMemo<Record<SalidaBlock, string>>(
     () => ({
@@ -361,9 +363,15 @@ export function SalidaHistoryPage() {
 
         setSuccess({ movement: lastMovement, erp: erpOutcome, message: batchResult.message });
         if (isComplete) {
-          clearSalidaOutbox();
-          clearSalidaLastMovement();
-          setOutbox(null);
+          if (queued && queued.trips.length > 1) {
+            const remainingTrips = queued.trips.slice(1);
+            writeSalidaOutbox({ ...queued, trips: remainingTrips, currentTripPayloads: undefined });
+            setOutbox(readSalidaOutbox());
+          } else {
+            clearSalidaOutbox();
+            clearSalidaLastMovement();
+            setOutbox(null);
+          }
         } else {
           // The movement is still owed: the outbox and the card keep saying pending.
           if (queued) {
@@ -397,6 +405,8 @@ export function SalidaHistoryPage() {
               message: callback.message,
             }),
           );
+          setNotice({ type: 'error', message: salidaActionableErrorMessage(callback.code, callback.message, t) });
+          setOutbox(readSalidaOutbox());
         } else {
           void postAeroAuditEvent(
             salidaReadResultEvent({
@@ -407,8 +417,8 @@ export function SalidaHistoryPage() {
               message: callback.message,
             }),
           );
+          setCheckError(salidaActionableErrorMessage(callback.code, callback.message, t));
         }
-        setCheckError(salidaActionableErrorMessage(callback.code, callback.message, t));
       }
 
       setParams({ date: answeredDate }, { replace: true });
@@ -426,6 +436,7 @@ export function SalidaHistoryPage() {
    * ones the record kept, and a catalogue that changed since then must not rewrite the exit.
    */
   const resendToErp = async (movement: SalidaMovement) => {
+    if (isReadOnly) return;
     setResendingId(movement.id);
     setNotice(null);
     try {
@@ -632,6 +643,15 @@ export function SalidaHistoryPage() {
           failedMessage={t('salida.historyDaysUnavailable')}
         />
 
+        {isReadOnly && (
+          <p
+            className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600"
+            data-testid="salida-history-readonly-note"
+          >
+            {t('history.readOnly')}
+          </p>
+        )}
+
         <div
           data-testid="salida-history-actions"
           className="grid grid-cols-1 gap-2 border-t border-gray-100 pt-3 sm:flex sm:items-center sm:justify-between"
@@ -695,6 +715,7 @@ export function SalidaHistoryPage() {
               onResend={(target) => void resendToErp(target)}
               onRefresh={() => void load()}
               resending={resendingId === movement.id}
+              readOnly={isReadOnly}
             />
           ))}
         </div>

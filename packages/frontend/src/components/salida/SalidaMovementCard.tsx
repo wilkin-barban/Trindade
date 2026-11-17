@@ -36,6 +36,7 @@ export function SalidaMovementCard({
   onResend,
   onRefresh,
   resending = false,
+  readOnly = false,
 }: {
   movement: SalidaMovement;
   timeLabel: string;
@@ -43,6 +44,7 @@ export function SalidaMovementCard({
   onResend?: (movement: SalidaMovement) => void;
   onRefresh?: () => void;
   resending?: boolean;
+  readOnly?: boolean;
 }) {
   const { t } = useTranslation();
   // The retention cleanup deletes the file and its row together, so a card drawn from a cached page can point at
@@ -196,16 +198,18 @@ export function SalidaMovementCard({
                     <span className="text-[11px] font-semibold leading-tight text-gray-700">
                       {t('salida.photoUnavailable')}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => void handleDeletePhoto(photo.id)}
-                      disabled={deletingPhotoId === photo.id}
-                      className="absolute right-1 top-1 inline-flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white shadow hover:bg-red-700 disabled:opacity-50"
-                      aria-label={t('salida.photoRemove')}
-                      data-testid={`salida-photo-delete-${photo.id}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    {!readOnly && (
+                      <button
+                        type="button"
+                        onClick={() => void handleDeletePhoto(photo.id)}
+                        disabled={deletingPhotoId === photo.id}
+                        className="absolute right-1 top-1 inline-flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white shadow hover:bg-red-700 disabled:opacity-50"
+                        aria-label={t('salida.photoRemove')}
+                        data-testid={`salida-photo-delete-${photo.id}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <div key={photo.id} className="relative aspect-square overflow-hidden rounded-md border border-gray-200">
@@ -224,16 +228,18 @@ export function SalidaMovementCard({
                         onError={() => markPhotoUnavailable(photo.id)}
                       />
                     </a>
-                    <button
-                      type="button"
-                      onClick={() => void handleDeletePhoto(photo.id)}
-                      disabled={deletingPhotoId === photo.id}
-                      className="absolute right-1 top-1 inline-flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white shadow hover:bg-red-700 disabled:opacity-50"
-                      aria-label={t('salida.photoRemove')}
-                      data-testid={`salida-photo-delete-${photo.id}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    {!readOnly && (
+                      <button
+                        type="button"
+                        onClick={() => void handleDeletePhoto(photo.id)}
+                        disabled={deletingPhotoId === photo.id}
+                        className="absolute right-1 top-1 inline-flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white shadow hover:bg-red-700 disabled:opacity-50"
+                        aria-label={t('salida.photoRemove')}
+                        data-testid={`salida-photo-delete-${photo.id}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 ),
               )}
@@ -248,21 +254,23 @@ export function SalidaMovementCard({
           <p className="mt-3 text-xs text-gray-400">{t('salida.noPhotos')}</p>
         )}
 
-        {movement.photos.length >= SALIDA_MAX_PHOTOS ? (
-          <p className="mt-2 text-xs font-medium text-gray-500" data-testid={`salida-photos-max-${movement.id}`}>
-            {t('salida.photosMaxReached')}
-          </p>
-        ) : (
-          <div className="mt-2">
-            <SalidaPhotoPicker
-              photos={[]}
-              onAdd={(files) => void handleAddPhoto(files)}
-              error={photoError}
-              disabled={uploading}
-              compact
-              existingCount={movement.photos.length}
-            />
-          </div>
+        {!readOnly && (
+          movement.photos.length >= SALIDA_MAX_PHOTOS ? (
+            <p className="mt-2 text-xs font-medium text-gray-500" data-testid={`salida-photos-max-${movement.id}`}>
+              {t('salida.photosMaxReached')}
+            </p>
+          ) : (
+            <div className="mt-2">
+              <SalidaPhotoPicker
+                photos={[]}
+                onAdd={(files) => void handleAddPhoto(files)}
+                error={photoError}
+                disabled={uploading}
+                compact
+                existingCount={movement.photos.length}
+              />
+            </div>
+          )
         )}
 
         <div className="mt-3 flex flex-wrap gap-2">
@@ -276,7 +284,7 @@ export function SalidaMovementCard({
             <MessageCircle className="h-4 w-4" />
             {t('salida.shareWhatsApp')}
           </Button>
-          {canRelaunchSalida(movement) && onResend && (
+          {!readOnly && canRelaunchSalida(movement) && onResend && (
             <Button
               type="button"
               variant="outline"
