@@ -110,3 +110,17 @@ iphone
   operarios que solo existen en el ERP se marcan como en Masas. El texto que se comparte por WhatsApp la incluye en el
   mismo orden que la web (después de Masas).
 - **Dónde se ve**: la vista del reporte y la previsualización de creación, con el mismo contenido.
+
+## Estado de ejecución (2026-11-16)
+
+| Tarea | Estado | Commit | Evidencia |
+| --- | --- | --- | --- |
+| T1 — cabecera compartida en los dos lanzamientos, Masas sin selector de fecha | hecho | `32fd90ce` | `DaySessionHeader` con prefijo de test ids (`salida-*`, `massas-*`); Masas lanza el día de planta |
+| T2 — `/salida-history` abre en hoy, día vacío sin tarjetas | hecho | `32fd90ce` | abre en `saoPauloToday()`, valida `?date=`, estado vacío con acceso a lanzar |
+| T3 — sin compartir por tarjeta en días pasados, en los dos históricos | hecho | `32fd90ce` | `SalidaMovementCard` (`!readOnly`) y el equivalente de Masas; el compartir del día queda |
+| T4 — bloque de Salidas/Baixa en el reporte | hecho | `cff68334` | `salidaReportDayView`, `GET /api/reports/day/salidas`, sección `📤 *SAÍDAS / BAIXA*` en el texto, `SalidaReportSection` en `/reports/:id` y en `/reports` |
+| T5 — paridad Android actualizada | hecho | `7bf2877f` | `docs/paridad-android-web.md`, sección nueva con cabecera, sin selector, históricos y bloque del reporte |
+| T6 — cierre | en curso | — | suites, build, E2E, deploy y verificación |
+
+Números al cerrar el código: backend **969/969**, Vitest **219/219** (29 archivos), node **749/749**, typecheck limpio,
+contrato OpenAPI al día y cliente Kotlin regenerado (195 archivos).
