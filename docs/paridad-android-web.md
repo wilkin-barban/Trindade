@@ -232,3 +232,38 @@ Tanto la UI como el log de auditoría deben mapear los fallos a los siguientes c
    - El módulo Salida/Baja está actualmente restringido al usuario `wilkin` (`isBetaWorker` en servidor y cliente). Su apertura a todos los roles y trabajadores se realizará en una entrega posterior.
 4. **Implementación de vistas Android para Salida**:
    - El contrato Kotlin ya cuenta con los modelos generados en `packages/android/contract/src/main/kotlin/com/trindade/app/contract/models/SalidaMovement.kt` (junto con `SalidaCreateRequest.kt`, `SalidaProduct.kt`, etc.), pero aún deben construirse las pantallas Jetpack Compose (`SalidaLaunchScreen`, `SalidaHistoryScreen`), sus ViewModels y el repositorio correspondiente en `packages/android/app/`.
+
+## Históricos y reporte (pasada del 2026-11-16)
+
+### Cabecera de los dos lanzamientos
+
+Las pantallas de lanzamiento (Salida/Baja y Masas) comparten la misma cabecera: la línea con el día de planta
+(`Hoje · dd/mm/aaaa`, calculado en São Paulo, nunca con la zona del teléfono), el botón que lleva al histórico del
+módulo y el operador de la sesión con su etiqueta «Sesión»/«Sessão». En Android: la barra superior de cada pantalla de
+lanzamiento, con ese orden y esos destinos.
+
+### Sin selector de fecha en el lanzamiento
+
+Desde esta pasada, un lanzamiento es siempre el día de planta. El selector de fecha desapareció de las dos pantallas
+de lanzamiento; el pasado se consulta en el histórico. En Android, lo mismo: sin selector, con el día del servidor.
+
+### Históricos
+
+- Abren en el día de planta.
+- Si el día está vacío no se dibujan tarjetas: se muestra el estado vacío con el acceso a lanzar.
+- Los días pasados son de solo lectura y **sin el compartir por tarjeta**; el botón del final, que comparte el día
+  completo, sigue disponible. Hoy conserva los dos.
+- El histórico de Salidas conserva además sus fotos (máximo 3) y el relanzar al ERP cuando el envío no fue aceptado.
+
+### Bloque de Salidas dentro del reporte
+
+- **Datos**: `GET /api/reports/day/salidas?date=YYYY-MM-DD`, con sesión y **cualquier rol** (el reporte lo lee todo el
+  mundo; `/api/salida` sigue siendo la beta privada de un usuario). Devuelve `{ date, operators[], totalUnits,
+  movementCount }`, cada operario con `{ name, username, units, products[{ code, name, block, units }] }`.
+- **Pantalla**: una tarjeta por operario con sus productos y unidades, el total del día, el estado vacío cuando no hubo
+  salidas y un aviso cuando el día no se pudo leer (nunca “no hubo salidas” si falló la lectura).
+- **Dónde se ve**: en la vista del reporte y en la pantalla de creación, como previsualización.
+- **Texto compartido**: después de `🍝 *LANÇAMENTO DE MASSAS*` y antes de las notas,
+  `📤 *SAÍDAS / BAIXA*`, `Por Operário:`, `👤 NOMBRE:` con una línea por producto (`   - PRODUCTO: N un`), y
+  `📊 Total: N un`. Sin códigos de producto. Si el día no tuvo salidas, el bloque no aparece.
+- **Día**: el `report_date` del propio reporte, el mismo que usan Masas e Insumos.
