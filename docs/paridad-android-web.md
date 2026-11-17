@@ -260,6 +260,13 @@ de lanzamiento; el pasado se consulta en el histórico. En Android, lo mismo: si
 - **Datos**: `GET /api/reports/day/salidas?date=YYYY-MM-DD`, con sesión y **cualquier rol** (el reporte lo lee todo el
   mundo; `/api/salida` sigue siendo la beta privada de un usuario). Devuelve `{ date, operators[], totalUnits,
   movementCount }`, cada operario con `{ name, username, units, products[{ code, name, block, units }], erpOnly }`.
+- **Nombres de producto (encoding)**: el WebService de la empresa **no declara charset** y el puente lee el cuerpo
+  como UTF-8. Cuando la heurística cae en ISO-8859-2, los bytes UTF-8 de `Ç` llegan como `Ă` más un carácter de
+  control (`AĂ…UCAR 5 KG`), y queda así guardado en `aero_movements`. Regla obligatoria: **un código que existe en el
+  catálogo de Salida se nombra con el nombre canónico del catálogo** (1074 → `AÇÚCAR 5kg`), nunca con el texto del
+  espejo; y para un código ajeno al catálogo, el texto del ERP se repara al leerlo (mapear cada carácter a su byte
+  ISO-8859-2 y decodificar esos bytes como UTF-8, aceptando el resultado solo si no queda ningún carácter de control).
+  No se toca la ingesta compartida: el espejo guarda lo que trajo el puente y la reparación es de quien muestra.
 - **Regla de operarios (obligatoria)**: el bloque une los lanzamientos de Trindade con **las salidas que la empresa
   registró en su ERP**, emparejando por producto + unidades + operador para no contar dos veces la misma salida, y
   **solo acepta asientos cuyo operario sea una cuenta activa de Trindade** (por usuario o por nombre visible). Un
