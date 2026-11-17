@@ -20,7 +20,8 @@ describe('receipts sync wiring', () => {
     // El sobre con Authorization ya no se arma acá: se pide un ticket de la acción y el servidor escribe la
     // petición. Lo único que viaja desde esta página es el cuerpo certificado de los movimientos.
     assert.ok(helper.includes('requestAeroBridgeTicket('));
-    assert.ok(helper.includes('aeroMovementsPayload({ date: options.date, userName: null })'));
+    // The payload keeps its entries-only default; the report's own sync is the one that asks for the exits.
+    assert.ok(helper.includes('includeExits: options.includeExits'));
   });
 
   it('reads the same callback the launch screen reads, and only for the movements action', () => {

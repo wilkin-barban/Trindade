@@ -12,6 +12,7 @@ import { DaySessionHeader } from '../../components/DaySessionHeader';
 import { SalidaBlockSwitch, SalidaProductGrid } from '../../components/salida/SalidaBlocks';
 import { SalidaSummaryBar } from '../../components/salida/SalidaSummaryBar';
 import { SalidaSuccessDialog, type SalidaErpOutcome } from '../../components/salida/SalidaSuccessDialog';
+import { Dialog } from '../../components/ui/dialog';
 import { saoPauloToday } from '../../lib/date';
 import {
   aeroBridgeCallbackFor,
@@ -68,6 +69,9 @@ export function SalidaLaunchPage() {
   const [activeBlocks, setActiveBlocks] = useState<SalidaBlock[]>([...SALIDA_BLOCKS]);
   const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  // The launch goes through a confirmation, like a Masas launch: the operator reads what is leaving before the
+  // ticket is armed. Nothing leaves the page until Confirmar.
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [notice, setNotice] = useState<{ type: 'error' | 'info'; message: string } | null>(null);
   const [success, setSuccess] = useState<{
     movement: SalidaMovement | null;
@@ -226,12 +230,19 @@ export function SalidaLaunchPage() {
     setQuantities((current) => ({ ...current, [code]: raw }));
   };
 
-  const handleLaunch = async () => {
+  /** The button: reads the form and opens the confirmation. Nothing is sent here. */
+  const handleLaunch = () => {
     if (items.length === 0) {
       setNotice({ type: 'error', message: t('salida.emptySelection') });
       return;
     }
+    setNotice(null);
+    setConfirmOpen(true);
+  };
 
+  /** Confirmar: from here the movement is written and the trip is armed, exactly as before the dialog existed. */
+  const handleConfirmLaunch = async () => {
+    setConfirmOpen(false);
     setSubmitting(true);
     setNotice(null);
     const payloads = buildSalidaPayloads(items, {
@@ -386,8 +397,65 @@ export function SalidaLaunchPage() {
         totalUnits={totalUnits}
         submitting={submitting}
         disabled={items.length === 0}
-        onLaunch={() => void handleLaunch()}
+        onLaunch={handleLaunch}
       />
+
+      <Dialog
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        labelledBy="salida-confirm-title"
+        describedBy="salida-confirm-desc"
+        panelTestId="salida-confirm-modal"
+      >
+        <div className="max-h-[85vh] w-full max-w-md space-y-4 overflow-y-auto p-6">
+          <h2 id="salida-confirm-title" className="flex items-center gap-2 text-lg font-bold text-gray-900">
+            <span aria-hidden="true">🚛</span>
+            <span>{t('salida.confirmTitle')}</span>
+          </h2>
+          <p id="salida-confirm-desc" className="text-xs text-gray-500">
+            {t('salida.confirmSubtitle')}
+          </p>
+
+          <div className="max-h-60 space-y-2 overflow-y-auto rounded-lg border bg-gray-50 p-3">
+            {items.map((item) => {
+              const product = (catalog ?? []).find((candidate) => candidate.code === String(item.code));
+              return (
+                <div key={item.code} className="flex items-center justify-between gap-2 text-sm" data-testid={`salida-confirm-item-${item.code}`}>
+                  <span className="min-w-0 font-medium text-gray-800">{product?.name ?? item.code}</span>
+                  <span className="shrink-0 text-right font-bold tabular-nums text-gray-900">{item.quantity} un</span>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex items-center justify-between border-t pt-2 text-sm">
+            <span className="font-semibold text-gray-700">
+              {t('salida.confirmProducts')}: {items.length}
+            </span>
+            <span className="text-base font-extrabold tabular-nums text-gray-900" data-testid="salida-confirm-total">
+              {totalUnits} un
+            </span>
+          </div>
+
+          <div className="flex flex-col-reverse gap-3 pt-3 sm:flex-row sm:justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setConfirmOpen(false)}
+              className="min-h-[44px] w-full sm:w-auto"
+              data-testid="salida-confirm-cancel"
+            >
+              {t('salida.confirmCancel')}
+            </Button>
+            <Button
+              onClick={() => void handleConfirmLaunch()}
+              className="min-h-[44px] w-full bg-green-600 font-semibold text-white hover:bg-green-700 sm:w-auto"
+              data-testid="salida-confirm-action"
+            >
+              {t('salida.confirmAction')}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
 
       <SalidaSuccessDialog
         open={success !== null}

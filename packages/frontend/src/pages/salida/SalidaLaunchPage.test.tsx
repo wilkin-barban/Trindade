@@ -160,6 +160,12 @@ beforeEach(async () => {
   await i18n.changeLanguage('es');
 });
 
+/** Lanzar opens the confirmation; Confirmar is what actually sends. */
+function confirmLaunch() {
+  fireEvent.click(screen.getByTestId('salida-launch'));
+  fireEvent.click(screen.getByTestId('salida-confirm-action'));
+}
+
 describe('SalidaLaunchPage', () => {
   it('shows the plant day and the session operator', async () => {
     await renderReady();
@@ -251,7 +257,7 @@ describe('SalidaLaunchPage', () => {
 
     await renderReady();
     fireEvent.change(screen.getByTestId('salida-quantity-1357'), { target: { value: '20' } });
-    fireEvent.click(screen.getByTestId('salida-launch'));
+    confirmLaunch();
 
     await waitFor(() => expect(ticket).toHaveBeenCalledTimes(1));
     expect(ticket.mock.calls[0]?.[0]).toMatchObject({
@@ -293,7 +299,7 @@ describe('SalidaLaunchPage', () => {
     await renderReady();
 
     fireEvent.change(screen.getByTestId('salida-quantity-1357'), { target: { value: '20' } });
-    fireEvent.click(screen.getByTestId('salida-launch'));
+    confirmLaunch();
 
     await waitFor(() => expect(screen.getByTestId('salida-erp-answer')).toBeInTheDocument());
 
@@ -316,7 +322,7 @@ describe('SalidaLaunchPage', () => {
 
     await renderReady();
     fireEvent.change(screen.getByTestId('salida-quantity-1357'), { target: { value: '20' } });
-    fireEvent.click(screen.getByTestId('salida-launch'));
+    confirmLaunch();
 
     await waitFor(() => expect(screen.getByTestId('salida-erp-answer')).toBeInTheDocument());
 
@@ -339,7 +345,7 @@ describe('SalidaLaunchPage', () => {
     await renderReady();
     fireEvent.change(screen.getByTestId('salida-quantity-1357'), { target: { value: '20' } });
     fireEvent.change(screen.getByTestId('salida-quantity-1673'), { target: { value: '5' } });
-    fireEvent.click(screen.getByTestId('salida-launch'));
+    confirmLaunch();
 
     await waitFor(() => expect(audit.length).toBeGreaterThan(0));
 
@@ -425,4 +431,37 @@ describe('SalidaLaunchPage — iPhone header', () => {
     expect(header.className).toContain('sm:flex-row');
     expect(header.contains(screen.getByTestId('salida-launch-help'))).toBe(true);
   });
+  it('opens the confirmation instead of sending, and Cancelar leaves everything untouched', async () => {
+    await renderReady();
+    fireEvent.change(screen.getByTestId('salida-quantity-1357'), { target: { value: '20' } });
+    fireEvent.change(screen.getByTestId('salida-quantity-1673'), { target: { value: '5' } });
+
+    fireEvent.click(screen.getByTestId('salida-launch'));
+
+    // The operator reads what is leaving: the products, the total, and two decisions.
+    const dialog = screen.getByTestId('salida-confirm-modal');
+    expect(dialog).toBeTruthy();
+    expect(screen.getByTestId('salida-confirm-item-1357').textContent).toContain('20 un');
+    expect(screen.getByTestId('salida-confirm-total').textContent).toContain('25');
+    // Nothing left the page: no movement, no ticket.
+    expect(post).not.toHaveBeenCalled();
+    expect(ticket).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId('salida-confirm-cancel'));
+    expect(screen.queryByTestId('salida-confirm-modal')).toBeNull();
+    expect(post).not.toHaveBeenCalled();
+    expect(ticket).not.toHaveBeenCalled();
+  });
+
+  it('Confirmar is what writes the movement and arms the trip', async () => {
+    ticket.mockImplementation(async () => ({ ticket: 't-1', ticketUrl: 'https://app.example/t/1', expiresAt: '' }));
+
+    await renderReady();
+    fireEvent.change(screen.getByTestId('salida-quantity-1357'), { target: { value: '20' } });
+    confirmLaunch();
+
+    await waitFor(() => expect(post).toHaveBeenCalledWith('/salida', expect.anything()));
+    await waitFor(() => expect(ticket).toHaveBeenCalledTimes(1));
+  });
+
 });
