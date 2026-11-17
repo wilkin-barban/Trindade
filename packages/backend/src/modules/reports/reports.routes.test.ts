@@ -1740,5 +1740,40 @@ describe('Reports Routes', () => {
       assert.strictEqual(body.operators[0].products[0].code, '1357');
       assert.strictEqual(body.operators[0].products[0].units, 20);
     });
+
+    it('shows every operator of the day, not only the caller', async () => {
+      // The block exists so the report states the day, and the day is not one person's: whoever reads it has to see
+      // what every worker launched, grouped by each one.
+      const adminId = 1;
+      db.prepare(`
+        INSERT INTO salida_movements (id, movement_date, user_id, created_at)
+        VALUES (811, '2026-11-13', ?, '2026-11-13 09:00:00'), (812, '2026-11-13', ?, '2026-11-13 11:00:00')
+      `).run(workerUserId, adminId);
+      db.prepare(`
+        INSERT INTO salida_movement_items (movement_id, product_code, product_name, block, quantity, position)
+        VALUES (811, '1357', 'EMBALAG. DISCO 200g', 'embalagens', 30, 1),
+               (812, '1900', 'BOBINA ROLO', 'bobinas', 5, 1)
+      `).run();
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/reports/day/salidas?date=2026-11-13',
+        headers: { authorization: `Bearer ${workerToken}` },
+      });
+      assert.strictEqual(res.statusCode, 200);
+      const body = JSON.parse(res.body);
+      assert.strictEqual(body.movementCount, 2);
+      assert.strictEqual(body.totalUnits, 35);
+      assert.strictEqual(body.operators.length, 2, 'the day belongs to every operator, not to the caller');
+      const usernames = body.operators.map((operator: { username: string }) => operator.username);
+      const adminUsername = (db.prepare('SELECT username FROM users WHERE id = ?').get(adminId) as { username: string })
+        .username;
+      assert.ok(usernames.includes(adminUsername), 'the other operator who launched appears too');
+      assert.strictEqual(
+        new Set(usernames).size,
+        2,
+        'two different operators, each once, even though the caller is one of them',
+      );
+    });
   });
 });
