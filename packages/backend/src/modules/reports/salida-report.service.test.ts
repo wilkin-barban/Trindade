@@ -185,4 +185,32 @@ describe('salidaReportDayView', () => {
     assert.equal(day.operators[0].products.length, 2);
   });
 
+  it('names a catalogue product from the catalogue, which is what frees the block from the ERP charset', () => {
+    // The company's book answered `AĂ\u0087UCAR 5 KG` for 001074: the UTF-8 bytes of `Ç` read as ISO-8859-2. The
+    // code is this plant's (1074, açúcar), so the catalogue's own name wins and the mojibake never reaches a screen.
+    db.exec('DELETE FROM salida_movement_items');
+    db.exec('DELETE FROM salida_movements');
+    db.exec('DELETE FROM aero_movements');
+    db.exec(`
+      INSERT INTO aero_movements
+        (movement_date, ent_lan, product_code, product_desc, quantity, entry_date, operator_name, movement_type, synced_at)
+      VALUES
+        ('2026-11-20', 7001, '001074', 'AĂ\u0087UCAR 5 KG', 6, '2026-11-20', 'ANA SOUZA', 'S', '2026-11-20T09:00:00.000Z'),
+        ('2026-11-20', 7002, '009999', 'AĂ\u0087UCAR 5 KG', 2, '2026-11-20', 'ANA SOUZA', 'S', '2026-11-20T09:05:00.000Z')
+    `);
+
+    const day = salidaReportDayView(db, '2026-11-20');
+    const product1074 = day.operators[0].products.find((product) => product.code === '001074');
+    assert.ok(product1074);
+    assert.equal(product1074!.name, 'AÇÚCAR 5kg', 'the catalogue names its own code');
+    assert.equal(product1074!.block, 'materia-prima');
+
+    // A code this plant does not sell keeps the company's own words, repaired in the block and nowhere else. The
+    // book spells it `AÇUCAR` (no accent on the U); the catalogue's `AÇÚCAR 5kg` is the name this plant uses.
+    const foreign = day.operators[0].products.find((product) => product.code === '009999');
+    assert.ok(foreign);
+    assert.equal(foreign!.name, 'AÇUCAR 5 KG');
+    assert.equal(/[\u0080-\u009f]/.test(foreign!.name), false, 'no control character survives');
+  });
+
 });

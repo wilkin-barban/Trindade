@@ -21,7 +21,7 @@ describe('aero-mirror: the movements request the ticket carries', () => {
       CODPRO: null,
       DTINI: '2026-10-28',
       DTFIM: '2026-10-28',
-      ENTSAI: null,
+      ENTSAI: 'E',
     });
   });
 
@@ -232,4 +232,11 @@ describe('aero-mirror: the seats this tab is about', () => {
       [9],
     );
   });
+  it('asks for both sides of the day only when the caller says so', () => {
+    // The report states the whole day, exits included. Every other reader of the mirror wants the entries, and a
+    // query that asked for both everywhere would change what every module sees.
+    assert.equal(aeroMovementsPayload({ date: '2026-10-28' }).ENTSAI, 'E');
+    assert.equal(aeroMovementsPayload({ date: '2026-10-28', includeExits: true }).ENTSAI, null);
+  });
+
 });

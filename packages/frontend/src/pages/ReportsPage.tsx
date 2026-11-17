@@ -108,6 +108,8 @@ export function ReportsPage() {
       const fired = await triggerAeroMovementsSync(aeroSettings, {
         date: reportDate,
         callbackPath: location.pathname,
+        // The report states the whole day, exits included; every other caller keeps the entries-only default.
+        includeExits: true,
       });
       if (fired) return;
       // A device without company access refreshes what it already read, and says so in the log: the

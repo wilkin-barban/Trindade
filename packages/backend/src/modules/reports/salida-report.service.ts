@@ -2,6 +2,7 @@ import type Database from 'better-sqlite3';
 import { z } from 'zod';
 import { SalidaBlockSchema } from '../salida/salida.schema.js';
 import { codeKey, operatorKey } from '../massas/massas-reconcile.js';
+import { SALIDA_PRODUCTS, type SalidaProduct } from '../salida/salida.catalog.js';
 
 export const SalidaReportProductSchema = z
   .object({
@@ -53,6 +54,42 @@ interface RawMovementItemRow {
  * Product names are kept as stored, operators are ordered alphabetically by name.
  * Empty day returns empty arrays, never null.
  */
+/**
+ * The ERP's name, as the company wrote it.
+ *
+ * The WebService answers without declaring a charset and the shortcut reads the body as UTF-8; when the guess falls
+ * to ISO-8859-2, the bytes of `Ç` come out as `Ă` plus a control character. The repair lives here, in the report's
+ * exit block, and not in the shared mirror: the mirror keeps what the bridge brought, and every other reader of it
+ * is out of this change's scope.
+ */
+function repairErpName(value: string): string {
+  if (!/[\u0080-\u009f]/.test(value)) return value;
+  const decoder = new TextDecoder('iso-8859-2');
+  const bytes = new Map<string, number>();
+  for (let byte = 0; byte < 256; byte += 1) {
+    const character = decoder.decode(new Uint8Array([byte]));
+    if (!bytes.has(character)) bytes.set(character, byte);
+  }
+  const out: number[] = [];
+  for (const character of value) {
+    const byte = bytes.get(character);
+    if (byte === undefined) return value;
+    out.push(byte);
+  }
+  try {
+    const repaired = new TextDecoder('utf-8', { fatal: true }).decode(new Uint8Array(out));
+    return /[\u0080-\u009f]/.test(repaired) ? value : repaired;
+  } catch {
+    return value;
+  }
+}
+
+/** The catalogue's name and block for a code, which is the truth this plant controls. */
+function catalogueProduct(code: string): SalidaProduct | null {
+  const padded = code.replace(/^0+/, '');
+  return SALIDA_PRODUCTS.find((product) => product.code === padded) ?? null;
+}
+
 export function salidaReportDayView(db: Database.Database, date: string): SalidaReportDayView {
   const countRow = db
     .prepare('SELECT COUNT(*) AS count FROM salida_movements WHERE movement_date = ?')
@@ -177,10 +214,13 @@ export function salidaReportDayView(db: Database.Database, date: string): Salida
     const existing = op.products.get(seat.product_code);
     if (existing) existing.units += seat.quantity;
     else {
+      // A code this plant sells has a name this plant owns: the catalogue wins over whatever the book spelled,
+      // which is also what frees the block from the ERP's charset.
+      const known = catalogueProduct(seat.product_code);
       op.products.set(seat.product_code, {
         code: seat.product_code,
-        name: seat.product_desc,
-        block: 'embalagens',
+        name: known ? known.name : repairErpName(seat.product_desc),
+        block: known ? known.block : 'embalagens',
         units: seat.quantity,
       });
     }

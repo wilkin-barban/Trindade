@@ -436,6 +436,30 @@ describe('Export Service (Generador Inteligente)', () => {
     const text = generateWhatsAppText(db, 300)!;
     assert.ok(!text.includes('LANÇAMENTO DE MASSAS'));
   });
+  it('names the catalogue for its own code, so the sugar travels as AÇÚCAR and never as mojibake', () => {
+    // The company's book spells it `AĂ\u0087UCAR 5 KG`; the group has to read the name this plant uses.
+    db.exec('DELETE FROM salida_movement_items');
+    db.exec('DELETE FROM salida_movements');
+    db.exec('DELETE FROM aero_movements');
+    // Only an operator that exists in this application reaches the block, so the seat is written for one.
+    const operator = (
+      db.prepare('SELECT username FROM users ORDER BY id LIMIT 1').get() as { username: string }
+    ).username.toUpperCase();
+    db.prepare(`
+      INSERT INTO aero_movements
+        (movement_date, ent_lan, product_code, product_desc, quantity, entry_date, operator_name, movement_type, synced_at)
+      VALUES ('2026-06-12', 7101, '001074', ?, 6, '2026-06-12', ?, 'S', '2026-06-12T09:00:00.000Z')
+    `).run('AĂ\u0087UCAR 5 KG', operator);
+
+    const text = generateWhatsAppText(db, reportId)!;
+
+    assert.ok(text.includes('📤 *SAÍDAS / BAIXA*'));
+    assert.ok(text.includes('AÇÚCAR 5kg'), 'the catalogue names its own code');
+    assert.equal(/[\u0080-\u009f]/.test(text), false, 'no control character reaches the message');
+
+    db.exec('DELETE FROM aero_movements');
+  });
+
 });
 
 /**
@@ -536,4 +560,5 @@ describe('Export Service — recebimento desde el espejo del ERP', () => {
 
     assert.ok(!text.includes('RECEBIMENTO'), 'an untouched category must not add an empty heading');
   });
+
 });

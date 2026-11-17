@@ -28,9 +28,9 @@ export interface AeroMovementSnapshot {
  * The body that asks Aero32 for the day's movements, through the one bridge.
  *
  * `userName` absent is the ordinary case: the plant reads the whole day, because the boxes are the
- * factory's and any operator may have launched them. `ENTSAI: null` asks for both sides: the day's report has
- * to state what came in *and* what left, including the exits the company typed in its own ERP without
- * Trindade. Asking only for `E` left every exit out of the report, which is what the operator noticed.
+ * factory's and any operator may have launched them. `ENTSAI: 'E'` is the default because the mirror feeds the
+ * massas and receipts sections; the report asks for `includeExits` explicitly, because that day has to state what
+ * came in *and* what left.
  *
  * `_method: 'PATCH'` travels in the body as well as in the endpoint, which is the certified request the web
  * and the Android client both send; the server keeps it as the body of the ticket and the shortcut posts it
@@ -39,6 +39,8 @@ export interface AeroMovementSnapshot {
 export function aeroMovementsPayload(args: {
   date: string;
   userName?: string | null;
+  /** Ask for both sides of the day. The report needs it; the mirror of massas and receipts does not. */
+  includeExits?: boolean;
 }): Record<string, unknown> {
   return {
     _method: 'PATCH',
@@ -46,7 +48,7 @@ export function aeroMovementsPayload(args: {
       userName: args.userName ?? null,
       startDate: args.date,
       endDate: args.date,
-      entrySaida: null,
+      entrySaida: args.includeExits ? null : 'E',
     }),
   };
 }
@@ -54,6 +56,8 @@ export function aeroMovementsPayload(args: {
 export interface AeroMovementsSyncOptions {
   /** The day to ask for. */
   date: string;
+  /** Ask the company for the exits too. Only the report's sync does: its day includes what left the plant. */
+  includeExits?: boolean;
   /** Where the shortcut comes back; the page the operator was on. */
   callbackPath: string;
   /** How the shortcut is launched. The page assigns `location.href`; a test records the URL instead. */
@@ -85,7 +89,9 @@ export async function triggerAeroMovementsSync(
     ticket = await requestAeroBridgeTicket(
       {
         action: 'movimentos',
-        payloads: [aeroMovementsPayload({ date: options.date, userName: null })],
+        payloads: [
+          aeroMovementsPayload({ date: options.date, userName: null, includeExits: options.includeExits }),
+        ],
         callbackPath: aeroBridgeCallbackFor('movimentos', options.callbackPath),
       },
       options.client,
