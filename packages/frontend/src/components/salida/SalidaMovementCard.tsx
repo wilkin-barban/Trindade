@@ -273,32 +273,34 @@ export function SalidaMovementCard({
           )
         )}
 
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => onShare(movement)}
-            className="min-h-[44px] w-full bg-green-600 text-white hover:bg-green-700 sm:w-auto"
-            data-testid={`salida-share-${movement.id}`}
-          >
-            <MessageCircle className="h-4 w-4" />
-            {t('salida.shareWhatsApp')}
-          </Button>
-          {!readOnly && canRelaunchSalida(movement) && onResend && (
+        {!readOnly && (
+          <div className="mt-3 flex flex-wrap gap-2">
             <Button
               type="button"
-              variant="outline"
               size="sm"
-              onClick={() => onResend(movement)}
-              disabled={resending}
-              className="min-h-[44px]"
-              data-testid={`salida-resend-${movement.id}`}
+              onClick={() => onShare(movement)}
+              className="min-h-[44px] w-full bg-green-600 text-white hover:bg-green-700 sm:w-auto"
+              data-testid={`salida-share-${movement.id}`}
             >
-              <RefreshCw className={`h-4 w-4 ${resending ? 'animate-spin' : ''}`} />
-              {resending ? t('salida.resendingErp') : t('salida.resendErp')}
+              <MessageCircle className="h-4 w-4" />
+              {t('salida.shareWhatsApp')}
             </Button>
-          )}
-        </div>
+            {canRelaunchSalida(movement) && onResend && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => onResend(movement)}
+                disabled={resending}
+                className="min-h-[44px]"
+                data-testid={`salida-resend-${movement.id}`}
+              >
+                <RefreshCw className={`h-4 w-4 ${resending ? 'animate-spin' : ''}`} />
+                {resending ? t('salida.resendingErp') : t('salida.resendErp')}
+              </Button>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

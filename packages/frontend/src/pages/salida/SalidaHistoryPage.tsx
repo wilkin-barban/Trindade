@@ -130,7 +130,16 @@ export function SalidaHistoryPage() {
   }, []);
 
   const asked = params.get('date');
-  const date = asked && /^\d{4}-\d{2}-\d{2}$/.test(asked) ? asked : (days.list[0]?.date ?? today);
+  const isRealPastOrToday = (candidate: string | null | undefined): candidate is string => {
+    if (!candidate || !/^\d{4}-\d{2}-\d{2}$/.test(candidate)) return false;
+    if (candidate > today) return false;
+    const [y, m, d] = candidate.split('-').map(Number);
+    if (y < 2000 || m < 1 || m > 12 || d < 1 || d > 31) return false;
+    const parsed = new Date(Date.UTC(y, m - 1, d));
+    return parsed.getUTCFullYear() === y && parsed.getUTCMonth() === m - 1 && parsed.getUTCDate() === d;
+  };
+
+  const date = isRealPastOrToday(asked) ? asked : today;
   const isReadOnly = isSalidaReadOnly(date, today);
 
   const labels = useMemo<Record<SalidaBlock, string>>(
@@ -168,10 +177,13 @@ export function SalidaHistoryPage() {
     [days.list, date],
   );
 
-  const chips = useMemo<HistoryDay[]>(
-    () => days.list.map((entry) => ({ date: entry.date, units: entry.total_units })),
-    [days.list],
-  );
+  const chips = useMemo<HistoryDay[]>(() => {
+    const listed = days.list
+      .filter((entry) => entry.date <= today)
+      .map((entry) => ({ date: entry.date, units: entry.total_units }));
+    if (listed.some((entry) => entry.date === today)) return listed;
+    return [{ date: today, units: null }, ...listed];
+  }, [days.list, today]);
 
   // The day shows only the session user's movements when the API returns more than one operator's (T3).
   // No worker filter is added.

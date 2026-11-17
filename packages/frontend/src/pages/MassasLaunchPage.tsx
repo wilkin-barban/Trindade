@@ -4,11 +4,10 @@ import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/button';
-import { DateField } from '../components/ui/date-field';
 import { LoadingSpinner } from '../components/ui/loading-spinner';
-import { History } from 'lucide-react';
 import { Dialog } from '../components/ui/dialog';
 import { ModuleHelpModal } from '../components/ui/ModuleHelpModal';
+import { DaySessionHeader } from '../components/DaySessionHeader';
 import { MassasLaunchGrid } from './massas/MassasLaunchGrid';
 import { saoPauloToday } from '../lib/date';
 import { isClosedDay } from '../lib/massas-day';
@@ -82,7 +81,7 @@ function erpNotReadyMessage(
 export function MassasLaunchPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const [date, setDate] = useState(saoPauloToday());
+  const date = useMemo(() => saoPauloToday(), []);
   // Today is the only day that still accepts boxes: yesterday is a record the API refuses to reopen.
   const dayIsClosed = isClosedDay(date, saoPauloToday());
   const [dayView, setDayView] = useState<MassasLaunchDayView | null>(null);
@@ -401,42 +400,23 @@ export function MassasLaunchPage() {
     <div className="max-w-6xl mx-auto space-y-4 pb-12 sm:space-y-6">
       {aeroAllowed && deviceLimited && <AeroDeviceBanner device={device} />}
 
-      {/* Header and Date Selection */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 bg-white p-4 rounded-xl border border-gray-200 shadow-sm sm:p-6">
-        <div className="min-w-0">
-          <div className="flex items-center justify-between gap-2">
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{t('massas.title')}</h1>
-            <div className="shrink-0">
-              <ModuleHelpModal
-                title={t('moduleHelp.massasLaunch.title')}
-                subtitle={t('moduleHelp.massasLaunch.subtitle')}
-                description={t('moduleHelp.massasLaunch.description')}
-                sections={t('moduleHelp.massasLaunch.sections', { returnObjects: true }) as any}
-              />
-            </div>
-          </div>
-          <p className="text-sm text-gray-500 mt-1">{t('massas.subtitle')}</p>
-        </div>
-
-        <div className="flex w-full items-center gap-2 sm:w-auto">
-          <DateField
-            id="massa-date"
-            label={`${t('massas.date')}:`}
-            value={date}
-            onChange={setDate}
-            max={saoPauloToday()}
-            testId="massas-launch-date"
+      {/* Header and Date/Session */}
+      <DaySessionHeader
+        date={date}
+        historyHref="/massas-history"
+        username={user?.username}
+        testIdPrefix="massas"
+        title={t('massas.title')}
+        subtitle={t('massas.subtitle')}
+        help={
+          <ModuleHelpModal
+            title={t('moduleHelp.massasLaunch.title')}
+            subtitle={t('moduleHelp.massasLaunch.subtitle')}
+            description={t('moduleHelp.massasLaunch.description')}
+            sections={t('moduleHelp.massasLaunch.sections', { returnObjects: true }) as any}
           />
-          <Link
-            to="/massas-history"
-            className="inline-flex h-11 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-300 bg-white px-3 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 sm:h-10"
-          >
-            <History className="h-4 w-4 shrink-0" />
-            <span className="sm:hidden">{t('massas.historyShort')}</span>
-            <span className="hidden sm:inline">{t('massas.viewHistory')}</span>
-          </Link>
-        </div>
-      </div>
+        }
+      />
 
       {/* Global Notices */}
       {error && (

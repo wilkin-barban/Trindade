@@ -575,6 +575,7 @@
     "historySubtitle": "Consulte lanzamientos de días anteriores, resumen colectivo y compartir",
     "historyReadOnly": "Historial de solo lectura: los días anteriores no aceptan modificaciones ni sincronización.",
     "viewHistory": "Ver Historial",
+    "navHistory": "Histórico de Massas",
     "backToToday": "Volver a Hoy",
     "confirmTitle": "Confirmar Lanzamiento de Masas",
     "confirmSubtitle": "Verifique los productos y cajas antes de confirmar el lanzamiento:",

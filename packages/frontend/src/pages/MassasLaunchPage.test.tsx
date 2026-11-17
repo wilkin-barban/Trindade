@@ -70,15 +70,22 @@ describe('MassasLaunchPage — requirements 1, 3, 4, 5', () => {
     });
   });
 
-  it('keeps only date, grid, confirmation and launch button, removing the 4 sections (Item 1)', async () => {
+  it('renders DaySessionHeader (date, operator, history nav) and removes date field and 4 sections (Change 1)', async () => {
     render(
       <MemoryRouter initialEntries={['/massas-launch']}>
         <MassasLaunchPage />
       </MemoryRouter>,
     );
 
-    // Kept: DateField, grid, launch button
-    expect(await screen.findByTestId('massas-launch-date')).toBeInTheDocument();
+    // DaySessionHeader: massas-date, massas-operator, massas-nav-history
+    expect(await screen.findByTestId('massas-date')).toBeInTheDocument();
+    expect(screen.getByTestId('massas-operator')).toHaveTextContent('wilkin');
+    expect(screen.getByTestId('massas-nav-history')).toBeInTheDocument();
+
+    // Date field is gone
+    expect(screen.queryByTestId('massas-launch-date')).toBeNull();
+
+    // Product grid and launch button kept
     expect(await screen.findByTestId('massas-product-1045')).toBeInTheDocument();
     expect(await screen.findByTestId('massas-launch')).toBeInTheDocument();
 

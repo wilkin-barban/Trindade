@@ -55,7 +55,6 @@ async function openLaunchPage(page: Page) {
   // operator does -- and then walks to the launch screen through the app, which is what keeps it in memory.
   await openErpSession(page);
   await navigateInApp(page, '/massas-launch');
-  await page.locator('[data-testid="massas-launch-date"]').fill(DAY);
   await expect(page.locator('input[type="number"]').first()).toBeVisible({ timeout: 15000 });
 }
 

@@ -8,6 +8,7 @@ import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { LoadingSpinner } from '../../components/ui/loading-spinner';
 import { ModuleHelpModal, type HelpSection } from '../../components/ui/ModuleHelpModal';
+import { DaySessionHeader } from '../../components/DaySessionHeader';
 import { SalidaBlockSwitch, SalidaProductGrid } from '../../components/salida/SalidaBlocks';
 import { SalidaSummaryBar } from '../../components/salida/SalidaSummaryBar';
 import { SalidaSuccessDialog, type SalidaErpOutcome } from '../../components/salida/SalidaSuccessDialog';
@@ -291,58 +292,22 @@ export function SalidaLaunchPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-4 pb-4 sm:space-y-6">
-      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
-        <div
-          data-testid="salida-launch-header"
-          className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
-        >
-          <div className="min-w-0">
-            <div className="flex items-center justify-between gap-2">
-              <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">{t('salida.title')}</h1>
-              <div className="shrink-0" data-testid="salida-launch-help">
-                <ModuleHelpModal
-                  title={t('moduleHelp.salida.title')}
-                  subtitle={t('moduleHelp.salida.subtitle')}
-                  description={t('moduleHelp.salida.description')}
-                  sections={t('moduleHelp.salida.sections', { returnObjects: true }) as unknown as HelpSection[]}
-                />
-              </div>
-            </div>
-            <p className="mt-1 text-sm text-gray-500">{t('salida.subtitle')}</p>
-          </div>
-          <div className="flex w-full items-center gap-2 sm:w-auto sm:shrink-0">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => navigate('/salida-history')}
-              className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 text-sm font-semibold sm:w-auto"
-              data-testid="salida-nav-history"
-            >
-              <History className="h-4 w-4" />
-              {t('salida.navHistory')}
-            </Button>
-          </div>
-        </div>
-
-        {/* Neither the date nor the operator is a field: one is the plant's day and the other is the session. */}
-        <dl className="mt-4 grid grid-cols-1 gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm sm:grid-cols-2">
-          <div className="flex items-baseline gap-2">
-            <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">{t('salida.dateLabel')}</dt>
-            <dd className="font-medium text-gray-900" data-testid="salida-date">
-              {salidaDateLine(date)}
-            </dd>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-              {t('salida.operatorLabel')}
-            </dt>
-            <dd className="font-medium text-gray-900" data-testid="salida-operator">
-              {user?.username ?? ''}
-              <span className="ml-2 text-xs font-normal text-gray-500">({t('salida.session')})</span>
-            </dd>
-          </div>
-        </dl>
-      </div>
+      <DaySessionHeader
+        date={date}
+        historyHref="/salida-history"
+        username={user?.username}
+        testIdPrefix="salida"
+        title={t('salida.title')}
+        subtitle={t('salida.subtitle')}
+        help={
+          <ModuleHelpModal
+            title={t('moduleHelp.salida.title')}
+            subtitle={t('moduleHelp.salida.subtitle')}
+            description={t('moduleHelp.salida.description')}
+            sections={t('moduleHelp.salida.sections', { returnObjects: true }) as unknown as HelpSection[]}
+          />
+        }
+      />
 
       {catalogFailed && (
         <p

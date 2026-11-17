@@ -36,7 +36,9 @@ async function openLaunchPage(page: Page) {
     { key: AERO_SETTINGS_KEY, value: SETTINGS },
   );
   await page.goto('/massas-launch');
-  await page.locator('[data-testid="massas-launch-date"]').fill(DAY);
+  // El lanzamiento es siempre el día de planta: el selector de fecha se retiró del módulo y el día se lee en la
+  // cabecera compartida con Salida.
+  await expect(page.locator('[data-testid="massas-date"]')).toBeVisible();
   await expect(page.locator('input[type="number"]').first()).toBeVisible({ timeout: 15000 });
 }
 

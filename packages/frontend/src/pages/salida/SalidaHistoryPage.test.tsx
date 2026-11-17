@@ -238,6 +238,46 @@ describe('SalidaHistoryPage', () => {
     expect(screen.getByTestId('salida-badge-3').textContent).toBe('Parcial');
   });
 
+  it('opens on plant today by default, showing empty state when today has no movements (Requirement 2)', async () => {
+    get.mockImplementation(async (url: string) => {
+      if (url === '/salida/history') {
+        return {
+          days: [
+            { date: '2026-11-12', total_units: 5, movements: [PARTIAL_OTHER_DAY] },
+          ],
+        };
+      }
+      return {};
+    });
+
+    await renderReady('/salida-history');
+
+    // Should open on today (2026-11-13) rather than 2026-11-12 (the first listed day with data)
+    expect(screen.getByTestId('salida-history-empty')).toBeInTheDocument();
+    expect(screen.getByTestId('salida-empty-cta')).toBeInTheDocument();
+    expect(screen.queryByTestId('salida-movement-3')).toBeNull();
+  });
+
+  it('falls back to plant today when the URL date is not a real date (Requirement 2)', async () => {
+    get.mockImplementation(async (url: string) => {
+      if (url === '/salida/history') {
+        return {
+          days: [
+            { date: '2026-11-12', total_units: 5, movements: [PARTIAL_OTHER_DAY] },
+          ],
+        };
+      }
+      return {};
+    });
+
+    const { unmount } = await renderReady('/salida-history?date=2099-01-01');
+    expect(screen.getByTestId('salida-history-empty')).toBeInTheDocument();
+    unmount();
+
+    await renderReady('/salida-history?date=not-a-date');
+    expect(screen.getByTestId('salida-history-empty')).toBeInTheDocument();
+  });
+
   it('shows read-only note and hides relaunch and photo controls on an earlier day (S9)', async () => {
     get.mockImplementation(async (url: string) =>
       url === '/salida/history'
@@ -284,7 +324,9 @@ describe('SalidaHistoryPage', () => {
     expect(screen.queryByTestId('salida-photo-input')).toBeNull();
     expect(screen.queryByTestId('salida-photo-delete-881')).toBeNull();
     expect(screen.getByTestId('salida-photo-881')).toBeInTheDocument();
-    expect(screen.getByTestId('salida-share-88')).toBeInTheDocument();
+    // Requirement 3: Past days keep no per-card share; day-level share stays
+    expect(screen.queryByTestId('salida-share-88')).toBeNull();
+    expect(screen.getByTestId('salida-share-day')).toBeInTheDocument();
   });
 
   it('hands the movement summary to the share helper from the card action', async () => {
