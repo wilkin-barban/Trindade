@@ -211,9 +211,20 @@ describe('ReportsPage — the phone, 390 px', () => {
     // The categories arrive asynchronously: the ERP card only exists once the page knows where to place it.
     const salidaCard = await screen.findByTestId('salida-report-section');
 
-    const massasBlock = screen.getByTestId('massas-block');
-    expect(massasBlock.contains(salidaCard)).toBe(false);
-    expect(screen.getByTestId('report-massas-card').contains(salidaCard)).toBe(false);
+    // Three records, three cards, under the one sync action that refreshes them.
+    for (const other of ['massas-block', 'receipts-block', 'report-massas-card', 'report-receipts-card']) {
+      const block = screen.queryByTestId(other);
+      if (block) expect(block.contains(salidaCard)).toBe(false);
+    }
+    expect(screen.getByTestId('report-massas-card')).toBeTruthy();
+    // The button that refreshes the day sits above all three cards, not inside any of them.
+    const sync = screen.getByTestId('erp-movements-sync');
+    const header = screen.getByTestId('erp-movements-header');
+    expect(header.contains(sync)).toBe(true);
+    for (const card of ['report-massas-card', 'report-receipts-card', 'salida-report-section']) {
+      const element = screen.queryByTestId(card);
+      if (element) expect(element.contains(sync)).toBe(false);
+    }
   });
 
 });

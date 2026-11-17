@@ -2,11 +2,11 @@ import { expect, test } from '@playwright/test';
 import { getE2EIdentities, goToProtected } from './auth-helpers';
 
 /**
- * The one card the report shows for the company's day.
+ * The company's day in the report: one heading, one button, one card per record.
  *
- * The plant used to read two cards and press two sync buttons for the same day, and a balance bar comparing the
- * ERP against itself. What the browser has to prove now is that the day is one card, that there is one button
- * to ask Delphi for it, and that both lenses -- massas and supply receipts -- are inside it.
+ * The plant used to read two cards and press two sync buttons for the same day. What the browser proves now is
+ * that the day has a single heading with a single button, and that each record -- massas, supply receipts and the
+ * plant's own exits -- gets its own card instead of being stacked inside one.
  */
 const API = 'http://localhost:3099/api';
 
@@ -53,11 +53,18 @@ test.describe('ERP movements card', () => {
 
     const card = page.locator('[data-testid="report-massas-card"]');
     await expect(card).toBeVisible();
-    await expect(card).toContainText('Movimentações do ERP');
 
-    // One card for the whole day, and exactly one button to ask the company for it.
-    await expect(page.locator('[data-testid="report-massas-card"]')).toHaveCount(1);
+    // The heading names the day and holds the only button that asks the company for it.
+    const header = page.locator('[data-testid="erp-movements-header"]');
+    await expect(header).toBeVisible();
+    await expect(header).toContainText('Movimentações do ERP');
+    await expect(header.locator('[data-testid="erp-movements-sync"]')).toHaveCount(1);
     await expect(page.locator('[data-testid="erp-movements-sync"]')).toHaveCount(1);
+
+    // Three records of one day, three cards: massas, receipts and the plant's exits. The exits card is the
+    // plant's own and never lives inside the other two.
+    await expect(page.locator('[data-testid="report-massas-card"]')).toHaveCount(1);
+    await expect(page.locator('[data-testid="salida-report-section"]')).toHaveCount(1);
     await expect(page.locator('[data-testid="receipts-sync"]')).toHaveCount(0);
     await expect(page.locator('[data-testid="massas-report-refresh"]')).toHaveCount(0);
 
@@ -79,10 +86,12 @@ test.describe('ERP movements card', () => {
     await expect(card.locator('[data-testid="massas-report-products"]')).toContainText('QUADRADA');
     await expect(card.locator('[data-testid="massas-report-products"]')).toContainText(`${quadradaUnits} un`);
 
-    // The insumos lens reads the same day from the other side: the supply is listed under its own heading,
-    // and it never reaches the massas summary.
-    await expect(card).toContainText('Insumos');
-    await expect(card.locator('[data-testid="receipt-line-41002-009001"]')).toContainText('FARINHA DE TRIGO');
+    // The insumos lens reads the same day from the other side, in its own card: the supply is listed under its
+    // own heading, and it never reaches the massas summary.
+    const receiptsCard = page.locator('[data-testid="report-receipts-card"]');
+    await expect(receiptsCard).toBeVisible();
+    await expect(receiptsCard).toContainText('Insumos');
+    await expect(receiptsCard.locator('[data-testid="receipt-line-41002-009001"]')).toContainText('FARINHA DE TRIGO');
     await expect(card.locator('[data-testid="massas-report-products"]')).not.toContainText('FARINHA');
   });
 

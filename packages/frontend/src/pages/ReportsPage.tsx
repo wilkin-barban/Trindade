@@ -341,55 +341,67 @@ export function ReportsPage() {
   );
 
   // ---- Loading / Error states ----
-  // S5, S6, S8: Movimentações do ERP (Massas e Recebimento) num só card com botão de sincronização único.
+  /**
+   * The three records of the day, one card each, under the one action that refreshes them.
+   *
+   * They used to share a single card with two inner blocks: on a phone that stacked a third section into a block
+   * that already had two, and the card grew until the reading order broke. The sync button stays above all three
+   * because it is one action over one day, not a property of any of the cards.
+   */
+  const erpMovementsHeader = (
+    <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" data-testid="erp-movements-header">
+      <h2 className="text-base font-bold leading-snug text-gray-900 sm:text-lg">
+        {t('reports.erpMovementsTitle', 'Movimentações do ERP')}
+      </h2>
+      <Button
+        type="button"
+        onClick={handleSyncErpMovements}
+        className="min-h-[44px] w-full shrink-0 gap-2 text-xs font-semibold sm:w-auto"
+        data-testid="erp-movements-sync"
+        aria-label={
+          canSyncErp ? t('massas.syncHeader.action', 'Sincronizar com ERP') : t('reports.receiptsRefresh', 'Atualizar')
+        }
+      >
+        <RefreshCw className="h-4 w-4" />
+        {canSyncErp ? t('massas.syncHeader.action', 'Sincronizar com ERP') : t('reports.receiptsRefresh', 'Atualizar')}
+      </Button>
+    </div>
+  );
+
   const massasCard = (
-    <Card className="mb-6" data-testid="report-massas-card">
-      {/*
-        The header stacks on a phone and becomes the single row only when there is room for it. Side by side
-        on a 375-wide screen, the button took the width it needed and left the title four words wide, so
-        "Movimentações do ERP (Massas e Recebimento)" read as four cramped lines beside it -- and the button
-        itself overflowed the card's padding. Stacked, the title gets the full measure and the action gets a
-        full-width 44px target underneath, which is also the thumb reach that matters on a handset.
-      */}
-      <CardHeader className="flex flex-col gap-3 pb-3 sm:flex-row sm:items-center sm:justify-between">
-        <CardTitle className="text-base font-bold leading-snug sm:text-lg">
-          {t('reports.erpMovementsTitle', 'Movimentações do ERP')}
-        </CardTitle>
-        <Button
-          type="button"
-          onClick={handleSyncErpMovements}
-          className="min-h-[44px] w-full shrink-0 gap-2 text-xs font-semibold sm:w-auto"
-          data-testid="erp-movements-sync"
-          aria-label={
-            canSyncErp ? t('massas.syncHeader.action', 'Sincronizar com ERP') : t('reports.receiptsRefresh', 'Atualizar')
-          }
-        >
-          <RefreshCw className="h-4 w-4" />
-          {canSyncErp ? t('massas.syncHeader.action', 'Sincronizar com ERP') : t('reports.receiptsRefresh', 'Atualizar')}
-        </Button>
-      </CardHeader>
-      <CardContent className="pt-2 space-y-4">
-        {/*
-          Two blocks, two lists. The massas come from the report's products and the insumos from the mirrored
-          receipts; sharing one card is a matter of one sync action, not of one list, so neither block reads the
-          other's rows.
-        */}
-        <div className="rounded-xl border border-gray-100 bg-white p-3 sm:p-4" data-testid="massas-block">
+    <Card className="mb-4" data-testid="report-massas-card">
+      <CardContent className="pt-6">
+        <div data-testid="massas-block">
           <MassasReportSection date={reportDate} hideRefresh refetchKey={movementsRefreshKey} />
         </div>
-        {usesErpReceipts(reportDate) && (
-          <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-3 sm:p-4" data-testid="receipts-block">
-            <ReceiptsSection
-              date={reportDate}
-              hideHeader
-              refetchKey={movementsRefreshKey}
-              onSynced={handleMovementsSynced}
-            />
-          </div>
-        )}
       </CardContent>
     </Card>
   );
+
+  const receiptsCard = usesErpReceipts(reportDate) ? (
+    <Card className="mb-4" data-testid="report-receipts-card">
+      <CardContent className="pt-6">
+        <div data-testid="receipts-block">
+          <ReceiptsSection
+            date={reportDate}
+            hideHeader
+            refetchKey={movementsRefreshKey}
+            onSynced={handleMovementsSynced}
+          />
+        </div>
+      </CardContent>
+    </Card>
+  ) : null;
+
+  const erpMovementsBlock = (
+    <section className="mb-6" data-testid="erp-movements-section">
+      {erpMovementsHeader}
+      {massasCard}
+      {receiptsCard}
+      {salidaCard}
+    </section>
+  );
+
   // The day's production sits right below Temperaturas, and there may be more than one temperature category:
   // it follows the last of them, once. Rendering it after each one drew the same card twice on a page whose
   // categories somebody else grew.
@@ -467,12 +479,7 @@ export function ReportsPage() {
         {/* Dynamic category sections. A produção do dia entra logo abaixo de Temperaturas: é a última coisa
             que o operador lê antes de contar quanto saiu, e separá-las obrigava a subir e descer a página
             para conferir a mesma manhã duas vezes. */}
-        {massasAfterCategoryId === null && (
-          <>
-            {massasCard}
-            {salidaCard}
-          </>
-        )}
+        {massasAfterCategoryId === null && erpMovementsBlock}
 
         {categories.filter((cat) => !cat.parent_category_id).map((cat) => {
           const children = categories.filter((child) => child.parent_category_id === cat.id);
@@ -513,12 +520,7 @@ export function ReportsPage() {
                   )}
                 </CardContent>
               </Card>
-              {cat.id === massasAfterCategoryId && (
-                <>
-                  {massasCard}
-                  {salidaCard}
-                </>
-              )}
+              {cat.id === massasAfterCategoryId && erpMovementsBlock}
             </Fragment>
           );
         })}
