@@ -294,8 +294,8 @@ Horario de Cargamento la montará con su propio texto y su propio PDF cuando se 
 
 El módulo usa la misma tarjeta que el reporte, con su propio texto y su propio documento:
 
-- La acción primaria del día es **Salvar** (44 px), igual que en el reporte: cierra el día y abre la tarjeta
-  (`/loading?share=1&date=…`). La grilla sigue guardando cada turno en cuanto se elige el chofer —ese tablero vivo es
+- La acción primaria del día es **Salvar Horário** (44 px, a todo el ancho en teléfono), y es la **única** acción de
+  la pantalla: el PDF vive dentro de la tarjeta que abre (`/loading?share=1&date=…`). La grilla sigue guardando cada turno en cuanto se elige el chofer —ese tablero vivo es
   el sentido de la pantalla—, así que «Salvar» cierra, no persiste.
 - **Compartir en WhatsApp**: texto de `GET /loading/export?date=` (el mismo que sale al grupo), con la hoja nativa y
   la copia como respaldo.
