@@ -427,28 +427,29 @@ test.describe('Loading Schedule — Export Modal', () => {
   });
 
   test('4.3 export modal opens and shows copy button', async ({ page }) => {
-    // Click the export button
+    // Click the share button
     await page.locator('[data-testid="open-export-btn"]').click();
 
-    // Modal should appear
-    const modal = page.locator('[data-testid="loading-export-modal"]');
-    await expect(modal).toBeVisible();
+    // The card takes the grid's place: the message, and the decisions that follow it.
+    const card = page.locator('[data-testid="loading-share-card"]');
+    await expect(card).toBeVisible();
 
-    // Export text should be in Portuguese
-    const textContent = page.locator('[data-testid="loading-export-text"]');
+    const textContent = page.locator('[data-testid="loading-share-text"]');
     await expect(textContent).toBeVisible();
 
-    // Copy button should be present
-    const copyBtn = page.locator('[data-testid="loading-export-copy"]');
-    await expect(copyBtn).toBeVisible();
+    // The four actions, and no copy button: the share sheet already carries the text.
+    await expect(page.locator('[data-testid="loading-share-whatsapp"]')).toBeVisible();
+    await expect(page.locator('[data-testid="loading-share-pdf"]')).toBeVisible();
+    await expect(page.locator('[data-testid="loading-share-edit"]')).toBeVisible();
+    await expect(page.locator('[data-testid="loading-share-close"]')).toBeVisible();
+    await expect(page.locator('[data-testid="loading-export-copy"]')).toHaveCount(0);
 
-    // Close button should be present
-    const closeBtn = page.locator('[data-testid="loading-export-close"]');
+    // Closing the card returns to the grid of the same day.
+    const closeBtn = page.locator('[data-testid="loading-share-close"]');
     await expect(closeBtn).toBeVisible();
-
-    // Close the modal
     await closeBtn.click();
-    await expect(modal).not.toBeVisible();
+    await expect(card).toHaveCount(0);
+    await expect(page.locator('[data-testid="schedule-grid"]')).toBeVisible();
   });
 
 
@@ -482,7 +483,7 @@ test.describe('Loading Schedule — Export Modal', () => {
     await page.locator('[data-testid="open-export-btn"]').click();
 
     // Wait for export text to load
-    const textContent = page.locator('[data-testid="loading-export-text"]');
+    const textContent = page.locator('[data-testid="loading-share-text"]');
     await expect(textContent).toBeVisible();
 
     const text = await textContent.textContent();
@@ -497,9 +498,9 @@ test.describe('Loading Schedule — Export Modal', () => {
     await page.goto('/loading?date=2099-12-31');
     await page.waitForSelector('[data-testid="schedule-grid"]', { timeout: 10000 });
     await page.locator('[data-testid="open-export-btn"]').click();
-    await page.waitForSelector('[data-testid="loading-export-text"]', { timeout: 10000 });
+    await page.waitForSelector('[data-testid="loading-share-text"]', { timeout: 10000 });
 
-    const text = await page.locator('[data-testid="loading-export-text"]').textContent();
+    const text = await page.locator('[data-testid="loading-share-text"]').textContent();
     expect(text).toContain(nextLoadingDayDisplay());
     expect(page.url()).toContain('date=2099-12-31');
   });

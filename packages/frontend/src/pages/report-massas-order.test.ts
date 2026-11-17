@@ -22,15 +22,15 @@ describe('Massa do dia follows Temperaturas', () => {
   it('renders under the category that reads temperatures, wherever the plant put it', () => {
     assert.ok(create.includes('hasTemperatureTasks'), 'the placement is decided by the category, not by a fixed id');
     assert.ok(
-      create.includes('{cat.id === massasAfterCategoryId && massasCard}'),
-      'the card is placed by the category that reads temperatures',
+      create.includes('{cat.id === massasAfterCategoryId && erpMovementsBlock}'),
+      'the block is placed by the category that reads temperatures',
     );
   });
 
   it('keeps one card definition, so the two placements cannot drift apart', () => {
     assert.equal(create.match(/data-testid="report-massas-card"/g)?.length, 1);
     assert.ok(
-      create.includes('{massasAfterCategoryId === null && massasCard}'),
+      create.includes('{massasAfterCategoryId === null && erpMovementsBlock}'),
       'a report with no temperatures still shows it',
     );
   });
@@ -45,14 +45,14 @@ describe('Massa do dia follows Temperaturas', () => {
       'the placement is a single category, not a membership test inside the list',
     );
     assert.equal(
-      create.match(/\{cat\.id === massasAfterCategoryId && massasCard\}/g)?.length,
+      create.match(/\{cat\.id === massasAfterCategoryId && erpMovementsBlock\}/g)?.length,
       1,
-      'the card is offered by one branch only',
+      'the block is offered by one branch only',
     );
   });
 
   it('never renders it before the temperatures section in the create form', () => {
-    const massasPlacement = create.indexOf('{cat.id === massasAfterCategoryId && massasCard}');
+    const massasPlacement = create.indexOf('{cat.id === massasAfterCategoryId && erpMovementsBlock}');
     const categoriesMap = create.indexOf('{categories.filter((cat) => !cat.parent_category_id).map((cat) =>');
     assert.ok(categoriesMap > 0 && massasPlacement > categoriesMap);
   });

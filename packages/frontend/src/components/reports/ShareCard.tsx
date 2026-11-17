@@ -29,6 +29,7 @@ export function ShareCard({
   onEdit,
   onClose,
   footer,
+  testIdPrefix = 'report',
 }: {
   title: string;
   subtitle?: string | null;
@@ -40,18 +41,21 @@ export function ShareCard({
   printing?: boolean;
   onShare: () => void;
   onPdf: () => void;
-  onEdit: () => void;
+  /** Omitted when the card is only a share surface: a past day has nothing to edit. */
+  onEdit?: () => void;
   onClose: () => void;
   footer?: ReactNode;
+  /** `report` by default; another module says its own name so the test ids never collide. */
+  testIdPrefix?: string;
 }) {
   const { t } = useTranslation();
 
   return (
-    <Card className="mb-4 overflow-hidden" data-testid="report-share-card">
+    <Card className="mb-4 overflow-hidden" data-testid={`${testIdPrefix}-share-card`}>
       <div className="border-b border-gray-200 bg-gray-50 px-4 py-3">
         <h1 className="text-base font-bold text-gray-900">{title}</h1>
         {subtitle && (
-          <p className="mt-0.5 text-sm text-gray-600" data-testid="report-share-subtitle">
+          <p className="mt-0.5 text-sm text-gray-600" data-testid={`${testIdPrefix}-share-subtitle`}>
             {subtitle}
           </p>
         )}
@@ -59,7 +63,7 @@ export function ShareCard({
 
       <CardContent className="p-0">
         {loading && (
-          <div className="flex justify-center py-10" data-testid="report-share-loading">
+          <div className="flex justify-center py-10" data-testid={`${testIdPrefix}-share-loading`}>
             <LoadingSpinner />
           </div>
         )}
@@ -68,7 +72,7 @@ export function ShareCard({
           <p
             role="alert"
             className="m-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-            data-testid="report-share-error"
+            data-testid={`${testIdPrefix}-share-error`}
           >
             {error}
           </p>
@@ -77,7 +81,7 @@ export function ShareCard({
         {!loading && !error && (
           <pre
             className="max-h-[52vh] overflow-auto whitespace-pre-wrap break-words px-4 py-3 text-[13px] leading-relaxed text-gray-800 select-text"
-            data-testid="report-share-text"
+            data-testid={`${testIdPrefix}-share-text`}
           >
             {text}
           </pre>
@@ -89,7 +93,7 @@ export function ShareCard({
             onClick={onShare}
             disabled={loading || Boolean(error) || sharing}
             className="col-span-2 min-h-[44px] gap-2 bg-green-600 text-white hover:bg-green-700"
-            data-testid="report-share-whatsapp"
+            data-testid={`${testIdPrefix}-share-whatsapp`}
           >
             <MessageCircle className="h-4 w-4" />
             {sharing ? t('reports.shareSending') : t('salida.shareWhatsApp')}
@@ -100,27 +104,29 @@ export function ShareCard({
             onClick={onPdf}
             disabled={loading || Boolean(error) || printing}
             className="min-h-[44px] gap-2"
-            data-testid="report-share-pdf"
+            data-testid={`${testIdPrefix}-share-pdf`}
           >
             <Download className="h-4 w-4" />
             {t('reports.exportPdf')}
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onEdit}
-            className="min-h-[44px] gap-2"
-            data-testid="report-share-edit"
-          >
-            <Pencil className="h-4 w-4" />
-            {t('reports.editTitle')}
-          </Button>
+          {onEdit && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onEdit}
+              className="min-h-[44px] gap-2"
+              data-testid={`${testIdPrefix}-share-edit`}
+            >
+              <Pencil className="h-4 w-4" />
+              {t('reports.editTitle')}
+            </Button>
+          )}
           <Button
             type="button"
             variant="ghost"
             onClick={onClose}
             className="col-span-2 min-h-[44px] gap-2"
-            data-testid="report-share-close"
+            data-testid={`${testIdPrefix}-share-close`}
           >
             <X className="h-4 w-4" />
             {t('ui.close')}
@@ -128,7 +134,7 @@ export function ShareCard({
         </div>
 
         {note && (
-          <p className="px-4 pb-3 text-xs text-gray-500" data-testid="report-share-note">
+          <p className="px-4 pb-3 text-xs text-gray-500" data-testid={`${testIdPrefix}-share-note`}>
             {note}
           </p>
         )}

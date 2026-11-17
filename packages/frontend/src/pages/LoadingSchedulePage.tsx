@@ -6,6 +6,9 @@ import { Button } from '../components/ui/button';
 import { LoadingSpinner } from '../components/ui/loading-spinner';
 import { ScheduleGrid } from '../components/loading/ScheduleGrid';
 import { ScheduleExportView } from '../components/loading/ScheduleExportView';
+import { ShareCard } from '../components/reports/ShareCard';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { exportLoadingPdf, fetchLoadingExportText, shareLoadingMessage } from '../lib/loading-share';
 import { exportScheduleTextAsPdf } from '../lib/schedule-pdf';
 import { ModuleHelpModal } from '../components/ui/ModuleHelpModal';
 import type { ScheduleRow, DriverRow } from '../components/loading/ScheduleGrid';
@@ -53,6 +56,21 @@ export function LoadingSchedulePage() {
 
   // Export modal
   const [exportOpen, setExportOpen] = useState(false);
+  /**
+   * The share card for the day.
+   *
+   * The schedule is saved slot by slot, so there is no single "save" to land on the message: the card is the
+   * module's share screen, opened on purpose, and it is the same card the report uses.
+   */
+  const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
+  const showingShare = params.get('share') === '1';
+  const [shareText, setShareText] = useState('');
+  const [shareLoading, setShareLoading] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
+  const [printing, setPrinting] = useState(false);
+  const [shareNote, setShareNote] = useState<string | null>(null);
 
   // ---- Fetch data for current date ----
   // Answers whether the day was read: the picker opens over that answer, not over the last grid on screen.
@@ -80,6 +98,52 @@ export function LoadingSchedulePage() {
       setLoaded(true);
     }
   }, [date, t]);
+
+  // The card's text, loaded when the card is shown. It sits with the other hooks on purpose: a hook after an
+  // early return changes the order the moment the flag flips.
+  useEffect(() => {
+    if (!showingShare) return;
+    let cancelled = false;
+    setShareLoading(true);
+    setShareError(null);
+    void (async () => {
+      try {
+        const text = await fetchLoadingExportText(date);
+        if (!cancelled) setShareText(text);
+      } catch (err) {
+        if (!cancelled) setShareError(err instanceof Error ? err.message : t('loading.exportError'));
+      } finally {
+        if (!cancelled) setShareLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [showingShare, date, t]);
+
+  async function handleShareMessage() {
+    setSharing(true);
+    setShareNote(null);
+    try {
+      const outcome = await shareLoadingMessage(shareText);
+      if (outcome === 'copied') setShareNote(t('loading.shareCopied', 'Texto copiado: pegalo en el chat.'));
+      else if (outcome === 'failed') setShareNote(t('loading.shareUnavailable', 'No se pudo compartir.'));
+    } finally {
+      setSharing(false);
+    }
+  }
+
+  async function handleSharePdf() {
+    setPrinting(true);
+    setShareNote(null);
+    try {
+      await exportLoadingPdf(date, shareText);
+    } catch (err) {
+      setShareNote(err instanceof Error ? err.message : t('loading.exportError'));
+    } finally {
+      setPrinting(false);
+    }
+  }
 
   useEffect(() => {
     if (error) {
@@ -124,6 +188,33 @@ export function LoadingSchedulePage() {
     return (
       <div className="flex items-center justify-center py-16">
         <LoadingSpinner />
+      </div>
+    );
+  }
+
+  // The share card takes the place of the grid: the day is already done, and what is left is sending it.
+  if (showingShare) {
+    return (
+      <div className="mx-auto w-full max-w-2xl p-4">
+        <ShareCard
+          testIdPrefix="loading"
+          title={t('loading.exportTitle')}
+          subtitle={formatDisplayDate(date)}
+          text={shareText}
+          loading={shareLoading}
+          error={shareError}
+          note={shareNote}
+          sharing={sharing}
+          printing={printing}
+          onShare={() => void handleShareMessage()}
+          onPdf={() => void handleSharePdf()}
+          onEdit={() => navigate(`/loading/edit?date=${date}`)}
+          onClose={() => {
+            const next = { ...Object.fromEntries(params) };
+            delete next.share;
+            setParams(next, { replace: true });
+          }}
+        />
       </div>
     );
   }
@@ -205,7 +296,7 @@ export function LoadingSchedulePage() {
           {t('loading.exportPdf')}
         </Button>
         <Button
-          onClick={() => setExportOpen(true)}
+          onClick={() => setParams({ ...Object.fromEntries(params), share: '1' }, { replace: false })}
           size="lg"
           className="w-full whitespace-nowrap px-2 text-xs sm:w-auto sm:px-4 sm:text-sm"
           data-testid="open-export-btn"
