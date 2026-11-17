@@ -12,6 +12,21 @@ verificaciones está en [docs/release-android-historial.md](docs/release-android
 
 ## [Unreleased]
 
+### Salida y Masas: el lanzamiento lanza, el histórico gobierna el día (2026-11-16)
+
+- **Salida**: botón con la cuenta de productos (`Lanzar salida (4)`); la vuelta del puente aterriza en
+  `/salida-history`; el catálogo pierde `EMBALAG. NHOQUE 1kg` y `EMBALAG. NHOQUE 400g` (19 productos, 11/3/5) y el API
+  los rechaza con `SALIDA_UNKNOWN_PRODUCT`.
+- **Masas**: `Produção do dia`, `Lançamentos Individuais`, `Resumo Coletivo do Dia` y `Compartilhar por WhatsApp` se
+  mudan al histórico y la producción del día se dibuja como tarjetas; barra de lanzar fija en el teléfono; fuera el
+  interruptor de sincronización (si hay conexión configurada, se lanza contra el ERP); `Sincronizar com ERP` vive en
+  el histórico y la vuelta del puente aterriza en `/massas-history`.
+- **Regla común de los históricos**: el día de hoy se gestiona (compartir, relanzar, editar, fotos) y los días
+  pasados son solo lectura, con el compartir disponible porque no muta nada.
+- **Paridad Android documentada**: `docs/paridad-android-web.md` con el mapeo de cada comportamiento, endpoint y
+  evento de auditoría que la app nativa tiene que replicar.
+
+
 ### Aero: la respuesta del puente deja de viajar en la URL (2026-11-16)
 
 - **Corregido el `414 Request-URI Too Large`** de «Conferir no ERP»: la respuesta del ERP viajaba codificada en el

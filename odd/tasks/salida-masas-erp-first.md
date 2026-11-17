@@ -136,7 +136,7 @@ Massas para que al recresar del Scriptable valla a su historico
 | T8 — callback de Masas al histórico | hecho | `f4844564` | `aeroBridgeCallbackFor('entrada'/'entrada_lote', '/massas-history')` |
 | T9 — hoy gestionable / pasado solo lectura | hecho | `7c5678d3` (Salida) y `f4844564` (Masas) | `isSalidaReadOnly` y `isPastDay`; compartir se mantiene, mutaciones ocultas, nota visible |
 | T10 — paridad Android documentada | hecho | `6d3bf62b` | `docs/paridad-android-web.md` (234 líneas, 34 rutas verificadas) |
-| T11 — cierre | pendiente | — | suites completas, build, E2E, deploy y verificación en producción |
+| T11 — cierre | hecho | `af29dc17` + deploy | E2E **118/118 dos veces consecutivas**; deploy `api`+`web`; producción verificada |
 
 ### Integración de la entrega de Masas
 
@@ -168,3 +168,18 @@ actualizaron sin cambiar lo que afirman:
 - `auto-read-after-launch`, `aero-vault-new-tab`, `aero-sync-lenses` y `aero-scriptable-dialog`: pendientes en la
   corrida completa (107/118), con el mismo patrón de puerta vieja y de dependencia de restos de otros specs. Se
   atacan en una pasada dedicada.
+
+### Cierre (2026-11-16)
+
+- **E2E**: 118/118 en dos corridas consecutivas (`7m 26s` y `7m 43s`), después de mudar nueve specs a la puerta nueva
+  sin borrar aserciones, sin reintentos y sin `skip`. Commits `f4890b01`, `af29dc17`.
+- **Deploy**: `docker compose up -d --build api web`, ambas healthy; arranque en `revision 14`, integridad `ok`, 23
+  tablas.
+- **Producción verificada**: `/api/health` 200; `/salida`, `/salida-history`, `/massas-launch`, `/massas-history`,
+  `/reports`, `/loading` 200; catálogo sin sesión 401; catálogo desplegado con **19 productos y sin ninguno de los dos
+  nhoque**; CSP, HSTS, `nosniff`, `DENY`, HTML `no-cache`, asset gzip + `immutable`, API `no-store`; log escribible.
+- **Bundles**: el histórico de Masas sirve `massas-history-readonly`, `massas-sync-erp` y `massas-whatsapp`; el
+  lanzamiento ya no trae `aero-sync-switch`; el de Salida conserva `salida-nav-history`.
+
+Números finales de la pasada: backend **962/962**, Vitest **212/212**, node **749/749**, typecheck y build limpios,
+E2E **118/118 ×2**.
