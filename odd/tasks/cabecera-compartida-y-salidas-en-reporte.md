@@ -194,3 +194,20 @@ compartir **incluye las fotos** del reporte; (3) **sin** botón de copiar.
 
 Vitest **227/227** (31 archivos) con dos tests nuevos de la tarjeta y dos de la página (con y sin `?saved=1`),
 `tsc` limpio y build verde. El botón de copiar no existe en la tarjeta.
+
+## La tarjeta de compartir en Horario de Cargamento (2026-11-16)
+
+Pedido: llevar el mismo diseño y los mismos botones al módulo Horario de Cargamento.
+
+- `ShareCard` ganó dos cosas para poder viajar: prefijo de test ids (`loading-share-*`) y acción de editar
+  **opcional** (un día pasado no tiene nada que corregir).
+- `lib/loading-share.ts`: texto desde `GET /loading/export?date=` (el mismo que sale por WhatsApp), compartir con la
+  hoja nativa y copia como respaldo, y PDF con el generador que ya existía (`horario-<fecha>.pdf`).
+- `LoadingSchedulePage`: el botón de exportar abre la tarjeta en lugar del diálogo; «Editar» va a
+  `/loading/edit?date=`, «Cerrar» vuelve a la grilla del mismo día y la URL conserva la fecha al abrir y al cerrar.
+- **Desvío declarado**: este módulo guarda turno por turno, no tiene un «guardar el día» único; por eso la tarjeta se
+  abre a propósito desde el botón y no aparece sola después de cada guardado, que interrumpiría una grilla de veinte
+  turnos. Queda documentado para Android con la misma regla.
+
+Evidencia: Vitest **227/227**, node **749/749**, `tsc` limpio, el spec de Horario **13/13** con las cuatro acciones y
+sin botón de copiar.

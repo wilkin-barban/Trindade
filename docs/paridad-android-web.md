@@ -289,3 +289,19 @@ reconstruirlo; el compartir es el `Intent.ACTION_SEND` con el texto y, cuando el
 `EXTRA_STREAM` múltiple si el proveedor lo admite; el PDF se genera desde el mismo texto para que el documento y el
 mensaje no diverjan; «Editar» y «Cerrar» son navegación, sin estado propio. La tarjeta es reutilizable: el módulo
 Horario de Cargamento la montará con su propio texto y su propio PDF cuando se implemente allí.
+
+## Horario de Cargamento: la misma tarjeta de compartir
+
+El módulo usa la misma tarjeta que el reporte, con su propio texto y su propio documento:
+
+- Se abre desde el botón de compartir del día (`/loading?share=1`), no después de guardar: el horario se guarda
+  turno por turno, y una tarjeta tras cada guardado interrumpiría una grilla de veinte turnos.
+- **Compartir en WhatsApp**: texto de `GET /loading/export?date=` (el mismo que sale al grupo), con la hoja nativa y
+  la copia como respaldo.
+- **PDF**: `horario-<fecha>.pdf`, generado desde ese mismo texto.
+- **Editar**: vuelve a la pantalla de edición del día. **Cerrar**: vuelve a la grilla del mismo día, conservando la
+  fecha en la URL.
+- **Sin botón de copiar**, igual que en el reporte.
+
+Para Android: el texto sale del mismo endpoint (no reconstruirlo), el compartir es `ACTION_SEND` con el texto, el PDF
+se genera del mismo texto y la tarjeta no se dispara sola al guardar un turno.
