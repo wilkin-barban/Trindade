@@ -259,7 +259,12 @@ de lanzamiento; el pasado se consulta en el histórico. En Android, lo mismo: si
 
 - **Datos**: `GET /api/reports/day/salidas?date=YYYY-MM-DD`, con sesión y **cualquier rol** (el reporte lo lee todo el
   mundo; `/api/salida` sigue siendo la beta privada de un usuario). Devuelve `{ date, operators[], totalUnits,
-  movementCount }`, cada operario con `{ name, username, units, products[{ code, name, block, units }] }`.
+  movementCount }`, cada operario con `{ name, username, units, products[{ code, name, block, units }], erpOnly }`.
+- **Regla de operarios (obligatoria)**: el bloque une los lanzamientos de Trindade con **las salidas que la empresa
+  registró en su ERP**, emparejando por producto + unidades + operador para no contar dos veces la misma salida, y
+  **solo acepta asientos cuyo operario sea una cuenta activa de Trindade** (por usuario o por nombre visible). Un
+  nombre que solo existe en el libro de la empresa —TELEVENDAS, recepción, cualquiera que nunca usó la app— se
+  descarta junto con sus productos. La app Android debe aplicar la misma regla al pintar el bloque.
 - **Pantalla**: una tarjeta por operario con sus productos y unidades, el total del día, el estado vacío cuando no hubo
   salidas y un aviso cuando el día no se pudo leer (nunca “no hubo salidas” si falló la lectura).
 - **Dónde se ve**: en la vista del reporte y en la pantalla de creación, como previsualización.
