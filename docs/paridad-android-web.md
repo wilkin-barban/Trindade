@@ -267,3 +267,25 @@ de lanzamiento; el pasado se consulta en el histórico. En Android, lo mismo: si
   `📤 *SAÍDAS / BAIXA*`, `Por Operário:`, `👤 NOMBRE:` con una línea por producto (`   - PRODUCTO: N un`), y
   `📊 Total: N un`. Sin códigos de producto. Si el día no tuvo salidas, el bloque no aparece.
 - **Día**: el `report_date` del propio reporte, el mismo que usan Masas e Insumos.
+
+## Reporte: al guardar, la tarjeta del mensaje (2026-11-16)
+
+El flujo de un reporte en la web/iPhone termina en el mensaje que el grupo recibe, no en el formulario:
+
+1. La pantalla de creación guarda el reporte y **navega a la tarjeta de compartir** (`/reports/:id?saved=1`).
+2. La tarjeta muestra el **texto del servidor** (`GET /reports/:id/export`), exacto al que se envía, con cuatro
+   acciones de 44 px:
+   - **Compartir en WhatsApp**: hoja nativa del sistema con el texto y, cuando el navegador admite archivos, las
+     fotos del reporte; si no hay hoja, copia el texto al portapapeles.
+   - **PDF**: genera el documento desde ese mismo texto con el generador del cliente (`relatorio-<id>.pdf`).
+   - **Editar**: vuelve a la pantalla de edición (`/reports/:id/edit`).
+   - **Cerrar**: sale a `/reports`.
+   - **No hay botón de copiar**: la hoja de compartir ya lleva el texto.
+3. La **vista de lectura** completa sigue existiendo y se abre al entrar al reporte sin el flag (por ejemplo desde
+   el histórico); conserva sus botones de export y su diálogo.
+
+Notas para Android: el texto sale del mismo endpoint, así que la app nativa debe pintar ese texto en vez de
+reconstruirlo; el compartir es el `Intent.ACTION_SEND` con el texto y, cuando el reporte tiene fotos, con
+`EXTRA_STREAM` múltiple si el proveedor lo admite; el PDF se genera desde el mismo texto para que el documento y el
+mensaje no diverjan; «Editar» y «Cerrar» son navegación, sin estado propio. La tarjeta es reutilizable: el módulo
+Horario de Cargamento la montará con su propio texto y su propio PDF cuando se implemente allí.
