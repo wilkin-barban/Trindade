@@ -211,3 +211,20 @@ Pedido: llevar el mismo diseño y los mismos botones al módulo Horario de Carga
 
 Evidencia: Vitest **227/227**, node **749/749**, `tsc` limpio, el spec de Horario **13/13** con las cuatro acciones y
 sin botón de copiar.
+
+## Remediaciones del 2026-11-17
+
+Estas cuatro llegaron después del cierre inicial de esta pasada y se registran acá, no en el ODD anterior.
+
+| Tarea | Commit | Evidencia |
+| --- | --- | --- |
+| El sync del reporte pide **ambos lados** del día, sin cambiar el default de los demás | `016ea89e`, acotado en `46dd17f6` | `aeroMovementsPayload` vuelve a `ENTSAI: 'E'` por defecto y acepta `includeExits`; **solo** `ReportsPage` lo pasa. Tests: `aero-mirror` 26/26 (default `E`, explícito `null`), `receipts-sync-wiring` actualizado |
+| El bloque de Salidas une espejo + lanzamientos locales y **solo admite operarios con cuenta activa** | `013ffd6d`, `8051cc94` | Verificado contra producción el 17/11: devuelve `joaoh` 20 un, `viviane` 435 un y `wilkin` 13 un (total 468); descarta JOSIANE, FELIPE, TELEVENDAS y WILIAN. Tests: un operario escrito de dos formas es **un** grupo; un día hecho solo de asientos se muestra |
+| Nombre canónico del catálogo para 1074 y reparación **local** del charset en el bloque | `46dd17f6`, `049d8322` | El espejo guardaba `AĂ…UCAR 5 KG` (UTF-8 leído como ISO-8859-2). La ingesta compartida **no** se toca: el bloque nombra 1074 con el catálogo (`AÇÚCAR 5kg`, bloque matéria-prima) y repara el texto de códigos ajenos al leerlo. La fila de producción se normalizó a `AÇÚCAR 5 KG`. Tests: bloque 5/5 y texto de WhatsApp 26/26 con el nombre correcto y sin caracteres de control; regla de encoding documentada para Android |
+| Confirmación de `Lanzar saída` con Cancelar / Confirmar | `729025fe` | `handleLaunch` abre el diálogo y `handleConfirmLaunch` ejecuta; `salida-confirm-modal` con productos, total y botones de 44 px. Tests de página 18/18: Lanzar abre y **no** llama a la API ni al ticket, Cancelar no lanza, Confirmar escribe el movimiento y arma el viaje. E2E propio: `salida-confirm-launch.spec.ts` |
+
+### Estado de pruebas y despliegue
+
+- Backend **974/974**. Frontend **230/230** vitest (31 archivos) y **750/750** node. `tsc` limpio. Build verde (`16.61s`).
+- E2E: suite completa **118/118** más el spec nuevo de la confirmación de Salida (ver su propio conteo abajo).
+- Deploy: `api` + `web` reconstruidos y healthy; producción verificada para el filtro de operarios y el nombre del azúcar.
