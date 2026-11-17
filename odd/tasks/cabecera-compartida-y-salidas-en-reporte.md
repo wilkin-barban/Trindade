@@ -139,3 +139,18 @@ contrato OpenAPI al día y cliente Kotlin regenerado (195 archivos).
   `salida-report-operator-` y `salida-report-total`, y el chunk de lanzamiento de Masas monta `DaySessionHeader` con
   **cero** inputs de fecha; CSP y HSTS presentes, asset gzip + `immutable`, log escribible.
 - **Árbol**: `.vitest/` eliminado y agregado a `.gitignore` (`97e2dd5c`); sin artefactos sin trackear.
+
+### Corrección: la tarjeta de Salidas sale del bloque de ERP
+
+Reporte del usuario: en «Movimentações do ERP» del reporte, la sección de Salidas quedaba mezclada con «Massas do dia» y
+rompía el diseño en el teléfono.
+
+Causa: la sección estaba montada **dentro** de la tarjeta de movimientos, en el mismo bloque que Massas, así que el
+bloque apilaba una tercera sección y la tarjeta crecía.
+
+Arreglo: `SalidaReportSection` es su propia tarjeta, con los márgenes de sus vecinas, al lado de la tarjeta de ERP en
+`/reports` y después de la de Massas en `/reports/:id`. Un test fija la estructura: la tarjeta de salidas no puede
+estar contenida en `massas-block` ni en `report-massas-card`.
+
+Evidencia: Vitest **220/220** (dos corridas), build verde, E2E **118/118** y los tres specs del reporte 19/19; deploy
+solo de `web` (healthy) y `/reports` 200 en producción con la sección servida en su propio chunk.
