@@ -662,23 +662,6 @@ export function SalidaHistoryPage() {
           </p>
         )}
 
-        <div
-          data-testid="salida-bridge-update-notice"
-          className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"
-        >
-          <p className="font-semibold">{t('massas.aero.bridgeUpdateTitle')}</p>
-          <p className="mt-1 text-amber-800 leading-relaxed">
-            {t('massas.aero.bridgeUpdateSteps')}{' '}
-            <a
-              href={AERO_SCRIPTABLE_CODE_PATH}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-medium underline hover:text-amber-950 inline-flex items-center gap-1"
-            >
-              /Aero32Bridge.js
-            </a>
-          </p>
-        </div>
       </div>
 
       {visibleMovements.length === 0 ? (

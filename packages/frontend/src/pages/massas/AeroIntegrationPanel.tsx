@@ -628,24 +628,6 @@ export function AeroIntegrationPanel({
           </Button>
         </div>
 
-        {/* Aviso de actualización del puente si el operador aún tiene la versión previa */}
-        <div
-          data-testid="aero-bridge-update-notice"
-          className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"
-        >
-          <p className="font-semibold">{t('massas.aero.bridgeUpdateTitle')}</p>
-          <p className="mt-1 text-amber-800 leading-relaxed">
-            {t('massas.aero.bridgeUpdateSteps')}{' '}
-            <a
-              href={AERO_SCRIPTABLE_CODE_PATH}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-medium underline hover:text-amber-950 inline-flex items-center gap-1"
-            >
-              /Aero32Bridge.js
-            </a>
-          </p>
-        </div>
 
         {/* El proceso nativo se instala una vez, en dos pasos: la app y el código. Se explica debajo de las
             acciones porque es lo primero que hay que resolver cuando un botón abre una app sin el script. */}

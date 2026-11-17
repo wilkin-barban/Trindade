@@ -593,7 +593,7 @@
       "scriptableInstallHint": "O Scriptable é o app que roda a ponte: sem ele o iPhone não chega à rede da fábrica. Instala-se uma única vez, pela App Store.",
       "scriptableInstallButton": "Instalar o Scriptable no iPhone",
       "scriptableCopyButton": "Copiar código para o Scriptable",
-      "scriptableCopyHint": "Toque em Copiar, abra o Scriptable, toque em +, cole o código e renomeie o script para Aero32Bridge.",
+      "scriptableCopyHint": "Toque em Copiar, abra o Scriptable, toque +, cole o código e renomeie o script para Aero32Bridge. Se você já tinha instalado, copie de novo: a ponte mudou e precisa ser substituída.",
       "scriptableCopied": "Copiado",
       "scriptableCopyFailed": "Não foi possível copiar o código. Abra /Aero32Bridge.js e copie de lá.",
       "scriptableLoadFailed": "Não foi possível carregar o código do script.",
@@ -656,9 +656,7 @@
       "passwordNotStored": "Não há senha guardada: digite uma vez e ela fica cifrada no servidor.",
       "passwordKeepPlaceholder": "Deixe vazio para manter a guardada",
       "passwordNeeded": "A senha do ERP não está guardada no servidor: abra Admin → Integração e salve-a para continuar.",
-      "bridgeError": "A ponte retornou um erro. Verifique a conexão e tente novamente.",
-      "bridgeUpdateTitle": "Atualizar ponte Aero32",
-      "bridgeUpdateSteps": "A ponte precisa ser atualizada: abra /Aero32Bridge.js no navegador, copie todo o código, Scriptable → + → cole e renomeie para Aero32Bridge."
+      "bridgeError": "A ponte retornou um erro. Verifique a conexão e tente novamente."
     },
     "historyShort": "Histórico",
     "todayShort": "Hoje",
