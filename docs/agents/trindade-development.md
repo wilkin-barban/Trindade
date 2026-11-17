@@ -163,6 +163,8 @@ Un cambio de flujo debe implementarse en web y Android cuando el usuario final l
 
 No copiar un componente visual si el patrón nativo ya existe; adaptar la interacción al tamaño del teléfono.
 
+**Lectura obligatoria previa**: Antes de iniciar cualquier implementación en Android para **Salida/Baja**, **Masas** o **integración ERP**, consultar la checklist exhaustiva en [docs/paridad-android-web.md](../paridad-android-web.md). Ese documento fija el catálogo de 19 productos (split 11/3/5), la persistencia local previa al ERP, los estados de tarjetas (`Enviado ao ERP`, `Conciliado`, `Parcial`, `Pendente`), el formato de WhatsApp sin códigos, la regla de hoy gestionable vs pasado solo lectura, la rotación de sesiones con ventana de gracia y el contrato de auditoría.
+
 ### 6.3 Builds
 
 La documentación de firma y keystore es [docs/release-android.md](../release-android.md). Reglas:
@@ -428,4 +430,5 @@ limpieza opcional; seguir el procedimiento documentado y no borrar el volumen.
 - [docs/registro-integracion-aero-webservice.md](../registro-integracion-aero-webservice.md): contratos exactos.
 - [docs/integracion-aero32.md](../integracion-aero32.md): auditoría del WebService.
 - [docs/auditoria-android.md](../auditoria-android.md): log y eventos Android.
+- [docs/paridad-android-web.md](../paridad-android-web.md): checklist de paridad Android ↔ Web (Salida, Masas, ERP y auditoría).
 - [CONTRIBUTING.md](../../CONTRIBUTING.md): convenciones de commits y trabajo.
