@@ -431,7 +431,9 @@ test.describe('Loading Schedule — Export Modal', () => {
     const save = page.locator('[data-testid="loading-save-btn"]');
     await expect(save).toBeVisible();
     expect((await save.boundingBox())!.height).toBeGreaterThanOrEqual(44);
-    await expect(save).toContainText(/Salvar/);
+    await expect(save).toContainText(/Salvar Horário|Salvar Horario/);
+    // The PDF lives in the card: the day has one action, not two.
+    await expect(page.locator('[data-testid="loading-export-pdf-btn"]')).toHaveCount(0);
     await save.click();
 
     // The card takes the grid's place: the message, and the decisions that follow it.

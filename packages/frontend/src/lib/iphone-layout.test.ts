@@ -37,18 +37,17 @@ describe('iPhone polish', () => {
     assert.match(dashboard, /<div className="shrink-0">\s*<ModuleHelpModal/);
   });
 
-  it('puts the two loading exports in one row on a phone', () => {
+  it('leaves the loading module one full-width action on a phone', () => {
+    // The PDF moved into the share card, so the day has a single primary action: Salvar. It fills the row on a
+    // phone and shrinks to its label on a desk, with the same thumb-sized target the exports used to have.
     for (const file of ['pages/LoadingSchedulePage.tsx', 'pages/LoadingEditPage.tsx']) {
       const source = page(file);
-      assert.match(source, /grid grid-cols-2 gap-2 sm:flex sm:justify-end sm:gap-3/, `${file} stacks its exports`);
-      assert.equal(
-        (source.match(/w-full[^"`]*sm:w-auto/g) ?? []).length >= 2,
-        true,
-        `${file} must let both buttons fill their own cell`,
-      );
+      assert.match(source, /flex justify-end/, `${file} keeps the action at the end of the day`);
+      assert.match(source, /w-full[^"`]*sm:w-auto/, `${file} must fill the row on a phone`);
       assert.match(source, /text-xs/, `${file} keeps a phone-sized label`);
       assert.match(source, /sm:text-sm/, `${file} keeps the desktop label size`);
-      assert.match(source, /whitespace-nowrap/, `${file} must not wrap «Exportar PDF»`);
+      assert.match(source, /whitespace-nowrap/, `${file} must not wrap «Salvar Horário»`);
+      assert.doesNotMatch(source, /loading-export-pdf-btn/, `${file} no longer offers a PDF of its own`);
     }
   });
 

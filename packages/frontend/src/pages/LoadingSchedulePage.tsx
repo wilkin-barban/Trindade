@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { LucideSave, LucideFileDown } from 'lucide-react';
+import { LucideSave } from 'lucide-react';
 import { api } from '../api/client';
 import { Button } from '../components/ui/button';
 import { LoadingSpinner } from '../components/ui/loading-spinner';
@@ -9,7 +9,6 @@ import { ScheduleExportView } from '../components/loading/ScheduleExportView';
 import { ShareCard } from '../components/reports/ShareCard';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { exportLoadingPdf, fetchLoadingExportText, shareLoadingMessage } from '../lib/loading-share';
-import { exportScheduleTextAsPdf } from '../lib/schedule-pdf';
 import { ModuleHelpModal } from '../components/ui/ModuleHelpModal';
 import type { ScheduleRow, DriverRow } from '../components/loading/ScheduleGrid';
 
@@ -166,20 +165,6 @@ export function LoadingSchedulePage() {
     }
   }
 
-  // ---- Export PDF Handler ----
-  async function handleExportPdf() {
-    setError('');
-    try {
-      const data = await api.get<{ text: string }>(`/loading/export?date=${date}`);
-
-      await exportScheduleTextAsPdf(data.text, `horario-${date}`);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : t('loading.exportError')
-      );
-    }
-  }
-
   // ---- Loading state ----
   // The spinner is for the first read of the day, not for every reload: a batch that lands reloads the grid
   // while the modal is open, and replacing the page with a spinner would close the modal and take with it the
@@ -282,19 +267,8 @@ export function LoadingSchedulePage() {
       />
       )}
 
-      {/* Action buttons */}
-      <div className="mt-6 mb-8 grid grid-cols-2 gap-2 sm:flex sm:justify-end sm:gap-3">
-        <Button
-          onClick={handleExportPdf}
-          variant="outline"
-          size="lg"
-          className="w-full whitespace-nowrap px-2 text-xs sm:w-auto sm:px-4 sm:text-sm"
-          data-testid="loading-export-pdf-btn"
-          disabled={schedules.length === 0}
-        >
-          <LucideFileDown className="h-4 w-4" />
-          {t('loading.exportPdf')}
-        </Button>
+      {/* One action: the day closes and the message opens; the PDF lives in that card. */}
+      <div className="mt-6 mb-8 flex justify-end">
         <Button
           onClick={() => setParams({ ...Object.fromEntries(params), share: '1' }, { replace: false })}
           size="lg"

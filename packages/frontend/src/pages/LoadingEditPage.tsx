@@ -1,12 +1,11 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { LucideArrowLeft, LucidePencil, LucideX, LucideCheck, LucideSave, LucideFileDown } from 'lucide-react';
+import { LucideArrowLeft, LucidePencil, LucideX, LucideCheck, LucideSave } from 'lucide-react';
 import { api, ApiClientError } from '../api/client';
 import { Button } from '../components/ui/button';
 import { LoadingSpinner } from '../components/ui/loading-spinner';
 import { ScheduleExportView } from '../components/loading/ScheduleExportView';
-import { exportScheduleTextAsPdf } from '../lib/schedule-pdf';
 import type { ScheduleRow } from '../components/loading/ScheduleGrid';
 import { countInWindow, isQuotaExceeded, quotaIfMoved, toMinutes } from '../lib/loading-quota';
 import { isClosedDay } from '../lib/massas-day';
@@ -62,24 +61,6 @@ export function LoadingEditPage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<number | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
-  const [pdfLoading, setPdfLoading] = useState(false);
-
-  // ---- Export PDF Handler ----
-  const handleExportPdf = useCallback(async () => {
-    setError('');
-    setPdfLoading(true);
-    try {
-      const data = await api.get<{ text: string }>(`/loading/export?date=${date}`);
-
-      await exportScheduleTextAsPdf(data.text, `horario-${date}`);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : t('loading.exportError')
-      );
-    } finally {
-      setPdfLoading(false);
-    }
-  }, [date, t]);
 
   const fetchData = useCallback(async () => {
     setError('');
@@ -335,19 +316,8 @@ export function LoadingEditPage() {
         </div>
       )}
 
-      {/* Action buttons */}
-      <div className="mt-6 mb-8 grid grid-cols-2 gap-2 sm:flex sm:justify-end sm:gap-3">
-        <Button
-          onClick={handleExportPdf}
-          variant="outline"
-          size="lg"
-          className="w-full whitespace-nowrap px-2 text-xs sm:w-auto sm:px-4 sm:text-sm"
-          data-testid="loading-export-pdf-btn"
-          disabled={schedules.length === 0 || pdfLoading}
-        >
-          <LucideFileDown className={`h-4 w-4 ${pdfLoading ? 'animate-spin' : ''}`} />
-          {t('loading.exportPdf')}
-        </Button>
+      {/* One action: the same Salvar the grid has, and the PDF lives in the card it opens. */}
+      <div className="mt-6 mb-8 flex justify-end">
         <Button
           onClick={() => navigate(`/loading?share=1&date=${date}`)}
           size="lg"
