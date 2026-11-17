@@ -154,3 +154,17 @@ estar contenida en `massas-block` ni en `report-massas-card`.
 
 Evidencia: Vitest **220/220** (dos corridas), build verde, E2E **118/118** y los tres specs del reporte 19/19; deploy
 solo de `web` (healthy) y `/reports` 200 en producción con la sección servida en su propio chunk.
+
+### Reordenamiento: un encabezado y tres tarjetas en el reporte
+
+Pedido del usuario: Massas do dia e Insumos cada una en su tarjeta, como ya estaba Salida/Baixa, y el botón
+«Sincronizar com ERP» por encima de las tres.
+
+- `erp-movements-header` es una cabecera propia (título + botón único) fuera de las tarjetas.
+- `report-massas-card`, `report-receipts-card` (solo en los días con recebimentos) y `salida-report-section` son tres
+  tarjetas hermanas, sin anidamiento.
+- El spec de la tarjeta ERP ahora prueba que la cabecera contiene el botón y que cada registro dibuja su tarjeta; el
+  de insumos lee su línea de harina en `report-receipts-card`.
+
+Evidencia: Vitest **220/220**, typecheck y build limpios, los cuatro specs de movimientos del ERP 8/8, E2E completo
+**118/118** (8m 12s), deploy solo de `web` (healthy) y `/reports` 200 con los cuatro test ids servidos.
