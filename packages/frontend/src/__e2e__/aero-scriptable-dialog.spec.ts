@@ -59,7 +59,7 @@ test.describe('the Scriptable install screen on a phone', () => {
 
     await expect(dialog).toContainText(/Aero32Bridge/);
     // Los pasos de Scriptable, no los del archivo: instalar, copiar, +, pegar y renombrar.
-    await expect(dialog).toContainText(/tocá \+|toque em \+/i);
+    await expect(dialog).toContainText(/tocá \+|toque \+/i);
     await expect(dialog).toContainText(/pegá|cole/i);
     await expect(dialog).toContainText(/renombr|renomeie/i);
 

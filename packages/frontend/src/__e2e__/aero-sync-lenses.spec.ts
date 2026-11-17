@@ -62,7 +62,7 @@ test.describe('the ERP sync, read through each module lens', () => {
     await loginViaApi(page, identities.worker);
     const today = await serverToday(page);
 
-    await page.goto(callbackUrl('/massas-launch', daySeats(today)));
+    await page.goto(callbackUrl('/massas-history', daySeats(today)));
 
     const dialog = page.locator('[data-testid="aero-sync-result-modal"]');
     await expect(dialog).toBeVisible();

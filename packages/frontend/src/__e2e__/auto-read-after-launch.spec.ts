@@ -63,7 +63,7 @@ async function launchOne(page: Page) {
 
 /** The shortcut's way back, with what the ERP answered. */
 async function answer(page: Page, payload: unknown) {
-  await page.goto(`/massas-launch?aero_action=entrada&aero_data=${encodeURIComponent(JSON.stringify(payload))}`);
+  await page.goto(`/massas-history?aero_action=entrada&aero_data=${encodeURIComponent(JSON.stringify(payload))}`);
 }
 
 function readRequests(page: Page): string[] {

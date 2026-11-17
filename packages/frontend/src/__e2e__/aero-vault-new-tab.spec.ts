@@ -50,7 +50,7 @@ test.describe('the ERP vault across tabs', () => {
     // The tab iOS opens: a fresh document of the same context. It shares `localStorage` (the session) but not
     // `sessionStorage`, which is precisely the condition that used to break this.
     const second = await context.newPage();
-    await second.goto('/massas-launch');
+    await second.goto('/massas-history');
 
     const sync = second.locator('[data-testid="massas-sync-erp"]');
     await expect(sync).toBeEnabled();
@@ -94,7 +94,7 @@ test.describe('the ERP vault across tabs', () => {
       (response) =>
         response.url().endsWith('/api/integration/aero/movements') && response.request().method() === 'POST',
     );
-    await second.goto(`/massas-launch?aero_action=movimentos&aero_data=${encodeURIComponent(answer)}`);
+    await second.goto(`/massas-history?aero_action=movimentos&aero_data=${encodeURIComponent(answer)}`);
     expect((await mirrored).status()).toBe(201);
 
     await expect(second.getByText(/no está guardada en el servidor|não está guardada no servidor/)).toHaveCount(0);

@@ -20,7 +20,7 @@ test('a bridge that cannot reach the plant explains itself instead of leaving th
   // pantalla no queda bloqueada después del error.
   await saveAeroVault(page, { wsUrl: 'http://192.168.25.250:1453/api', username: 'wilkin', password: 'senha-e2e' });
 
-  await page.goto(`/massas-launch?aero_error=wifi_required&aero_msg=${encodeURIComponent(MESSAGE)}`);
+  await page.goto(`/massas-history?aero_error=wifi_required&aero_msg=${encodeURIComponent(MESSAGE)}`);
 
   const dialog = page.locator('[data-testid="massa-result-modal"]');
   await expect(dialog).toBeVisible();

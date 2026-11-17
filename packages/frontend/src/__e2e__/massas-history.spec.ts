@@ -48,7 +48,7 @@ test.describe('Massas history days', () => {
       // Today is the day the page opens on, because it is the one that can still be managed.
       await expect(strip).toBeVisible();
       await expect(todayChip).toHaveAttribute('aria-pressed', 'true');
-      await expect(todayChip).toHaveText(/^\d{2}\/\d{2}$/);
+      await expect(todayChip).toHaveText(/^\d{2}\/\d{2}(?: · \d+)?$/);
       // The card this screen used to draw is gone: one control, not two designs.
       await expect(page.getByText('Escolha o dia')).toHaveCount(0);
 
@@ -63,7 +63,7 @@ test.describe('Massas history days', () => {
       await todayChip.click();
       await expect(todayChip).toHaveAttribute('aria-pressed', 'true');
       await expect(page).toHaveURL(/\/massas-history$/);
-      await expect(page.getByTestId('massas-history-empty')).toBeVisible();
+      await expect(page.getByTestId('massas-history-empty').or(page.getByTestId('massas-unified-card'))).toBeVisible();
       await expect(page.getByRole('alert')).toHaveCount(0);
     });
   }

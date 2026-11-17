@@ -91,12 +91,13 @@ async function readQueue(page: Page): Promise<{ items: unknown[]; inFlight: unkn
 }
 
 async function answer(page: Page, action: string, payload: unknown) {
-  const url = `/massas-launch?aero_action=${action}&aero_data=${encodeURIComponent(JSON.stringify(payload))}`;
+  // La respuesta vuelve al histórico, que es donde vive el diálogo del veredicto desde el rediseño.
+  const url = `/massas-history?aero_action=${action}&aero_data=${encodeURIComponent(JSON.stringify(payload))}`;
   // El lanzamiento dejó `window.location` apuntando a `scriptable:///run/…`, que Chromium cancela. Cargar la
   // pantalla limpia primero descarta esa navegación pendiente y deja el documento en un estado conocido; recién
   // entonces se entrega la respuesta. Sin esto, el `goto` del callback competía con el aborto y la página podía
   // quedar a medio montar, sin el diálogo.
-  await page.goto('/massas-launch').catch(() => page.goto('/massas-launch'));
+  await page.goto('/massas-history').catch(() => page.goto('/massas-history'));
   await page.goto(url);
 }
 
