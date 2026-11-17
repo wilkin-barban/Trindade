@@ -71,8 +71,8 @@ const MOVEMENT: SalidaMovement = {
   items: [
     {
       id: 1,
-      product_code: '1474',
-      product_name: 'EMBALAG. NHOQUE 1kg',
+      product_code: '1357',
+      product_name: 'EMBALAG. DISCO 200g',
       block: 'embalagens',
       quantity: 20,
       position: 0,
@@ -176,35 +176,39 @@ describe('SalidaLaunchPage', () => {
   it('hides the product code in the row and keeps it in the accessible name', async () => {
     await renderReady();
 
-    const row = screen.getByTestId('salida-product-1474');
+    const row = screen.getByTestId('salida-product-1357');
     // The row reads name + quantity: the code is traceability, not something the operator has to read.
-    expect(row.textContent).toContain('EMBALAG. NHOQUE 1kg');
-    expect(row.textContent).not.toContain('1474');
+    expect(row.textContent).toContain('EMBALAG. DISCO 200g');
+    expect(row.textContent).not.toContain('1357');
 
     // It is still there for a screen reader, for the tests and for the payload that leaves.
-    expect(row.getAttribute('data-testid')).toContain('1474');
-    expect(screen.getByTestId('salida-quantity-1474').getAttribute('aria-label')).toContain('1474');
+    expect(row.getAttribute('data-testid')).toContain('1357');
+    expect(screen.getByTestId('salida-quantity-1357').getAttribute('aria-label')).toContain('1357');
+
+    // S3: 1474 and 1473 leave the catalogue definitively
+    expect(screen.queryByTestId('salida-product-1474')).toBeNull();
+    expect(screen.queryByTestId('salida-product-1473')).toBeNull();
   });
 
   it('clears the quantities of a block that is switched off', async () => {
     await renderReady();
 
-    fireEvent.change(screen.getByTestId('salida-quantity-1474'), { target: { value: '20' } });
+    fireEvent.change(screen.getByTestId('salida-quantity-1357'), { target: { value: '20' } });
     expect(screen.getByTestId('salida-summary-units').textContent).toContain('20');
 
     fireEvent.click(screen.getByTestId('salida-block-switch-embalagens'));
 
-    expect(screen.queryByTestId('salida-quantity-1474')).toBeNull();
+    expect(screen.queryByTestId('salida-quantity-1357')).toBeNull();
     expect(screen.getByTestId('salida-summary-units').textContent).toContain('0');
 
     fireEvent.click(screen.getByTestId('salida-block-switch-embalagens'));
-    expect((screen.getByTestId('salida-quantity-1474') as HTMLInputElement).value).toBe('');
+    expect((screen.getByTestId('salida-quantity-1357') as HTMLInputElement).value).toBe('');
   });
 
   it('counts only whole units above zero', async () => {
     await renderReady();
 
-    const field = screen.getByTestId('salida-quantity-1474');
+    const field = screen.getByTestId('salida-quantity-1357');
     fireEvent.change(field, { target: { value: '2.5' } });
 
     expect(screen.getByTestId('salida-summary-units').textContent).toContain('0');
@@ -218,7 +222,7 @@ describe('SalidaLaunchPage', () => {
   it('adds up the products and units of every active block', async () => {
     await renderReady();
 
-    fireEvent.change(screen.getByTestId('salida-quantity-1474'), { target: { value: '20' } });
+    fireEvent.change(screen.getByTestId('salida-quantity-1357'), { target: { value: '20' } });
     fireEvent.change(screen.getByTestId('salida-quantity-1673'), { target: { value: '5' } });
 
     expect(screen.getByTestId('salida-summary-products').textContent).toBe('2');
@@ -257,13 +261,13 @@ describe('SalidaLaunchPage', () => {
 
     await renderReady();
 
-    fireEvent.change(screen.getByTestId('salida-quantity-1474'), { target: { value: '20' } });
+    fireEvent.change(screen.getByTestId('salida-quantity-1357'), { target: { value: '20' } });
     fireEvent.click(screen.getByTestId('salida-launch'));
 
     await waitFor(() => expect(screen.getByTestId('salida-erp-answer')).toBeInTheDocument());
 
     expect(order).toEqual(['post:/salida', 'ticket']);
-    expect(post).toHaveBeenCalledWith('/salida', { items: [{ code: '1474', quantity: 20 }] });
+    expect(post).toHaveBeenCalledWith('/salida', { items: [{ code: '1357', quantity: 20 }] });
     expect(ticket.mock.calls[0]?.[0]).toMatchObject({ action: 'saida' });
 
     // The movement is not lost: the dialog says the ERP has not answered and the outbox offers a resend.
@@ -271,7 +275,7 @@ describe('SalidaLaunchPage', () => {
     expect(screen.getByTestId('salida-success-total').textContent).toContain('25');
     expect(screen.getByTestId('salida-outbox')).toBeInTheDocument();
     // And the form is empty, so the same quantities cannot be filed twice.
-    expect((screen.getByTestId('salida-quantity-1474') as HTMLInputElement).value).toBe('');
+    expect((screen.getByTestId('salida-quantity-1357') as HTMLInputElement).value).toBe('');
   });
 
   it('logs a refused ticket with its code and leaves nothing owed', async () => {
@@ -280,7 +284,7 @@ describe('SalidaLaunchPage', () => {
     });
 
     await renderReady();
-    fireEvent.change(screen.getByTestId('salida-quantity-1474'), { target: { value: '20' } });
+    fireEvent.change(screen.getByTestId('salida-quantity-1357'), { target: { value: '20' } });
     fireEvent.click(screen.getByTestId('salida-launch'));
 
     await waitFor(() => expect(screen.getByTestId('salida-erp-answer')).toBeInTheDocument());
@@ -302,7 +306,7 @@ describe('SalidaLaunchPage', () => {
     ticket.mockImplementation(async () => ({ ticket: 't-1', ticketUrl: 'https://app.example/t/1', expiresAt: '' }));
 
     await renderReady();
-    fireEvent.change(screen.getByTestId('salida-quantity-1474'), { target: { value: '20' } });
+    fireEvent.change(screen.getByTestId('salida-quantity-1357'), { target: { value: '20' } });
     fireEvent.change(screen.getByTestId('salida-quantity-1673'), { target: { value: '5' } });
     fireEvent.click(screen.getByTestId('salida-launch'));
 
@@ -323,7 +327,7 @@ describe('SalidaLaunchPage', () => {
     expect(String(requested.note ?? '')).toMatch(/batch 2/);
     // The payload that was armed is the ERP payload, PRODUCTO by PRODUCTO.
     expect(requested.payload).toEqual([
-      expect.objectContaining({ PRO_COD: '001474', PRO_QTD: 2000, PED_USU: 'WILKIN', PED_SER: 'APL' }),
+      expect.objectContaining({ PRO_COD: '001357', PRO_QTD: 2000, PED_USU: 'WILKIN', PED_SER: 'APL' }),
       expect.objectContaining({ PRO_COD: '001673', PRO_QTD: 500, PED_USU: 'WILKIN', PED_SER: 'APL' }),
     ]);
     expect(requested.attemptId).toBe(stored?.attemptId);
@@ -412,7 +416,7 @@ describe('SalidaLaunchPage', () => {
     ticket.mockImplementation(async () => ({ ticket: 't-9', ticketUrl: 'https://app.example/t/9', expiresAt: '' }));
 
     const first = await renderReady();
-    fireEvent.change(screen.getByTestId('salida-quantity-1474'), { target: { value: '20' } });
+    fireEvent.change(screen.getByTestId('salida-quantity-1357'), { target: { value: '20' } });
     fireEvent.click(screen.getByTestId('salida-launch'));
 
     await waitFor(() => expect(audit.length).toBeGreaterThan(0));
@@ -501,10 +505,10 @@ describe('SalidaLaunchPage', () => {
     await renderReady(`/salida?aero_action=saida&aero_data=${data}`);
     const dialog = await screen.findByTestId('salida-success-dialog');
 
-    expect(dialog.textContent).toContain('EMBALAG. NHOQUE 1kg');
-    expect(dialog.textContent).not.toContain('1474');
+    expect(dialog.textContent).toContain('EMBALAG. DISCO 200g');
+    expect(dialog.textContent).not.toContain('1357');
     // The code survives where it is read, not where it is drawn.
-    expect(dialog.querySelector('[aria-label*="1474"]')).not.toBeNull();
+    expect(dialog.querySelector('[aria-label*="1357"]')).not.toBeNull();
   });
 
   it('falls back to the fixed catalogue when the server does not answer', async () => {
@@ -516,7 +520,7 @@ describe('SalidaLaunchPage', () => {
     await renderReady();
 
     expect(screen.getByTestId('salida-catalog-fallback')).toBeInTheDocument();
-    expect(screen.getByTestId('salida-quantity-1474')).toBeInTheDocument();
+    expect(screen.getByTestId('salida-quantity-1357')).toBeInTheDocument();
   });
 });
 

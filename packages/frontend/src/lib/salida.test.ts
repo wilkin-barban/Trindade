@@ -102,22 +102,24 @@ function movement(overrides: Partial<SalidaMovement> = {}): SalidaMovement {
 describe('the fixed catalogue', () => {
   const grouped = salidaProductsByBlock(CATALOG);
 
-  it('has 21 products split 13 / 3 / 5', () => {
-    assert.equal(CATALOG.length, 21);
-    assert.equal(grouped.embalagens.length, 13);
+  it('has 19 products split 11 / 3 / 5', () => {
+    assert.equal(CATALOG.length, 19);
+    assert.equal(grouped.embalagens.length, 11);
     assert.equal(grouped.bobinas.length, 3);
     assert.equal(grouped['materia-prima'].length, 5);
   });
 
-  it('carries no 1040 and only one 1673', () => {
+  it('carries no 1040, 1474 or 1473 and only one 1673', () => {
     assert.equal(CATALOG.some((product) => product.code === '1040'), false);
+    assert.equal(CATALOG.some((product) => product.code === '1474'), false);
+    assert.equal(CATALOG.some((product) => product.code === '1473'), false);
     assert.equal(CATALOG.filter((product) => product.code === '1673').length, 1);
   });
 
   it('keeps the Portuguese names the ERP knows', () => {
     assert.equal(grouped.bobinas[0]?.name, 'BOBINA ROLO');
     assert.equal(grouped['materia-prima'][3]?.name, 'AÇÚCAR 5kg');
-    assert.equal(grouped.embalagens[0]?.name, 'EMBALAG. NHOQUE 1kg');
+    assert.equal(grouped.embalagens[0]?.name, 'EMBALAG. DISCO 200g');
   });
 });
 
@@ -157,12 +159,12 @@ describe('quantities', () => {
 
   it('builds the items of the active blocks only, in catalogue order', () => {
     const items = salidaItemsFromQuantities(
-      { '1673': '5', '1474': '20', '1900': '3' },
+      { '1673': '5', '1357': '20', '1900': '3' },
       CATALOG,
       ['embalagens', 'materia-prima'],
     );
     assert.deepEqual(items, [
-      { code: '1474', quantity: 20 },
+      { code: '1357', quantity: 20 },
       { code: '1673', quantity: 5 },
     ]);
   });
@@ -176,7 +178,7 @@ describe('quantities', () => {
 describe('the ERP payload', () => {
   const payloads = buildSalidaPayloads(
     [
-      { code: '1474', quantity: 20 },
+      { code: '1357', quantity: 20 },
       { code: '1673', quantity: 5 },
     ],
     { date: '2026-11-13', username: 'wilkin', products: CATALOG },
@@ -184,14 +186,14 @@ describe('the ERP payload', () => {
 
   it('writes one payload per product, in the order given', () => {
     assert.equal(payloads.length, 2);
-    assert.equal(payloads[0]?.PRO_COD, '001474');
+    assert.equal(payloads[0]?.PRO_COD, '001357');
     assert.equal(payloads[1]?.PRO_COD, '001673');
   });
 
   it('carries every field of S7 and none of the entry ones', () => {
     assert.deepEqual(payloads[0], {
-      PRO_COD: '001474',
-      PRO_DES: 'EMBALAG. NHOQUE 1kg',
+      PRO_COD: '001357',
+      PRO_DES: 'EMBALAG. DISCO 200g',
       PRO_QTD: 2000,
       PED_DTA: '2026-11-13',
       PED_USU: 'WILKIN',
@@ -218,12 +220,15 @@ describe('the ERP payload', () => {
     const kept = buildSalidaPayloads(
       [
         { code: '1040', quantity: 4 },
-        { code: '1474', quantity: 3 },
-        { code: '1474', quantity: 9 },
+        { code: '1474', quantity: 8 },
+        { code: '1473', quantity: 7 },
+        { code: '1357', quantity: 3 },
+        { code: '1357', quantity: 9 },
       ],
       { date: '2026-11-13', username: 'wilkin', products: CATALOG },
     );
     assert.equal(kept.length, 1);
+    assert.equal(kept[0]?.PRO_COD, '001357');
     assert.equal(kept[0]?.PRO_QTD, 300);
   });
 });
@@ -236,8 +241,8 @@ describe('the trips to the ERP', () => {
 
   it('sends up to eight products per ticket', () => {
     const trips = buildSalidaTrips(payloads);
-    assert.equal(payloads.length, 21);
-    assert.deepEqual(trips.map((trip) => trip.payloads.length), [8, 8, 5]);
+    assert.equal(payloads.length, 19);
+    assert.deepEqual(trips.map((trip) => trip.payloads.length), [8, 8, 3]);
   });
 
   it('arms the saida action on every trip', () => {
@@ -260,7 +265,7 @@ describe('the trips to the ERP', () => {
 describe('the write order', () => {
   it('persists in Trindade, then uploads photos, then calls the ERP', async () => {
     const calls: string[] = [];
-    const result = await submitSalida([{ code: '1474', quantity: 20 }], {
+    const result = await submitSalida([{ code: '1357', quantity: 20 }], {
       create: async () => {
         calls.push('create');
         return movement();
@@ -281,7 +286,7 @@ describe('the write order', () => {
 
   it('never calls the ERP when Trindade could not write', async () => {
     const calls: string[] = [];
-    const result = await submitSalida([{ code: '1474', quantity: 20 }], {
+    const result = await submitSalida([{ code: '1357', quantity: 20 }], {
       create: async () => {
         calls.push('create');
         throw new Error('sin conexión');
@@ -302,7 +307,7 @@ describe('the write order', () => {
   });
 
   it('keeps the movement when the photos or the ERP fail', async () => {
-    const result = await submitSalida([{ code: '1474', quantity: 20 }], {
+    const result = await submitSalida([{ code: '1357', quantity: 20 }], {
       create: async () => movement(),
       uploadPhotos: async () => {
         throw new Error('foto grande');
@@ -513,7 +518,7 @@ describe('batch verdict and erp mapping (T1)', () => {
       {
         movementId: 99,
         date: '2026-11-16',
-        trips: [{ action: 'saida', payloads: [{ PRO_COD: '1474' }, { PRO_COD: '1473' }] }],
+        trips: [{ action: 'saida', payloads: [{ PRO_COD: '1357' }, { PRO_COD: '1356' }] }],
         startedAt: '2026-11-16T15:13:55.000Z',
         currentTripPayloads: 2,
       },
@@ -662,7 +667,7 @@ describe('the audit pair of one trip (S13)', () => {
   const ATTEMPT = { attemptId: 'attempt-saida-1', startedAt: 1_700_000_000_000 };
   const payloads = buildSalidaPayloads(
     [
-      { code: '1474', quantity: 20 },
+      { code: '1357', quantity: 20 },
       { code: '1673', quantity: 5 },
     ],
     { date: '2026-11-13', username: 'wilkin', products: CATALOG },

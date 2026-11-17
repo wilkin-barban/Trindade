@@ -5,7 +5,7 @@
  * product, not the movement. A row of `salida_movement_items` keeps the code, the name and the block of the
  * moment it was launched, so renaming a product here tomorrow cannot rewrite what a movement said yesterday.
  *
- * No CRUD on purpose. The list is invariable in this delivery: 21 products, in this order, and the screen
+ * No CRUD on purpose. The list is invariable in this delivery: 19 products, in this order, and the screen
  * renders them in it. `1040` (FARINHA TRIGO) is deliberately absent and `1673` (GORDURA VEGETAL) appears
  * once; both are invariants the suite asserts, because the plant's own sheet already carried that mistake.
  */
@@ -24,11 +24,9 @@ export interface SalidaProduct {
 }
 
 /** How many product codes one movement may carry: the whole catalogue is the ceiling. */
-export const MAX_SALIDA_ITEMS = 21;
+export const MAX_SALIDA_ITEMS = 19;
 
 export const SALIDA_PRODUCTS: readonly SalidaProduct[] = [
-  { code: '1474', name: 'EMBALAG. NHOQUE 1kg', block: 'embalagens' },
-  { code: '1473', name: 'EMBALAG. NHOQUE 400g', block: 'embalagens' },
   { code: '1357', name: 'EMBALAG. DISCO 200g', block: 'embalagens' },
   { code: '1356', name: 'EMBALAG. DISCO 400g', block: 'embalagens' },
   { code: '1355', name: 'EMBALAG. DISCO 500g', block: 'embalagens' },

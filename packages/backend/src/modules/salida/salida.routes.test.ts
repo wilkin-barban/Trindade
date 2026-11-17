@@ -90,7 +90,7 @@ describe('salida routes', () => {
     });
   }
 
-  async function launchOne(code = '1474', quantity = 10): Promise<number> {
+  async function launchOne(code = '1357', quantity = 10): Promise<number> {
     const response = await launch([{ code, quantity }]);
     assert.equal(response.statusCode, 201, response.body);
     return JSON.parse(response.body).movement.id as number;
@@ -142,26 +142,26 @@ describe('salida routes', () => {
   });
 
   describe('catalog', () => {
-    it('serves the fixed 21 products in the S1 order, split 13/3/5', async () => {
+    it('serves the fixed 19 products in the S1 order, split 11/3/5', async () => {
       const response = await app.inject({ method: 'GET', url: '/api/salida/catalog', headers: wilkin() });
       assert.equal(response.statusCode, 200, response.body);
 
       const { products } = JSON.parse(response.body) as {
         products: { code: string; name: string; block: string }[];
       };
-      assert.equal(products.length, 21);
+      assert.equal(products.length, 19);
       assert.deepEqual(
         {
           embalagens: products.filter((p) => p.block === 'embalagens').length,
           bobinas: products.filter((p) => p.block === 'bobinas').length,
           'materia-prima': products.filter((p) => p.block === 'materia-prima').length,
         },
-        { embalagens: 13, bobinas: 3, 'materia-prima': 5 },
+        { embalagens: 11, bobinas: 3, 'materia-prima': 5 },
       );
 
-      assert.equal(products[0].code, '1474');
-      assert.equal(products[0].name, 'EMBALAG. NHOQUE 1kg');
-      assert.equal(products[20].code, '1673');
+      assert.equal(products[0].code, '1357');
+      assert.equal(products[0].name, 'EMBALAG. DISCO 200g');
+      assert.equal(products[18].code, '1673');
     });
 
     it('leaves out the wrong list entry and lists 1673 once', async () => {
@@ -175,7 +175,7 @@ describe('salida routes', () => {
   describe('launching a movement', () => {
     it('persists the header and its ordered items and answers 201', async () => {
       const response = await launch([
-        { code: '1474', quantity: 20 },
+        { code: '1357', quantity: 20 },
         { code: '1900', quantity: 3 },
         { code: '1673', quantity: 5 },
       ]);
@@ -195,12 +195,12 @@ describe('salida routes', () => {
           item.block,
         ]),
         [
-          ['1474', 0, 20, 'embalagens'],
+          ['1357', 0, 20, 'embalagens'],
           ['1900', 1, 3, 'bobinas'],
           ['1673', 2, 5, 'materia-prima'],
         ],
       );
-      assert.equal(movement.items[0].product_name, 'EMBALAG. NHOQUE 1kg');
+      assert.equal(movement.items[0].product_name, 'EMBALAG. DISCO 200g');
       assert.equal(movement.total_units, 28);
       assert.deepEqual(movement.photos, []);
       assert.deepEqual(movement.reconciliation, { status: 'pending', ent_lans: [], matched_item_ids: [] });
@@ -211,7 +211,7 @@ describe('salida routes', () => {
       assert.deepEqual(
         stored.map((row) => Object.values(row as Record<string, unknown>)),
         [
-          ['1474', 20, 0],
+          ['1357', 20, 0],
           ['1900', 3, 1],
           ['1673', 5, 2],
         ],
@@ -224,29 +224,31 @@ describe('salida routes', () => {
       assert.equal(JSON.parse(response.body).code, 'SALIDA_INVALID_ITEMS');
     });
 
-    it('refuses more than 21 items', async () => {
+    it('refuses more than 19 items', async () => {
       const response = await launch(
-        Array.from({ length: 22 }, () => ({ code: '1474', quantity: 1 })),
+        Array.from({ length: 20 }, () => ({ code: '1357', quantity: 1 })),
       );
       assert.equal(response.statusCode, 400);
     });
 
     it('refuses a duplicated code', async () => {
       const response = await launch([
-        { code: '1474', quantity: 1 },
-        { code: '1474', quantity: 2 },
+        { code: '1357', quantity: 1 },
+        { code: '1357', quantity: 2 },
       ]);
       assert.equal(response.statusCode, 400);
     });
 
-    it('refuses a code the catalog does not offer', async () => {
-      const response = await launch([{ code: '1040', quantity: 1 }]);
-      assert.equal(response.statusCode, 400);
-      assert.equal(JSON.parse(response.body).code, 'SALIDA_UNKNOWN_PRODUCT');
-      assert.equal(
-        (db.prepare('SELECT COUNT(*) AS n FROM salida_movement_items WHERE product_code = ?').get('1040') as { n: number }).n,
-        0,
-      );
+    it('refuses codes the catalog does not offer, including 1040, 1474 and 1473', async () => {
+      for (const unknownCode of ['1040', '1474', '1473']) {
+        const response = await launch([{ code: unknownCode, quantity: 1 }]);
+        assert.equal(response.statusCode, 400);
+        assert.equal(JSON.parse(response.body).code, 'SALIDA_UNKNOWN_PRODUCT');
+        assert.equal(
+          (db.prepare('SELECT COUNT(*) AS n FROM salida_movement_items WHERE product_code = ?').get(unknownCode) as { n: number }).n,
+          0,
+        );
+      }
     });
 
     const refusedQuantities: [string, unknown][] = [
@@ -261,7 +263,7 @@ describe('salida routes', () => {
           method: 'POST',
           url: '/api/salida',
           headers: wilkin(),
-          payload: { items: [{ code: '1474', quantity }] },
+          payload: { items: [{ code: '1357', quantity }] },
         });
         assert.equal(response.statusCode, 400, response.body);
         assert.equal(JSON.parse(response.body).code, 'SALIDA_INVALID_ITEMS');
@@ -385,7 +387,7 @@ describe('salida routes', () => {
     });
 
     it('accepts an iPhone HEIC, stores `.heic` and serves the bytes back', async () => {
-      const movementId = await launchOne('1473', 3);
+      const movementId = await launchOne('1307', 3);
       const created = await uploadPhoto(movementId, 'image/heic', fakeHeic);
       assert.equal(created.statusCode, 201, created.body);
 
@@ -405,7 +407,7 @@ describe('salida routes', () => {
     });
 
     it('maps the HEIF family of the same header to `image/heif` and `.heif`', async () => {
-      const movementId = await launchOne('1473', 2);
+      const movementId = await launchOne('1625', 2);
       const created = await uploadPhoto(movementId, 'image/heif', isoBmffStill('mif1'));
       assert.equal(created.statusCode, 201, created.body);
 
@@ -415,7 +417,7 @@ describe('salida routes', () => {
     });
 
     it('keeps accepting JPEG, PNG and WebP and keeps their extensions', async () => {
-      const movementId = await launchOne('1473', 1);
+      const movementId = await launchOne('1354', 1);
       const cases: { mime: string; data: Buffer; ext: string }[] = [
         { mime: 'image/jpeg', data: fakeJpeg, ext: '.jpg' },
         { mime: 'image/png', data: fakePng, ext: '.png' },
@@ -432,13 +434,13 @@ describe('salida routes', () => {
     });
 
     it('refuses a declared HEIC whose bytes are not an ISO-BMFF container', async () => {
-      const movementId = await launchOne('1473', 4);
+      const movementId = await launchOne('1528', 4);
       const response = await uploadPhoto(movementId, 'image/heic', Buffer.from('not a heic at all'));
       assert.equal(response.statusCode, 415, response.body);
     });
 
     it('refuses a HEIC file declared as `image/jpeg`', async () => {
-      const movementId = await launchOne('1473', 5);
+      const movementId = await launchOne('1781', 5);
       const response = await uploadPhoto(movementId, 'image/jpeg', fakeHeic);
       assert.equal(response.statusCode, 415, response.body);
     });
@@ -503,7 +505,7 @@ describe('salida routes', () => {
   describe('the beta guard', () => {
     const guarded: { method: 'GET' | 'POST' | 'DELETE'; url: string; payload?: Record<string, unknown> }[] = [
       { method: 'GET', url: '/api/salida/catalog' },
-      { method: 'POST', url: '/api/salida', payload: { items: [{ code: '1474', quantity: 1 }] } },
+      { method: 'POST', url: '/api/salida', payload: { items: [{ code: '1357', quantity: 1 }] } },
       { method: 'GET', url: '/api/salida' },
       { method: 'GET', url: '/api/salida/history' },
       { method: 'POST', url: '/api/salida/1/erp-result', payload: { status: 'sent' } },
@@ -558,7 +560,7 @@ describe('salida routes', () => {
     });
 
     it('answers 400 for an invalid body: missing status', async () => {
-      const movementId = await launchOne('1474', 5);
+      const movementId = await launchOne('1357', 5);
       const response = await app.inject({
         method: 'POST',
         url: `/api/salida/${movementId}/erp-result`,
@@ -569,7 +571,7 @@ describe('salida routes', () => {
     });
 
     it('answers 400 for an invalid body: unknown status', async () => {
-      const movementId = await launchOne('1474', 5);
+      const movementId = await launchOne('1357', 5);
       const response = await app.inject({
         method: 'POST',
         url: `/api/salida/${movementId}/erp-result`,
@@ -580,7 +582,7 @@ describe('salida routes', () => {
     });
 
     it('answers 400 for an invalid body: extra properties (strict)', async () => {
-      const movementId = await launchOne('1474', 5);
+      const movementId = await launchOne('1357', 5);
       const response = await app.inject({
         method: 'POST',
         url: `/api/salida/${movementId}/erp-result`,
@@ -591,7 +593,7 @@ describe('salida routes', () => {
     });
 
     it('answers 400 for an invalid body: message exceeds 512 characters', async () => {
-      const movementId = await launchOne('1474', 5);
+      const movementId = await launchOne('1357', 5);
       const response = await app.inject({
         method: 'POST',
         url: `/api/salida/${movementId}/erp-result`,
@@ -602,7 +604,7 @@ describe('salida routes', () => {
     });
 
     it('records sent verdict and reflects it in list and history', async () => {
-      const movementId = await launchOne('1474', 5);
+      const movementId = await launchOne('1357', 5);
       const response = await app.inject({
         method: 'POST',
         url: `/api/salida/${movementId}/erp-result`,
@@ -644,7 +646,7 @@ describe('salida routes', () => {
     });
 
     it('records failed verdict with message', async () => {
-      const movementId = await launchOne('1474', 8);
+      const movementId = await launchOne('1357', 8);
       const response = await app.inject({
         method: 'POST',
         url: `/api/salida/${movementId}/erp-result`,
@@ -658,7 +660,7 @@ describe('salida routes', () => {
     });
 
     it('overwrites on relaunch (idempotent)', async () => {
-      const movementId = await launchOne('1474', 12);
+      const movementId = await launchOne('1357', 12);
       const first = await app.inject({
         method: 'POST',
         url: `/api/salida/${movementId}/erp-result`,
@@ -725,7 +727,7 @@ describe('salida routes', () => {
 
     it('records salida_create with the movement it stored, and no credentials', async () => {
       const response = await launch([
-        { code: '1474', quantity: 20 },
+        { code: '1357', quantity: 20 },
         { code: '1900', quantity: 3 },
       ]);
       assert.equal(response.statusCode, 201, response.body);
@@ -764,7 +766,7 @@ describe('salida routes', () => {
     });
 
     it('records salida_photo with the photo it stored', async () => {
-      const movementId = await launchOne('1474', 7);
+      const movementId = await launchOne('1357', 7);
       const upload = await uploadPhoto(movementId);
       assert.equal(upload.statusCode, 201, upload.body);
       const { photo } = JSON.parse(upload.body) as { photo: { id: number; file_size: number } };
@@ -786,7 +788,7 @@ describe('salida routes', () => {
     it('writes nothing when the launch is refused', async () => {
       // The line records a fact, so a 400 has nothing to record: a log that mentioned the refused attempt would
       // make a refused quantity look like a movement somebody has to reconcile.
-      const refused = await launch([{ code: '1474', quantity: 0 }]);
+      const refused = await launch([{ code: '1357', quantity: 0 }]);
       assert.equal(refused.statusCode, 400, refused.body);
       assert.equal(existsSync(logFile()), false);
     });
@@ -798,7 +800,7 @@ describe('salida routes', () => {
       writeFileSync(unwritable, 'this path is a file, so the log directory cannot be created');
       process.env.AERO_LOG_DIR = unwritable;
 
-      const response = await launch([{ code: '1474', quantity: 4 }]);
+      const response = await launch([{ code: '1357', quantity: 4 }]);
       assert.equal(response.statusCode, 201, response.body);
       const movementId = (JSON.parse(response.body) as { movement: { id: number } }).movement.id;
       const stored = db.prepare('SELECT COUNT(*) AS count FROM salida_movements WHERE id = ?').get(movementId) as {

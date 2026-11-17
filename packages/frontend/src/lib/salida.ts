@@ -31,15 +31,13 @@ export interface SalidaProduct {
 }
 
 /**
- * The 21 products, in the order the backend serves them.
+ * The 19 products, in the order the backend serves them.
  *
  * This copy exists only as the fallback for a catalogue that could not be read, and a test pins it against the
  * server's list: a fallback that drifts is a screen that silently launches a product the backend does not have.
  * `1040` FARINHA TRIGO is deliberately absent and `1673` appears once.
  */
 export const SALIDA_FALLBACK_PRODUCTS: readonly SalidaProduct[] = [
-  { code: '1474', name: 'EMBALAG. NHOQUE 1kg', block: 'embalagens' },
-  { code: '1473', name: 'EMBALAG. NHOQUE 400g', block: 'embalagens' },
   { code: '1357', name: 'EMBALAG. DISCO 200g', block: 'embalagens' },
   { code: '1356', name: 'EMBALAG. DISCO 400g', block: 'embalagens' },
   { code: '1355', name: 'EMBALAG. DISCO 500g', block: 'embalagens' },

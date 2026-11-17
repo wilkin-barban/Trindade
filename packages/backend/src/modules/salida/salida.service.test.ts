@@ -88,26 +88,28 @@ describe('salida service', () => {
   after(() => db.close());
 
   describe('the fixed catalogue', () => {
-    it('holds exactly 21 products, 13/3/5 per block, and is at most one movement long', () => {
-      assert.equal(SALIDA_PRODUCTS.length, 21);
-      assert.equal(MAX_SALIDA_ITEMS, 21);
+    it('holds exactly 19 products, 11/3/5 per block, and is at most one movement long', () => {
+      assert.equal(SALIDA_PRODUCTS.length, 19);
+      assert.equal(MAX_SALIDA_ITEMS, 19);
       assert.deepEqual(
         SALIDA_BLOCKS.map((block) => SALIDA_PRODUCTS.filter((product) => product.block === block).length),
-        [13, 3, 5],
+        [11, 3, 5],
       );
-      assert.equal(new Set(SALIDA_PRODUCTS.map((product) => product.code)).size, 21);
+      assert.equal(new Set(SALIDA_PRODUCTS.map((product) => product.code)).size, 19);
     });
 
-    it('leaves 1040 out and lists 1673 once', () => {
+    it('leaves 1040, 1474 and 1473 out and lists 1673 once', () => {
       assert.equal(findSalidaProduct('1040'), undefined);
+      assert.equal(findSalidaProduct('1474'), undefined);
+      assert.equal(findSalidaProduct('1473'), undefined);
       assert.equal(SALIDA_PRODUCTS.filter((product) => product.code === '1673').length, 1);
       assert.equal(findSalidaProduct('1673')?.name, 'GORDURA VEGETAL');
     });
 
     it('widens a code to the six digits the ERP writes', () => {
-      assert.equal(salidaErpProductCode('1474'), '001474');
+      assert.equal(salidaErpProductCode('1357'), '001357');
       assert.equal(salidaErpProductCode('1673'), '001673');
-      assert.equal(salidaErpProductCode('001474'), '001474');
+      assert.equal(salidaErpProductCode('001357'), '001357');
     });
   });
 
@@ -115,7 +117,7 @@ describe('salida service', () => {
     it('stores the header and its items in one transaction and reads them back ordered', () => {
       const movement = createSalidaMovement(db, {
         items: [
-          { code: '1474', quantity: 20 },
+          { code: '1357', quantity: 20 },
           { code: '1012', quantity: 6 },
         ],
         userId,
@@ -127,7 +129,7 @@ describe('salida service', () => {
       assert.deepEqual(
         movement.items.map((item) => [item.product_code, item.position, item.quantity]),
         [
-          ['1474', 0, 20],
+          ['1357', 0, 20],
           ['1012', 1, 6],
         ],
       );
@@ -142,7 +144,7 @@ describe('salida service', () => {
       assert.throws(() =>
         createSalidaMovement(db, {
           items: [
-            { code: '1474', quantity: 1 },
+            { code: '1357', quantity: 1 },
             // Not in the catalogue: the second insert fails, so the whole launch has to roll back.
             { code: '9999', quantity: 1 },
           ],
@@ -153,7 +155,7 @@ describe('salida service', () => {
 
       assert.equal(db.prepare('SELECT COUNT(*) AS n FROM salida_movements').pluck().get(), before);
       assert.equal(
-        db.prepare('SELECT COUNT(*) AS n FROM salida_movement_items WHERE product_code = ?').pluck().get('1474'),
+        db.prepare('SELECT COUNT(*) AS n FROM salida_movement_items WHERE product_code = ?').pluck().get('1357'),
         1,
       );
     });
@@ -217,7 +219,7 @@ describe('salida service', () => {
   describe('ERP verdict and transmission state', () => {
     it('sets erp to null on newly launched movement', () => {
       const movement = createSalidaMovement(db, {
-        items: [{ code: '1474', quantity: 10 }],
+        items: [{ code: '1357', quantity: 10 }],
         userId,
       });
       assert.equal(movement.erp, null);
@@ -225,7 +227,7 @@ describe('salida service', () => {
 
     it('records erp result with sent status', () => {
       const movement = createSalidaMovement(db, {
-        items: [{ code: '1474', quantity: 5 }],
+        items: [{ code: '1357', quantity: 5 }],
         userId,
       });
       const updated = recordSalidaErpResult(db, {
@@ -240,7 +242,7 @@ describe('salida service', () => {
 
     it('records erp result with failed status and message', () => {
       const movement = createSalidaMovement(db, {
-        items: [{ code: '1474', quantity: 5 }],
+        items: [{ code: '1357', quantity: 5 }],
         userId,
       });
       const updated = recordSalidaErpResult(db, {
@@ -256,7 +258,7 @@ describe('salida service', () => {
 
     it('overwrites the verdict on relaunch (idempotent)', () => {
       const movement = createSalidaMovement(db, {
-        items: [{ code: '1474', quantity: 5 }],
+        items: [{ code: '1357', quantity: 5 }],
         userId,
       });
       recordSalidaErpResult(db, {
@@ -283,7 +285,7 @@ describe('salida service', () => {
 
     it('maps erp state in listSalidaMovements and salidaHistory', () => {
       const movement = createSalidaMovement(db, {
-        items: [{ code: '1474', quantity: 3 }],
+        items: [{ code: '1357', quantity: 3 }],
         userId,
         date: '2026-11-17',
       });
