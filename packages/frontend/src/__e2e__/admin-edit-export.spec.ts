@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { apiToken, fillAllTemperatureInputs, getE2EIdentities, goToProtected } from './auth-helpers';
+import { apiToken, fillAllTemperatureInputs, getE2EIdentities, goToProtected, openSavedReportView } from './auth-helpers';
 
 const API_BASE = 'http://localhost:3099/api';
 
@@ -73,6 +73,9 @@ test.describe('Admin Edit & Export (Phase 4)', () => {
     await page.locator('[data-testid="temperature-task-5"]').fill('-22');
     await page.locator('[data-testid="notes-textarea"]').fill('Relatório de teste E2E');
     await page.locator('[data-testid="submit-report-btn"]').click();
+
+    // The save lands on the message card; this spec asserts the reading view.
+    await openSavedReportView(page);
 
     // Should redirect to the report detail page
     await page.waitForSelector('[data-testid="report-detail"]', { timeout: 10000 });

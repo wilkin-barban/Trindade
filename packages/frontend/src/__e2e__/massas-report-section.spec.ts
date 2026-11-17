@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { fillAllTemperatureInputs, getE2EIdentities, goToProtected } from './auth-helpers';
+import { fillAllTemperatureInputs, getE2EIdentities, goToProtected, openSavedReportView } from './auth-helpers';
 
 /**
  * The Massas card on both report screens.
@@ -82,6 +82,9 @@ test.describe('Massas report section', () => {
     await page.locator('[data-testid="check-task-1"]').check();
     await fillAllTemperatureInputs(page);
     await page.locator('[data-testid="submit-report-btn"]').click();
+
+    // The save lands on the message card; this spec asserts the reading view.
+    await openSavedReportView(page);
 
     await page.waitForSelector('[data-testid="report-detail"]', { timeout: 10000 });
 

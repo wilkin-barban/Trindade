@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { fillAllTemperatureInputs, getActiveTemperatureReadings, getE2EIdentities, goToProtected, loginViaApi, VALID_TEMPERATURES } from './auth-helpers';
+import { fillAllTemperatureInputs, getActiveTemperatureReadings, getE2EIdentities, goToProtected, loginViaApi, VALID_TEMPERATURES, openSavedReportView } from './auth-helpers';
 
 /**
  * Photo Gallery UI E2E tests (PR1 remediation)
@@ -56,6 +56,9 @@ test.describe('Photo Gallery UI (Phase 3)', () => {
     await fillAllTemperatureInputs(page);
     await page.locator('[data-testid="submit-report-btn"]').click();
 
+    // The save lands on the message card; this spec asserts the reading view.
+    await openSavedReportView(page);
+
     // Should redirect to report detail
     await page.waitForSelector('[data-testid="report-detail"]', { timeout: 10000 });
 
@@ -73,6 +76,9 @@ test.describe('Photo Gallery UI (Phase 3)', () => {
     await page.locator('[data-testid="check-task-1"]').check();
     await fillAllTemperatureInputs(page);
     await page.locator('[data-testid="submit-report-btn"]').click();
+
+    // The save lands on the message card; this spec asserts the reading view.
+    await openSavedReportView(page);
 
     await page.waitForSelector('[data-testid="report-detail"]', { timeout: 10000 });
 
@@ -95,6 +101,9 @@ test.describe('Photo Gallery UI (Phase 3)', () => {
     await page.locator('[data-testid="check-task-1"]').check();
     await fillAllTemperatureInputs(page);
     await page.locator('[data-testid="submit-report-btn"]').click();
+
+    // The save lands on the message card; this spec asserts the reading view.
+    await openSavedReportView(page);
 
     await page.waitForSelector('[data-testid="report-detail"]', { timeout: 10000 });
     const reportViewUrl = page.url();
@@ -161,6 +170,8 @@ test.describe('Photo Gallery UI (Phase 3)', () => {
     });
 
     await page.locator('[data-testid="submit-report-btn"]').click();
+
+    // This save is meant to fail on the photo upload, so the form stays where it is: no card, no navigation.
     await expect(page.locator('text=Injected upload failure')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('[data-testid="report-builder-form"]')).toBeVisible();
     await expect(page.locator('[data-testid="check-task-1"]')).toBeChecked();
@@ -176,10 +187,12 @@ test.describe('Photo Gallery UI (Phase 3)', () => {
         response.request().method() === 'POST' &&
         response.status() === 201
       ),
-      page.waitForURL(/\/reports\/\d+$/),
+      page.waitForURL(/\/reports\/\d+/),
       page.locator('[data-testid="submit-report-btn"]').click(),
     ]);
 
+    // The save opens the message card; this spec asserts the reading view.
+    await openSavedReportView(page);
     await page.waitForSelector('[data-testid="report-detail"]', { timeout: 10000 });
     await expect(page.locator('text=Retry keeps this note')).toBeVisible();
     await expect(page.locator('[data-testid="report-detail"] img[alt^="Photo"]').first()).toBeVisible();

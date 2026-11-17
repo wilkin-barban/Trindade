@@ -22,6 +22,19 @@ interface E2EFixtures {
   admin: E2EIdentity;
   worker: E2EIdentity;
 }
+/**
+ * Leaves the share card and lands on the reading view of the report just saved.
+ *
+ * Since the redesign a save opens the message card -- the text the group receives, with share, PDF, edit and
+ * close -- and the reading view is one route away. A spec that asserts the reading view has to say so instead of
+ * assuming the save landed there.
+ */
+export async function openSavedReportView(page: Page): Promise<void> {
+  await page.waitForURL(/\/reports\/\d+/);
+  const url = new URL(page.url());
+  await page.goto(url.pathname);
+}
+
 export async function getE2EIdentities(page: Page): Promise<E2EFixtures> {
   const response = await page.request.get('http://localhost:3099/__test_fixtures');
   if (!response.ok()) throw new Error(`Fixture lookup failed: ${response.statusText()}`);

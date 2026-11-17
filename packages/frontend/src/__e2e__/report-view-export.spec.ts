@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { fillAllTemperatureInputs, getE2EIdentities, goToProtected } from './auth-helpers';
+import { fillAllTemperatureInputs, getE2EIdentities, goToProtected, openSavedReportView } from './auth-helpers';
 import { saoPauloToday } from '../lib/date';
 
 async function cleanTodayReports(page: Page) {
@@ -46,6 +46,9 @@ test.describe('Report View & Export', () => {
     // Submit
     await page.locator('[data-testid="submit-report-btn"]').click();
 
+    // The save lands on the message card; this spec asserts the reading view.
+    await openSavedReportView(page);
+
     // Should redirect to the report detail page
     await page.waitForSelector('[data-testid="report-detail"]', { timeout: 10000 });
     await expect(page.locator('[data-testid="report-detail"]')).toBeVisible();
@@ -69,6 +72,9 @@ test.describe('Report View & Export', () => {
     await fillAllTemperatureInputs(page);
     await page.locator('[data-testid="notes-textarea"]').fill('Export test');
     await page.locator('[data-testid="submit-report-btn"]').click();
+
+    // The save lands on the message card; this spec asserts the reading view.
+    await openSavedReportView(page);
 
     await page.waitForSelector('[data-testid="report-detail"]', { timeout: 10000 });
 
@@ -145,6 +151,9 @@ test.describe('Report View & Export', () => {
     await page.locator('[data-testid="check-task-1"]').check();
     await fillAllTemperatureInputs(page);
     await page.locator('[data-testid="submit-report-btn"]').click();
+
+    // The save lands on the message card; this spec asserts the reading view.
+    await openSavedReportView(page);
     await page.waitForSelector('[data-testid="report-detail"]', { timeout: 10000 });
 
     await page.locator('[data-testid="export-whatsapp-btn"]').click();
@@ -170,6 +179,9 @@ test.describe('Report View & Export', () => {
     await fillAllTemperatureInputs(page);
     await page.locator('[data-testid="submit-report-btn"]').click();
 
+    // The save lands on the message card; this spec asserts the reading view.
+    await openSavedReportView(page);
+
     await page.waitForSelector('[data-testid="report-detail"]', { timeout: 10000 });
 
     // Open export modal
@@ -192,6 +204,9 @@ test.describe('Report View & Export', () => {
     await page.locator('[data-testid="check-task-1"]').check();
     await fillAllTemperatureInputs(page);
     await page.locator('[data-testid="submit-report-btn"]').click();
+
+    // The save lands on the message card; this spec asserts the reading view.
+    await openSavedReportView(page);
 
     await page.waitForSelector('[data-testid="report-detail"]', { timeout: 10000 });
 
@@ -219,6 +234,9 @@ test.describe('Report View & Export', () => {
     await page.locator('[data-testid="temperature-task-5"]').fill('-15');
     await page.locator('[data-testid="submit-report-btn"]').click();
 
+    // The save lands on the message card; this spec asserts the reading view.
+    await openSavedReportView(page);
+
     await page.waitForSelector('[data-testid="report-detail"]', { timeout: 10000 });
 
     // Open export
@@ -242,6 +260,9 @@ test.describe('Report View & Export', () => {
     await page.locator('[data-testid="check-task-1"]').check();
     await fillAllTemperatureInputs(page);
     await page.locator('[data-testid="submit-report-btn"]').click();
+
+    // The save lands on the message card; this spec asserts the reading view.
+    await openSavedReportView(page);
 
     await page.waitForSelector('[data-testid="report-detail"]', { timeout: 10000 });
 
