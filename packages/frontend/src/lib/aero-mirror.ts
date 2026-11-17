@@ -28,8 +28,9 @@ export interface AeroMovementSnapshot {
  * The body that asks Aero32 for the day's movements, through the one bridge.
  *
  * `userName` absent is the ordinary case: the plant reads the whole day, because the boxes are the
- * factory's and any operator may have launched them. `ENTSAI: 'E'` because Trindade only records entries;
- * a stock exit is the company's business and has nothing here to reconcile against.
+ * factory's and any operator may have launched them. `ENTSAI: null` asks for both sides: the day's report has
+ * to state what came in *and* what left, including the exits the company typed in its own ERP without
+ * Trindade. Asking only for `E` left every exit out of the report, which is what the operator noticed.
  *
  * `_method: 'PATCH'` travels in the body as well as in the endpoint, which is the certified request the web
  * and the Android client both send; the server keeps it as the body of the ticket and the shortcut posts it
@@ -45,7 +46,7 @@ export function aeroMovementsPayload(args: {
       userName: args.userName ?? null,
       startDate: args.date,
       endDate: args.date,
-      entrySaida: 'E',
+      entrySaida: null,
     }),
   };
 }

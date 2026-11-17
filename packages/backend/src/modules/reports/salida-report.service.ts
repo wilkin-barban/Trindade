@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3';
 import { z } from 'zod';
 import { SalidaBlockSchema } from '../salida/salida.schema.js';
+import { codeKey, operatorKey } from '../massas/massas-reconcile.js';
 
 export const SalidaReportProductSchema = z
   .object({
@@ -19,6 +20,8 @@ export const SalidaReportOperatorSchema = z
     username: z.string(),
     units: z.number().int().nonnegative(),
     products: z.array(SalidaReportProductSchema),
+    /** True when the name only exists in the company's book: nobody launched it from Trindade. */
+    erpOnly: z.boolean(),
   })
   .strict();
 
@@ -110,6 +113,61 @@ export function salidaReportDayView(db: Database.Database, date: string): Salida
     }
   }
 
+  /**
+   * The exits the company recorded that Trindade never saw.
+   *
+   * A seat is the company's own line, and it can exist without a launch here: somebody typed it in the ERP, or a
+   * day was posted before this module existed. A seat whose product, units and operator match an item already
+   * counted is the same exit and is skipped -- the pairing rule is the one reconciliation uses, so the report
+   * cannot count one exit twice. Everything else joins its operator, marked as ERP-only.
+   */
+  const localKeys = new Set<string>();
+  for (const row of rows) {
+    localKeys.add(
+      [codeKey(row.product_code), Math.round(row.quantity * 1000) / 1000, operatorKey(row.username)].join('|'),
+    );
+  }
+
+  const seats = db
+    .prepare(
+      `SELECT ent_lan, product_code, product_desc, quantity, operator_name
+         FROM aero_movements
+        WHERE movement_date = ? AND movement_type = 'S'
+        ORDER BY ent_lan ASC`,
+    )
+    .all(date) as {
+    ent_lan: number;
+    product_code: string;
+    product_desc: string;
+    quantity: number;
+    operator_name: string;
+  }[];
+
+  const erpOnlyKeys = new Set<string>();
+  for (const seat of seats) {
+    const key = [codeKey(seat.product_code), Math.round(seat.quantity * 1000) / 1000, operatorKey(seat.operator_name)].join('|');
+    if (localKeys.has(key)) continue;
+
+    const erpKey = operatorKey(seat.operator_name);
+    erpOnlyKeys.add(erpKey);
+
+    let op = [...operatorMap.entries()].find(([, candidate]) => operatorKey(candidate.username) === erpKey)?.[1];
+    if (!op) {
+      op = { name: seat.operator_name.trim(), username: seat.operator_name.trim(), products: new Map() };
+      operatorMap.set(-(operatorMap.size + 1), op);
+    }
+    const existing = op.products.get(seat.product_code);
+    if (existing) existing.units += seat.quantity;
+    else {
+      op.products.set(seat.product_code, {
+        code: seat.product_code,
+        name: seat.product_desc,
+        block: 'embalagens',
+        units: seat.quantity,
+      });
+    }
+  }
+
   const operators: SalidaReportOperator[] = [...operatorMap.values()]
     .map((op) => {
       const products = [...op.products.values()];
@@ -119,6 +177,7 @@ export function salidaReportDayView(db: Database.Database, date: string): Salida
         username: op.username,
         units,
         products,
+        erpOnly: erpOnlyKeys.has(operatorKey(op.username)),
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name) || a.username.localeCompare(b.username));

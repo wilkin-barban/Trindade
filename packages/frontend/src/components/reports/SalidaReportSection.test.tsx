@@ -75,4 +75,36 @@ describe('SalidaReportSection', () => {
     await waitFor(() => expect(screen.getByTestId('salida-report-error')).toBeTruthy());
     expect(screen.queryByTestId('salida-report-empty')).toBeNull();
   });
+  it('marks the operator the company recorded on its own, with no launch here', async () => {
+    // A seat typed in the ERP has nobody behind it in Trindade: the card says so instead of pretending it is an
+    // account of the plant.
+    get.mockResolvedValue({
+      date: '2026-11-18',
+      movementCount: 1,
+      totalUnits: 33,
+      operators: [
+        {
+          name: 'Wilkin',
+          username: 'WILKIN',
+          units: 20,
+          erpOnly: false,
+          products: [{ code: '1357', name: 'EMBALAG. DISCO 200g', block: 'embalagens', units: 20 }],
+        },
+        {
+          name: 'JOSIANE',
+          username: 'JOSIANE',
+          units: 13,
+          erpOnly: true,
+          products: [{ code: '1900', name: 'BOBINA ROLO', block: 'bobinas', units: 13 }],
+        },
+      ],
+    });
+
+    render(<SalidaReportSection date="2026-11-18" />);
+
+    await waitFor(() => expect(screen.getByTestId('salida-report-operator-JOSIANE')).toBeTruthy());
+    expect(screen.getByTestId('salida-report-erp-only-JOSIANE')).toBeTruthy();
+    expect(screen.queryByTestId('salida-report-erp-only-WILKIN')).toBeNull();
+  });
+
 });

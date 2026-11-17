@@ -78,7 +78,7 @@ describe('triggering the ERP movements sync', () => {
           CODPRO: null,
           DTINI: '2026-10-30',
           DTFIM: '2026-10-30',
-          ENTSAI: 'E',
+          ENTSAI: null,
         },
       ],
       callbackPath: '/reports?aero_action=movimentos&aero_data=',

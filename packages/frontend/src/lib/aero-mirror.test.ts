@@ -21,7 +21,7 @@ describe('aero-mirror: the movements request the ticket carries', () => {
       CODPRO: null,
       DTINI: '2026-10-28',
       DTFIM: '2026-10-28',
-      ENTSAI: 'E',
+      ENTSAI: null,
     });
   });
 

@@ -31,6 +31,8 @@ export interface SalidaReportOperator {
   username: string;
   units: number;
   products: SalidaReportProduct[];
+  /** True when the name only exists in the company's book: nobody launched it from Trindade. */
+  erpOnly?: boolean;
 }
 
 interface SalidaReportDay {
@@ -127,6 +129,14 @@ export function SalidaReportSection({
                     {operator.name}
                     {operator.name !== operator.username && (
                       <span className="ml-1 text-xs font-normal text-gray-500">({operator.username})</span>
+                    )}
+                    {operator.erpOnly && (
+                      <span
+                        className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800"
+                        data-testid={`salida-report-erp-only-${operator.username}`}
+                      >
+                        {t('reports.salidaErpOnly')}
+                      </span>
                     )}
                   </p>
                   <ul className="mt-1 space-y-0.5">
