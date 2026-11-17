@@ -16,6 +16,7 @@ import { describe, it } from 'node:test';
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
 const launch = read('../MassasLaunchPage.tsx');
+const history = read('../MassasHistoryPage.tsx');
 const mirror = read('../../lib/aero-mirror.ts');
 const receipts = read('../../components/reports/ReceiptsSection.tsx');
 const reports = read('../ReportsPage.tsx');
@@ -29,21 +30,21 @@ function between(source: string, start: string, end: string): string {
   return source.slice(from, to);
 }
 
-/** Los cuatro caminos que abren Scriptable desde la pantalla de lanzamientos. */
+/** Los cuatro caminos que abren Scriptable desde lanzamiento e histórico. */
 const launchPaths = {
   triggerAeroSync: () =>
-    between(launch, 'const triggerAeroSync = useCallback(', 'const handleSendPendingLaunch = useCallback('),
+    between(launch, 'const triggerAeroSync = useCallback(', 'const handleConfirmLaunch = async () => {'),
   handleSendPendingLaunch: () =>
-    between(launch, 'const handleSendPendingLaunch = useCallback(', 'const retryFailedLaunches = useCallback('),
+    between(history, 'const handleSendPendingLaunch = useCallback(', 'const retryFailedLaunches = useCallback('),
   retryFailedLaunches: () =>
-    between(launch, 'const retryFailedLaunches = useCallback(', 'const handleSyncFromErp = async () => {'),
+    between(history, 'const retryFailedLaunches = useCallback(', 'const handleSyncFromErp = async () => {'),
   handleSyncFromErp: () =>
-    between(launch, 'const handleSyncFromErp = async () => {', 'const handleMovementsCallback = useCallback('),
+    between(history, 'const handleSyncFromErp = async () => {', 'const handleMovementsCallback = useCallback('),
 };
 
 describe('el aviso de error del puente', () => {
   it('muestra el mensaje de Wi-Fi/ERP y no toca la cola ni los envíos pendientes', () => {
-    const branch = between(launch, "if (parsed.kind === 'error') {", "if (parsed.kind === 'test') {");
+    const branch = between(history, "if (parsed.kind === 'error') {", "if (parsed.kind === 'test') {");
 
     assert.ok(branch.includes("t('massas.aero.wifiRequiredTitle')"), 'el aviso necesita su título');
     assert.ok(branch.includes("t('massas.aero.wifiRequired')"), 'y la frase que dice qué revisar');
@@ -59,11 +60,11 @@ describe('el aviso de error del puente', () => {
   });
 
   it('olvida la marca en cualquier callback, justo donde se limpia la query', () => {
-    const stripped = launch.indexOf(
+    const stripped = history.indexOf(
       "window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`)",
     );
     assert.notEqual(stripped, -1, 'el callback tiene que limpiar la query');
-    const after = launch.slice(stripped, launch.indexOf('if (parsed.kind ===', stripped));
+    const after = history.slice(stripped, history.indexOf('if (parsed.kind ===', stripped));
     assert.ok(after.includes('clearAeroBridgePending()'), 'cualquier respuesta termina la espera de la marca');
 
     // Receipts cierra el mismo viaje por el mismo motivo.
@@ -76,11 +77,11 @@ describe('el aviso de error del puente', () => {
   });
 
   it('lee el watchdog en mount y en visibility, y sólo avisa cuando la marca venció', () => {
-    assert.ok(launch.includes('readAeroBridgePending()'), 'la página tiene que leer la marca');
-    assert.ok(launch.includes('aeroBridgeMarkExpired('), 'y preguntar si ya venció');
-    assert.ok(launch.includes("t('massas.aero.scriptableNoReturn')"), 'con la frase de Scriptable sin respuesta');
+    assert.ok(history.includes('readAeroBridgePending()'), 'la página tiene que leer la marca');
+    assert.ok(history.includes('aeroBridgeMarkExpired('), 'y preguntar si ya venció');
+    assert.ok(history.includes("t('massas.aero.scriptableNoReturn')"), 'con la frase de Scriptable sin respuesta');
 
-    const watchdog = between(launch, 'const armBridgeWatchdog = useCallback(() => {', 'useEffect(() => {');
+    const watchdog = between(history, 'const armBridgeWatchdog = useCallback(() => {', 'useEffect(() => {');
     // Sólo una marca vencida avisa: la fresca únicamente arma la espera que le queda.
     const expiry = watchdog.indexOf('aeroBridgeMarkExpired(mark, Date.now())');
     const warning = watchdog.indexOf('warnBridgeDidNotReturn()');
@@ -88,11 +89,11 @@ describe('el aviso de error del puente', () => {
     assert.ok(warning > expiry, 'el aviso vive dentro de la pregunta, no antes');
 
     assert.ok(
-      launch.includes("document.addEventListener('visibilitychange', onVisibility)"),
+      history.includes("document.addEventListener('visibilitychange', onVisibility)"),
       'volver a la pestaña tiene que revisar la marca',
     );
     // El aviso limpia la marca y el estado de envío: la pantalla no queda «enviando» para siempre.
-    const warn = between(launch, 'const warnBridgeDidNotReturn = useCallback(', 'const armBridgeWatchdog = useCallback(');
+    const warn = between(history, 'const warnBridgeDidNotReturn = useCallback(', 'const armBridgeWatchdog = useCallback(');
     assert.ok(warn.includes('clearAeroBridgePending()'));
     assert.ok(warn.includes('setSyncAwaiting(null)'));
   });

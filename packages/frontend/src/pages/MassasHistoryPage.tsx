@@ -1,106 +1,248 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useSearchParams } from 'react-router-dom';
-import { api } from '../api/client';
-import { Card, CardContent } from '../components/ui/card';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import { api, ApiClientError } from '../api/client';
+import { resolveApiErrorKey } from '../lib/api-error-normalizer';
+import { useAuth } from '../contexts/AuthContext';
+import { Button } from '../components/ui/button';
+import { Dialog } from '../components/ui/dialog';
 import { HistoryDayPanel, type HistoryDay } from '../components/ui/HistoryDayPanel';
-
 import { LoadingSpinner } from '../components/ui/loading-spinner';
 import { toWhatsAppNumber } from '../lib/phone';
 import { shareOrCopy, waMeLink } from '../lib/whatsapp';
-import { massasMessage, type MassasHistoryDay, type MassasLaunchDayView } from '../lib/massas';
-import { ArrowLeft } from 'lucide-react';
+import {
+  massasMessage,
+  type MassasHistoryDay,
+  type MassasLaunchDayView,
+  type MassaIndividualLaunch,
+} from '../lib/massas';
+import { ArrowLeft, RefreshCw } from 'lucide-react';
 import { ModuleHelpModal } from '../components/ui/ModuleHelpModal';
 import { MassasCollectiveTable } from './massas/MassasCollectiveTable';
-import { readAeroMovementsSnapshot, type AeroMovementSnapshot } from '../lib/aero-mirror';
-import { massasUnifiedRows, type MassasUnifiedRow } from '../lib/massas-unified';
+import {
+  deriveDisplayName,
+  loadAckedLaunchIds,
+  massasUnifiedRows,
+  toggleAckedLaunchId,
+  type MassasUnifiedRow,
+} from '../lib/massas-unified';
+import {
+  deriveUsername,
+  quickWorkerPassword,
+  QUICK_WORKER_ROLE_ID,
+} from '../lib/share-app';
 import { MassasWhatsAppShare } from './massas/MassasWhatsAppShare';
-import { saoPauloDaysAgo, saoPauloYesterday } from '../lib/date';
+import { formatDateLabel, saoPauloDaysAgo, saoPauloToday } from '../lib/date';
+import {
+  aeroBridgeCallbackFor,
+  aeroMissingSetup,
+  aeroSettingsReady,
+  aeroEndpoint,
+  buildAeroBridgeTriggerUrl,
+  buildAeroMovementsSnapshot,
+  buildEntradaItemPayload,
+  isAeroAllowed,
+  loadAeroSettings,
+  parseAeroCallback,
+  readAeroBridgeResult,
+  readAeroMovements,
+  resolveAeroCallback,
+  saveAeroSettings,
+  type AeroSettings,
+} from '../lib/aero-integration';
+import { fetchAeroVaultSettings, requestAeroBridgeTicket } from '../lib/aero-vault';
+import { aeroAttemptHeaders, aeroImportAuditEvent, newAeroAttempt, postAeroAuditEvent } from '../lib/aero-audit';
+import {
+  aeroBridgeMarkExpired,
+  AERO_BRIDGE_MARK_TTL_MS,
+  clearAeroBridgePending,
+  markAeroBridgePending,
+  readAeroBridgePending,
+} from '../lib/aero-watchdog';
+import {
+  aeroAttemptDate,
+  clearAeroPendingAttempt,
+  loadAeroPendingAttempt,
+  type AeroPendingAction,
+  saveAeroPendingAttempt,
+} from '../lib/aero-pending-attempt';
+import {
+  aeroTestNoVerdictEvent,
+  aeroTestResultEvent,
+  clearAeroPendingTest,
+  loadAeroPendingTest,
+  saveAeroTestOutcome,
+  type AeroTestOutcome,
+} from '../lib/aero-test';
+import {
+  clearAeroQueue,
+  pendingLaunchQueueItem,
+  readAeroQueue,
+  takeAeroBatch,
+  writeAeroQueue,
+  type AeroQueue,
+} from '../lib/aero-queue';
+import { AERO_BATCH_MAX, buildAeroLaunchTrips } from '../lib/aero-batch';
+import { AeroResultDialog } from './massas/AeroResultDialog';
+import { armAeroAutoRead, consumeAeroAutoRead } from '../lib/aero-auto-read';
+import { AeroDeviceBanner } from '../components/aero/AeroDeviceBanner';
+import { useDevice } from '../contexts/DeviceContext';
+import { canControlAero } from '../lib/device-detection';
+import {
+  batchSyncFeedback,
+  launchMirrorHint,
+  movementsSyncFeedback,
+  readAeroBatchResult,
+  type AeroSyncFeedback,
+} from '../lib/aero-feedback';
+import {
+  aeroImportPayload,
+  aeroMovementsPayload,
+  lastSyncLabel,
+  readAeroMovementsSnapshot,
+  type AeroMovementSnapshot,
+} from '../lib/aero-mirror';
+
+function erpNotReadyMessage(
+  t: (key: string, options?: Record<string, unknown>) => string,
+  settings: Pick<AeroSettings, 'wsUrl' | 'username' | 'hasPassword'> | null | undefined,
+): string {
+  return aeroMissingSetup(settings) === 'password'
+    ? t('massas.aero.passwordNeeded')
+    : t('massas.aero.syncNeedsSetup');
+}
+
+function useOptionalAuth() {
+  try {
+    return useAuth();
+  } catch {
+    return { user: null };
+  }
+}
 
 /**
- * A past day of launching, read and shared but not edited.
- *
- * The newest day it will open is yesterday: today is still being launched, and that is the launch
- * screen's job. With that limit in place no day here is ever editable, so the editing handlers this
- * screen used to carry are gone rather than left wired to buttons nobody can reach.
+ * The history of massas: today is manageable (edit, delete, relaunch, sync),
+ * earlier days are read-only (mutations hidden, one visible read-only line, WhatsApp share kept).
+ * Shows the day structured as cards: day header, Produção do dia, Lançamentos Individuais,
+ * Resumo Coletivo do Dia, and WhatsApp share.
  */
 export function MassasHistoryPage() {
   const { t } = useTranslation();
-  /**
-   * The open day lives in the URL.
-   *
-   * The launch screen and the report both link here with a day, so the day has to survive a reload, a
-   * shared link and the back button. `?date=` is the deep link; without it -- or with a day the history
-   * will not open -- the page falls back to yesterday, the newest day it can show.
-   */
+  const { user } = useOptionalAuth();
+  const location = useLocation();
   const [params, setParams] = useSearchParams();
-  const yesterday = useMemo(() => saoPauloYesterday(), []);
+
+  const today = useMemo(() => saoPauloToday(), []);
+  const asked = params.get('date');
   const date = useMemo(() => {
-    const asked = params.get('date');
-    if (asked && /^\d{4}-\d{2}-\d{2}$/.test(asked) && asked <= yesterday) return asked;
-    return yesterday;
-  }, [params, yesterday]);
+    if (asked && /^\d{4}-\d{2}-\d{2}$/.test(asked) && asked <= today) return asked;
+    return today;
+  }, [asked, today]);
+
+  const isToday = date === today;
+  const isPastDay = date < today;
+
   const setDate = useCallback(
     (next: string) => {
-      setParams(next === yesterday ? {} : { date: next }, { replace: true });
+      setParams(next === today ? {} : { date: next }, { replace: true });
     },
-    [setParams, yesterday],
+    [setParams, today],
   );
+
   const [dayView, setDayView] = useState<MassasLaunchDayView | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-  /**
-   * The ERP's side of the same day.
-   *
-   * The launch screen already reads it, and without it here the history knew only what Trindade recorded: a box
-   * the company already received read as pending, and the balance was short by exactly those boxes. A failed
-   * read leaves the day as it was instead of inventing a second one.
-   */
-  const [mirror, setMirror] = useState<{ loading: boolean; snapshot: AeroMovementSnapshot | null }>({
-    loading: false,
-    snapshot: null,
+
+  // Individual editing / deleting state for today
+  const [editingLaunchId, setEditingLaunchId] = useState<number | null>(null);
+  const [editingBoxes, setEditingBoxes] = useState('');
+  const [editingBusy, setEditingBusy] = useState(false);
+  const [deletingLaunchId, setDeletingLaunchId] = useState<number | null>(null);
+
+  // WhatsApp state
+  const [phone, setPhone] = useState('');
+  const [copyNote, setCopyNote] = useState('');
+
+  // Integration & Mirror state
+  const aeroAllowed = isAeroAllowed(user ? { username: user.username, role: user.role } : null);
+  const [aeroSettings, setAeroSettings] = useState<AeroSettings>(loadAeroSettings);
+  const [, setAeroTestOutcome] = useState<AeroTestOutcome | null>(null);
+  const device = useDevice();
+  const deviceLimited = !canControlAero(device);
+
+  const [syncAwaiting, setSyncAwaiting] = useState<{ date: string; remaining: number } | null>(() => {
+    const queue = readAeroQueue();
+    return queue ? { date: queue.date, remaining: queue.items.length + queue.inFlight.length } : null;
   });
-  /**
-   * The days that have launches, for the list above the table.
-   *
-   * Its own read, and its own failure: a day list that could not be loaded leaves the operator with the one
-   * day that always exists -- yesterday -- instead of hiding the history behind an error.
-   */
+
+  const aeroCallbackHandled = useRef(false);
+
+  const [mirror, setMirror] = useState<{
+    loading: boolean;
+    error: string | null;
+    snapshot: AeroMovementSnapshot | null;
+  }>({ loading: false, error: null, snapshot: null });
+  const [importingEntLan, setImportingEntLan] = useState<number | null>(null);
+  const [creatingOperatorEntLan, setCreatingOperatorEntLan] = useState<number | null>(null);
+  const [ackedLaunchIds, setAckedLaunchIds] = useState<number[]>(() => loadAckedLaunchIds(date));
+
+  const [syncResult, setSyncResult] = useState<{
+    feedback: AeroSyncFeedback;
+    detail: string | null;
+  } | null>(null);
+
+  const [resultModal, setResultModal] = useState<{
+    type: 'success' | 'warn' | 'error';
+    title?: string;
+    message: string;
+    sentToErp?: boolean;
+    retryCount?: number;
+  } | null>(null);
+
   const [days, setDays] = useState<{ loading: boolean; failed: boolean; list: MassasHistoryDay[] }>({
     loading: true,
     failed: false,
     list: [],
   });
 
-  /**
-   * The days as chips: one per day that has launches, plus yesterday when the endpoint never listed it.
-   *
-   * Yesterday is always offered because it is the day the operator usually means, and the page opens on it
-   * by default; when the history does not carry it there is no count to print, so its chip shows the day
-   * alone. Today is left out on purpose: today is still being launched and belongs to the launch screen.
-   */
   const dayChips = useMemo<HistoryDay[]>(() => {
     if (days.loading) return [];
     const listed = days.list
-      .filter((day) => day.date <= yesterday)
+      .filter((day) => day.date <= today)
       .map((day) => ({ date: day.date, units: day.totalUnits }));
-    if (listed.some((day) => day.date === yesterday)) return listed;
-    return [{ date: yesterday, units: null }, ...listed];
-  }, [days, yesterday]);
+    if (listed.some((day) => day.date === today)) return listed;
+    return [{ date: today, units: null }, ...listed];
+  }, [days, today]);
 
-  // Edit / Delete state for Administrador
+  const aeroDestination = useCallback(() => {
+    return aeroSettings.wsUrl?.trim() || null;
+  }, [aeroSettings.wsUrl]);
 
-  // WhatsApp state
-  const [phone, setPhone] = useState('');
-  const [copyNote, setCopyNote] = useState('');
+  useEffect(() => {
+    if (!aeroAllowed) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const vault = await fetchAeroVaultSettings();
+        if (cancelled || !vault.configured) return;
+        setAeroSettings((current) =>
+          saveAeroSettings({
+            ...current,
+            wsUrl: vault.wsUrl ?? current.wsUrl,
+            username: vault.username ?? current.username,
+            hasPassword: vault.hasPassword,
+          }),
+        );
+      } catch {
+        // Vault read failure handled silently
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [aeroAllowed]);
 
-  /**
-   * The last read asked for, so an older answer cannot paint over a newer day.
-   *
-   * The chips are a row of targets: tapping two of them quickly leaves two reads in flight, and the slower
-   * one used to land last and show the day the operator had already left.
-   */
   const readToken = useRef(0);
 
   const loadDay = useCallback(
@@ -113,78 +255,406 @@ export function MassasHistoryPage() {
         setDayView(loaded);
       } catch (err) {
         if (readToken.current !== token) return;
-        // A failure has to clear the day, or the table of the previous day stays under the error message and
-        // reads as the day that failed.
         setDayView(null);
         setError(err instanceof Error ? err.message : t('massas.loadError'));
       } finally {
-        if (readToken.current === token) setLoading(false);
+        if (readToken.current === token) {
+          setLoading(false);
+        }
       }
     },
-    [t]
+    [t],
   );
 
-  useEffect(() => {
-    void loadDay(date);
-  }, [date, loadDay]);
-
-  useEffect(() => {
-    let active = true;
-    void api
-      .get<{ days?: MassasHistoryDay[] }>('/massas-launch/history')
-      .then((body) => {
-        if (!active) return;
-        const list = Array.isArray(body?.days) ? body.days : [];
-        setDays({ loading: false, failed: false, list });
-      })
-      .catch(() => {
-        if (active) setDays({ loading: false, failed: true, list: [] });
+  const loadMirror = useCallback(async (targetDate: string) => {
+    setMirror((prev) => ({ ...prev, loading: true, error: null }));
+    try {
+      const body = await api.get<unknown>(`/integration/aero/movements?date=${targetDate}`);
+      setMirror({
+        loading: false,
+        error: null,
+        snapshot: readAeroMovementsSnapshot(body),
       });
-    return () => {
-      active = false;
-    };
+    } catch {
+      setMirror((prev) => ({ ...prev, loading: false }));
+    }
+  }, []);
+
+  const loadDays = useCallback(async () => {
+    try {
+      const loaded = await api.get<{ days?: MassasHistoryDay[] }>('/massas-launch/history');
+      setDays({ loading: false, failed: false, list: loaded.days ?? [] });
+    } catch {
+      setDays((prev) => ({ loading: false, failed: true, list: prev.list }));
+    }
   }, []);
 
   useEffect(() => {
-    let active = true;
-    setMirror({ loading: true, snapshot: null });
-    void api
-      .get<unknown>(`/integration/aero/movements?date=${date}`)
-      .then((body) => {
-        if (!active) return;
-        setMirror({ loading: false, snapshot: readAeroMovementsSnapshot(body) });
-      })
-      .catch(() => {
-        // The mirror is an extra lens, not the record: a day with no snapshot still reads as itself.
-        if (active) setMirror({ loading: false, snapshot: null });
-      });
-    return () => {
-      active = false;
-    };
-  }, [date]);
+    void loadDays();
+  }, [loadDays]);
+
+  useEffect(() => {
+    setLoading(true);
+    void loadDay(date);
+    void loadMirror(date);
+    setAckedLaunchIds(loadAckedLaunchIds(date));
+  }, [date, loadDay, loadMirror]);
+
+  const aeroCannotReachInternet = useCallback(() => {
+    const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+    if (!offline) return false;
+    setNotice({ type: 'error', message: t('massas.aero.offline') });
+    return true;
+  }, [t]);
 
   /**
-   * One row per box, from both screens, exactly as the launch screen builds it.
-   *
-   * The history never acknowledges nor imports — it is a record — so the acked list is empty and no handler is
-   * passed down; what it gains is the same reconciliation the plant saw that day.
+   * Dispatches tickets to Scriptable.
    */
-  const unifiedRows = useMemo<MassasUnifiedRow[]>(
-    () =>
-      massasUnifiedRows({
-        launches: dayView?.launches ?? [],
-        movements: mirror.snapshot?.movements ?? [],
-        products: dayView?.products ?? [],
-        ackedLaunchIds: [],
-      }),
-    [dayView, mirror.snapshot],
+  const triggerAeroSync = useCallback(
+    async (queue: AeroQueue) => {
+      if (aeroCannotReachInternet()) return;
+      const taken = takeAeroBatch(queue, AERO_BATCH_MAX);
+      if (taken.batch.length === 0) {
+        clearAeroQueue();
+        setSyncAwaiting(null);
+        return;
+      }
+
+      const operatorUser = aeroSettings.username?.trim() || user?.username?.trim() || null;
+      const payloads = taken.batch.map((item) =>
+        buildEntradaItemPayload({
+          productCode: item.productCode,
+          productName: item.productName,
+          quantity: item.quantity,
+          entryDate: queue.date,
+          userCode: item.operatorName ?? operatorUser,
+          launchIds: item.launchIds,
+        }),
+      );
+
+      const [trip] = buildAeroLaunchTrips({
+        payloads,
+        singleCallbackPath: aeroBridgeCallbackFor('entrada', '/massas-history'),
+        batchCallbackPath: aeroBridgeCallbackFor('entrada_lote', '/massas-history'),
+      });
+      if (!trip) return;
+
+      let ticket: { ticket: string; ticketUrl: string };
+      try {
+        ticket = await requestAeroBridgeTicket({
+          action: trip.action,
+          payloads: trip.payloads,
+          callbackPath: trip.callbackPath,
+        });
+      } catch {
+        setSyncAwaiting(null);
+        setNotice({ type: 'error', message: t('massas.aero.vaultTicketError') });
+        void postAeroAuditEvent({
+          event: 'launch_sync',
+          phase: 'requested',
+          destinationUrl: aeroEndpoint(aeroSettings.wsUrl, 'entradasitem'),
+          client: 'web',
+          error: 'AERO_TICKET_REFUSED',
+          note: `${payloads.length} not sent`,
+        });
+        return;
+      }
+
+      writeAeroQueue({ ...taken.rest, inFlight: taken.batch });
+      setSyncAwaiting({ date: queue.date, remaining: taken.batch.length + taken.rest.items.length });
+
+      const action: AeroPendingAction = payloads.length === 1 ? 'entrada' : 'entrada_lote';
+      const attempt = newAeroAttempt();
+      saveAeroPendingAttempt({ action, ...attempt, date });
+
+      void postAeroAuditEvent({
+        event: 'launch_sync',
+        phase: 'requested',
+        destinationUrl: aeroEndpoint(aeroSettings.wsUrl, 'entradasitem'),
+        client: 'web',
+        ...attempt,
+        payload: payloads.length === 1 ? payloads[0] : payloads,
+        note:
+          payloads.length === 1
+            ? `${taken.rest.items.length > 0 ? `${taken.rest.items.length} pending` : 'last entry'} · via=bridge`
+            : `batch ${payloads.length}${taken.rest.items.length > 0 ? ` · ${taken.rest.items.length} pending` : ''} · via=bridge`,
+      });
+
+      markAeroBridgePending({ action, date });
+      window.location.href = buildAeroBridgeTriggerUrl({
+        ticket: ticket.ticket,
+        ticketUrl: ticket.ticketUrl,
+      });
+    },
+    [aeroCannotReachInternet, aeroSettings, date, t, user],
   );
 
-  const previewMessage = useMemo(() => {
-    if (!dayView) return '';
-    return massasMessage(dayView);
-  }, [dayView]);
+  const handleSendPendingLaunch = useCallback(
+    (row: MassasUnifiedRow) => {
+      if (!aeroSettingsReady(aeroSettings)) {
+        setNotice({ type: 'error', message: erpNotReadyMessage(t, aeroSettings) });
+        return;
+      }
+      if (aeroCannotReachInternet()) return;
+      const item = pendingLaunchQueueItem({
+        productCode: row.productCode,
+        productName: row.productName,
+        units: row.units,
+        operatorName: row.operatorName,
+        launchIds: row.launchIds,
+      });
+      const queue: AeroQueue = { createdAt: new Date().toISOString(), date, items: [item], inFlight: [] };
+      writeAeroQueue(queue);
+      void triggerAeroSync(queue);
+    },
+    [aeroCannotReachInternet, aeroSettings, date, t, triggerAeroSync],
+  );
 
+  const retryFailedLaunches = useCallback(() => {
+    if (aeroCannotReachInternet()) return;
+    setResultModal(null);
+    const queue = readAeroQueue();
+    if (!queue) return;
+    void triggerAeroSync(queue);
+  }, [aeroCannotReachInternet, triggerAeroSync]);
+
+  /**
+   * Sincronizar com ERP — reads movements for the date into the mirror.
+   */
+  const handleSyncFromErp = async () => {
+    if (!aeroSettingsReady(aeroSettings)) {
+      setNotice({ type: 'error', message: erpNotReadyMessage(t, aeroSettings) });
+      return;
+    }
+    if (aeroCannotReachInternet()) return;
+
+    const payload = aeroMovementsPayload({ date, userName: null });
+
+    let ticket: { ticket: string; ticketUrl: string };
+    try {
+      ticket = await requestAeroBridgeTicket({
+        action: 'movimentos',
+        payloads: [payload],
+        callbackPath: aeroBridgeCallbackFor('movimentos', `/massas-history?date=${date}`),
+      });
+    } catch {
+      setNotice({ type: 'error', message: t('massas.aero.vaultTicketError') });
+      return;
+    }
+
+    const attempt = newAeroAttempt();
+    saveAeroPendingAttempt({ action: 'movimentos', ...attempt, date });
+
+    void postAeroAuditEvent({
+      event: 'read_history',
+      phase: 'requested',
+      destinationUrl: aeroEndpoint(aeroSettings.wsUrl, 'movimentoitem'),
+      client: 'web',
+      payload,
+      note: 'via=bridge',
+      ...attempt,
+    });
+
+    markAeroBridgePending({ action: 'movimentos', date });
+    window.location.href = buildAeroBridgeTriggerUrl({
+      ticket: ticket.ticket,
+      ticketUrl: ticket.ticketUrl,
+    });
+  };
+
+  const handleMovementsCallback = useCallback(
+    async (data: unknown) => {
+      const attempt = loadAeroPendingAttempt('movimentos');
+      clearAeroPendingAttempt();
+      const answeredDate = aeroAttemptDate(attempt, date);
+      const pairing = attempt
+        ? { attemptId: attempt.attemptId, startedAt: attempt.startedAt, client: 'web' as const }
+        : { client: 'web' as const };
+
+      const read = readAeroMovements(data);
+      if (read.status === 'error') {
+        setSyncResult({ feedback: movementsSyncFeedback({ status: 'error', count: 0 }), detail: read.message });
+        void postAeroAuditEvent({
+          event: 'read_history',
+          phase: 'result',
+          destinationUrl: aeroEndpoint(aeroSettings.wsUrl, 'movimentoitem'),
+          error: read.message ?? 'movements_unreadable',
+          note: 'via=bridge',
+          ...pairing,
+        });
+        setMirror({
+          loading: false,
+          error: read.message ?? t('massas.erp.error'),
+          snapshot: null,
+        });
+        return;
+      }
+
+      void postAeroAuditEvent({
+        event: 'read_history',
+        phase: 'result',
+        destinationUrl: aeroEndpoint(aeroSettings.wsUrl, 'movimentoitem'),
+        note: `seats=${read.movements.length} skipped=${read.skipped} · via=bridge`,
+        ...pairing,
+      });
+
+      try {
+        const stored = await api.post<{ massas?: number }>(
+          '/integration/aero/movements',
+          buildAeroMovementsSnapshot(answeredDate, read.movements),
+          { headers: aeroAttemptHeaders(attempt) },
+        );
+        await loadMirror(answeredDate);
+        setSyncResult({
+          feedback: movementsSyncFeedback({ status: 'ok', count: stored?.massas ?? 0 }),
+          detail: null,
+        });
+      } catch {
+        setMirror({
+          loading: false,
+          error: t('massas.erp.error'),
+          snapshot: { date, movements: read.movements, syncedAt: new Date().toISOString() },
+        });
+        setSyncResult({
+          feedback: movementsSyncFeedback({ status: 'ok', count: 0 }),
+          detail: t('massas.erp.storeFailed'),
+        });
+      }
+    },
+    [aeroSettings.wsUrl, date, loadMirror, t],
+  );
+
+  const handleImportErpSeat = async (request: {
+    entLan: number;
+    operatorName: string;
+    productCode: string;
+    boxes: number;
+    date: string;
+  }) => {
+    setImportingEntLan(request.entLan);
+    const audit = {
+      date: request.date,
+      entLan: request.entLan,
+      productCode: request.productCode,
+      boxes: request.boxes,
+    };
+    try {
+      await api.post(
+        '/massas-launch',
+        aeroImportPayload(
+          { entLan: request.entLan, operatorName: request.operatorName },
+          { productCode: request.productCode, boxes: request.boxes },
+          request.date,
+        ),
+      );
+      void postAeroAuditEvent(aeroImportAuditEvent(audit));
+      setNotice({ type: 'success', message: t('massas.erp.imported') });
+      await Promise.all([loadDay(date), loadMirror(date)]);
+    } catch (err) {
+      void postAeroAuditEvent(aeroImportAuditEvent({ ...audit, error: 'AERO_IMPORT_REFUSED' }));
+      const known = err instanceof ApiClientError ? resolveApiErrorKey(err.status, err.message, err.code) : null;
+      setNotice({
+        type: 'error',
+        message: known ? t(known) : t('massas.erp.importError'),
+      });
+    } finally {
+      setImportingEntLan(null);
+    }
+  };
+
+  const handleCreateOperator = async (row: MassasUnifiedRow) => {
+    const entLan = row.entLans[0];
+    setCreatingOperatorEntLan(entLan);
+    try {
+      const username = deriveUsername(row.operatorName);
+      const display_name = deriveDisplayName(row.operatorName);
+      const password = quickWorkerPassword(username);
+
+      await api.post('/admin/users', {
+        username,
+        display_name,
+        password,
+        role_id: QUICK_WORKER_ROLE_ID,
+      });
+
+      setNotice({
+        type: 'success',
+        message: t('massas.unified.operatorCreated', 'Operário cadastrado com sucesso!'),
+      });
+      await Promise.all([loadDay(date), loadMirror(date)]);
+    } catch (err) {
+      const message =
+        err instanceof ApiClientError && (err.status === 409 || err.message.includes('userAlreadyExists'))
+          ? t('admin.workers.userAlreadyExists')
+          : t('share.createServerError');
+      setNotice({ type: 'error', message });
+    } finally {
+      setCreatingOperatorEntLan(null);
+    }
+  };
+
+  const handleSyncManualResult = async (ok: boolean) => {
+    await postAeroAuditEvent({
+      event: 'launch_sync',
+      phase: 'result',
+      destinationUrl: aeroDestination() ?? aeroSettings.wsUrl ?? '',
+      httpStatus: ok ? 200 : null,
+      note: ok ? 'manual_confirmation:ok' : 'manual_confirmation:failed',
+      error: ok ? null : 'manual_confirmation',
+    });
+    clearAeroQueue();
+    setSyncAwaiting(null);
+    setNotice({ type: ok ? 'success' : 'error', message: t('massas.aero.syncRecorded') });
+  };
+
+  // Editing handlers for today
+  const startEditing = (launch: MassaIndividualLaunch) => {
+    if (!isToday) return;
+    setEditingLaunchId(launch.id);
+    setEditingBoxes(String(launch.boxes));
+  };
+
+  const cancelEditing = () => {
+    setEditingLaunchId(null);
+    setEditingBoxes('');
+  };
+
+  const saveEditing = async (launchId: number) => {
+    if (!isToday) return;
+    const boxesNum = parseInt(editingBoxes, 10);
+    if (!Number.isInteger(boxesNum) || boxesNum <= 0 || editingBusy) return;
+    setEditingBusy(true);
+    setNotice(null);
+    try {
+      await api.put(`/massas-launch/${launchId}`, { boxes: boxesNum });
+      setEditingLaunchId(null);
+      setEditingBoxes('');
+      setNotice({ type: 'success', message: t('massas.updateSuccess') });
+      await loadDay(date);
+    } catch (err) {
+      setNotice({ type: 'error', message: err instanceof Error ? err.message : t('massas.updateError') });
+    } finally {
+      setEditingBusy(false);
+    }
+  };
+
+  const handleDeleteLaunch = async (launchId: number) => {
+    if (!isToday) return;
+    if (!window.confirm(t('massas.deleteConfirm'))) return;
+    setDeletingLaunchId(launchId);
+    setNotice(null);
+    try {
+      await api.del(`/massas-launch/${launchId}`);
+      setNotice({ type: 'success', message: t('massas.deleteSuccess') });
+      await loadDay(date);
+    } catch (err) {
+      setNotice({ type: 'error', message: err instanceof Error ? err.message : t('massas.deleteError') });
+    } finally {
+      setDeletingLaunchId(null);
+    }
+  };
+
+  // WhatsApp handlers
   const handleCopyReport = async () => {
     if (!previewMessage) return;
     setCopyNote('');
@@ -205,6 +675,263 @@ export function MassasHistoryPage() {
     }
   };
 
+  const bridgeWatchdog = useRef<number | null>(null);
+
+  const disarmBridgeWatchdog = useCallback(() => {
+    if (bridgeWatchdog.current === null) return;
+    window.clearTimeout(bridgeWatchdog.current);
+    bridgeWatchdog.current = null;
+  }, []);
+
+  const warnBridgeDidNotReturn = useCallback(() => {
+    setSyncAwaiting(null);
+    setNotice({ type: 'error', message: t('massas.aero.scriptableNoReturn') });
+    clearAeroBridgePending();
+    disarmBridgeWatchdog();
+  }, [disarmBridgeWatchdog, t]);
+
+  const armBridgeWatchdog = useCallback(() => {
+    const queryString = location.search || window.location.search;
+    if (parseAeroCallback(queryString)) return;
+    const mark = readAeroBridgePending();
+    disarmBridgeWatchdog();
+    if (!mark) return;
+    if (aeroBridgeMarkExpired(mark, Date.now())) {
+      warnBridgeDidNotReturn();
+      return;
+    }
+    const remaining = mark.at + AERO_BRIDGE_MARK_TTL_MS - Date.now();
+    bridgeWatchdog.current = window.setTimeout(() => {
+      bridgeWatchdog.current = null;
+      if (!aeroBridgeMarkExpired(mark, Date.now())) return;
+      warnBridgeDidNotReturn();
+    }, Math.max(remaining, 0) + 250);
+  }, [disarmBridgeWatchdog, warnBridgeDidNotReturn]);
+
+  useEffect(() => {
+    armBridgeWatchdog();
+    const onVisibility = () => {
+      if (document.visibilityState !== 'visible') return;
+      armBridgeWatchdog();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      disarmBridgeWatchdog();
+    };
+  }, [armBridgeWatchdog, disarmBridgeWatchdog]);
+
+  /**
+   * Shortcut callback return handler: verdict opens in MassasHistoryPage per Requirement 6.
+   */
+  useEffect(() => {
+    if (aeroCallbackHandled.current) return;
+    void (async () => {
+      const queryString = location.search || window.location.search;
+      const parsed = await resolveAeroCallback(queryString);
+      if (!parsed) return;
+      aeroCallbackHandled.current = true;
+      window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`);
+      clearAeroBridgePending();
+      disarmBridgeWatchdog();
+
+      if (parsed.kind === 'error') {
+        clearAeroPendingAttempt();
+        setResultModal({
+          type: 'error',
+          title: t('massas.aero.wifiRequiredTitle'),
+          message: parsed.code === 'wifi_required' ? t('massas.aero.wifiRequired') : t('massas.aero.bridgeError'),
+        });
+        return;
+      }
+
+      if (parsed.kind === 'test') {
+        const pending = loadAeroPendingTest();
+        const destinationUrl = pending?.destinationUrl ?? aeroDestination() ?? aeroSettings.wsUrl;
+        clearAeroPendingTest();
+        void postAeroAuditEvent(
+          aeroTestResultEvent({ verdict: parsed.verdict, raw: parsed.raw, destinationUrl }),
+        );
+        setAeroTestOutcome({ verdict: parsed.verdict, raw: parsed.raw, destinationUrl });
+        saveAeroTestOutcome({ verdict: parsed.verdict, raw: parsed.raw, destinationUrl });
+        return;
+      }
+
+      if (parsed.kind === 'bridge') {
+        if (parsed.action === 'movimentos') {
+          void handleMovementsCallback(parsed.data);
+          return;
+        }
+
+        if (parsed.action === 'entrada_lote') {
+          const attempt = loadAeroPendingAttempt('entrada_lote');
+          clearAeroPendingAttempt();
+          const pairing = attempt
+            ? { attemptId: attempt.attemptId, startedAt: attempt.startedAt, client: 'web' as const }
+            : { client: 'web' as const };
+          const queue = readAeroQueue();
+          const sent = queue?.inFlight ?? [];
+          const expected = sent.length > 0 ? sent.length : Array.isArray(parsed.data) ? parsed.data.length : 1;
+          const batch = readAeroBatchResult(parsed.data, expected);
+          const destination = aeroDestination();
+
+          void postAeroAuditEvent({
+            event: 'launch_sync',
+            phase: 'result',
+            destinationUrl: destination ?? aeroSettings.wsUrl ?? '',
+            httpStatus: batch.ok === batch.total ? 200 : null,
+            response: `${batch.ok}/${batch.total} ok`,
+            error: batch.failed > 0 ? batch.message ?? 'batch_item_failed' : null,
+            note: `batch ok=${batch.ok} failed=${batch.failed} · via=bridge`,
+            ...pairing,
+          });
+
+          const feedback = batchSyncFeedback(batch);
+
+          if (!feedback) {
+            const rest = queue
+              ? {
+                  ...queue,
+                  items: [...(batch.ok === 1 ? sent.slice(1) : sent), ...queue.items],
+                  inFlight: [],
+                }
+              : null;
+            if (rest && rest.items.length > 0) {
+              writeAeroQueue(rest);
+              void triggerAeroSync(rest);
+              return;
+            }
+            clearAeroQueue();
+            setSyncAwaiting(null);
+            if (batch.ok === 1) armAeroAutoRead(date);
+            setResultModal(
+              batch.ok === 1
+                ? { type: 'success', message: t('massas.aero.syncConfirmYes'), sentToErp: true }
+                : { type: 'error', message: batch.message ?? t('massas.aero.syncConfirmNo') },
+            );
+            return;
+          }
+
+          const failedItems = batch.failedIndexes
+            .map((index) => sent[index])
+            .filter((item): item is NonNullable<typeof item> => item !== undefined);
+          const retryItems =
+            batch.state === 'complete' ? [] : batch.state === 'partial' ? failedItems : sent;
+          const rest = queue ? { ...queue, items: [...retryItems, ...queue.items], inFlight: [] } : null;
+          if (rest) writeAeroQueue(rest);
+          else clearAeroQueue();
+          setSyncAwaiting(rest && rest.items.length > 0 ? { date: rest.date, remaining: rest.items.length } : null);
+
+          if (batch.ok > 0 && !rest?.items.length) armAeroAutoRead(date);
+          setResultModal({
+            type: feedback.tone === 'ok' ? 'success' : feedback.tone === 'warn' ? 'warn' : 'error',
+            title: t(feedback.titleKey),
+            message: t(feedback.messageKey, {
+              ...feedback.params,
+              count: feedback.count,
+              date: queue?.date ?? '',
+              detail: batch.message ?? t('massas.erp.batchNoDetail'),
+            }),
+            sentToErp: batch.ok > 0,
+            retryCount: batch.state === 'complete' ? undefined : batch.failed,
+          });
+          return;
+        }
+
+        const outcome = readAeroBridgeResult(parsed.data);
+        const attempt = parsed.action === 'entrada' ? loadAeroPendingAttempt('entrada') : null;
+        clearAeroPendingAttempt();
+        const pairing = attempt
+          ? { attemptId: attempt.attemptId, startedAt: attempt.startedAt, client: 'web' as const }
+          : { client: 'web' as const };
+        void postAeroAuditEvent({
+          event: 'launch_sync',
+          phase: 'result',
+          destinationUrl: aeroDestination() ?? aeroSettings.wsUrl ?? '',
+          httpStatus: outcome.status === 'ok' ? 200 : null,
+          response: outcome.message,
+          error: outcome.status === 'error' ? outcome.message ?? 'bridge_unreadable' : null,
+          note: `action=${parsed.action} · via=bridge`,
+          ...pairing,
+        });
+
+        if (parsed.action !== 'entrada') return;
+
+        const queue = readAeroQueue();
+        if (outcome.status === 'ok' && queue) {
+          const rest = { ...queue, inFlight: [] };
+          if (rest.items.length > 0) {
+            writeAeroQueue(rest);
+            void triggerAeroSync(rest);
+            return;
+          }
+        }
+
+        const refused = outcome.status !== 'ok' && queue ? { ...queue, items: [...queue.inFlight, ...queue.items], inFlight: [] } : null;
+        if (refused && refused.items.length > 0) {
+          writeAeroQueue(refused);
+          setSyncAwaiting({ date: refused.date, remaining: refused.items.length });
+        } else {
+          clearAeroQueue();
+          setSyncAwaiting(null);
+        }
+
+        if (outcome.status === 'ok') armAeroAutoRead(date);
+        setResultModal({
+          type: outcome.status === 'ok' ? 'success' : 'error',
+          title: outcome.status === 'ok' ? t('massas.successTitle') : t('massas.errorTitle'),
+          message: outcome.message || (outcome.status === 'ok' ? t('massas.aero.syncConfirmYes') : t('massas.aero.syncConfirmNo')),
+          sentToErp: outcome.status === 'ok',
+          retryCount: outcome.status === 'ok' ? undefined : 1,
+        });
+      }
+    })();
+  }, [aeroDestination, aeroSettings.wsUrl, date, disarmBridgeWatchdog, handleMovementsCallback, t, triggerAeroSync]);
+
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (aeroCallbackHandled.current) return;
+      if (parseAeroCallback(window.location.search)) return;
+      const pending = loadAeroPendingTest();
+      if (!pending) return;
+      clearAeroPendingTest();
+      void postAeroAuditEvent(aeroTestNoVerdictEvent({ destinationUrl: pending.destinationUrl }));
+      setAeroTestOutcome({ verdict: 'unknown', raw: '', destinationUrl: pending.destinationUrl });
+      saveAeroTestOutcome({ verdict: 'unknown', raw: '', destinationUrl: pending.destinationUrl });
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, []);
+
+  const unifiedRows = useMemo<MassasUnifiedRow[]>(
+    () =>
+      massasUnifiedRows({
+        launches: dayView?.launches ?? [],
+        movements: mirror.snapshot?.movements ?? [],
+        products: dayView?.products ?? [],
+        ackedLaunchIds,
+      }),
+    [dayView, mirror.snapshot, ackedLaunchIds],
+  );
+
+  const previewMessage = useMemo(() => {
+    if (!dayView) return '';
+    return massasMessage(dayView, unifiedRows);
+  }, [dayView, unifiedRows]);
+
+  const closeResultModal = () => {
+    setResultModal(null);
+    if (!consumeAeroAutoRead(date)) return;
+    void handleSyncFromErp();
+  };
+
+  const handleToggleAck = (row: MassasUnifiedRow) => {
+    const launchId = row.launchIds[0];
+    if (launchId === undefined) return;
+    setAckedLaunchIds(toggleAckedLaunchId(date, launchId));
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -215,12 +942,12 @@ export function MassasHistoryPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-4 pb-12 sm:space-y-6">
-      {/* Encabezado y Enlace Cruzado a Hoy. Sin la placa del reloj: en un teléfono se llevaba el
-          ancho que el título necesitaba. */}
+      {aeroAllowed && deviceLimited && <AeroDeviceBanner device={device} />}
+
+      {/* Header and Cross link back to today's launch */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 bg-white p-4 rounded-xl border border-gray-200 shadow-sm sm:p-6">
         <div className="min-w-0">
           <div className="flex items-center justify-between gap-2">
-            {/* Un escalón menos en el teléfono: el título entra en dos renglones y el encabezado deja de ser media pantalla. */}
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{t('massas.historyTitle')}</h1>
             <div className="shrink-0">
               <ModuleHelpModal
@@ -233,8 +960,7 @@ export function MassasHistoryPage() {
           </div>
           <p className="text-sm text-gray-500 mt-1">{t('massas.historySubtitle')}</p>
         </div>
-        {/* La vuelta a hoy, sola: elegir día es trabajo de la lista, que muestra los totales de cada
-            jornada y no obliga a abrir un calendario para llegar a ayer. */}
+
         <div className="flex w-full items-center gap-2 sm:w-auto">
           <Link
             to="/massas-launch"
@@ -247,7 +973,7 @@ export function MassasHistoryPage() {
         </div>
       </div>
 
-      {/* Avisos Globales */}
+      {/* Global Notices */}
       {error && (
         <div role="alert" className="p-4 text-red-700 bg-red-50 border border-red-200 rounded-lg">
           {error}
@@ -255,7 +981,7 @@ export function MassasHistoryPage() {
       )}
       {notice && (
         <div
-          role="alert"
+          role="status"
           className={`p-4 rounded-lg border text-sm font-medium ${
             notice.type === 'success'
               ? 'bg-green-50 border-green-200 text-green-800'
@@ -265,51 +991,126 @@ export function MassasHistoryPage() {
           {notice.message}
         </div>
       )}
-      {/* El día, con el mismo panel del conteo: el campo grande abre el calendario y los días con
-          lanzamientos van como chips al costado, para que el día más buscado -- ayer -- no cueste abrir
-          nada. Antes esto era una tarjeta de botones de dos líneas: el mismo control dibujado de otra
-          forma, que es justo lo que ya no puede pasar. */}
-      <HistoryDayPanel
-        id="massas-history-date"
-        label={t('massas.date')}
-        value={date}
-        onChange={setDate}
-        min={saoPauloDaysAgo(30)}
-        max={yesterday}
-        testIdPrefix="massas-history"
-        groupLabel={t('massas.historyDaysLabel')}
-        days={dayChips}
-        failed={days.failed}
-        failedMessage={t('massas.historyDaysUnavailable')}
-      />
 
-      {/* Un día sin lanzamientos es un día vacío, no un error: la tabla no dibuja nada y sin esta línea
-          la pantalla quedaría muda, que es indistinguible de una lectura que falló. */}
-      {dayView && dayView.launches.length === 0 && (
+      {/* History Day Panel: accepts up to today */}
+      <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
+        <HistoryDayPanel
+          id="massas-history-date"
+          label={t('massas.date')}
+          value={date}
+          onChange={setDate}
+          min={saoPauloDaysAgo(30)}
+          max={today}
+          testIdPrefix="massas-history"
+          groupLabel={t('massas.historyDaysLabel')}
+          days={dayChips}
+          failed={days.failed}
+          failedMessage={t('massas.historyDaysUnavailable')}
+        />
+
+        {/* ERP Sync button for today (Item 5), or Read-Only line for past days (Item 7) */}
+        {aeroAllowed && isToday && (
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100" data-testid="massas-sync-header">
+            <button
+              type="button"
+              onClick={handleSyncFromErp}
+              disabled={mirror.loading || !aeroSettingsReady(aeroSettings) || deviceLimited}
+              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg bg-amber-600 px-3 text-xs font-semibold text-white transition-colors hover:bg-amber-700 disabled:opacity-50"
+              data-testid="massas-sync-erp"
+            >
+              <RefreshCw className={`h-4 w-4 shrink-0 ${mirror.loading ? 'animate-spin' : ''}`} />
+              {t('massas.syncHeader.action', 'Sincronizar com ERP')}
+            </button>
+            <span className="text-xs text-gray-500" data-testid="massas-last-sync">
+              {t('massas.syncHeader.lastSync', 'Último sync')}:{' '}
+              <span className="font-semibold tabular-nums text-gray-700">
+                {lastSyncLabel(mirror.snapshot?.syncedAt ?? null)}
+              </span>
+            </span>
+          </div>
+        )}
+
+        {isPastDay && (
+          <p
+            className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600"
+            data-testid="massas-history-readonly"
+          >
+            {t('massas.historyReadOnly', 'Histórico somente leitura: este dia não aceita alterações nem sincronização.')}
+          </p>
+        )}
+      </div>
+
+      {/* Fallback confirmation if shortcut never returned */}
+      {aeroAllowed && syncAwaiting && (
+        <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3">
+          <div>
+            <p className="text-sm font-semibold text-amber-900">{t('massas.aero.syncConfirmTitle')}</p>
+            <p className="text-xs text-amber-800 mt-0.5">
+              {t('massas.aero.syncConfirmHint')}
+              {syncAwaiting.remaining > 0 && ` · ${syncAwaiting.remaining}`}
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button
+              type="button"
+              onClick={() => void handleSyncManualResult(true)}
+              className="min-h-[44px] w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-semibold"
+            >
+              {t('massas.aero.syncConfirmYes')}
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void handleSyncManualResult(false)}
+              variant="outline"
+              className="min-h-[44px] w-full sm:w-auto font-semibold text-red-700"
+            >
+              {t('massas.aero.syncConfirmNo')}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Empty day placeholder when there are neither local launches nor ERP seats */}
+      {dayView && dayView.launches.length === 0 && unifiedRows.length === 0 && (
         <div
           data-testid="massas-history-empty"
           className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-600 shadow-sm"
         >
-          {t('massas.historyEmptyDay')}
+          {t('massas.historyEmptyDay', 'No hay lanzamientos registrados en ese día.')}
         </div>
       )}
 
-      {/* Resumen Colectivo y Desglose por Operador */}
-      {dayView && dayView.launches.length > 0 && (
+      {/* Cards: Produção do dia, Lançamentos Individuais, Resumo Coletivo */}
+      {dayView && (dayView.launches.length > 0 || unifiedRows.length > 0) && (
         <MassasCollectiveTable
           products={dayView.products}
           launches={dayView.launches}
-          // The history is a record: no edit, no delete, no owner and no role to weigh. Both screens
-          // draw the same read-only day, which is what the company's audit needs.
-          readOnly={true}
-          // The same rows the launch screen draws, so a box already received from the ERP shows as reconciled and
-          // one the ERP never saw keeps its badge. Nothing here can send, import or acknowledge.
+          currentUserId={user?.id}
+          isAdmin={user?.role === 'Administrador'}
+          readOnly={isPastDay}
+          editingLaunchId={isToday ? editingLaunchId : null}
+          editingBoxes={editingBoxes}
+          editingBusy={editingBusy}
+          onStartEdit={isToday ? startEditing : undefined}
+          onCancelEdit={isToday ? cancelEditing : undefined}
+          onSaveEdit={isToday ? saveEditing : undefined}
+          onEditBoxesChange={isToday ? setEditingBoxes : undefined}
+          onDelete={isToday ? handleDeleteLaunch : undefined}
+          deletingId={isToday ? deletingLaunchId : null}
           unifiedRows={unifiedRows}
           unifiedDate={date}
+          canSync={aeroAllowed && aeroSettingsReady(aeroSettings)}
+          deviceLimited={deviceLimited}
+          onSendToErp={isToday ? handleSendPendingLaunch : undefined}
+          onImport={isToday ? ((request) => void handleImportErpSeat(request)) : undefined}
+          importingEntLan={isToday ? importingEntLan : null}
+          onCreateOperator={isToday ? ((row) => void handleCreateOperator(row)) : undefined}
+          creatingOperatorEntLan={isToday ? creatingOperatorEntLan : null}
+          onToggleAck={isToday ? handleToggleAck : undefined}
         />
       )}
 
-      {/* Bloque WhatsApp con Preview Actualizado */}
+      {/* WhatsApp Share Block (Item 2) */}
       <MassasWhatsAppShare
         phone={phone}
         onPhoneChange={setPhone}
@@ -318,6 +1119,77 @@ export function MassasHistoryPage() {
         onOpenWhatsApp={handleOpenWhatsApp}
         copyNote={copyNote}
       />
+
+      {/* ERP Movements Sync Result Dialog */}
+      <AeroResultDialog
+        open={syncResult !== null}
+        tone={syncResult?.feedback.tone ?? 'ok'}
+        title={t(syncResult?.feedback.titleKey ?? 'massas.erp.syncOkTitle')}
+        message={t(syncResult?.feedback.messageKey ?? 'massas.erp.syncError', {
+          count: syncResult?.feedback.count ?? 0,
+          date: formatDateLabel(date),
+        })}
+        hint={syncResult?.detail ?? null}
+        onClose={() => setSyncResult(null)}
+        testId="aero-sync-result-modal"
+      />
+
+      {/* Launch verdict dialog returned from Scriptable to /massas-history (Requirement 6) */}
+      {resultModal && (
+        <Dialog
+          open={resultModal !== null}
+          onClose={closeResultModal}
+          labelledBy="massa-result-title"
+          panelTestId="massa-result-modal"
+        >
+          <div className="p-6 space-y-4 max-w-sm w-full text-center">
+            <div className="text-4xl">
+              {resultModal.type === 'success' ? '✅' : resultModal.type === 'warn' ? '⚠️' : '❌'}
+            </div>
+            <h2 id="massa-result-title" className="text-lg font-bold text-gray-900">
+              {resultModal.title ??
+                (resultModal.type === 'success'
+                  ? t('massas.successTitle', 'Lançamento Concluído')
+                  : t('massas.errorTitle', 'Erro no Lançamento'))}
+            </h2>
+            <p className="text-sm text-gray-600" data-testid="massa-result-message">
+              {resultModal.message}
+            </p>
+            {launchMirrorHint(resultModal) && (
+              <p
+                className="rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs leading-relaxed text-amber-900"
+                data-testid="massa-result-mirror-hint"
+              >
+                {t('massas.erp.mirrorHint')}
+              </p>
+            )}
+            <div className="space-y-2 pt-2">
+              {resultModal.retryCount ? (
+                <Button
+                  onClick={retryFailedLaunches}
+                  className="min-h-[44px] w-full bg-amber-600 font-semibold text-white hover:bg-amber-700"
+                  data-testid="massa-result-retry"
+                >
+                  {t('massas.erp.batchRetry', { count: resultModal.retryCount })}
+                </Button>
+              ) : null}
+              <Button
+                onClick={closeResultModal}
+                className={`min-h-[44px] w-full font-semibold ${
+                  resultModal.type === 'success'
+                    ? 'bg-green-600 hover:bg-green-700 text-white'
+                    : resultModal.type === 'warn'
+                      ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                      : 'bg-red-600 hover:bg-red-700 text-white'
+                }`}
+                data-testid="massa-result-close"
+              >
+                {t('massas.close', 'Fechar')}
+              </Button>
+            </div>
+          </div>
+        </Dialog>
+      )}
     </div>
   );
 }

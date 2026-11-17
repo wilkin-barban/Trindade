@@ -3,19 +3,19 @@ import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
 /**
- * The Massas history is a record, not a work surface.
+ * Today is manageable, earlier days are read-only (S9 / T8).
  *
- * Editing or deleting a past day is how a company loses the ability to answer "who launched this, and when".
- * The page is the only place that decides it, so the assertion is that the page hands the table a read-only
- * one and no way to change anything -- for every role, administrators included.
+ * For the plant's today: keep sharing, individual edit/delete, relaunching, sync.
+ * For earlier days: hide every mutation (edit, delete, relaunch, sync) and keep WhatsApp share,
+ * with one visible read-only line instead of silently disabled controls.
  */
 const historyPage = readFileSync(new URL('../MassasHistoryPage.tsx', import.meta.url), 'utf8');
 
-describe('massas history is read-only', () => {
-  it('hands the day table a read-only table, whoever is signed in', () => {
-    assert.match(historyPage, /readOnly=\{true\}/);
-    // `readOnly={!isAdmin}` was the old rule, and it is what let an administrator rewrite yesterday.
-    assert.equal(/readOnly=\{!isAdmin\}/.test(historyPage), false);
+describe('massas history is read-only on past days, manageable today (S9)', () => {
+  it('hands the day table read-only mode for past days', () => {
+    assert.match(historyPage, /readOnly=\{isPastDay\}/);
+    assert.match(historyPage, /const isPastDay = date < today;/);
+    assert.match(historyPage, /const isToday = date === today;/);
   });
 
   it('reconciles the day with the ERP mirror, like the launch screen does', () => {
@@ -27,9 +27,10 @@ describe('massas history is read-only', () => {
     assert.ok(historyPage.includes('unifiedDate={date}'));
   });
 
-  it('offers no way to edit or delete from the history', () => {
-    for (const handler of ['onStartEdit', 'onDelete', 'onSaveEdit', 'onDeleteLaunch', 'handleDeleteLaunch']) {
-      assert.equal(historyPage.includes(`${handler}={`), false, `the history still wires ${handler}`);
-    }
+  it('guards editing, deleting, syncing and relaunching behind isToday, and shows read-only notice on past days', () => {
+    assert.ok(historyPage.includes('onStartEdit={isToday ? startEditing : undefined}'));
+    assert.ok(historyPage.includes('onDelete={isToday ? handleDeleteLaunch : undefined}'));
+    assert.ok(historyPage.includes('onSendToErp={isToday ? handleSendPendingLaunch : undefined}'));
+    assert.ok(historyPage.includes('data-testid="massas-history-readonly"'));
   });
 });

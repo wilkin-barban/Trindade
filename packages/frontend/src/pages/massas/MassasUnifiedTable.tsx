@@ -46,9 +46,9 @@ const STATE_LABEL: Record<MassasRowState, string> = {
 };
 
 const STATE_CLASS: Record<MassasRowState, string> = {
-  reconciled: 'bg-green-100 text-green-800',
-  pendingErp: 'bg-amber-100 text-amber-800',
-  erpOnly: 'bg-sky-100 text-sky-800',
+  reconciled: 'bg-green-100 text-green-800 border border-green-200',
+  pendingErp: 'bg-amber-100 text-amber-800 border border-amber-200',
+  erpOnly: 'bg-sky-100 text-sky-800 border border-sky-200',
 };
 
 /**
@@ -99,7 +99,7 @@ export function MassasUnifiedTable({
           {t('massas.unified.empty', 'Nenhuma massa lançada neste dia.')}
         </p>
       ) : (
-        <ul className="space-y-2" data-testid="massas-unified-rows">
+        <ul className="space-y-3" data-testid="massas-unified-rows">
           {rows.map((row) => {
             const busy = importingEntLan !== null && row.entLans.includes(importingEntLan);
             return (
@@ -107,7 +107,7 @@ export function MassasUnifiedTable({
                 key={row.key}
                 data-testid={`massas-unified-row-${row.key}`}
                 data-state={row.state}
-                className="rounded-lg border border-gray-200 p-3"
+                className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-colors"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">

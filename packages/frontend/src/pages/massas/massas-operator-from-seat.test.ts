@@ -10,7 +10,7 @@ import { describe, it } from 'node:test';
  * the creation button is never rendered and an explanation is shown instead.
  */
 const table = readFileSync(new URL('./MassasUnifiedTable.tsx', import.meta.url), 'utf8');
-const page = readFileSync(new URL('../MassasLaunchPage.tsx', import.meta.url), 'utf8');
+const page = readFileSync(new URL('../MassasHistoryPage.tsx', import.meta.url), 'utf8');
 
 describe('operator creation from ERP seat (S16-S19)', () => {
   it('shows inline button + Criar Operário: <NOMBRE> for administrator when seat has no owner', () => {
@@ -27,7 +27,7 @@ describe('operator creation from ERP seat (S16-S19)', () => {
     assert.ok(table.includes('creatingOperatorEntLan === row.entLans[0]'));
   });
 
-  it('wires creation in MassasLaunchPage with username, display name, deterministic password and role 2', () => {
+  it('wires creation in MassasHistoryPage with username, display name, deterministic password and role 2', () => {
     assert.ok(page.includes('handleCreateOperator'));
     assert.ok(page.includes('deriveUsername'));
     assert.ok(page.includes('deriveDisplayName'));
@@ -50,6 +50,6 @@ describe('operator creation from ERP seat (S16-S19)', () => {
   });
 
   it('refreshes both the launches and the mirror immediately after creation (S18)', () => {
-    assert.ok(page.includes('await Promise.all([load(date), loadMirror(date)])'));
+    assert.ok(page.includes('await Promise.all([loadDay(date), loadMirror(date)])'));
   });
 });

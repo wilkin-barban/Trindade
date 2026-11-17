@@ -12,6 +12,7 @@ import { describe, it } from 'node:test';
  */
 const panel = readFileSync(new URL('./AeroIntegrationPanel.tsx', import.meta.url), 'utf8');
 const launch = readFileSync(new URL('../MassasLaunchPage.tsx', import.meta.url), 'utf8');
+const history = readFileSync(new URL('../MassasHistoryPage.tsx', import.meta.url), 'utf8');
 const unified = readFileSync(new URL('./MassasUnifiedTable.tsx', import.meta.url), 'utf8');
 
 describe('integration panel honours the device', () => {
@@ -44,16 +45,19 @@ describe('integration panel honours the device', () => {
 describe('launch screen honours the device', () => {
   it('shows the banner before the controls it explains', () => {
     const banner = launch.indexOf('<AeroDeviceBanner device={device} />');
-    const syncButton = launch.indexOf('data-testid="massas-sync-erp"');
-    assert.ok(banner > 0 && syncButton > banner);
+    assert.ok(banner > 0);
+    const historyBanner = history.indexOf('<AeroDeviceBanner device={device} />');
+    const syncButton = history.indexOf('data-testid="massas-sync-erp"');
+    assert.ok(historyBanner > 0 && syncButton > historyBanner);
   });
 
   it('disables the dispatch, the sync and the mirror import on a desktop', () => {
-    assert.ok(launch.includes('data-testid="massas-sync-erp"'));
-    const sync = launch.slice(launch.indexOf('data-testid="massas-sync-erp"') - 300, launch.indexOf('data-testid="massas-sync-erp"'));
+    assert.ok(launch.includes('deviceLimited'));
+    assert.ok(history.includes('data-testid="massas-sync-erp"'));
+    const sync = history.slice(history.indexOf('data-testid="massas-sync-erp"') - 300, history.indexOf('data-testid="massas-sync-erp"'));
     assert.ok(sync.includes('deviceLimited'), 'the header sync must be disabled');
-    assert.ok(launch.includes('disabled={!aeroSettingsReady(aeroSettings) || deviceLimited}'));
-    assert.ok(launch.includes('deviceLimited={deviceLimited}'));
+    assert.ok(history.includes('disabled={mirror.loading || !aeroSettingsReady(aeroSettings) || deviceLimited}'));
+    assert.ok(history.includes('deviceLimited={deviceLimited}'));
   });
 
   it('carries the rule into the table, where the send button lives', () => {

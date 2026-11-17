@@ -1,39 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { api, ApiClientError } from '../api/client';
-import { resolveApiErrorKey } from '../lib/api-error-normalizer';
+import { api } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/button';
 import { DateField } from '../components/ui/date-field';
 import { LoadingSpinner } from '../components/ui/loading-spinner';
-import { toWhatsAppNumber } from '../lib/phone';
-import { shareOrCopy, waMeLink } from '../lib/whatsapp';
-import {
-  massasMessage,
-  POLL_INTERVAL_MS,
-  shouldPollMassas,
-  type MassasLaunchDayView,
-  type MassaIndividualLaunch,
-} from '../lib/massas';
-import { History, RefreshCw } from 'lucide-react';
+import { History } from 'lucide-react';
 import { Dialog } from '../components/ui/dialog';
 import { ModuleHelpModal } from '../components/ui/ModuleHelpModal';
 import { MassasLaunchGrid } from './massas/MassasLaunchGrid';
-import { MassasCollectiveTable } from './massas/MassasCollectiveTable';
-import {
-  deriveDisplayName,
-  loadAckedLaunchIds,
-  massasUnifiedRows,
-  toggleAckedLaunchId,
-  type MassasUnifiedRow,
-} from '../lib/massas-unified';
-import {
-  deriveUsername,
-  quickWorkerPassword,
-  QUICK_WORKER_ROLE_ID,
-} from '../lib/share-app';
-import { MassasWhatsAppShare } from './massas/MassasWhatsAppShare';
 import { saoPauloToday } from '../lib/date';
 import { isClosedDay } from '../lib/massas-day';
 import {
@@ -42,70 +18,44 @@ import {
   aeroSettingsReady,
   aeroEndpoint,
   buildAeroBridgeTriggerUrl,
-  buildAeroMovementsSnapshot,
   buildEntradaItemPayload,
   isAeroAllowed,
   loadAeroSettings,
   parseAeroCallback,
-  readAeroBridgeResult,
-  readAeroMovements,
   resolveAeroCallback,
   saveAeroSettings,
   type AeroSettings,
 } from '../lib/aero-integration';
 import { fetchAeroVaultSettings, requestAeroBridgeTicket } from '../lib/aero-vault';
-import { aeroAttemptHeaders, aeroImportAuditEvent, newAeroAttempt, postAeroAuditEvent } from '../lib/aero-audit';
+import { newAeroAttempt, postAeroAuditEvent } from '../lib/aero-audit';
 import {
-  aeroBridgeMarkExpired,
-  AERO_BRIDGE_MARK_TTL_MS,
   clearAeroBridgePending,
   markAeroBridgePending,
-  readAeroBridgePending,
 } from '../lib/aero-watchdog';
 import {
-  aeroAttemptDate,
   clearAeroPendingAttempt,
-  loadAeroPendingAttempt,
-  type AeroPendingAction,
   saveAeroPendingAttempt,
+  type AeroPendingAction,
 } from '../lib/aero-pending-attempt';
 import {
-  aeroTestNoVerdictEvent,
-  aeroTestResultEvent,
   clearAeroPendingTest,
   loadAeroPendingTest,
   saveAeroTestOutcome,
+  aeroTestNoVerdictEvent,
+  aeroTestResultEvent,
   type AeroTestOutcome,
 } from '../lib/aero-test';
 import {
   clearAeroQueue,
-  pendingLaunchQueueItem,
-  readAeroQueue,
-  takeAeroBatch,
   writeAeroQueue,
+  takeAeroBatch,
   type AeroQueue,
 } from '../lib/aero-queue';
 import { AERO_BATCH_MAX, buildAeroLaunchTrips } from '../lib/aero-batch';
-import { formatDateLabel } from '../lib/date';
-import { AeroResultDialog } from './massas/AeroResultDialog';
-import { armAeroAutoRead, consumeAeroAutoRead } from '../lib/aero-auto-read';
 import { AeroDeviceBanner } from '../components/aero/AeroDeviceBanner';
 import { useDevice } from '../contexts/DeviceContext';
 import { canControlAero } from '../lib/device-detection';
-import {
-  batchSyncFeedback,
-  launchMirrorHint,
-  movementsSyncFeedback,
-  readAeroBatchResult,
-  type AeroSyncFeedback,
-} from '../lib/aero-feedback';
-import {
-  aeroImportPayload,
-  aeroMovementsPayload,
-  lastSyncLabel,
-  readAeroMovementsSnapshot,
-  type AeroMovementSnapshot,
-} from '../lib/aero-mirror';
+import type { MassasLaunchDayView, MassaIndividualLaunch } from '../lib/massas';
 
 /**
  * What to say when an action needed the ERP and could not reach it.
@@ -122,6 +72,13 @@ function erpNotReadyMessage(
     : t('massas.aero.syncNeedsSetup');
 }
 
+/**
+ * The launch screen of Masas.
+ *
+ * Keeps only the date, the product grid, the confirmation dialog and the launch button pinned
+ * to the bottom of the viewport on mobile devices.
+ * All daily history, individual launches, collective summary and WhatsApp sharing live in MassasHistoryPage.
+ */
 export function MassasLaunchPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -133,7 +90,7 @@ export function MassasLaunchPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  // Block 1 state: quantities per product code
+  // Grid state: quantities per product code
   const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
@@ -142,67 +99,20 @@ export function MassasLaunchPage() {
   >([]);
   const [resultModal, setResultModal] = useState<{
     type: 'success' | 'warn' | 'error';
-    /** Already-translated title, for the dialogs whose sentence is not one of the two generic ones. */
     title?: string;
     message: string;
-    /** El lanzamiento viajó a la empresa: el espejo ya tiene un asiento nuevo que mostrar. */
-    sentToErp?: boolean;
-    /** Products the ERP refused or never answered: the operator can send exactly those again. */
-    retryCount?: number;
   } | null>(null);
-
-  // Block 2 state: inline editing of an individual launch
-  const [editingLaunchId, setEditingLaunchId] = useState<number | null>(null);
-  const [editingBoxes, setEditingBoxes] = useState('');
-  const [editingBusy, setEditingBusy] = useState(false);
-  const [deletingLaunchId, setDeletingLaunchId] = useState<number | null>(null);
-
-  // Block 3 state: WhatsApp phone input
-  const [phone, setPhone] = useState('');
-  const [copyNote, setCopyNote] = useState('');
 
   // Company integration: both plant roles use it, each with the vault of their own account.
   const aeroAllowed = isAeroAllowed(user ? { username: user.username, role: user.role } : null);
   const [aeroSettings, setAeroSettings] = useState<AeroSettings>(loadAeroSettings);
-  const [aeroTestOutcome, setAeroTestOutcome] = useState<AeroTestOutcome | null>(null);
-  const [syncToErp, setSyncToErp] = useState(() => aeroSettings.syncEnabled && aeroSettingsReady(aeroSettings));
-  // El sistema operativo decide si estas acciones pueden mover algo. En una computadora no hay forma de
-  // hablar con Aero32: la tabla y el espejo se ven enteros y deshabilitados, con el banner que dice qué
-  // dispositivo sí puede.
+  const [, setAeroTestOutcome] = useState<AeroTestOutcome | null>(null);
+
   const device = useDevice();
   const deviceLimited = !canControlAero(device);
-  const [syncAwaiting, setSyncAwaiting] = useState<{ date: string; remaining: number } | null>(() => {
-    const queue = readAeroQueue();
-    // The indicator counts products, not trips: "3 pendentes" is what the operator launched, and after a
-    // partial batch it says how many are still owed to the company.
-    return queue ? { date: queue.date, remaining: queue.items.length + queue.inFlight.length } : null;
-  });
-  const aeroCallbackHandled = useRef(false);
-
-  // The company's side of the day. It lives in the backend so any phone in the plant reads the same
-  // snapshot, and it survives a reload that the callback never reaches.
-  const [mirror, setMirror] = useState<{
-    loading: boolean;
-    error: string | null;
-    snapshot: AeroMovementSnapshot | null;
-  }>({ loading: false, error: null, snapshot: null });
-  const [importingEntLan, setImportingEntLan] = useState<number | null>(null);
-  const [creatingOperatorEntLan, setCreatingOperatorEntLan] = useState<number | null>(null);
-  /** What this phone already carried to the tablet today; the mark is per device and dies with the day. */
-  const [ackedLaunchIds, setAckedLaunchIds] = useState<number[]>(() => loadAckedLaunchIds(date));
-  /** Lo que la consulta de movimientos tiene para decir cuando el teléfono vuelve. */
-  const [syncResult, setSyncResult] = useState<{
-    feedback: AeroSyncFeedback;
-    /** What the ERP said when it refused, shown as written instead of paraphrased. */
-    detail: string | null;
-  } | null>(null);
 
   /**
    * The vault, read once per mount.
-   *
-   * The password is not here and cannot be: the page only learns whether the server keeps one. Without this
-   * read a fresh tab would show «sin configurar» -- the address and the user are locally cached, the secret
-   * is not -- and every action would refuse to start on a phone that is perfectly configured.
    */
   useEffect(() => {
     if (!aeroAllowed) return;
@@ -220,21 +130,13 @@ export function MassasLaunchPage() {
           }),
         );
       } catch {
-        // An unreadable vault is not an error the production screen has to shout: the actions that need it
-        // already say what is missing, and the panel in Admin is where the vault itself is fixed.
+        // Vault read failure is handled silently; actions explain what is missing.
       }
     })();
     return () => {
       cancelled = true;
     };
   }, [aeroAllowed]);
-
-  // El interruptor guardado sólo puede encenderse cuando hay con qué: la lectura del cofre llega después del
-  // primer render, y sin esto un teléfono que ya sincronizaba arrancaría apagado.
-  useEffect(() => {
-    if (!aeroSettings.hasPassword) return;
-    setSyncToErp((want) => want || aeroSettings.syncEnabled);
-  }, [aeroSettings.hasPassword, aeroSettings.syncEnabled]);
 
   const load = useCallback(
     async (targetDate: string, isSilent = false) => {
@@ -249,99 +151,30 @@ export function MassasLaunchPage() {
           setError(err instanceof Error ? err.message : t('massas.loadError'));
         }
       } finally {
-        if (!isSilent) {
-          setLoading(false);
-        }
-      }
-    },
-    [t]
-  );
-
-  /**
-   * Reads the mirrored day from Trindade's own database.
-   *
-   * A 503 is not a failure of the request but of the installation: the revision is pending, and the plant
-   * must be told to run `db:migrate` instead of reading an empty day as "nothing was produced".
-   */
-  const loadMirror = useCallback(
-    async (targetDate: string) => {
-      setMirror((prev) => ({ ...prev, loading: true, error: null }));
-      try {
-        const body = await api.get<unknown>(`/integration/aero/movements?date=${targetDate}`);
-        const snapshot = readAeroMovementsSnapshot(body);
-        if (!snapshot) {
-          setMirror({ loading: false, error: t('massas.erp.error'), snapshot: null });
-          return;
-        }
-        setMirror({ loading: false, error: null, snapshot });
-      } catch (err) {
-        const message =
-          err instanceof ApiClientError && err.status === 503
-            ? t('massas.erp.notMigrated')
-            : err instanceof Error
-              ? err.message
-              : t('massas.erp.error');
-        setMirror({ loading: false, error: message, snapshot: null });
+        setLoading(false);
       }
     },
     [t],
   );
 
-  // Initial load or date switch
   useEffect(() => {
+    setLoading(true);
     void load(date);
   }, [date, load]);
 
-  // The mirror follows the same day as the launch list.
-  useEffect(() => {
-    void loadMirror(date);
-  }, [date, loadMirror]);
-
-  // Passive live-reload polling every 15s with visibility and interaction guards
-  useEffect(() => {
-    const triggerSilentPoll = () => {
-      const visibilityState = typeof document !== 'undefined' ? document.visibilityState : 'visible';
-      const isEditing = editingLaunchId !== null;
-      if (shouldPollMassas({ visibilityState, isEditing, isSubmitting: submitting })) {
-        void load(date, true);
-      }
-    };
-
-    const intervalId = window.setInterval(triggerSilentPoll, POLL_INTERVAL_MS);
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        triggerSilentPoll();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      window.clearInterval(intervalId);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [date, load, editingLaunchId, submitting]);
+  const aeroDestination = useCallback(() => {
+    return aeroSettings.wsUrl?.trim() || null;
+  }, [aeroSettings.wsUrl]);
 
   const handleQuantityChange = (code: string, rawVal: string) => {
-    const cleaned = rawVal.replace(/\D/g, '');
-    setQuantities((prev) => ({ ...prev, [code]: cleaned }));
+    setQuantities((prev) => ({
+      ...prev,
+      [code]: rawVal,
+    }));
   };
 
-  /** The panel shows the verdict once and the page forgets it, so a later render cannot replay it. */
-  const handleTestOutcomeHandled = useCallback(() => setAeroTestOutcome(null), []);
-
-  /** Where a launch would land, in the log's terms. */
-  const aeroDestination = useCallback(
-    () => (aeroSettings.wsUrl ? `${aeroSettings.wsUrl.replace(/\/$/, '')}/entradasitem` : ''),
-    [aeroSettings.wsUrl],
-  );
-
   const handleRequestLaunch = () => {
-    // Defence in depth: the grid hides the button, and the handler refuses anyway, because a closed day
-    // reached from a stale render must not become a 409 the operator has to decode.
-    if (dayIsClosed) return;
-    if (!dayView || submitting) return;
+    if (!dayView || dayIsClosed) return;
     const items = dayView.products
       .map((p) => {
         const boxes = parseInt(quantities[p.code] || '0', 10);
@@ -359,8 +192,100 @@ export function MassasLaunchPage() {
     setIsConfirmOpen(true);
   };
 
+  /**
+   * Whether the phone already knows the trip would fail.
+   */
+  const aeroCannotReachInternet = useCallback(() => {
+    const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+    if (!offline) return false;
+    setNotice({ type: 'error', message: t('massas.aero.offline') });
+    return true;
+  }, [t]);
+
+  /**
+   * Hands the next batch of pending entries to the Atajos app.
+   * Callback destination is /massas-history per Requirement 6 (Task T7 / Spec S2).
+   */
+  const triggerAeroSync = useCallback(
+    async (queue: AeroQueue) => {
+      if (aeroCannotReachInternet()) return;
+      const taken = takeAeroBatch(queue, AERO_BATCH_MAX);
+      if (taken.batch.length === 0) {
+        clearAeroQueue();
+        return;
+      }
+
+      const operatorUser = aeroSettings.username?.trim() || user?.username?.trim() || null;
+      const payloads = taken.batch.map((item) =>
+        buildEntradaItemPayload({
+          productCode: item.productCode,
+          productName: item.productName,
+          quantity: item.quantity,
+          entryDate: queue.date,
+          userCode: item.operatorName ?? operatorUser,
+          launchIds: item.launchIds,
+        }),
+      );
+
+      // The callback route returns to /massas-history where the verdict dialog opens
+      const [trip] = buildAeroLaunchTrips({
+        payloads,
+        singleCallbackPath: aeroBridgeCallbackFor('entrada', '/massas-history'),
+        batchCallbackPath: aeroBridgeCallbackFor('entrada_lote', '/massas-history'),
+      });
+      if (!trip) return;
+
+      let ticket: { ticket: string; ticketUrl: string };
+      try {
+        ticket = await requestAeroBridgeTicket({
+          action: trip.action,
+          payloads: trip.payloads,
+          callbackPath: trip.callbackPath,
+        });
+      } catch {
+        setNotice({ type: 'error', message: t('massas.aero.vaultTicketError') });
+        void postAeroAuditEvent({
+          event: 'launch_sync',
+          phase: 'requested',
+          destinationUrl: aeroEndpoint(aeroSettings.wsUrl, 'entradasitem'),
+          client: 'web',
+          error: 'AERO_TICKET_REFUSED',
+          note: `${payloads.length} not sent`,
+        });
+        return;
+      }
+
+      writeAeroQueue({ ...taken.rest, inFlight: taken.batch });
+
+      const action: AeroPendingAction = payloads.length === 1 ? 'entrada' : 'entrada_lote';
+      const attempt = newAeroAttempt();
+      saveAeroPendingAttempt({ action, ...attempt, date });
+
+      void postAeroAuditEvent({
+        event: 'launch_sync',
+        phase: 'requested',
+        destinationUrl: aeroEndpoint(aeroSettings.wsUrl, 'entradasitem'),
+        client: 'web',
+        ...attempt,
+        payload: payloads.length === 1 ? payloads[0] : payloads,
+        note:
+          payloads.length === 1
+            ? `${taken.rest.items.length > 0 ? `${taken.rest.items.length} pending` : 'last entry'} · via=bridge`
+            : `batch ${payloads.length}${taken.rest.items.length > 0 ? ` · ${taken.rest.items.length} pending` : ''} · via=bridge`,
+      });
+
+      markAeroBridgePending({ action, date });
+      window.location.href = buildAeroBridgeTriggerUrl({
+        ticket: ticket.ticket,
+        ticketUrl: ticket.ticketUrl,
+      });
+    },
+    [aeroCannotReachInternet, aeroSettings, date, t, user],
+  );
+
   const handleConfirmLaunch = async () => {
     if (!dayView || submitting || itemsToConfirm.length === 0) return;
+    if (dayIsClosed) return;
     setSubmitting(true);
     setIsConfirmOpen(false);
     try {
@@ -369,15 +294,12 @@ export function MassasLaunchPage() {
         items: itemsToConfirm.map((i) => ({ product_code: i.product_code, boxes: i.boxes })),
       });
 
-      // The entry is already Trindade's before the company hears about it: whatever happens in the
-      // Atajos app, the day's production is on record.
-      const wantsSync = aeroAllowed && syncToErp;
-      const syncable = wantsSync && aeroSettingsReady(aeroSettings);
+      // No sync toggle: if the integration is configured (aeroSettingsReady), it always goes to the ERP.
+      const syncable = aeroAllowed && aeroSettingsReady(aeroSettings);
       const requested = itemsToConfirm.map((i) => ({
         productCode: i.product_code,
         productName: i.name,
         quantity: i.units,
-        // Only this trip's launches: the day may already carry earlier ones at the same product.
         launchIds: (created?.created ?? [])
           .filter((launch) => launch.product_code === i.product_code)
           .map((launch) => launch.id),
@@ -393,11 +315,7 @@ export function MassasLaunchPage() {
         return;
       }
 
-      if (wantsSync) {
-        // The switch said "send it to the company" and the entry stayed home. The operator's launch is safe,
-        // but the reason belongs in the log: at this point the configuration itself is what is missing.
-        // And it belongs on screen too: the day's record is complete, the company's is not, and nobody is
-        // told otherwise.
+      if (aeroAllowed) {
         setNotice({ type: 'error', message: erpNotReadyMessage(t, aeroSettings) });
         void postAeroAuditEvent({
           event: 'launch_sync',
@@ -412,806 +330,53 @@ export function MassasLaunchPage() {
       setResultModal({
         type: 'success',
         message: t('massas.launchSuccess', 'Lançamento registrado com sucesso!'),
-        sentToErp: false,
       });
     } catch (err) {
       setResultModal({
         type: 'error',
         message: err instanceof Error ? err.message : t('massas.launchError', 'Erro ao registrar lançamento.'),
       });
-      // Do not clear quantities on error so the operator can retry
     } finally {
       setSubmitting(false);
     }
   };
 
   /**
-   * Whether the phone already knows the trip would fail.
-   *
-   * The bridge is a deep link to Scriptable: opening it without a network leaves the operator on a screen that
-   * says «enviando» while the phone has no way to ask the plant for anything. One sentence here is cheaper
-   * than a launch that never had a chance, and it is said in the same place the other refusals are.
-   */
-  const aeroCannotReachInternet = useCallback(() => {
-    const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
-    if (!offline) return false;
-    setNotice({ type: 'error', message: t('massas.aero.offline') });
-    return true;
-  }, [t]);
-
-  /**
-   * Hands the next batch of pending entries to the Atajos app.
-   *
-   * One ticket per trip, and one trip per trip: a launch of three products used to be three returns to
-   * Safari, and the operator never knew whether the second one had arrived. Up to `AERO_BATCH_MAX` products
-   * now travel together and the shortcut repeats the request on the phone. What does not fit keeps waiting in
-   * the queue and becomes the next ticket.
-   *
-   * The ticket is asked for before anything is written: a server that refuses it means nothing left the page,
-   * and a queue marked in-flight by a trip that never happened would wait forever. The navigation happens
-   * last: everything that must survive the trip -- the log line, the remaining queue, which products are in
-   * the phone -- is written before Safari leaves.
-   */
-  const triggerAeroSync = useCallback(
-    async (queue: AeroQueue) => {
-      if (aeroCannotReachInternet()) return;
-      const taken = takeAeroBatch(queue, AERO_BATCH_MAX);
-      if (taken.batch.length === 0) {
-        clearAeroQueue();
-        setSyncAwaiting(null);
-        return;
-      }
-
-      // `ENT_USU` lleva el usuario en mayúsculas: es lo que el binario Delphi manda y lo que el ERP acepta.
-      // El lanzamiento pertenece a quien cargó las cajas, así que cada entrada viaja con su operario; el de
-      // la sesión es sólo el respaldo de una entrada vieja que no lo guardó.
-      const operatorUser = aeroSettings.username?.trim() || user?.username?.trim() || null;
-
-      const payloads = taken.batch.map((item) =>
-        buildEntradaItemPayload({
-          productCode: item.productCode,
-          productName: item.productName,
-          quantity: item.quantity,
-          entryDate: queue.date,
-          userCode: item.operatorName ?? operatorUser,
-          launchIds: item.launchIds,
-        }),
-      );
-      // El atajo no sabe de massas: recibe un ticket y lo canjea por lo que el servidor ya armó. Cambiar la
-      // clave o la IP es un cambio en la web, y el iPhone no se toca. Un producto pide `entrada`; varios,
-      // `entrada_lote`.
-      const [trip] = buildAeroLaunchTrips({
-        payloads,
-        singleCallbackPath: aeroBridgeCallbackFor('entrada'),
-        batchCallbackPath: aeroBridgeCallbackFor('entrada_lote'),
-      });
-      if (!trip) return;
-
-      let ticket: { ticket: string; ticketUrl: string };
-      try {
-        ticket = await requestAeroBridgeTicket({
-          action: trip.action,
-          payloads: trip.payloads,
-          callbackPath: trip.callbackPath,
-        });
-      } catch {
-        // Nothing left the page: the queue keeps every product, and the reason reaches the log and the screen.
-        setSyncAwaiting(null);
-        setNotice({ type: 'error', message: t('massas.aero.vaultTicketError') });
-        void postAeroAuditEvent({
-          event: 'launch_sync',
-          phase: 'requested',
-          destinationUrl: aeroEndpoint(aeroSettings.wsUrl, 'entradasitem'),
-          client: 'web',
-          error: 'AERO_TICKET_REFUSED',
-          note: `${payloads.length} not sent`,
-        });
-        return;
-      }
-
-      // The products travel with the queue so the return can name the failures instead of asking the
-      // operator which of the three it was.
-      writeAeroQueue({ ...taken.rest, inFlight: taken.batch });
-      setSyncAwaiting({ date: queue.date, remaining: taken.batch.length + taken.rest.items.length });
-
-      // The ticket has to be written down before leaving: the identifier that pairs this line with the
-      // answer the shortcut brings back lives in storage, because the page itself is gone by then. A batch
-      // and a single entry are different trips.
-      const action: AeroPendingAction = payloads.length === 1 ? 'entrada' : 'entrada_lote';
-      const attempt = newAeroAttempt();
-      saveAeroPendingAttempt({ action, ...attempt, date });
-
-      void postAeroAuditEvent({
-        event: 'launch_sync',
-        phase: 'requested',
-        destinationUrl: aeroEndpoint(aeroSettings.wsUrl, 'entradasitem'),
-        client: 'web',
-        ...attempt,
-        // One line per trip: the products are in the payload, and a log that grows with the plant's output
-        // is unreadable exactly when it is needed.
-        payload: payloads.length === 1 ? payloads[0] : payloads,
-        note:
-          payloads.length === 1
-            ? `${taken.rest.items.length > 0 ? `${taken.rest.items.length} pending` : 'last entry'} · via=bridge`
-            : `batch ${payloads.length}${taken.rest.items.length > 0 ? ` · ${taken.rest.items.length} pending` : ''} · via=bridge`,
-      });
-
-      // La marca dice qué acción quedó debiendo una respuesta y de qué día, y se escribe antes de salir: si
-      // Scriptable no vuelve, la pantalla podrá decirlo en vez de mentir «enviando» para siempre.
-      markAeroBridgePending({ action, date });
-      window.location.href = buildAeroBridgeTriggerUrl({
-        ticket: ticket.ticket,
-        ticketUrl: ticket.ticketUrl,
-      });
-    },
-    [aeroCannotReachInternet, aeroSettings, date, t, user],
-  );
-
-  /**
-   * Sends one pending row to the ERP.
-   *
-   * The row's button used to call the movements read, so the trip asked the plant for the day and the
-   * launch stayed pending. This is the other trip: one queue with this row's product, its boxes in units,
-   * its launch ids and, above all, its operator -- the seat the company receives has to name the person
-   * who typed the boxes, not whoever configured the phone.
-   */
-  const handleSendPendingLaunch = useCallback(
-    (row: MassasUnifiedRow) => {
-      // It used to return here without a word: a tab that had lost the password looked like a button that
-      // does nothing. The row stays pending and the reason is said.
-      if (!aeroSettingsReady(aeroSettings)) {
-        setNotice({ type: 'error', message: erpNotReadyMessage(t, aeroSettings) });
-        return;
-      }
-      // Y sin red no hay viaje que ofrecer: se dice y el lanzamiento sigue en la fila.
-      if (aeroCannotReachInternet()) return;
-      const item = pendingLaunchQueueItem({
-        productCode: row.productCode,
-        productName: row.productName,
-        // The row already reconciled boxes into units against the plant's catalogue.
-        units: row.units,
-        operatorName: row.operatorName,
-        launchIds: row.launchIds,
-      });
-      const queue: AeroQueue = { createdAt: new Date().toISOString(), date, items: [item], inFlight: [] };
-      writeAeroQueue(queue);
-      void triggerAeroSync(queue);
-    },
-    [aeroCannotReachInternet, aeroSettings, date, t, triggerAeroSync],
-  );
-
-  /**
-   * Sends the products the ERP refused or never answered, and only those.
-   *
-   * They are already at the front of the queue: the partial batch put them back. A second trip is the
-   * operator's decision, never the page's, because a phone that leaves on its own is the problem this whole
-   * milestone exists to remove.
-   */
-  const retryFailedLaunches = useCallback(() => {
-    if (aeroCannotReachInternet()) return;
-    setResultModal(null);
-    const queue = readAeroQueue();
-    if (!queue) return;
-    void triggerAeroSync(queue);
-  }, [aeroCannotReachInternet, triggerAeroSync]);
-
-  /**
-   * Asks the company for the day's movements through the same ticket every launch uses.
-   *
-   * The query leaves the operator filter open on purpose: the boxes are the factory's, and any operator may
-   * have launched them. Publishing it as `read_history` keeps the audit trail honest about what this phone
-   * actually asked for.
-   */
-  const handleSyncFromErp = async () => {
-    if (!aeroSettingsReady(aeroSettings)) {
-      setNotice({ type: 'error', message: erpNotReadyMessage(t, aeroSettings) });
-      return;
-    }
-    // Sin red no hay ticket que canjear: se dice y no se abre Scriptable para nada.
-    if (aeroCannotReachInternet()) return;
-
-    const payload = aeroMovementsPayload({ date, userName: null });
-
-    let ticket: { ticket: string; ticketUrl: string };
-    try {
-      ticket = await requestAeroBridgeTicket({
-        action: 'movimentos',
-        payloads: [payload],
-        callbackPath: aeroBridgeCallbackFor('movimentos'),
-      });
-    } catch {
-      setNotice({ type: 'error', message: t('massas.aero.vaultTicketError') });
-      return;
-    }
-
-    const attempt = newAeroAttempt();
-    // The date travels with the attempt: the page returns in a fresh document and today's clock there is
-    // not necessarily the day this request asked for.
-    saveAeroPendingAttempt({ action: 'movimentos', ...attempt, date });
-
-    void postAeroAuditEvent({
-      event: 'read_history',
-      phase: 'requested',
-      destinationUrl: aeroEndpoint(aeroSettings.wsUrl, 'movimentoitem'),
-      client: 'web',
-      payload,
-      note: 'via=bridge',
-      ...attempt,
-    });
-
-    // La consulta también es un viaje que se puede perder: la marca lleva su acción y su día.
-    markAeroBridgePending({ action: 'movimentos', date });
-    window.location.href = buildAeroBridgeTriggerUrl({
-      ticket: ticket.ticket,
-      ticketUrl: ticket.ticketUrl,
-    });
-  };
-
-  /**
-   * Closes the movements round trip: stores the snapshot and re-reads the day.
-   *
-   * The ERP answered the phone, not this page, so the answer travels back in the URL and becomes the
-   * snapshot every other device will read. Failing to store it does not discard what came back: the mirror
-   * shows the seats and the error at the same time, so the operator can still see the factory's record.
-   */
-  const handleMovementsCallback = useCallback(
-    async (data: unknown) => {
-      // The page returned from the shortcut: the request line is already on disk with this identifier.
-      const attempt = loadAeroPendingAttempt('movimentos');
-      clearAeroPendingAttempt();
-      // The answer belongs to the day the trip asked for, not to the one the calendar says on return: a
-      // read launched at 23:55 and answered at 00:01 would otherwise store yesterday's plant under today.
-      const answeredDate = aeroAttemptDate(attempt, date);
-      const pairing = attempt
-        ? { attemptId: attempt.attemptId, startedAt: attempt.startedAt, client: 'web' as const }
-        : { client: 'web' as const };
-
-      const read = readAeroMovements(data);
-      if (read.status === 'error') {
-        setSyncResult({ feedback: movementsSyncFeedback({ status: 'error', count: 0 }), detail: read.message });
-        void postAeroAuditEvent({
-          event: 'read_history',
-          phase: 'result',
-          destinationUrl: aeroEndpoint(aeroSettings.wsUrl, 'movimentoitem'),
-          error: read.message ?? 'movements_unreadable',
-          note: 'via=bridge',
-          ...pairing,
-        });
-        setMirror({
-          loading: false,
-          error: read.message ?? t('massas.erp.error'),
-          snapshot: null,
-        });
-        return;
-      }
-
-      void postAeroAuditEvent({
-        event: 'read_history',
-        phase: 'result',
-        destinationUrl: aeroEndpoint(aeroSettings.wsUrl, 'movimentoitem'),
-        // The bridge reports what the ERP answered, not an HTTP status: the page never saw the socket, and
-        // a 200 invented here would read as an ERP answer in a log where the whole point is who said what.
-        note: `seats=${read.movements.length} skipped=${read.skipped} · via=bridge`,
-        ...pairing,
-      });
-
-      try {
-        // The mirror answers how the day splits, so this page counts its own lens without carrying a copy
-        // of the catalogue: the boxes are not this screen's business and must never appear in its dialog.
-        const stored = await api.post<{ massas?: number }>(
-          '/integration/aero/movements',
-          buildAeroMovementsSnapshot(answeredDate, read.movements),
-          // The refusal this call may get is audited by the server, and that line has to name the same
-          // attempt as the page's result line: no attempt in memory means no header, never an invented one.
-          { headers: aeroAttemptHeaders(attempt) },
-        );
-        await loadMirror(answeredDate);
-        setSyncResult({
-          feedback: movementsSyncFeedback({ status: 'ok', count: stored?.massas ?? 0 }),
-          detail: null,
-        });
-      } catch {
-        // The snapshot is a cache of the company's record, so failing to store it must not throw away what
-        // came back: the seats stay on screen, next to the reason they will not survive a reload.
-        setMirror({
-          loading: false,
-          error: t('massas.erp.error'),
-          snapshot: { date, movements: read.movements, syncedAt: new Date().toISOString() },
-        });
-        setSyncResult({
-          feedback: movementsSyncFeedback({ status: 'ok', count: 0 }),
-          detail: t('massas.erp.storeFailed'),
-        });
-      }
-    },
-    [aeroSettings.wsUrl, date, loadMirror, t],
-  );
-
-  /**
-   * Brings one ERP seat into Trindade as a new local launch.
-   *
-   * Never an edit: the company's seat stays where it is. The boxes were computed from the ERP units and the
-   * catalog, so a seat whose quantity does not fit whole boxes offers no button at all.
-   */
-  const handleImportErpSeat = async (request: {
-    entLan: number;
-    operatorName: string;
-    productCode: string;
-    boxes: number;
-    date: string;
-  }) => {
-    setImportingEntLan(request.entLan);
-    // The line is written here, before the network, so an import that never answers still leaves the seat
-    // it tried to take. `ent_lan` is the only field that pairs this launch with the company's record.
-    const audit = {
-      date: request.date,
-      entLan: request.entLan,
-      productCode: request.productCode,
-      boxes: request.boxes,
-    };
-    try {
-      // The seat and the operator the tablet wrote travel with the boxes: without them the launch belongs
-      // to whoever pressed Importar and can only be paired by name, which is how a seat never settled.
-      await api.post(
-        '/massas-launch',
-        aeroImportPayload(
-          { entLan: request.entLan, operatorName: request.operatorName },
-          { productCode: request.productCode, boxes: request.boxes },
-          request.date,
-        ),
-      );
-      void postAeroAuditEvent(aeroImportAuditEvent(audit));
-      setNotice({ type: 'success', message: t('massas.erp.imported') });
-      await Promise.all([load(date), loadMirror(date)]);
-    } catch (err) {
-      void postAeroAuditEvent(aeroImportAuditEvent({ ...audit, error: 'AERO_IMPORT_REFUSED' }));
-      // La negativa del backend llega con un código semántico y una frase en el idioma del pedido. El texto
-      // crudo del servidor no es una frase para el operario: o hay clave conocida, o está el genérico.
-      const known = err instanceof ApiClientError ? resolveApiErrorKey(err.status, err.message, err.code) : null;
-      setNotice({
-        type: 'error',
-        message: known ? t(known) : t('massas.erp.importError'),
-      });
-    } finally {
-      setImportingEntLan(null);
-    }
-  };
-
-  /**
-   * Creates a worker directly from an unlinked ERP seat (S16-S19).
-   */
-  const handleCreateOperator = async (row: MassasUnifiedRow) => {
-    const entLan = row.entLans[0];
-    setCreatingOperatorEntLan(entLan);
-    try {
-      const username = deriveUsername(row.operatorName);
-      const display_name = deriveDisplayName(row.operatorName);
-      const password = quickWorkerPassword(username);
-
-      await api.post('/admin/users', {
-        username,
-        display_name,
-        password,
-        role_id: QUICK_WORKER_ROLE_ID,
-      });
-
-      setNotice({
-        type: 'success',
-        message: t('massas.unified.operatorCreated', 'Operário cadastrado com sucesso!'),
-      });
-      // S18: Table refreshes instantly, recognizes the new operator and button transforms to Importar
-      await Promise.all([load(date), loadMirror(date)]);
-    } catch (err) {
-      // Misma regla: el texto del servidor no se dibuja. Un alta rápida puede chocar con un usuario que ya
-      // existe o con un rol que no admite, y cada uno tiene su frase.
-      const message =
-        err instanceof ApiClientError && (err.status === 409 || err.message.includes('userAlreadyExists'))
-          ? t('admin.workers.userAlreadyExists')
-          : t('share.createServerError');
-      setNotice({ type: 'error', message });
-    } finally {
-      setCreatingOperatorEntLan(null);
-    }
-  };
-
-  /**
-   * Records what the operator says happened when the shortcut never called back.
-   *
-   * A cancelled shortcut, a wrong IP in the Atajos app and a genuine ERP refusal all look identical from
-   * the page. Rather than invent a verdict, the page asks, and the answer goes to the same log line the
-   * automatic path writes.
-   */
-  const handleSyncManualResult = async (ok: boolean) => {
-    await postAeroAuditEvent({
-      event: 'launch_sync',
-      phase: 'result',
-      destinationUrl: aeroDestination(),
-      httpStatus: ok ? 200 : null,
-      note: ok ? 'manual_confirmation:ok' : 'manual_confirmation:failed',
-      error: ok ? null : 'manual_confirmation',
-    });
-    clearAeroQueue();
-    setSyncAwaiting(null);
-    setNotice({ type: ok ? 'success' : 'error', message: t('massas.aero.syncRecorded') });
-  };
-
-  const handleToggleSync = (next: boolean) => {
-    if (!next) {
-      clearAeroQueue();
-      setSyncAwaiting(null);
-    }
-    setSyncToErp(next);
-    setAeroSettings(saveAeroSettings({ ...aeroSettings, syncEnabled: next }));
-  };
-
-  const startEditing = (launch: MassaIndividualLaunch) => {
-    setEditingLaunchId(launch.id);
-    setEditingBoxes(String(launch.boxes));
-  };
-
-  const cancelEditing = () => {
-    setEditingLaunchId(null);
-    setEditingBoxes('');
-  };
-
-  const saveEditing = async (launchId: number) => {
-    const boxesNum = parseInt(editingBoxes, 10);
-    if (!Number.isInteger(boxesNum) || boxesNum <= 0 || editingBusy) return;
-    setEditingBusy(true);
-    setNotice(null);
-    try {
-      await api.put(`/massas-launch/${launchId}`, { boxes: boxesNum });
-      setEditingLaunchId(null);
-      setEditingBoxes('');
-      setNotice({ type: 'success', message: t('massas.updateSuccess') });
-      await load(date);
-    } catch (err) {
-      setNotice({ type: 'error', message: err instanceof Error ? err.message : t('massas.updateError') });
-    } finally {
-      setEditingBusy(false);
-    }
-  };
-
-  const handleDeleteLaunch = async (launchId: number) => {
-    if (!window.confirm(t('massas.deleteConfirm'))) return;
-    setDeletingLaunchId(launchId);
-    setNotice(null);
-    try {
-      await api.del(`/massas-launch/${launchId}`);
-      setNotice({ type: 'success', message: t('massas.deleteSuccess') });
-      await load(date);
-    } catch (err) {
-      setNotice({ type: 'error', message: err instanceof Error ? err.message : t('massas.deleteError') });
-    } finally {
-      setDeletingLaunchId(null);
-    }
-  };
-
-  const handleCopyReport = async () => {
-    if (!previewMessage) return;
-    setCopyNote('');
-    const outcome = await shareOrCopy(previewMessage);
-    if (outcome === 'copied' || outcome === 'shared') {
-      setCopyNote(t('massas.copied'));
-    }
-  };
-
-  const handleOpenWhatsApp = () => {
-    if (!previewMessage) return;
-    const formattedNumber = toWhatsAppNumber(phone);
-    if (formattedNumber) {
-      const link = waMeLink(formattedNumber, previewMessage);
-      if (link) window.open(link, '_blank', 'noopener,noreferrer');
-    } else {
-      void shareOrCopy(previewMessage);
-    }
-  };
-
-  /**
-   * The wait the page owes the trip it just handed to Scriptable.
-   *
-   * The bridge is a deep link: the phone leaves for another app and comes back through a URL. When it never
-   * comes back -- the iPhone is off the factory Wi-Fi, or the script died before it could answer -- nothing
-   * tells the operator, and the screen stays on «enviando» for as long as they are willing to believe it. The
-   * mark written on the way out is what turns that silence into a sentence, once, and only after a wait long
-   * enough that a slow ERP is not mistaken for a phone that never returned.
-   */
-  const bridgeWatchdog = useRef<number | null>(null);
-
-  const disarmBridgeWatchdog = useCallback(() => {
-    if (bridgeWatchdog.current === null) return;
-    window.clearTimeout(bridgeWatchdog.current);
-    bridgeWatchdog.current = null;
-  }, []);
-
-  /** Nothing came back and the wait is over: say it once, drop the sending state and forget the trip. */
-  const warnBridgeDidNotReturn = useCallback(() => {
-    setSyncAwaiting(null);
-    setNotice({ type: 'error', message: t('massas.aero.scriptableNoReturn') });
-    clearAeroBridgePending();
-    disarmBridgeWatchdog();
-  }, [disarmBridgeWatchdog, t]);
-
-  /**
-   * Reads the mark and waits exactly what it has left.
-   *
-   * A fresh mark is a trip that just left and says nothing; an expired one is a phone that did not return.
-   * Reading it also discards what is not a mark anymore -- another day's, malformed, already answered -- so the
-   * page never warns about a launch it is not waiting for.
-   */
-  const armBridgeWatchdog = useCallback(() => {
-    // A callback in the URL is the answer the mark was waiting for: the effect that consumes it clears both.
-    if (parseAeroCallback(window.location.search)) return;
-    const mark = readAeroBridgePending();
-    disarmBridgeWatchdog();
-    if (!mark) return;
-    if (aeroBridgeMarkExpired(mark, Date.now())) {
-      warnBridgeDidNotReturn();
-      return;
-    }
-    // The mark knows when the page left, so the wait ends when that wait is over and not before.
-    const remaining = mark.at + AERO_BRIDGE_MARK_TTL_MS - Date.now();
-    bridgeWatchdog.current = window.setTimeout(() => {
-      bridgeWatchdog.current = null;
-      if (!aeroBridgeMarkExpired(mark, Date.now())) return;
-      warnBridgeDidNotReturn();
-    }, Math.max(remaining, 0) + 250);
-  }, [disarmBridgeWatchdog, warnBridgeDidNotReturn]);
-
-  useEffect(() => {
-    armBridgeWatchdog();
-    const onVisibility = () => {
-      if (document.visibilityState !== 'visible') return;
-      armBridgeWatchdog();
-    };
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => {
-      document.removeEventListener('visibilitychange', onVisibility);
-      disarmBridgeWatchdog();
-    };
-  }, [armBridgeWatchdog, disarmBridgeWatchdog]);
-
-  /**
-   * The shortcut's way back.
-   *
-   * The Atajos app finishes by opening this page with `aero_action` and `aero_data` -- the ERP answer, as it
-   * came -- which is the only channel a native app has to say what happened. The legacy `aero_sync` and
-   * `aero_test` parameters are still read, so a phone that has not rebuilt its shortcut keeps working. The
-   * query string is consumed and stripped, so a pull-to-refresh in the factory never replays a result.
+   * Handles error or test callbacks if returned directly to the launch route.
    */
   useEffect(() => {
-    if (aeroCallbackHandled.current) return;
     void (async () => {
       const parsed = await resolveAeroCallback(window.location.search);
       if (!parsed) return;
-      aeroCallbackHandled.current = true;
       window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`);
-    // Cualquier respuesta termina la espera: la marca describe un viaje, y el viaje ya volvió. Se limpia acá,
-    // donde se limpia la query, para que ni el aviso ni un refresh puedan reabrir un resultado ya leído.
-    clearAeroBridgePending();
-    disarmBridgeWatchdog();
+      clearAeroBridgePending();
 
-    if (parsed.kind === 'error') {
-      // El teléfono volvió sin la planta: el script no pudo alcanzar el ERP, así que no hay asiento que leer y
-      // nada puede marcarse como enviado. La cola y los lanzamientos pendientes quedan intactos; sólo se cierra
-      // el intento para que un refresh en la fábrica no repita el mismo aviso sobre trabajo que sigue pendiente.
-      clearAeroPendingAttempt();
-      setResultModal({
-        type: 'error',
-        title: t('massas.aero.wifiRequiredTitle'),
-        // El código es estable: sólo `wifi_required` habla de la red de la empresa. Cualquier otro error del
-        // puente se cuenta como error, no como un problema de Wi-Fi que el operario no puede resolver.
-        message: parsed.code === 'wifi_required' ? t('massas.aero.wifiRequired') : t('massas.aero.bridgeError'),
-      });
-      return;
-    }
-
-    if (parsed.kind === 'test') {
-      // The attempt was written before the phone left; this line closes it with what the endpoint said.
-      const pending = loadAeroPendingTest();
-      const destinationUrl = pending?.destinationUrl ?? aeroDestination() ?? aeroSettings.wsUrl;
-      clearAeroPendingTest();
-      void postAeroAuditEvent(
-        aeroTestResultEvent({ verdict: parsed.verdict, raw: parsed.raw, destinationUrl }),
-      );
-      setAeroTestOutcome({ verdict: parsed.verdict, raw: parsed.raw, destinationUrl });
-      // The panel that asked for this test may now be the one in the admin area, one trip away.
-      saveAeroTestOutcome({ verdict: parsed.verdict, raw: parsed.raw, destinationUrl });
-      return;
-    }
-
-    if (parsed.kind === 'bridge') {
-      // La consulta de movimientos no es un lanzamiento: viene con la respuesta del ERP y se guarda como
-      // snapshot del día, que es lo que el resto de la planta va a leer.
-      if (parsed.action === 'movimentos') {
-        void handleMovementsCallback(parsed.data);
-        return;
-      }
-
-      // Un lote vuelve como un array, en el orden en que se envió: cada posición es un producto y las que
-      // falten son productos sin confirmar, no un lote que terminó antes.
-      if (parsed.action === 'entrada_lote') {
-        const attempt = loadAeroPendingAttempt('entrada_lote');
+      if (parsed.kind === 'error') {
         clearAeroPendingAttempt();
-        const pairing = attempt
-          ? { attemptId: attempt.attemptId, startedAt: attempt.startedAt, client: 'web' as const }
-          : { client: 'web' as const };
-        const queue = readAeroQueue();
-        const sent = queue?.inFlight ?? [];
-        const expected = sent.length > 0 ? sent.length : Array.isArray(parsed.data) ? parsed.data.length : 1;
-        const batch = readAeroBatchResult(parsed.data, expected);
-        const destination = aeroDestination();
-
-        void postAeroAuditEvent({
-          event: 'launch_sync',
-          phase: 'result',
-          destinationUrl: destination,
-          httpStatus: batch.ok === batch.total ? 200 : null,
-          response: `${batch.ok}/${batch.total} ok`,
-          error: batch.failed > 0 ? batch.message ?? 'batch_item_failed' : null,
-          note: `batch ok=${batch.ok} failed=${batch.failed} · via=bridge`,
-          ...pairing,
-        });
-
-        const feedback = batchSyncFeedback(batch);
-
-        // Un atajo sin la rama de lote ignora `bodies` y contesta un objeto suelto: el lote degrada al flujo
-        // de siempre, con el primer producto ya confirmado y el resto todavía esperando en la cola.
-        if (!feedback) {
-          const rest = queue
-            ? {
-                ...queue,
-                items: [...(batch.ok === 1 ? sent.slice(1) : sent), ...queue.items],
-                inFlight: [],
-              }
-            : null;
-          if (rest && rest.items.length > 0) {
-            writeAeroQueue(rest);
-            void triggerAeroSync(rest);
-            return;
-          }
-          clearAeroQueue();
-          setSyncAwaiting(null);
-          // El producto quedó en la planta: este veredicto deja el día debiendo una lectura.
-          if (batch.ok === 1) armAeroAutoRead(date);
-          setResultModal(
-            batch.ok === 1
-              ? { type: 'success', message: t('massas.aero.syncConfirmYes'), sentToErp: true }
-              : { type: 'error', message: batch.message ?? t('massas.aero.syncConfirmNo') },
-          );
-          return;
-        }
-
-        // Sólo lo que el ERP no confirmó vuelve a la cola, y vuelve al frente: un lote completo se limpia, y
-        // uno fallido no se da por bueno. Un reintento es del operario, no de la página.
-        const failedItems = batch.failedIndexes
-          .map((index) => sent[index])
-          .filter((item): item is NonNullable<typeof item> => item !== undefined);
-        const retryItems =
-          batch.state === 'complete' ? [] : batch.state === 'partial' ? failedItems : sent;
-        const rest = queue ? { ...queue, items: [...retryItems, ...queue.items], inFlight: [] } : null;
-        if (rest) writeAeroQueue(rest);
-        else clearAeroQueue();
-        setSyncAwaiting(rest && rest.items.length > 0 ? { date: rest.date, remaining: rest.items.length } : null);
-
-        // Lo que la planta confirmó deja el día debiendo una lectura, y se paga al cerrar este veredicto:
-        // leer es otro viaje del atajo, y salir ahora sería dejar al operario sin la respuesta que pidió.
-        // Un lote parcial no la arma: lo que falta sigue en la cola y el próximo veredicto la arma.
-        if (batch.ok > 0 && !rest?.items.length) armAeroAutoRead(date);
         setResultModal({
-          type: feedback.tone === 'ok' ? 'success' : feedback.tone === 'warn' ? 'warn' : 'error',
-          title: t(feedback.titleKey),
-          message: t(feedback.messageKey, {
-            ...feedback.params,
-            count: feedback.count,
-            date: queue?.date ?? '',
-            detail: batch.message ?? t('massas.erp.batchNoDetail'),
-          }),
-          sentToErp: batch.ok > 0,
-          retryCount: batch.state === 'complete' ? undefined : batch.failed,
+          type: 'error',
+          title: t('massas.aero.wifiRequiredTitle'),
+          message: parsed.code === 'wifi_required' ? t('massas.aero.wifiRequired') : t('massas.aero.bridgeError'),
         });
         return;
       }
 
-      // El puente devuelve la respuesta del ERP sin interpretarla: acá se decide qué significa.
-      const outcome = readAeroBridgeResult(parsed.data);
-      // Only `entrada` is a launch this page opened; a `saida` comes back from another screen and must not
-      // borrow the identifier of a launch still in flight.
-      const attempt = parsed.action === 'entrada' ? loadAeroPendingAttempt('entrada') : null;
-      clearAeroPendingAttempt();
-      const pairing = attempt
-        ? { attemptId: attempt.attemptId, startedAt: attempt.startedAt, client: 'web' as const }
-        : { client: 'web' as const };
-      void postAeroAuditEvent({
-        event: 'launch_sync',
-        phase: 'result',
-        destinationUrl: aeroDestination(),
-        httpStatus: outcome.status === 'ok' ? 200 : null,
-        response: outcome.message,
-        error: outcome.status === 'error' ? outcome.message ?? 'bridge_unreadable' : null,
-        note: `action=${parsed.action} · via=bridge`,
-        ...pairing,
-      });
-
-      // Sólo la entrada es un lanzamiento que esta página tiene que cerrar. Una baja o una consulta vuelven
-      // igual, y quedan como evidencia en el log.
-      if (parsed.action !== 'entrada') return;
-
-      const queue = readAeroQueue();
-
-      // El producto que viajó ya está confirmado, así que sale de `inFlight`: lo que quede pendiente es lo
-      // que todavía no salió, y eso es lo único que puede disparar otro viaje. Mirar sólo `items` dejaba al
-      // operario sin veredicto justo en el caso normal, un producto que vuelve y no deja nada detrás.
-      if (outcome.status === 'ok' && queue) {
-        const rest = { ...queue, inFlight: [] };
-        if (rest.items.length > 0) {
-          writeAeroQueue(rest);
-          void triggerAeroSync(rest);
-          return;
-        }
+      if (parsed.kind === 'test') {
+        const pending = loadAeroPendingTest();
+        const destinationUrl = pending?.destinationUrl ?? aeroDestination() ?? aeroSettings.wsUrl;
+        clearAeroPendingTest();
+        void postAeroAuditEvent(
+          aeroTestResultEvent({ verdict: parsed.verdict, raw: parsed.raw, destinationUrl }),
+        );
+        setAeroTestOutcome({ verdict: parsed.verdict, raw: parsed.raw, destinationUrl });
+        saveAeroTestOutcome({ verdict: parsed.verdict, raw: parsed.raw, destinationUrl });
       }
-
-      // Una entrada rechazada no se pierde: vuelve al frente de la cola para que el reintento la encuentre.
-      const refused = outcome.status !== 'ok' && queue ? { ...queue, items: [...queue.inFlight, ...queue.items], inFlight: [] } : null;
-      if (refused && refused.items.length > 0) {
-        writeAeroQueue(refused);
-        setSyncAwaiting({ date: refused.date, remaining: refused.items.length });
-      } else {
-        clearAeroQueue();
-        setSyncAwaiting(null);
-      }
-
-      if (outcome.status === 'ok') armAeroAutoRead(date);
-      setResultModal(
-        outcome.status === 'ok'
-          ? { type: 'success', message: outcome.message ?? t('massas.aero.syncConfirmYes'), sentToErp: true }
-          : { type: 'error', message: outcome.message ?? t('massas.aero.syncConfirmNo') },
-      );
-      return;
-    }
-
-    if (parsed.kind !== 'sync') return;
-
-    const queue = readAeroQueue();
-    const destination = aeroDestination();
-
-    void postAeroAuditEvent({
-      event: 'launch_sync',
-      phase: 'result',
-      destinationUrl: destination,
-      httpStatus: parsed.status === 'ok' ? 200 : null,
-      response: parsed.message,
-      error: parsed.status === 'error' ? parsed.message ?? 'shortcut_error' : null,
-    });
-
-    if (parsed.status === 'ok' && queue) {
-      void triggerAeroSync(queue);
-      return;
-    }
-
-    clearAeroQueue();
-    setSyncAwaiting(null);
-    if (parsed.status === 'ok') armAeroAutoRead(date);
-    setResultModal(
-      parsed.status === 'ok'
-        ? { type: 'success', message: parsed.message ?? t('massas.aero.syncConfirmYes') }
-        : { type: 'error', message: parsed.message ?? t('massas.aero.syncConfirmNo') },
-    );
     })();
-  }, [aeroDestination, aeroSettings.wsUrl, date, disarmBridgeWatchdog, handleMovementsCallback, t, triggerAeroSync]);
+  }, [aeroDestination, aeroSettings.wsUrl, t]);
 
-  /**
-   * The operator came back from the phone without a verdict.
-   *
-   * Returning to this page with an open attempt means the shortcut was cancelled, failed before it could
-   * read the answer, or the return URL never opened. Closing the attempt keeps the trail honest: an open
-   * `requested` line forever is noise, and inventing a success would be worse.
-   */
   useEffect(() => {
     const onVisibility = () => {
       if (document.visibilityState !== 'visible') return;
-      if (aeroCallbackHandled.current) return;
-      // A callback in the URL belongs to the effect above, whatever order the browser fires events in.
       if (parseAeroCallback(window.location.search)) return;
       const pending = loadAeroPendingTest();
       if (!pending) return;
@@ -1224,26 +389,6 @@ export function MassasLaunchPage() {
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, []);
 
-  // One row per box, from both screens. It is derived on every render on purpose: the day and the mirror are
-  // the only truth, and a stored row state would be a third one to keep in sync (D5).
-  const unifiedRows = useMemo<MassasUnifiedRow[]>(
-    () =>
-      massasUnifiedRows({
-        launches: dayView?.launches ?? [],
-        movements: mirror.snapshot?.movements ?? [],
-        products: dayView?.products ?? [],
-        ackedLaunchIds,
-      }),
-    [dayView, mirror.snapshot, ackedLaunchIds],
-  );
-
-  // The message covers the whole day, so it reads the same rows the table draws: a worker who only exists in
-  // the ERP travels in the WhatsApp summary too, and an already reconciled launch is not counted twice.
-  const previewMessage = useMemo(() => {
-    if (!dayView) return '';
-    return massasMessage(dayView, unifiedRows);
-  }, [dayView, unifiedRows]);
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -1252,32 +397,11 @@ export function MassasLaunchPage() {
     );
   }
 
-
-
-  /**
-   * Closes the verdict, and only now pays the read the launch left owed.
-   *
-   * Both the backdrop and the button come through here: the mark is the only thing that decides, so a
-   * dialog the operator dismissed last of a day that owes nothing costs no trip.
-   */
-  const closeResultModal = () => {
-    setResultModal(null);
-    if (!consumeAeroAutoRead(date)) return;
-    void handleSyncFromErp();
-  };
-
-  const handleToggleAck = (row: MassasUnifiedRow) => {
-    const launchId = row.launchIds[0];
-    if (launchId === undefined) return;
-    setAckedLaunchIds(toggleAckedLaunchId(date, launchId));
-  };
-
   return (
     <div className="max-w-6xl mx-auto space-y-4 pb-12 sm:space-y-6">
       {aeroAllowed && deviceLimited && <AeroDeviceBanner device={device} />}
-      {/* Encabezado y Selección de Fecha. Sin el emoji: en un teléfono la placa del espagueti y el
-          botón se llevaban el ancho que el título necesitaba. Debajo de `sm` las acciones bajan a su
-          propio renglón y la fecha sigue alcanzable con el pulgar. */}
+
+      {/* Header and Date Selection */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 bg-white p-4 rounded-xl border border-gray-200 shadow-sm sm:p-6">
         <div className="min-w-0">
           <div className="flex items-center justify-between gap-2">
@@ -1292,33 +416,8 @@ export function MassasLaunchPage() {
             </div>
           </div>
           <p className="text-sm text-gray-500 mt-1">{t('massas.subtitle')}</p>
-          {/* Today is the only day the ERP can still be told about: a closed day is a record, and a header
-              that offers to refresh it would be offering an action the API answers with a refusal. */}
-          {aeroAllowed && !dayIsClosed && (
-            <div className="mt-3 flex flex-wrap items-center gap-2" data-testid="massas-sync-header">
-              <button
-                type="button"
-                onClick={handleSyncFromErp}
-                disabled={mirror.loading || !aeroSettingsReady(aeroSettings) || deviceLimited}
-                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg bg-amber-600 px-3 text-xs font-semibold text-white transition-colors hover:bg-amber-700 disabled:opacity-50"
-                data-testid="massas-sync-erp"
-              >
-                <RefreshCw className={`h-4 w-4 shrink-0 ${mirror.loading ? 'animate-spin' : ''}`} />
-                {t('massas.syncHeader.action', 'Sincronizar com ERP')}
-              </button>
-              <span className="text-xs text-gray-500" data-testid="massas-last-sync">
-                {t('massas.syncHeader.lastSync', 'Último sync')}:{' '}
-                <span className="font-semibold tabular-nums text-gray-700">
-                  {lastSyncLabel(mirror.snapshot?.syncedAt ?? null)}
-                </span>
-              </span>
-            </div>
-          )}
         </div>
-        {/* Una sola fila también en el teléfono. Los dos controles miden lo que su propio texto mide:
-            `DateField` dibuja la fecha él mismo y deja el input nativo invisible encima, así que WebKit
-            no puede reclamar los ~250px con los que dibujaría "28 de out. de 2026". El nombre completo
-            del destino sigue estando desde `sm`. */}
+
         <div className="flex w-full items-center gap-2 sm:w-auto">
           <DateField
             id="massa-date"
@@ -1328,12 +427,9 @@ export function MassasLaunchPage() {
             max={saoPauloToday()}
             testId="massas-launch-date"
           />
-          {/* Un enlace que envuelve un botón deja dos destinos anidados en el mismo punto: el lector de
-              pantalla anuncia dos y el dedo no sabe cuál tocó. El destino vive en el enlace. */}
           <Link
             to="/massas-history"
             className="inline-flex h-11 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-300 bg-white px-3 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 sm:h-10"
-
           >
             <History className="h-4 w-4 shrink-0" />
             <span className="sm:hidden">{t('massas.historyShort')}</span>
@@ -1361,7 +457,29 @@ export function MassasLaunchPage() {
         </div>
       )}
 
-      {/* BLOQUE 1 (Superior): Formulario / Grilla de 10 Productos SIN botón resetear */}
+      {/* When ERP is not configured, show plain message with link instead of toggle switch */}
+      {aeroAllowed && !aeroSettingsReady(aeroSettings) && (
+        <div
+          role="status"
+          className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 flex items-center justify-between gap-2"
+          data-testid="massas-erp-not-configured"
+        >
+          <span>
+            {aeroMissingSetup(aeroSettings) === 'password'
+              ? t('massas.aero.passwordNeeded')
+              : t('massas.aero.syncNeedsSetup')}
+          </span>
+          <Link
+            to="/admin?tab=integration"
+            className="font-semibold underline hover:text-amber-950 shrink-0"
+            data-testid="massas-configure-erp-link"
+          >
+            {t('massas.aero.configureLink', 'Configurar conexão')}
+          </Link>
+        </div>
+      )}
+
+      {/* Product Launch Grid with Sticky Bar */}
       {dayView && (
         <MassasLaunchGrid
           products={dayView.products}
@@ -1370,133 +488,10 @@ export function MassasLaunchPage() {
           onLaunch={handleRequestLaunch}
           submitting={submitting}
           readOnly={dayIsClosed}
-          erpControl={
-            aeroAllowed ? (
-              <div className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 sm:py-1">
-                <div className="min-w-0">
-                  <span id="aero-sync-label" className="block text-xs font-semibold text-gray-800 leading-tight">
-                    {t('massas.aero.syncLabel')}
-                  </span>
-                  <span className="block text-[11px] text-gray-500 leading-tight">
-                    {aeroSettingsReady(aeroSettings)
-                      ? t('massas.aero.syncHint')
-                      : aeroMissingSetup(aeroSettings) === 'password'
-                        ? t('massas.aero.passwordPending')
-                        : t('massas.aero.syncNeedsSetup')}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={syncToErp}
-                  aria-labelledby="aero-sync-label"
-                  onClick={() => handleToggleSync(!syncToErp)}
-                  disabled={!aeroSettingsReady(aeroSettings) || deviceLimited}
-                  className="inline-flex h-11 w-14 shrink-0 items-center justify-center rounded-full disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-                  data-testid="aero-sync-switch"
-                >
-                  <span
-                    className={`relative flex h-7 w-12 items-center rounded-full transition-colors ${
-                      syncToErp ? 'bg-amber-600' : 'bg-gray-300'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
-                        syncToErp ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </span>
-                </button>
-              </div>
-            ) : undefined
-          }
         />
       )}
 
-      {/* The shortcut does not always call back; the operator's answer is the fallback verdict. */}
-      {aeroAllowed && syncAwaiting && (
-        <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3">
-          <div>
-            <p className="text-sm font-semibold text-amber-900">{t('massas.aero.syncConfirmTitle')}</p>
-            <p className="text-xs text-amber-800 mt-0.5">
-              {t('massas.aero.syncConfirmHint')}
-              {syncAwaiting.remaining > 0 && ` · ${syncAwaiting.remaining}`}
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Button
-              type="button"
-              onClick={() => void handleSyncManualResult(true)}
-              className="min-h-[44px] w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-semibold"
-            >
-              {t('massas.aero.syncConfirmYes')}
-            </Button>
-            <Button
-              type="button"
-              onClick={() => void handleSyncManualResult(false)}
-              variant="outline"
-              className="min-h-[44px] w-full sm:w-auto font-semibold text-red-700"
-            >
-              {t('massas.aero.syncConfirmNo')}
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* BLOQUE 2 (Intermedio): Resumen Colectivo y Desglose RBAC */}
-      {dayView && (
-        <MassasCollectiveTable
-          products={dayView.products}
-          launches={dayView.launches}
-          currentUserId={user?.id}
-          isAdmin={user?.role === 'Administrador'}
-          editingLaunchId={editingLaunchId}
-          editingBoxes={editingBoxes}
-          editingBusy={editingBusy}
-          onStartEdit={startEditing}
-          onCancelEdit={cancelEditing}
-          onSaveEdit={saveEditing}
-          onEditBoxesChange={setEditingBoxes}
-          onDelete={handleDeleteLaunch}
-          deletingId={deletingLaunchId}
-          unifiedRows={unifiedRows}
-          unifiedDate={date}
-          canSync={aeroAllowed && aeroSettingsReady(aeroSettings)}
-          deviceLimited={deviceLimited}
-          onSendToErp={handleSendPendingLaunch}
-          onImport={(request) => void handleImportErpSeat(request)}
-          importingEntLan={importingEntLan}
-          onCreateOperator={(row) => void handleCreateOperator(row)}
-          creatingOperatorEntLan={creatingOperatorEntLan}
-          onToggleAck={handleToggleAck}
-        />
-      )}
-
-      {/* BLOQUE 3 (Inferior): Compartir por WhatsApp con máscara y unidades totales */}
-      <MassasWhatsAppShare
-        phone={phone}
-        onPhoneChange={setPhone}
-        previewMessage={previewMessage}
-        onCopy={handleCopyReport}
-        onOpenWhatsApp={handleOpenWhatsApp}
-        copyNote={copyNote}
-      />
-
-      {/* Resultado da consulta ao ERP: quantos assentos vieram, ou por que não vieram */}
-      <AeroResultDialog
-        open={syncResult !== null}
-        tone={syncResult?.feedback.tone ?? 'ok'}
-        title={t(syncResult?.feedback.titleKey ?? 'massas.erp.syncOkTitle')}
-        message={t(syncResult?.feedback.messageKey ?? 'massas.erp.syncError', {
-          count: syncResult?.feedback.count ?? 0,
-          date: formatDateLabel(date),
-        })}
-        hint={syncResult?.detail ?? null}
-        onClose={() => setSyncResult(null)}
-        testId="aero-sync-result-modal"
-      />
-
-      {/* Modal de Confirmação Prévio ao Lançamento */}
+      {/* Launch Confirmation Dialog */}
       {isConfirmOpen && (
         <Dialog
           open={isConfirmOpen}
@@ -1551,11 +546,11 @@ export function MassasLaunchPage() {
         </Dialog>
       )}
 
-      {/* Diálogo Modal de Notificação de Resultado */}
+      {/* Result Notification Modal */}
       {resultModal && (
         <Dialog
           open={resultModal !== null}
-          onClose={closeResultModal}
+          onClose={() => setResultModal(null)}
           labelledBy="massa-result-title"
           panelTestId="massa-result-modal"
         >
@@ -1572,32 +567,13 @@ export function MassasLaunchPage() {
             <p className="text-sm text-gray-600" data-testid="massa-result-message">
               {resultModal.message}
             </p>
-            {launchMirrorHint(resultModal) && (
-              <p
-                className="rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs leading-relaxed text-amber-900"
-                data-testid="massa-result-mirror-hint"
-              >
-                {t('massas.erp.mirrorHint')}
-              </p>
-            )}
             <div className="space-y-2 pt-2">
-              {resultModal.retryCount ? (
-                <Button
-                  onClick={retryFailedLaunches}
-                  className="min-h-[44px] w-full bg-amber-600 font-semibold text-white hover:bg-amber-700"
-                  data-testid="massa-result-retry"
-                >
-                  {t('massas.erp.batchRetry', { count: resultModal.retryCount })}
-                </Button>
-              ) : null}
               <Button
-                onClick={closeResultModal}
+                onClick={() => setResultModal(null)}
                 className={`min-h-[44px] w-full font-semibold ${
                   resultModal.type === 'success'
                     ? 'bg-green-600 hover:bg-green-700 text-white'
-                    : resultModal.type === 'warn'
-                      ? 'bg-amber-600 hover:bg-amber-700 text-white'
-                      : 'bg-red-600 hover:bg-red-700 text-white'
+                    : 'bg-red-600 hover:bg-red-700 text-white'
                 }`}
                 data-testid="massa-result-close"
               >

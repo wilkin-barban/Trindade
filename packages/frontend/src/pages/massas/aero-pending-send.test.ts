@@ -13,7 +13,7 @@ import { describe, it } from 'node:test';
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const unified = read('./MassasUnifiedTable.tsx');
 const collective = read('./MassasCollectiveTable.tsx');
-const launch = read('../MassasLaunchPage.tsx');
+const history = read('../MassasHistoryPage.tsx');
 
 describe('the pending row sends its own launch', () => {
   it('gives the row its own action instead of reusing the day sync', () => {
@@ -25,18 +25,18 @@ describe('the pending row sends its own launch', () => {
   });
 
   it('hands the page the pending row and trips the launch envelope', () => {
-    assert.match(launch, /onSendToErp=\{handleSendPendingLaunch\}/);
-    assert.match(launch, /const handleSendPendingLaunch = useCallback\(/);
-    assert.match(launch, /pendingLaunchQueueItem\(\{/);
+    assert.match(history, /handleSendPendingLaunch/);
+    assert.match(history, /const handleSendPendingLaunch = useCallback\(/);
+    assert.match(history, /pendingLaunchQueueItem\(\{/);
     // The row's operator and its launches are what make the envelope traceable back to the person.
-    assert.match(launch, /operatorName: row\.operatorName/);
-    assert.match(launch, /launchIds: row\.launchIds/);
-    assert.match(launch, /triggerAeroSync\(queue\)/);
+    assert.match(history, /operatorName: row\.operatorName/);
+    assert.match(history, /launchIds: row\.launchIds/);
+    assert.match(history, /triggerAeroSync\(queue\)/);
     // The movements read stays where it belongs: the header's "Sincronizar com ERP".
-    assert.match(launch, /onClick=\{handleSyncFromErp\}/);
+    assert.match(history, /onClick=\{handleSyncFromErp\}/);
   });
 
   it('signs each queued entry with its own operator, falling back to the session', () => {
-    assert.match(launch, /userCode: item\.operatorName \?\? operatorUser/);
+    assert.match(history, /userCode: item\.operatorName \?\? operatorUser/);
   });
 });

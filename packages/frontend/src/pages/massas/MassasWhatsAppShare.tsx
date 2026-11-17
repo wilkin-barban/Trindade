@@ -41,6 +41,7 @@ export function MassasWhatsAppShare({
               </label>
               <Input
                 id="massa-whatsapp-phone"
+                data-testid="massas-whatsapp-phone"
                 type="tel"
                 inputMode="tel"
                 placeholder={t('massas.phonePlaceholder')}

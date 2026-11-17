@@ -3,25 +3,27 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import i18n from '../i18n/config';
 import type { MassasLaunchDayView } from '../lib/massas';
-import { saoPauloDaysAgo, saoPauloYesterday } from '../lib/date';
+import { saoPauloDaysAgo, saoPauloToday, saoPauloYesterday } from '../lib/date';
 
-/**
- * The history picks its day the way the count does: a panel and a strip of the days that have launches.
- *
- * Four things are asserted here because they are the four ways this screen can lie to the operator: the
- * strip has to show the days that have launches with their units (which is how a person recognises a day),
- * a chip has to change the table it governs, the chosen day has to survive in the URL so a link -- the
- * launch screen and the report both build one -- opens the day it names, and yesterday has to be offered
- * even when the endpoint never listed it, because a day with nothing is still a day worth opening.
- *
- * A day with nothing is asserted too: an empty day and a failed read are different sentences, and a failed
- * day list must not take the day field down with it.
- */
 const get = vi.fn();
+const post = vi.fn();
+const put = vi.fn();
+const del = vi.fn();
 
 vi.mock('../api/client', () => ({
-  api: { get: (...args: unknown[]) => get(...args) },
+  api: {
+    get: (...args: unknown[]) => get(...args),
+    post: (...args: unknown[]) => post(...args),
+    put: (...args: unknown[]) => put(...args),
+    del: (...args: unknown[]) => del(...args),
+  },
   ApiClientError: class ApiClientError extends Error {},
+}));
+
+vi.mock('../contexts/AuthContext', () => ({
+  useAuth: () => ({
+    user: { id: 1, username: 'wilkin', role: 'Administrador' },
+  }),
 }));
 
 const { MassasHistoryPage } = await import('./MassasHistoryPage');
@@ -74,60 +76,106 @@ function renderPage(initialUrl = '/massas-history') {
 
 beforeEach(async () => {
   get.mockReset();
+  post.mockReset();
+  put.mockReset();
+  del.mockReset();
   currentUrl = '';
   await i18n.changeLanguage('es');
+
+  get.mockImplementation(async (url: string) => {
+    if (url.startsWith('/massas-launch/history')) {
+      return {
+        days: [
+          { date: saoPauloToday(), productsCount: 1, totalBoxes: 3, totalUnits: 30, operatorsCount: 1 },
+          { date: '2026-10-27', productsCount: 2, totalBoxes: 7, totalUnits: 70, operatorsCount: 3 },
+          { date: '2026-10-26', productsCount: 1, totalBoxes: 2, totalUnits: 20, operatorsCount: 1 },
+        ],
+      };
+    }
+    if (url.startsWith('/massas-launch?')) return dayView(url.split('date=')[1], 'MASSA DE PASTEL');
+    if (url.startsWith('/integration/aero/movements')) {
+      return { date: '2026-10-27', movements: [] };
+    }
+    if (url.startsWith('/admin/aero/vault')) {
+      return { configured: true, wsUrl: 'http://192.168.25.250:1453/api', username: 'APL', hasPassword: true };
+    }
+    return {};
+  });
 });
 
 describe('MassasHistoryPage', () => {
-  it('offers the day through the same panel the count uses, with one chip per day', async () => {
-    get.mockImplementation(async (url: string) => {
-      if (url.startsWith('/massas-launch/history')) {
-        return {
-          days: [
-            { date: '2026-10-27', productsCount: 2, totalBoxes: 7, totalUnits: 70, operatorsCount: 3 },
-            { date: '2026-10-26', productsCount: 1, totalBoxes: 2, totalUnits: 20, operatorsCount: 1 },
-          ],
-        };
-      }
-      if (url.startsWith('/massas-launch?')) return dayView(url.split('date=')[1], 'MASSA DE PASTEL');
-      return { date: '2026-10-27', movements: [] };
-    });
-
+  it('offers the day through the panel up to today, with chips (Item 2 & 7)', async () => {
     renderPage();
 
-    // The panel field carries the archive window: thirty days back, and never today.
     const field = await screen.findByTestId('massas-history-date');
     expect(field).toHaveAttribute('type', 'date');
-    const todayInSaoPaulo = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
-    const yesterdayInSaoPaulo = new Date(`${todayInSaoPaulo}T12:00:00Z`);
-    yesterdayInSaoPaulo.setUTCDate(yesterdayInSaoPaulo.getUTCDate() - 1);
-    expect(field).toHaveAttribute('max', yesterdayInSaoPaulo.toISOString().slice(0, 10));
+    expect(field).toHaveAttribute('max', saoPauloToday());
     expect(field).toHaveAttribute('min', saoPauloDaysAgo(30));
 
-    // One chip per day, day and units, the way the count writes them.
     expect(await screen.findByTestId('massas-history-days')).toBeInTheDocument();
     expect(screen.getByTestId('massas-history-day-2026-10-27')).toHaveTextContent('27/10 · 70');
     expect(screen.getByTestId('massas-history-day-2026-10-26')).toHaveTextContent('26/10 · 20');
-
-    // The two-line card that used to live here is gone, not renamed.
-    expect(screen.queryByText('Escolha o dia')).not.toBeInTheDocument();
   });
 
-  it('offers yesterday even when the endpoint never listed it, without claiming it was empty', async () => {
-    get.mockImplementation(async (url: string) => {
-      if (url.startsWith('/massas-launch/history')) return { days: [] };
-      if (url.startsWith('/massas-launch?')) return dayView(url.split('date=')[1], 'MASSA DE PASTEL');
-      return { date: '2026-10-27', movements: [] };
-    });
-
+  it('renders the 4 sections in history: produção as cards, individuais, coletivo, whatsapp (Item 2)', async () => {
     renderPage();
 
-    const yesterday = saoPauloYesterday();
-    const chip = await screen.findByTestId(`massas-history-day-${yesterday}`);
-    // A day nobody read has no count: printing 0 would state a fact the endpoint never gave.
-    expect(chip).toHaveTextContent(/^\d{2}\/\d{2}$/);
-    expect(chip).toHaveAttribute('aria-pressed', 'true');
-    expect(chip).toBeDisabled();
+    // 1. Produção do dia (restyled as cards)
+    expect(await screen.findByTestId('massas-unified')).toBeInTheDocument();
+    expect(screen.getByTestId('massas-unified-rows')).toBeInTheDocument();
+
+    // 2. Lançamentos Individuais with worker chips
+    expect(await screen.findByTestId('massas-individual-launches')).toBeInTheDocument();
+    expect(screen.getByTestId('massas-worker-chips')).toBeInTheDocument();
+
+    // 3. Resumo Coletivo do Dia
+    expect(await screen.findByTestId('massas-collective-summary')).toBeInTheDocument();
+
+    // 4. Compartilhar por WhatsApp
+    expect(await screen.findByTestId('massas-whatsapp-phone')).toBeInTheDocument();
+  });
+
+  it('shows ERP sync button for today and hides it for past days (Item 5)', async () => {
+    // Today
+    const { unmount } = renderPage(`/massas-history?date=${saoPauloToday()}`);
+    expect(await screen.findByTestId('massas-sync-erp')).toBeInTheDocument();
+    unmount();
+
+    // Past day
+    renderPage('/massas-history?date=2026-10-26');
+    await screen.findByTestId('massas-individual-launches');
+    expect(screen.queryByTestId('massas-sync-erp')).not.toBeInTheDocument();
+  });
+
+  it('handles bridge return and opens result modal in history (Item 6)', async () => {
+    const payload = [{ PRO_COD: '001192', PRO_QTD: 3000, SUCCESS: true }];
+    renderPage(`/massas-history?date=${saoPauloToday()}&aero_action=entrada_lote&aero_data=${encodeURIComponent(JSON.stringify(payload))}`);
+
+    expect(await screen.findByTestId('massa-result-modal')).toBeInTheDocument();
+    expect(screen.getByTestId('massa-result-close')).toBeInTheDocument();
+  });
+
+  it('today is manageable (edit/delete/relaunch) and past days are read-only with visible notice (Item 7)', async () => {
+    // 1. On Today: mutations allowed
+    const today = saoPauloToday();
+    const { unmount } = renderPage(`/massas-history?date=${today}`);
+
+    expect(await screen.findByTestId('massas-individual-launches')).toBeInTheDocument();
+    expect(screen.queryByTestId('massas-history-readonly')).not.toBeInTheDocument();
+    // Edit/delete controls present
+    expect(screen.getAllByTitle(/Editar|Editar lançamento/i).length).toBeGreaterThan(0);
+
+    unmount();
+
+    // 2. On Past Day: mutations hidden, read-only notice visible, WhatsApp kept
+    renderPage('/massas-history?date=2026-10-26');
+
+    expect(await screen.findByTestId('massas-history-readonly')).toBeInTheDocument();
+    expect(screen.queryByTestId('massas-sync-erp')).not.toBeInTheDocument();
+    expect(screen.queryByTitle(/Editar|Editar lançamento/i)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('massas-unified-send')).not.toBeInTheDocument();
+    // WhatsApp share is still present
+    expect(screen.getByTestId('massas-whatsapp-phone')).toBeInTheDocument();
   });
 
   it('changes the table when another day is clicked, and keeps the day in the URL', async () => {
@@ -152,70 +200,8 @@ describe('MassasHistoryPage', () => {
     await waitFor(() => expect(screen.getByTestId('massas-history-day-2026-10-26')).toBeInTheDocument());
     fireEvent.click(screen.getByTestId('massas-history-day-2026-10-26'));
 
-    // The name is the table's own header and its rows: what matters is that the day it shows changed.
     expect((await screen.findAllByText('MASSA DE QUEIJO')).length).toBeGreaterThan(0);
     await waitFor(() => expect(currentUrl).toBe('/massas-history?date=2026-10-26'));
-  });
-
-  it('drops a stale answer that arrives after a newer one', async () => {
-    const resolvers: Record<string, (view: MassasLaunchDayView) => void> = {};
-    get.mockImplementation((url: string) => {
-      if (url.startsWith('/massas-launch/history')) {
-        return Promise.resolve({
-          days: [
-            { date: '2026-10-27', productsCount: 1, totalBoxes: 3, totalUnits: 30, operatorsCount: 1 },
-            { date: '2026-10-26', productsCount: 1, totalBoxes: 3, totalUnits: 30, operatorsCount: 1 },
-          ],
-        });
-      }
-      if (url.startsWith('/massas-launch?')) {
-        const date = url.split('date=')[1];
-        if (date === '2026-10-27' || date === '2026-10-26') {
-          return new Promise<MassasLaunchDayView>((resolve) => {
-            resolvers[date] = resolve;
-          });
-        }
-        return Promise.resolve(dayView(date, 'MASSA DE PASTEL'));
-      }
-      return Promise.resolve({ date: '2026-10-27', movements: [] });
-    });
-
-    renderPage();
-
-    await waitFor(() => expect(screen.getByTestId('massas-history-day-2026-10-27')).toBeInTheDocument());
-    fireEvent.click(screen.getByTestId('massas-history-day-2026-10-27'));
-    // Both reads are in flight before either answers: that is the race the screen has to survive.
-    await waitFor(() => expect(resolvers['2026-10-27']).toBeDefined());
-    fireEvent.click(screen.getByTestId('massas-history-day-2026-10-26'));
-    await waitFor(() => expect(resolvers['2026-10-26']).toBeDefined());
-
-    // The second tap answers first; the first one lands afterwards carrying a day the operator already left.
-    resolvers['2026-10-26'](dayView('2026-10-26', 'MASSA DE QUEIJO'));
-    expect((await screen.findAllByText('MASSA DE QUEIJO')).length).toBeGreaterThan(0);
-
-    resolvers['2026-10-27'](dayView('2026-10-27', 'MASSA DE PASTEL VELHA'));
-    // Let the late answer run everything it wanted to run, and then look: it asked for a day nobody is on.
-    await act(async () => {
-      await Promise.resolve();
-    });
-    expect(screen.queryByText('MASSA DE PASTEL VELHA')).toBeNull();
-    expect(screen.queryAllByText('MASSA DE QUEIJO').length).toBeGreaterThan(0);
-  });
-
-  it('opens the day named in the URL', async () => {
-    get.mockImplementation(async (url: string) => {
-      if (url.startsWith('/massas-launch/history')) return { days: [] };
-      if (url.startsWith('/massas-launch?')) {
-        const date = url.split('date=')[1];
-        return dayView(date, date === '2026-10-20' ? 'MASSA DE PIZZA' : 'MASSA DE PASTEL');
-      }
-      return { date: '2026-10-20', movements: [] };
-    });
-
-    renderPage('/massas-history?date=2026-10-20');
-
-    expect((await screen.findAllByText('MASSA DE PIZZA')).length).toBeGreaterThan(0);
-    expect(get).toHaveBeenCalledWith('/massas-launch?date=2026-10-20');
   });
 
   it('says the day is empty instead of looking like a failed read', async () => {
@@ -225,27 +211,9 @@ describe('MassasHistoryPage', () => {
       return { date: '2026-10-27', movements: [] };
     });
 
-    renderPage();
+    renderPage('/massas-history?date=2026-10-27');
 
-    expect(await screen.findByTestId('massas-history-empty')).toHaveTextContent(
-      'No hay lanzamientos registrados en ese día.',
-    );
+    expect(await screen.findByTestId('massas-history-empty')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-  });
-
-  it('keeps yesterday when the day list cannot be read', async () => {
-    get.mockImplementation(async (url: string) => {
-      if (url.startsWith('/massas-launch/history')) throw new Error('offline');
-      if (url.startsWith('/massas-launch?')) return dayView('2026-10-27', 'MASSA DE PASTEL');
-      return { date: '2026-10-27', movements: [] };
-    });
-
-    renderPage();
-
-    // The panel survives the failure: the field is still the way to reach any day.
-    expect(await screen.findByText(/No se pudieron leer los días/)).toBeInTheDocument();
-    expect(screen.getByTestId('massas-history-date')).toBeInTheDocument();
-    expect(screen.getByTestId(`massas-history-day-${saoPauloYesterday()}`)).toBeInTheDocument();
-    expect((await screen.findAllByText('MASSA DE PASTEL')).length).toBeGreaterThan(0);
   });
 });

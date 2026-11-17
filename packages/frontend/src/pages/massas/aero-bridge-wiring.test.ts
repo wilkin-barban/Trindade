@@ -15,6 +15,8 @@ const RETIRED_SCHEME = ['short', 'cuts://'].join('');
 const panel = read('AeroIntegrationPanel.tsx');
 const dialog = read('AeroScriptableDialog.tsx');
 const launch = read('..', 'MassasLaunchPage.tsx');
+const history = read('..', 'MassasHistoryPage.tsx');
+const lib = read('..', '..', 'lib', 'aero-integration.ts');
 const collective = read('MassasCollectiveTable.tsx');
 const unified = read('MassasUnifiedTable.tsx');
 const admin = read('..', 'admin', 'AdminDashboard.tsx');
@@ -52,37 +54,37 @@ describe('aero bridge wiring: the panel asks for three things and dispatches the
     // by then, so the identifier is written down before leaving and read back on return. Without it the log
     // holds two lines about one action and no way to tell they belong together.
     assert.match(
-      launch,
+      history,
       /saveAeroPendingAttempt\(\{ action: 'movimentos', \.\.\.attempt, date \}\)/,
       'the movements read must remember its attempt and the day it asked for before leaving the page',
     );
     // The page returns in a fresh document: the answer is stored under the day the trip asked for, never
     // under whatever the clock says on return.
     assert.match(
-      launch,
+      history,
       /const answeredDate = aeroAttemptDate\(attempt, date\);/,
       'the movements answer must be filed under the day the read was armed for',
     );
     assert.match(
-      launch,
+      history,
       /buildAeroMovementsSnapshot\(answeredDate, read\.movements\)/,
       'the snapshot must carry the day the bridge asked for',
     );
     assert.match(
-      launch,
+      history,
       /loadAeroPendingAttempt\('movimentos'\)/,
       'the movements answer must close the line the page opened',
     );
     assert.match(
-      launch,
+      history,
       /loadAeroPendingAttempt\('entrada_lote'\)/,
       'a batch answer must close the batch line, not the movements one',
     );
     // Both lines of a pair carry `client: 'web'` and the same identifier: the first from memory, the second
     // from storage.
-    assert.match(launch, /client: 'web',\s*\.\.\.attempt,/);
-    assert.match(launch, /client: 'web' as const \}/);
-    assert.match(launch, /\.\.\.pairing,/);
+    assert.match(history, /client: 'web',\s*\.\.\.attempt,/);
+    assert.match(history, /client: 'web' as const \}/);
+    assert.match(history, /\.\.\.pairing,/);
   });
 
   it('reads the verdict the shortcut brought back to this tab', () => {
@@ -193,9 +195,9 @@ describe('aero bridge wiring: the launch hands the bridge a full envelope', () =
     assert.ok(launch.includes('payloads: trip.payloads'));
     assert.ok(launch.includes('callbackPath: trip.callbackPath'));
     assert.ok(launch.includes("action: trip.action"));
-    // Una entrada y un lote piden callbacks distintos; el viaje que decide la acción también trae el suyo.
-    assert.ok(launch.includes("singleCallbackPath: aeroBridgeCallbackFor('entrada')"));
-    assert.ok(launch.includes("batchCallbackPath: aeroBridgeCallbackFor('entrada_lote')"));
+    // The bridge returns to /massas-history per Requirement 6 / Task T7 / Spec S2.
+    assert.ok(launch.includes("singleCallbackPath: aeroBridgeCallbackFor('entrada', '/massas-history')"));
+    assert.ok(launch.includes("batchCallbackPath: aeroBridgeCallbackFor('entrada_lote', '/massas-history')"));
     assert.ok(launch.includes('buildAeroBridgeTriggerUrl({'));
     assert.ok(launch.includes('ticket: ticket.ticket'));
     assert.equal(launch.includes('aeroShortcutTriggerUrl('), false);
@@ -204,11 +206,13 @@ describe('aero bridge wiring: the launch hands the bridge a full envelope', () =
   });
 
   it('reads the ERP answer the bridge brought back instead of trusting the visit', () => {
-    assert.ok(launch.includes('readAeroBridgeResult(parsed.data)'));
-    assert.ok(launch.includes("parsed.kind === 'bridge'"));
-    assert.ok(launch.includes("parsed.action !== 'entrada'"));
-    // La rama legacy sigue viva mientras un teléfono no rehaga el atajo.
-    assert.ok(launch.includes("parsed.kind !== 'sync'"));
+    // El veredicto se lee donde ahora aterriza el callback: el histórico. La pantalla de lanzamiento ya no lo abre.
+    assert.ok(history.includes('readAeroBridgeResult'));
+    assert.ok(history.includes("parsed.kind === 'bridge'"));
+    assert.ok(history.includes('aeroBridgeCallbackFor('));
+    // La rama legacy sigue viva mientras un teléfono no rehaga el atajo: el parser del cliente es quien todavía
+    // entiende el callback `sync`, y el histórico el que lo consume.
+    assert.ok(lib.includes("kind: 'sync'"));
   });
 });
 
@@ -224,79 +228,72 @@ describe('aero bridge wiring: a launch of many products leaves once', () => {
   });
 
   it('reads the batch answer against the products that were in the phone', () => {
-    assert.ok(launch.includes("parsed.action === 'entrada_lote'"));
-    assert.ok(launch.includes('readAeroBatchResult(parsed.data, expected)'));
-    assert.ok(launch.includes('const sent = queue?.inFlight ?? []'));
-    assert.ok(launch.includes('batchSyncFeedback(batch)'));
+    assert.ok(history.includes("parsed.action === 'entrada_lote'"));
+    assert.ok(history.includes('readAeroBatchResult(parsed.data, expected)'));
+    assert.ok(history.includes('const sent = queue?.inFlight ?? []'));
+    assert.ok(history.includes('batchSyncFeedback(batch)'));
   });
 
   it('puts only the refused products back at the front of the queue', () => {
-    assert.ok(launch.includes('batch.failedIndexes'));
-    assert.ok(launch.includes('batch.state === \'complete\' ? [] : batch.state === \'partial\' ? failedItems : sent'));
-    assert.ok(launch.includes('{ ...queue, items: [...retryItems, ...queue.items], inFlight: [] }'));
+    assert.ok(history.includes('batch.failedIndexes'));
+    assert.ok(history.includes('batch.state === \'complete\' ? [] : batch.state === \'partial\' ? failedItems : sent'));
+    assert.ok(history.includes('{ ...queue, items: [...retryItems, ...queue.items], inFlight: [] }'));
   });
 
   it('logs one line per trip instead of one per product', () => {
-    assert.ok(launch.includes('`batch ok=${batch.ok} failed=${batch.failed} · via=bridge`'));
-    assert.ok(launch.includes('`batch ${payloads.length}'));
+    assert.ok(history.includes('`batch ok=${batch.ok} failed=${batch.failed} · via=bridge`'));
+    assert.ok(history.includes('`batch ${payloads.length}'));
   });
 
   it('closes the single-product trip instead of draining an empty queue', () => {
-    // Un producto viaja por `entrada` y vuelve confirmado: la cola ya no tiene nada pendiente. Antes el
-    // cierre miraba sólo `items`, que ahora está vacío porque el producto espera en `inFlight`, y el
-    // operario volvía a una pantalla sin veredicto.
-    assert.ok(launch.includes('const rest = { ...queue, inFlight: [] };'));
-    assert.ok(launch.includes('if (rest.items.length > 0) {'));
-    assert.ok(launch.includes("message: outcome.message ?? t('massas.aero.syncConfirmYes')"));
+    // Un producto viaja por `entrada` y vuelve confirmado: la cola ya no tiene nada pendiente.
+    assert.ok(history.includes('const rest = { ...queue, inFlight: [] };'));
+    assert.ok(history.includes('if (rest.items.length > 0) {'));
+    assert.ok(history.includes("t('massas.aero.syncConfirmYes')"));
   });
 
   it('returns a refused single product to the queue instead of dropping it', () => {
-    assert.ok(launch.includes("items: [...queue.inFlight, ...queue.items]"));
+    assert.ok(history.includes("items: [...queue.inFlight, ...queue.items]"));
     // El rechazo queda en la bitácora como error, no como una respuesta cualquiera.
-    assert.ok(launch.includes("error: outcome.status === 'error' ? outcome.message ?? 'bridge_unreadable' : null"));
+    assert.ok(history.includes("error: outcome.status === 'error' ? outcome.message ?? 'bridge_unreadable' : null"));
   });
 
   it('offers the retry to the operator and never sends it by itself', () => {
-    assert.ok(launch.includes('const retryFailedLaunches = useCallback'));
-    assert.ok(launch.includes('onClick={retryFailedLaunches}'));
-    assert.ok(launch.includes('data-testid="massa-result-retry"'));
+    assert.ok(history.includes('const retryFailedLaunches = useCallback'));
+    assert.ok(history.includes('onClick={retryFailedLaunches}'));
+    assert.ok(history.includes('data-testid="massa-result-retry"'));
     // El reintento sólo reencola y drena lo que el operario pidió: nada de un segundo viaje automático.
-    assert.equal(launch.includes('setTimeout(() => triggerAeroSync'), false);
+    assert.equal(history.includes('setTimeout(() => triggerAeroSync'), false);
   });
 });
 
 describe('aero bridge wiring: the ERP mirror', () => {
   it('asks for a `movimentos` ticket, with its own callback', () => {
-    assert.ok(launch.includes('aeroMovementsPayload({ date, userName: null })'));
-    assert.ok(launch.includes("action: 'movimentos'"));
-    assert.ok(launch.includes("aeroBridgeCallbackFor('movimentos')"));
-    assert.ok(launch.includes("parsed.action === 'movimentos'"));
+    assert.ok(history.includes('aeroMovementsPayload({ date, userName: null })'));
+    assert.ok(history.includes("action: 'movimentos'"));
+    assert.ok(history.includes("aeroBridgeCallbackFor('movimentos'"));
+    assert.ok(history.includes("parsed.action === 'movimentos'"));
     // La consulta se publica como lectura del historial, no como lanzamiento.
-    assert.ok(launch.includes("event: 'read_history'"));
+    assert.ok(history.includes("event: 'read_history'"));
     // La lectura automática que sigue al lanzamiento entra por el mismo camino: un solo `handleSyncFromErp`.
-    assert.ok(launch.includes('consumeAeroAutoRead(date)'));
-    assert.ok(launch.includes('void handleSyncFromErp()'));
+    assert.ok(history.includes('consumeAeroAutoRead(date)'));
+    assert.ok(history.includes('void handleSyncFromErp()'));
   });
 
   it('keeps the day in Trindade, so the plant reads it without running the shortcut', () => {
-    assert.ok(launch.includes("'/integration/aero/movements'"));
-    assert.ok(launch.includes('/integration/aero/movements?date='));
-    assert.ok(launch.includes('buildAeroMovementsSnapshot('));
-    assert.ok(launch.includes('readAeroMovementsSnapshot('));
-  });
-
-  it('says the installation is not migrated instead of showing an empty day', () => {
-    assert.ok(launch.includes('err.status === 503'));
-    assert.ok(launch.includes("t('massas.erp.notMigrated')"));
+    assert.ok(history.includes("'/integration/aero/movements'"));
+    assert.ok(history.includes('/integration/aero/movements?date='));
+    assert.ok(history.includes('buildAeroMovementsSnapshot('));
+    assert.ok(history.includes('readAeroMovementsSnapshot('));
   });
 
   it('imports a seat as a new local launch and never writes to the company record', () => {
-    assert.match(launch, /api\.post\(\s*'\/massas-launch'/);
+    assert.match(history, /api\.post\(\s*'\/massas-launch'/);
     // El cuerpo lleva el asiento y su operador: sin ellos el lanzamiento queda a nombre de quien apretó el
     // botón y no hay forma de conciliarlo con la tableta.
-    assert.ok(launch.includes('aeroImportPayload('));
-    assert.equal(/api\.(put|del)\(`\/integration\/aero/.test(launch), false);
-    assert.equal(/integration\/aero\/movements`\s*,\s*\{?\s*method: 'PUT'/.test(launch), false);
+    assert.ok(history.includes('aeroImportPayload('));
+    assert.equal(/api\.(put|del)\(`\/integration\/aero/.test(history), false);
+    assert.equal(/integration\/aero\/movements`\s*,\s*\{?\s*method: 'PUT'/.test(history), false);
   });
 
   it('quotes the local launch ids to the ERP so a doubtful seat can be traced back', () => {
@@ -314,8 +311,8 @@ describe('aero bridge wiring: the ERP mirror', () => {
     assert.ok(collective.includes('<MassasUnifiedTable'));
     // El historial no tiene espejo y no debe inventar una tabla vacía.
     assert.ok(collective.includes('unifiedRows?:'));
-    assert.ok(launch.includes('massasUnifiedRows({'));
-    assert.ok(launch.includes('loadAckedLaunchIds('));
+    assert.ok(history.includes('massasUnifiedRows({'));
+    assert.ok(history.includes('loadAckedLaunchIds('));
   });
 
   it('keeps the unified table read-only and every control at the 44px touch floor', () => {

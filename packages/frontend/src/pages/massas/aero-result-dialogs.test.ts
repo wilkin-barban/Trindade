@@ -13,7 +13,7 @@ function read(...parts: string[]): string {
   return readFileSync(new URL(parts.join('/'), import.meta.url), 'utf8');
 }
 
-const page = read('..', 'MassasLaunchPage.tsx');
+const page = read('..', 'MassasHistoryPage.tsx');
 const panel = read('AeroIntegrationPanel.tsx');
 const dialog = read('AeroResultDialog.tsx');
 

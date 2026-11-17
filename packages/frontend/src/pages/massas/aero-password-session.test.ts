@@ -12,6 +12,7 @@ import { describe, it } from 'node:test';
  * covered in `lib/aero-integration.test.ts`.
  */
 const launch = readFileSync(new URL('../MassasLaunchPage.tsx', import.meta.url), 'utf8');
+const history = readFileSync(new URL('../MassasHistoryPage.tsx', import.meta.url), 'utf8');
 
 function blockAfter(source: string, marker: string, size = 400): string {
   const index = source.indexOf(marker);
@@ -21,13 +22,13 @@ function blockAfter(source: string, marker: string, size = 400): string {
 
 describe('an integration whose vault has no password', () => {
   it('tells the operator instead of returning without a word from the day sync', () => {
-    const guard = blockAfter(launch, 'const handleSyncFromErp = async () => {');
+    const guard = blockAfter(history, 'const handleSyncFromErp = async () => {');
 
     assert.match(guard, /setNotice\(\{ type: 'error', message: erpNotReadyMessage/);
   });
 
   it('tells the operator when a pending row cannot be resent', () => {
-    const guard = blockAfter(launch, 'const handleSendPendingLaunch = useCallback(');
+    const guard = blockAfter(history, 'const handleSendPendingLaunch = useCallback(');
 
     assert.match(guard, /setNotice\(\{ type: 'error', message: erpNotReadyMessage/);
   });
@@ -40,11 +41,11 @@ describe('an integration whose vault has no password', () => {
     assert.match(helper, /massas\.aero\.syncNeedsSetup/);
   });
 
-  it('says the same thing under the switch, which is where the launch is decided', () => {
-    const hint = blockAfter(launch, 'id="aero-sync-label"', 900);
+  it('says the same thing under the configuration notice on launch, which is where the launch is decided', () => {
+    const hint = blockAfter(launch, 'data-testid="massas-erp-not-configured"', 900);
 
     assert.match(hint, /aeroMissingSetup\(aeroSettings\) === 'password'/);
-    assert.match(hint, /massas\.aero\.passwordPending/);
+    assert.match(hint, /massas\.aero\.passwordNeeded/);
   });
 
   it('never keeps or reads a password, and asks the server for a ticket instead', () => {
@@ -54,7 +55,7 @@ describe('an integration whose vault has no password', () => {
     assert.ok(launch.includes('hasPassword'));
     assert.ok(launch.includes('fetchAeroVaultSettings'));
     assert.ok(launch.includes('requestAeroBridgeTicket({'));
-    // La lectura automática que cierra el veredicto de un lanzamiento entra por el mismo camino.
-    assert.ok(launch.includes('consumeAeroAutoRead(date)'));
+    // La lectura automática que cierra el veredicto de un lanzamiento entra por el mismo camino en el histórico.
+    assert.ok(history.includes('consumeAeroAutoRead(date)'));
   });
 });

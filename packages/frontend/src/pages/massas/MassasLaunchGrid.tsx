@@ -130,20 +130,46 @@ export function MassasLaunchGrid({
           })}
         </div>
 
-        {/* Action Row: Botón Lançar SIN botón resetear. En un día cerrado no hay fila: no hay nada que lanzar. */}
+        {/* Action Row: Barra de lançar fixa no mobile (sticky bottom-0 com sm:static) */}
         {!readOnly && (
-          <div className="mt-6 flex flex-col sm:flex-row items-center justify-end gap-3 pt-4 border-t border-gray-100">
-            {erpControl && <div className="w-full sm:w-auto sm:mr-auto">{erpControl}</div>}
-            <Button
-              type="button"
-              onClick={onLaunch}
-              disabled={itemsToLaunch.length === 0 || submitting}
-              className="min-h-[44px] w-full bg-amber-600 px-6 font-semibold text-white hover:bg-amber-700 sm:w-auto"
-            >
-              <Send className="h-4 w-4 mr-2" />
-              {submitting ? t('massas.launching') : t('massas.launch')}
-              {totalLaunchBoxes > 0 && ` (${totalLaunchBoxes} cx)`}
-            </Button>
+          <div
+            className="sticky bottom-0 z-10 -mx-4 -mb-4 mt-6 border-t border-gray-200 bg-white/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:mb-0 sm:rounded-xl sm:border sm:shadow-sm"
+            data-testid="massas-summary-bar"
+            role="group"
+            aria-label={t('massas.totalToLaunch', 'Total Geral a Lançar')}
+          >
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <dl className="flex items-center gap-6">
+                <div>
+                  <dt className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                    {t('massas.totalBoxes', 'Total de Caixas')}
+                  </dt>
+                  <dd className="text-lg font-bold tabular-nums text-gray-900" data-testid="massas-summary-boxes">
+                    {totalLaunchBoxes} cx
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                    {t('massas.totalUnits', 'Total de Unidades')}
+                  </dt>
+                  <dd className="text-lg font-bold tabular-nums text-gray-900" data-testid="massas-summary-units">
+                    {totalLaunchUnits} un
+                  </dd>
+                </div>
+              </dl>
+
+              <Button
+                type="button"
+                onClick={onLaunch}
+                disabled={itemsToLaunch.length === 0 || submitting}
+                className="min-h-[48px] w-full bg-amber-600 px-6 font-semibold text-white hover:bg-amber-700 sm:w-auto"
+                data-testid="massas-launch"
+              >
+                <Send className="h-4 w-4 mr-2" />
+                {submitting ? t('massas.launching') : t('massas.launch')}
+                {totalLaunchBoxes > 0 && ` (${totalLaunchBoxes} cx)`}
+              </Button>
+            </div>
           </div>
         )}
         {readOnly && (
