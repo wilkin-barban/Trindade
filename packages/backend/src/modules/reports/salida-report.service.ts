@@ -119,7 +119,12 @@ export function salidaReportDayView(db: Database.Database, date: string): Salida
    * A seat is the company's own line, and it can exist without a launch here: somebody typed it in the ERP, or a
    * day was posted before this module existed. A seat whose product, units and operator match an item already
    * counted is the same exit and is skipped -- the pairing rule is the one reconciliation uses, so the report
-   * cannot count one exit twice. Everything else joins its operator, marked as ERP-only.
+   * cannot count one exit twice.
+   *
+   * The rule the plant asked for: **only operators that exist in this application reach this block.** The
+   * company's book carries every name that ever typed a movement -- TV sales, the front desk, people who never
+   * touch Trindade -- and a report of this plant is not their ledger. A seat whose operator is not an active user
+   * here is dropped, with its products: a product line without its operator would be an orphan row.
    */
   const localKeys = new Set<string>();
   for (const row of rows) {
@@ -143,17 +148,34 @@ export function salidaReportDayView(db: Database.Database, date: string): Salida
     operator_name: string;
   }[];
 
+  // Who is allowed in: the active accounts of this application, keyed by their username and by their display name,
+  // because the ERP writes the name the company knows and Trindade stores both.
+  const accounts = db
+    .prepare('SELECT username, display_name FROM users WHERE is_active = 1')
+    .all() as { username: string; display_name: string | null }[];
+  const accountByKey = new Map<string, { username: string; name: string }>();
+  for (const account of accounts) {
+    const entry = { username: account.username, name: (account.display_name || account.username).trim() };
+    accountByKey.set(operatorKey(account.username), entry);
+    if (account.display_name) accountByKey.set(operatorKey(account.display_name), entry);
+  }
+
   const erpOnlyKeys = new Set<string>();
   for (const seat of seats) {
     const key = [codeKey(seat.product_code), Math.round(seat.quantity * 1000) / 1000, operatorKey(seat.operator_name)].join('|');
     if (localKeys.has(key)) continue;
 
     const erpKey = operatorKey(seat.operator_name);
-    erpOnlyKeys.add(erpKey);
+    const account = accountByKey.get(erpKey);
+    // Not an operator of this application: the seat belongs to the company's own ledger, not to this report.
+    if (!account) continue;
+
+    // Keyed by the account, not by the name the ERP wrote: the badge follows the operator, not the spelling.
+    erpOnlyKeys.add(operatorKey(account.username));
 
     let op = [...operatorMap.entries()].find(([, candidate]) => operatorKey(candidate.username) === erpKey)?.[1];
     if (!op) {
-      op = { name: seat.operator_name.trim(), username: seat.operator_name.trim(), products: new Map() };
+      op = { name: account.name, username: account.username, products: new Map() };
       operatorMap.set(-(operatorMap.size + 1), op);
     }
     const existing = op.products.get(seat.product_code);

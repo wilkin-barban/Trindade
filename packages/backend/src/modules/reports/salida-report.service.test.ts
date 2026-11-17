@@ -125,8 +125,10 @@ describe('salidaReportDayView', () => {
       VALUES
         -- the same exit Trindade already counted, written the way the ERP writes it (padding, upper case)
         ('2026-11-18', 5001, '001357', 'EMBALAG. DISCO 200g', 20, '2026-11-18', 'OPERADOR1', 'S', '2026-11-18T10:00:00.000Z'),
-        -- an exit the company recorded at the counter, with no launch here
-        ('2026-11-18', 5002, '001900', 'BOBINA ROLO', 13, '2026-11-18', 'JOSIANE', 'S', '2026-11-18T10:05:00.000Z')
+        -- an exit of an operator of this application, recorded in the ERP and never launched here
+        ('2026-11-18', 5002, '001900', 'BOBINA ROLO', 13, '2026-11-18', 'ANA SOUZA', 'S', '2026-11-18T10:05:00.000Z'),
+        -- and a name that only exists in the company's book: TV sales never touches Trindade
+        ('2026-11-18', 5003, '001011', 'PROPIONATO', 900, '2026-11-18', 'TELEVENDAS', 'S', '2026-11-18T10:10:00.000Z')
     `);
 
     const day = salidaReportDayView(db, '2026-11-18');
@@ -135,10 +137,23 @@ describe('salidaReportDayView', () => {
     assert.ok(local, 'the launch Trindade recorded is still there');
     assert.equal(local!.units, 20, 'the matching seat did not count the same exit twice');
 
-    const fromErp = day.operators.find((operator) => operator.username === 'JOSIANE');
-    assert.ok(fromErp, 'the seat nobody launched here appears');
-    assert.equal(fromErp!.erpOnly, true, 'and it says where it comes from');
+    const fromErp = day.operators.find((operator) => operator.username === 'operador2');
+    assert.ok(fromErp, 'an operator of this application appears even without a launch here');
+    assert.equal(fromErp!.erpOnly, true, 'and it says the units came from the company book');
     assert.equal(fromErp!.products[0].units, 13);
+
+    // The rule the plant asked for: the company's ledger carries names that are not operators of this app, and
+    // this report is not their ledger.
+    assert.equal(
+      day.operators.some((operator) => /TELEVENDAS/i.test(operator.username) || /TELEVENDAS/i.test(operator.name)),
+      false,
+      'a name that is not an account of this application stays out',
+    );
+    assert.equal(
+      day.operators.some((operator) => operator.products.some((product) => product.code === '1011')),
+      false,
+      'and so do its products',
+    );
 
     assert.equal(day.totalUnits, 33, 'the day is the sum of both sides, each exit once');
   });
