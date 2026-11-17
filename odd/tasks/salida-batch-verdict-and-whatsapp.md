@@ -191,3 +191,15 @@ encabezado del proxy.
 `integrity ok`, 23 tablas, 3 movimientos y los tickets intactos) y backup `backups/trindade.post-revision14.db`.
 Producción: health 200, rutas 200, catálogo 401, `result` sin ticket 401, `last-result` sin sesión 401, y el script
 servido contiene `aero_result=stored` y `resultUrl`.
+
+### Corrección: la actualización del puente se explica en el panel, no en la planta
+
+El aviso «Atualizar ponte Aero32» que se había puesto en el histórico de Salidas (y en el panel) repetía, peor, el
+flujo de instalación que el panel administrativo ya tiene: `AeroScriptableDialog` instala Scriptable, **copia el
+script con un botón** y explica pegar y renombrar. Ese diálogo lee `/Aero32Bridge.js`, así que ya entrega el script
+nuevo.
+
+- Aviso eliminado de `SalidaHistoryPage` y de `AeroIntegrationPanel`; sus dos claves i18n borradas.
+- El hint oficial ahora aclara que quien ya lo tenía instalado debe copiarlo de nuevo (el puente cambió una vez).
+- Evidencia: Vitest 209/209, node 748/748, typecheck y build limpios; deploy web sin el aviso (cero coincidencias de
+  `bridgeUpdateTitle`/`salida-bridge-update-notice` en el bundle) y con el botón `scriptableCopyButton` presente.

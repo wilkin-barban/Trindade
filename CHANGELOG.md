@@ -19,7 +19,8 @@ verificaciones está en [docs/release-android-historial.md](docs/release-android
 - **Revisión 14**: `aero_bridge_tickets` guarda `result`/`result_at`; `POST /bridge-tickets/result` (autenticado por
   el ticket) y `GET /bridge-tickets/last-result` (por sesión, 10 minutos) mueven la respuesta al servidor.
 - **Script `Aero32Bridge`**: postea el resultado y abre un callback corto (`aero_result=stored`); los iPhone con el
-  script anterior siguen funcionando. La app muestra los pasos de actualización y el enlace al script.
+  script anterior siguen funcionando. La actualización se hace con el flujo oficial del panel administrativo
+  (Instalar Scriptable → **Copiar código para Scriptable**), que ya entrega el script nuevo.
 
 
 ### Salida/Baja: fotos en el histórico y vista previa real (2026-11-16)
