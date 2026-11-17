@@ -59,14 +59,8 @@ export function salidaReportDayView(db: Database.Database, date: string): Salida
     .get(date) as { count: number } | undefined;
   const movementCount = countRow?.count ?? 0;
 
-  if (movementCount === 0) {
-    return {
-      date,
-      operators: [],
-      totalUnits: 0,
-      movementCount: 0,
-    };
-  }
+  // No early return on an empty local day: the company's book may still hold exits for it, and a card that says
+  // «nothing left the plant» because Trindade recorded nothing would be lying with the operator's own data.
 
   const rows = db
     .prepare(
@@ -170,10 +164,12 @@ export function salidaReportDayView(db: Database.Database, date: string): Salida
     // Not an operator of this application: the seat belongs to the company's own ledger, not to this report.
     if (!account) continue;
 
-    // Keyed by the account, not by the name the ERP wrote: the badge follows the operator, not the spelling.
-    erpOnlyKeys.add(operatorKey(account.username));
+    // Keyed by the account, not by the name the ERP wrote: the badge, and the group, follow the operator and not
+    // the spelling. Searching by the ERP's spelling made a name like «JOAO H» open a new group per seat.
+    const accountKey = operatorKey(account.username);
+    erpOnlyKeys.add(accountKey);
 
-    let op = [...operatorMap.entries()].find(([, candidate]) => operatorKey(candidate.username) === erpKey)?.[1];
+    let op = [...operatorMap.entries()].find(([, candidate]) => operatorKey(candidate.username) === accountKey)?.[1];
     if (!op) {
       op = { name: account.name, username: account.username, products: new Map() };
       operatorMap.set(-(operatorMap.size + 1), op);

@@ -158,4 +158,31 @@ describe('salidaReportDayView', () => {
     assert.equal(day.totalUnits, 33, 'the day is the sum of both sides, each exit once');
   });
 
+  it('keeps one group per operator even when the ERP spells the name differently in each seat', () => {
+    // The company's book writes the operator however the counter typed it: upper case in one seat, lower in the
+    // next. Both are the same account here, so they are one group -- six groups for one person is not a report.
+    db.exec('DELETE FROM salida_movement_items');
+    db.exec('DELETE FROM salida_movements');
+    db.exec('DELETE FROM aero_movements');
+    db.exec(`
+      INSERT INTO users (id, username, password_hash, display_name, role_id, is_active)
+      VALUES (12, 'joaoh', 'hash', 'Joao H', 2, 1)
+    `);
+    db.exec(`
+      INSERT INTO aero_movements
+        (movement_date, ent_lan, product_code, product_desc, quantity, entry_date, operator_name, movement_type, synced_at)
+      VALUES
+        ('2026-11-19', 6001, '001900', 'BOBINA ROLO', 4, '2026-11-19', 'JOAO H', 'S', '2026-11-19T09:00:00.000Z'),
+        ('2026-11-19', 6002, '001900', 'BOBINA ROLO', 6, '2026-11-19', 'joao h', 'S', '2026-11-19T09:05:00.000Z'),
+        ('2026-11-19', 6003, '001356', 'EMBALAG. DISCO 400g', 10, '2026-11-19', 'JOAO H', 'S', '2026-11-19T09:10:00.000Z')
+    `);
+
+    const day = salidaReportDayView(db, '2026-11-19');
+
+    assert.equal(day.operators.length, 1, 'one operator, one group');
+    assert.equal(day.operators[0].username, 'joaoh', 'with the account the application knows');
+    assert.equal(day.operators[0].units, 20, 'and every seat summed once');
+    assert.equal(day.operators[0].products.length, 2);
+  });
+
 });
