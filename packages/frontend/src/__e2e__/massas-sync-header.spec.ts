@@ -25,7 +25,7 @@ function today(): string {
 
 test.use({ viewport: { width: 375, height: 667 } });
 
-test.describe('sync in the header', () => {
+test.describe('sync in the history', () => {
   test('offers the sync next to the day and shows the hour the ERP last answered', async ({ page }) => {
     // The integration belongs to the owner admin, so this is the identity that has the button at all.
     await loginAsAeroOwner(page);
@@ -34,11 +34,11 @@ test.describe('sync in the header', () => {
     });
     const token = (await login.json()).token as string;
 
-    await page.goto('/massas-launch');
-    // Today: the open day is the only one whose header offers the sync at all.
+    // The sync lives in the history now: it reads the day, and the day is what the history owns.
+    await page.goto('/massas-history');
     const date = today();
-    await page.locator('[data-testid="massas-launch-date"]').fill(date);
-    await expect(page.locator('[data-testid="massas-launch-date"]')).toHaveValue(date);
+    await page.locator('[data-testid="massas-history-date"]').fill(date);
+    await expect(page.locator('[data-testid="massas-history-date"]')).toHaveValue(date);
 
     const sync = page.locator('[data-testid="massas-sync-erp"]');
     await expect(sync).toBeVisible();
@@ -72,8 +72,9 @@ test.describe('sync in the header', () => {
     });
     expect(seeded.status()).toBe(201);
 
-    await page.goto('/massas-launch');
-    await page.locator('[data-testid="massas-launch-date"]').fill(date);
+    // The mirror line lives in the history, next to the sync it belongs to.
+    await page.goto('/massas-history');
+    await page.locator('[data-testid="massas-history-date"]').fill(date);
     await expect(page.locator('[data-testid="massas-last-sync"]')).toContainText(/\d{2}:\d{2}/);
 
     const overflow = await page.evaluate(
@@ -91,19 +92,20 @@ test.describe('sync in the header', () => {
    */
   test('the sync action is not offered on a past day', async ({ page }) => {
     await loginAsAeroOwner(page);
-    await page.goto('/massas-launch');
+    await page.goto('/massas-history');
 
     const yesterday = new Date(`${today()}T12:00:00Z`);
     yesterday.setUTCDate(yesterday.getUTCDate() - 1);
     const past = yesterday.toISOString().slice(0, 10);
 
-    await page.locator('[data-testid="massas-launch-date"]').fill(past);
-    await expect(page.locator('[data-testid="massas-launch-date"]')).toHaveValue(past);
+    await page.locator('[data-testid="massas-history-date"]').fill(past);
+    await expect(page.locator('[data-testid="massas-history-date"]')).toHaveValue(past);
 
     await expect(page.locator('[data-testid="massas-sync-erp"]')).toHaveCount(0);
     await expect(page.locator('[data-testid="massas-sync-header"]')).toHaveCount(0);
 
     // The day itself is still readable: what closed is the writing, not the record.
-    await expect(page.locator('text=Produção do dia')).toBeVisible();
+    await expect(page.locator('[data-testid="massas-history-readonly"]')).toBeVisible();
+    await expect(page.locator('[data-testid="massas-history-date"]')).toHaveValue(past);
   });
 });

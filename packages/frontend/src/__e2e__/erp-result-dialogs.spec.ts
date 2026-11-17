@@ -25,7 +25,7 @@ function movementsAnswer(success: boolean) {
 }
 
 function movementsCallbackUrl(success: boolean) {
-  return `/massas-launch?aero_action=movimentos&aero_data=${encodeURIComponent(movementsAnswer(success))}`;
+  return `/massas-history?aero_action=movimentos&aero_data=${encodeURIComponent(movementsAnswer(success))}`;
 }
 
 test.use({ viewport: { width: 375, height: 667 }, userAgent: IPHONE_UA });
@@ -124,7 +124,7 @@ test.describe('result dialogs on a phone screen', () => {
     await loginViaApi(page, identities.worker);
 
     const answer = encodeURIComponent(JSON.stringify({ success: true, message: 'Lançamento confirmado no ERP' }));
-    await page.goto(`/massas-launch?aero_action=entrada&aero_data=${answer}`);
+    await page.goto(`/massas-history?aero_action=entrada&aero_data=${answer}`);
 
     const dialog = page.locator('[data-testid="massa-result-modal"]');
     await expect(dialog).toBeVisible();
@@ -142,7 +142,7 @@ test.describe('result dialogs on a phone screen', () => {
     await loginViaApi(page, identities.worker);
 
     const answer = encodeURIComponent(JSON.stringify({ success: false, message: 'Firebird indisponível' }));
-    await page.goto(`/massas-launch?aero_action=entrada&aero_data=${answer}`);
+    await page.goto(`/massas-history?aero_action=entrada&aero_data=${answer}`);
 
     await expect(page.locator('[data-testid="massa-result-modal"]')).toBeVisible();
     await expect(page.locator('[data-testid="massa-result-mirror-hint"]')).toHaveCount(0);

@@ -4,11 +4,12 @@ import { goToProtected } from './auth-helpers';
 /**
  * The massas history picks its day the way the count does, and the day it picks is the day the URL carries.
  *
- * The e2e database is frozen in the past -- the history refuses writes to any day that is not today -- so
- * no day here has launches. What is asserted is everything the screen does without them: the panel field
- * is there with the archive window, yesterday is always offered as a chip and is the day it opens by
- * default, a day named in `?date=` is the day it opens, pressing yesterday from another day moves the page
- * there and drops the query, and a day with nothing reads as an empty day instead of a failed read.
+ * Since the redesign the history owns the day: today is the day it opens on and the only one that can be
+ * managed, and the archive window closes on today because the future is not history. What is asserted here is
+ * everything the screen does without launches in the fixture: the panel field with that window, today offered
+ * as a chip and pressed by default, a day named in `?date=` being the day it opens, pressing today from another
+ * day moving the page back and dropping the query, and a day with nothing reading as an empty day rather than a
+ * failed read.
  *
  * The day with launches -- the chip showing its units and the table switching when it is pressed -- is
  * covered in `src/pages/MassasHistoryPage.test.tsx`, where the API answers any day.
@@ -36,32 +37,31 @@ test.describe('Massas history days', () => {
       await goToProtected(page, '/massas-history');
 
       const today = await saoPauloToday(page);
-      const yesterday = shiftDays(today, -1);
       const older = shiftDays(today, -3);
       const field = page.getByTestId('massas-history-date');
       const strip = page.getByTestId('massas-history-days');
-      const yesterdayChip = page.getByTestId(`massas-history-day-${yesterday}`);
+      const todayChip = page.getByTestId(`massas-history-day-${today}`);
 
-      // The same panel the count uses, with its window closed on both ends.
+      // The same panel the count uses, with its window closed on today: the future is not history.
       await expect(field).toHaveAttribute('type', 'date');
-      await expect(field).toHaveAttribute('max', yesterday);
-      // Yesterday is the day the page opens on, and the only one it always offers -- alone, with no count.
+      await expect(field).toHaveAttribute('max', today);
+      // Today is the day the page opens on, because it is the one that can still be managed.
       await expect(strip).toBeVisible();
-      await expect(yesterdayChip).toHaveAttribute('aria-pressed', 'true');
-      await expect(yesterdayChip).toHaveText(/^\d{2}\/\d{2}$/);
+      await expect(todayChip).toHaveAttribute('aria-pressed', 'true');
+      await expect(todayChip).toHaveText(/^\d{2}\/\d{2}$/);
       // The card this screen used to draw is gone: one control, not two designs.
       await expect(page.getByText('Escolha o dia')).toHaveCount(0);
 
       // A day in the URL is the day that opens.
       await goToProtected(page, `/massas-history?date=${older}`);
-      await expect(yesterdayChip).toHaveAttribute('aria-pressed', 'false');
+      await expect(todayChip).toHaveAttribute('aria-pressed', 'false');
       await expect(page.getByTestId('massas-history-empty')).toBeVisible();
       await expect(page.getByRole('alert')).toHaveCount(0);
 
-      // Pressing yesterday moves the page to yesterday and leaves the URL without a day: yesterday is the
-      // default, and a link that repeats the default is a link that goes stale tomorrow.
-      await yesterdayChip.click();
-      await expect(yesterdayChip).toHaveAttribute('aria-pressed', 'true');
+      // Pressing today moves the page back to today and leaves the URL without a day: today is the default, and
+      // a link that repeats the default is a link that goes stale tomorrow.
+      await todayChip.click();
+      await expect(todayChip).toHaveAttribute('aria-pressed', 'true');
       await expect(page).toHaveURL(/\/massas-history$/);
       await expect(page.getByTestId('massas-history-empty')).toBeVisible();
       await expect(page.getByRole('alert')).toHaveCount(0);

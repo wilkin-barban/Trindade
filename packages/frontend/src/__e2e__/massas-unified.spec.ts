@@ -39,14 +39,10 @@ test.describe('unified massas day on a phone screen', () => {
     const token = (await login.json()).token as string;
     const mine = identities.worker.username.toUpperCase();
 
-    await page.goto('/massas-launch');
+    await page.goto('/massas-history');
     const date = today();
-    await page.locator('[data-testid="massas-launch-date"]').fill(date);
-    await expect(page.locator('[data-testid="massas-launch-date"]')).toHaveValue(date);
-
-    // One table, no tabs: the two lists are gone and the reason is on every row.
-    await expect(page.locator('[data-testid="massas-unified"]')).toBeVisible();
-    await expect(page.locator('[data-testid="massas-tab-erp"]')).toHaveCount(0);
+    await page.locator('[data-testid="massas-history-date"]').fill(date);
+    await expect(page.locator('[data-testid="massas-history-date"]')).toHaveValue(date);
 
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -91,6 +87,13 @@ test.describe('unified massas day on a phone screen', () => {
     });
     expect(seeded.status()).toBe(201);
 
+    // One table, no tabs: the two lists are gone and the reason is on every row. Asserted after the seed, because
+    // an empty day has no rows to draw and this test cannot borrow another spec's.
+    await page.reload();
+    await expect(page.locator('[data-testid="massas-history-date"]')).toHaveValue(date);
+    await expect(page.locator('[data-testid="massas-unified"]')).toBeVisible();
+    await expect(page.locator('[data-testid="massas-tab-erp"]')).toHaveCount(0);
+
     // The same fifteen units Jefferson recorded on the tablet, launched here by the worker: same product,
     // same quantity, same day and still two different rows, because the operator is not the same.
     const local = await page.request.post(`${API}/massas-launch`, {
@@ -101,9 +104,9 @@ test.describe('unified massas day on a phone screen', () => {
     expect(local.status(), localBody).toBe(201);
     const ownLaunchId = (JSON.parse(localBody).created as Array<{ id: number }>)[0].id;
 
-    await page.goto('/massas-launch');
-    await page.locator('[data-testid="massas-launch-date"]').fill(date);
-    await expect(page.locator('[data-testid="massas-launch-date"]')).toHaveValue(date);
+    await page.goto('/massas-history');
+    await page.locator('[data-testid="massas-history-date"]').fill(date);
+    await expect(page.locator('[data-testid="massas-history-date"]')).toHaveValue(date);
 
     const unified = page.locator('[data-testid="massas-unified"]');
     const erpOnly = unified.locator('[data-state="erpOnly"]');
@@ -218,9 +221,9 @@ test.describe('the day balance on a phone screen', () => {
     });
     expect(seeded.status()).toBe(201);
 
-    await page.goto('/massas-launch');
-    await page.locator('[data-testid="massas-launch-date"]').fill(date);
-    await expect(page.locator('[data-testid="massas-launch-date"]')).toHaveValue(date);
+    await page.goto('/massas-history');
+    await page.locator('[data-testid="massas-history-date"]').fill(date);
+    await expect(page.locator('[data-testid="massas-history-date"]')).toHaveValue(date);
 
     // The box size belongs to the plant's catalogue, so the spec reads what the launch really weighed
     // instead of hard-coding today's packaging.
