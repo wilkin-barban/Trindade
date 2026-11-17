@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3';
 import { parseSelectedProducts } from './reports.schema.js';
 import { massasReportDayView } from '../massas/massas-report.service.js';
+import { salidaReportDayView } from './salida-report.service.js';
 import { ERP_RECEIPT_CATEGORY_ID, dayReceipts, usesErpReceipts } from './receipts.service.js';
 
 /**
@@ -304,6 +305,29 @@ export function generateWhatsAppText(
       }
       lines.push('');
     }
+  }
+
+  // --- Salidas / Baixa ---
+  // Same idea as the massas block above: what left the plant belongs in the day's report, grouped by the operator
+  // who recorded it, with product names and units only -- never a code, which is traceability and not a message.
+  const salidaView = salidaReportDayView(db, report.report_date);
+  if (salidaView.operators.length > 0) {
+    lines.push('━━━━━━━━━━━━━━');
+    lines.push('📤 *SAÍDAS / BAIXA*');
+    lines.push('');
+
+    lines.push('Por Operário:');
+    for (const operator of salidaView.operators) {
+      lines.push(`👤 ${operator.name}:`);
+      for (const product of operator.products) {
+        if (product.units > 0) {
+          lines.push(`   - ${product.name}: ${product.units} un`);
+        }
+      }
+    }
+    lines.push('');
+    lines.push(`📊 Total: ${salidaView.totalUnits} un`);
+    lines.push('');
   }
 
   // --- Notes ---

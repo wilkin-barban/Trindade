@@ -9,6 +9,7 @@ import { LoadingSpinner } from '../components/ui/loading-spinner';
 import { ExportPreview } from '../components/reports/ExportPreview';
 import { ReceiptsSection } from '../components/reports/ReceiptsSection';
 import { MassasReportSection } from '../components/reports/MassasReportSection';
+import { SalidaReportSection } from '../components/reports/SalidaReportSection';
 import { ERP_RECEIPT_CATEGORY_ID, usesErpReceipts } from '../lib/receipts';
 
 // ---- Types ----
@@ -330,6 +331,8 @@ export function ReportViewPage() {
       <Card className="mb-4" data-testid="report-massas-card">
         <CardContent className="pt-6">
           <MassasReportSection date={report.report_date} />
+          {/* The day's exits, for the same date the report covers: what left the plant belongs in the report. */}
+          <SalidaReportSection date={report.report_date} />
         </CardContent>
       </Card>
 

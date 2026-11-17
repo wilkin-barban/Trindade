@@ -67,6 +67,7 @@ const EXPECTED_PATHS = [
   '/api/massas-launch/{id}',
   '/api/reports',
   '/api/reports/categories',
+  '/api/reports/day/salidas',
   '/api/reports/history',
   '/api/reports/photos/public/{token}',
   '/api/reports/photos/{photoId}',

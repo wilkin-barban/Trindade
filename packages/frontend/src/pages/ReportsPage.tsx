@@ -20,6 +20,7 @@ import { visibleReportCategories } from '../lib/report-categories';
 import { ReceiptsSection } from '../components/reports/ReceiptsSection';
 import { hasTemperatureTasks } from '../lib/report-sections';
 import { MassasReportSection } from '../components/reports/MassasReportSection';
+import { SalidaReportSection } from '../components/reports/SalidaReportSection';
 import { ERP_RECEIPT_CATEGORY_ID, usesErpReceipts } from '../lib/receipts';
 import { saoPauloToday } from '../lib/date';
 import { aeroEndpoint, aeroSettingsReady, loadAeroSettings } from '../lib/aero-integration';
@@ -369,6 +370,7 @@ export function ReportsPage() {
         */}
         <div className="rounded-xl border border-gray-100 bg-white p-3 sm:p-4" data-testid="massas-block">
           <MassasReportSection date={reportDate} hideRefresh refetchKey={movementsRefreshKey} />
+          <SalidaReportSection date={reportDate} hideRefresh refetchKey={movementsRefreshKey} />
         </div>
         {usesErpReceipts(reportDate) && (
           <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-3 sm:p-4" data-testid="receipts-block">

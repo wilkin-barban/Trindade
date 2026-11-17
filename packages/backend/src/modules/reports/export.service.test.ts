@@ -353,6 +353,51 @@ describe('Export Service (Generador Inteligente)', () => {
     assert.ok(massasIndex < notesIndex, 'Massas section must precede Observações');
   });
 
+  it('adds the day of salidas, grouped by operator, without product codes', () => {
+    // The salida block is its own record: what left the plant in insumos is not a massas launch, and the report
+    // has to say so where the group reads it -- after Masas and before the notes.
+    db.exec('DELETE FROM salida_movement_items');
+    db.exec('DELETE FROM salida_movements');
+    db.exec('DELETE FROM massa_launches');
+    db.exec('DELETE FROM aero_movements');
+    db.exec(`
+      INSERT INTO salida_movements (id, movement_date, user_id, created_at)
+      VALUES (9101, '2026-06-12', 10, '2026-06-12T09:00:00.000Z')
+    `);
+    db.exec(`
+      INSERT INTO salida_movement_items (movement_id, product_code, product_name, block, quantity, position)
+      VALUES
+        (9101, '1356', 'EMBALAG. DISCO 400g', 'embalagens', 6000, 0),
+        (9101, '1900', 'BOBINA ROLO', 'bobinas', 13, 1)
+    `);
+
+    const text = generateWhatsAppText(db, reportId)!;
+
+    assert.ok(text.includes('📤 *SAÍDAS / BAIXA*'));
+    assert.ok(text.includes('👤 Test User:'));
+    assert.ok(text.includes('   - EMBALAG. DISCO 400g: 6000 un'));
+    assert.ok(text.includes('   - BOBINA ROLO: 13 un'));
+    assert.ok(text.includes('📊 Total: 6013 un'));
+    // A code in the message is traceability leaking into a group chat.
+    assert.ok(!text.includes('1356'), 'the product code must not travel in the message');
+    assert.ok(!text.includes('1900'), 'and neither does the second one');
+
+    const salidaIndex = text.indexOf('📤 *SAÍDAS / BAIXA*');
+    const notesIndex = text.indexOf('📝 *Observações:*');
+    assert.ok(salidaIndex > -1 && salidaIndex < notesIndex, 'Salidas must sit before Observações');
+
+    db.exec('DELETE FROM salida_movement_items');
+    db.exec('DELETE FROM salida_movements');
+  });
+
+  it('says nothing about salidas on a day with none', () => {
+    db.exec('DELETE FROM salida_movement_items');
+    db.exec('DELETE FROM salida_movements');
+
+    const text = generateWhatsAppText(db, reportId)!;
+    assert.ok(!text.includes('SAÍDAS / BAIXA'), 'an empty day adds no block');
+  });
+
   it('counts a seat once, even when the plant also launched the same boxes', () => {
     // The day is shared with the test above, so the boxes it recorded are cleared first.
     db.exec('DELETE FROM massa_launches');

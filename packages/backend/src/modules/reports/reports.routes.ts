@@ -21,6 +21,7 @@ import * as query from './reports.query.service.js';
 import * as command from './reports.command.service.js';
 import * as lifecycle from './reports.lifecycle.service.js';
 import { generateWhatsAppText } from './export.service.js';
+import { salidaReportDayView } from './salida-report.service.js';
 import { log as auditLog } from '../audit/audit.service.js';
 
 export interface ReportsRouteOptions {
@@ -131,6 +132,25 @@ export async function reportsRoutes(fastify: FastifyInstance, opts: ReportsRoute
 
       return reply.send(day);
     }
+  );
+
+  /**
+   * GET /api/reports/day/salidas?date=YYYY-MM-DD
+   *
+   * A day of salidas grouped by operator. Any authenticated role can read it.
+   */
+  fastify.get(
+    '/day/salidas',
+    { preHandler: [fastify.authenticate] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const parsed = ReportReceiptsQuerySchema.safeParse(request.query);
+      if (!parsed.success) {
+        return reply.status(400).send(apiError('Data inválida: use AAAA-MM-DD', 'INVALID_DATE_FORMAT'));
+      }
+
+      const day = salidaReportDayView(fastify.db, parsed.data.date ?? getSaoPauloDateString());
+      return reply.send(day);
+    },
   );
 
   // ---- Report CRUD ----

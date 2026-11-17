@@ -96,6 +96,11 @@ import {
   TurnoResponseSchema,
   UpdateReportBodySchema,
 } from '../modules/reports/reports.schema.js';
+import {
+  SalidaReportProductSchema,
+  SalidaReportOperatorSchema,
+  SalidaReportDayViewSchema,
+} from '../modules/reports/salida-report.service.js';
 import { DashboardSummarySchema } from '../modules/dashboard/dashboard.schema.js';
 import {
   StockAddEntryBodySchema,
@@ -486,6 +491,9 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
   registerComponent(registry, 'SalidaHistoryResponse', SalidaHistoryResponseSchema);
   registerComponent(registry, 'SalidaPhotoResponse', SalidaPhotoResponseSchema);
   registerComponent(registry, 'SalidaPhotosResponse', SalidaPhotosResponseSchema);
+  registerComponent(registry, 'SalidaReportProduct', SalidaReportProductSchema);
+  registerComponent(registry, 'SalidaReportOperator', SalidaReportOperatorSchema);
+  registerComponent(registry, 'SalidaReportDayView', SalidaReportDayViewSchema);
 
   // The failure envelopes every path reuses. Declared here rather than at module scope because
   // errorResponse resolves the schema to a component reference, and the map it consults is only
@@ -953,6 +961,20 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
       400: errorResponse('The date did not match YYYY-MM-DD'),
       401: UNAUTHORIZED,
       503: errorResponse('The ERP mirror table is missing'),
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/api/reports/day/salidas',
+    summary: 'A day of salidas grouped by operator',
+    description: 'Answers all salidas of that day grouped by operator, with individual and collective totals.',
+    tags: ['reports'],
+    request: { query: ReportReceiptsQuerySchema },
+    responses: {
+      200: jsonResponse('The day of salidas grouped by operator', SalidaReportDayViewSchema),
+      400: errorResponse('The date did not match YYYY-MM-DD'),
+      401: UNAUTHORIZED,
     },
   });
 

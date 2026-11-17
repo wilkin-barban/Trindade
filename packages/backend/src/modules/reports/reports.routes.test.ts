@@ -1692,4 +1692,53 @@ describe('Reports Routes', () => {
       assert.strictEqual(existsSync(logFile()), true);
     });
   });
+
+  describe('GET /api/reports/day/salidas', () => {
+    it('answers 401 without authentication', async () => {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/reports/day/salidas?date=2026-11-14',
+      });
+      assert.strictEqual(res.statusCode, 401);
+    });
+
+    it('rejects an invalid date with 400', async () => {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/reports/day/salidas?date=invalid-date',
+        headers: { authorization: `Bearer ${workerToken}` },
+      });
+      assert.strictEqual(res.statusCode, 400);
+      const body = JSON.parse(res.body);
+      assert.strictEqual(body.code, 'INVALID_DATE_FORMAT');
+    });
+
+    it('answers the day of salidas grouped by operator for any authenticated role', async () => {
+      // Seed a salida movement
+      db.prepare(`
+        INSERT INTO salida_movements (id, movement_date, user_id, created_at)
+        VALUES (801, '2026-11-14', ?, '2026-11-14 10:00:00')
+      `).run(workerUserId);
+      db.prepare(`
+        INSERT INTO salida_movement_items (movement_id, product_code, product_name, block, quantity, position)
+        VALUES (801, '1357', 'EMBALAG. DISCO 200g', 'embalagens', 20, 1)
+      `).run();
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/reports/day/salidas?date=2026-11-14',
+        headers: { authorization: `Bearer ${workerToken}` },
+      });
+      assert.strictEqual(res.statusCode, 200);
+      const body = JSON.parse(res.body);
+      assert.strictEqual(body.date, '2026-11-14');
+      assert.strictEqual(body.movementCount, 1);
+      assert.strictEqual(body.totalUnits, 20);
+      assert.strictEqual(body.operators.length, 1);
+      const workerUsername = (db.prepare('SELECT username FROM users WHERE id = ?').get(workerUserId) as { username: string }).username;
+      assert.strictEqual(body.operators[0].username, workerUsername);
+      assert.strictEqual(body.operators[0].products[0].code, '1357');
+      assert.strictEqual(body.operators[0].products[0].units, 20);
+    });
+  });
 });

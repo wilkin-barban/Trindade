@@ -5791,7 +5791,7 @@
               "additionalProperties": false
             },
             "minItems": 1,
-            "maxItems": 21
+            "maxItems": 19
           }
         },
         "required": [
@@ -6704,6 +6704,172 @@
         },
         "required": [
           "photos"
+        ],
+        "additionalProperties": false
+      },
+      "SalidaReportProduct": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "block": {
+            "type": "string",
+            "enum": [
+              "embalagens",
+              "bobinas",
+              "materia-prima"
+            ]
+          },
+          "units": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "block",
+          "units"
+        ],
+        "additionalProperties": false
+      },
+      "SalidaReportOperator": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "units": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "products": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "block": {
+                  "type": "string",
+                  "enum": [
+                    "embalagens",
+                    "bobinas",
+                    "materia-prima"
+                  ]
+                },
+                "units": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "code",
+                "name",
+                "block",
+                "units"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "name",
+          "username",
+          "units",
+          "products"
+        ],
+        "additionalProperties": false
+      },
+      "SalidaReportDayView": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string"
+          },
+          "operators": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "username": {
+                  "type": "string"
+                },
+                "units": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "products": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "code": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "block": {
+                        "type": "string",
+                        "enum": [
+                          "embalagens",
+                          "bobinas",
+                          "materia-prima"
+                        ]
+                      },
+                      "units": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "required": [
+                      "code",
+                      "name",
+                      "block",
+                      "units"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "name",
+                "username",
+                "units",
+                "products"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "totalUnits": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "movementCount": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "date",
+          "operators",
+          "totalUnits",
+          "movementCount"
         ],
         "additionalProperties": false
       }
@@ -8263,6 +8429,58 @@
           },
           "503": {
             "description": "The ERP mirror table is missing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/day/salidas": {
+      "get": {
+        "summary": "A day of salidas grouped by operator",
+        "description": "Answers all salidas of that day grouped by operator, with individual and collective totals.",
+        "tags": [
+          "reports"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            "required": false,
+            "name": "date",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The day of salidas grouped by operator",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalidaReportDayView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The date did not match YYYY-MM-DD",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, or expired credentials",
             "content": {
               "application/json": {
                 "schema": {
