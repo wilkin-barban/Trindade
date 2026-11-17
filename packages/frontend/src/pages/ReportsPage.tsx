@@ -322,7 +322,8 @@ export function ReportsPage() {
 
       pendingPhotos.forEach((photo) => URL.revokeObjectURL(photo.previewUrl));
       setPendingPhotos([]);
-      navigate(`/reports/${reportId}`);
+      // The message the group will read, with the four decisions that follow: share, PDF, edit, close.
+      navigate(`/reports/${reportId}?saved=1`);
     } catch (err) {
       if (err instanceof ApiClientError) {
         setError(err.message === 'reportAlreadyExists' ? t('reports.reportAlreadyExists') : err.message);

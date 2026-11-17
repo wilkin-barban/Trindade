@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { LucideArrowLeft, LucideSend, LucidePencil, LucideImage, LucideFileDown } from 'lucide-react';
 import { api, apiUrl } from '../api/client';
@@ -8,6 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { LoadingSpinner } from '../components/ui/loading-spinner';
 import { ExportPreview } from '../components/reports/ExportPreview';
 import { ReceiptsSection } from '../components/reports/ReceiptsSection';
+import { ShareCard } from '../components/reports/ShareCard';
+import { exportReportPdf, fetchReportExportText, reportPhotoFiles, shareReportMessage } from '../lib/report-share';
 import { MassasReportSection } from '../components/reports/MassasReportSection';
 import { SalidaReportSection } from '../components/reports/SalidaReportSection';
 import { ERP_RECEIPT_CATEGORY_ID, usesErpReceipts } from '../lib/receipts';
@@ -100,6 +102,15 @@ export function ReportViewPage() {
   const [error, setError] = useState('');
   const [showExport, setShowExport] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
+  // The card an operator sees after saving, or when they ask to share: the message, not the form.
+  const [params, setParams] = useSearchParams();
+  const showingShare = params.get('saved') === '1';
+  const [shareText, setShareText] = useState('');
+  const [shareLoading, setShareLoading] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
+  const [printing, setPrinting] = useState(false);
+  const [shareNote, setShareNote] = useState<string | null>(null);
 
   useEffect(() => {
     if (error) {
@@ -139,6 +150,27 @@ export function ReportViewPage() {
     };
   }, [id, t]);
 
+  // The card's text is loaded when the card is shown: after a save, or when the operator asks to share.
+  useEffect(() => {
+    if (!showingShare || !report) return;
+    let cancelled = false;
+    setShareLoading(true);
+    setShareError(null);
+    void (async () => {
+      try {
+        const text = await fetchReportExportText(report.id);
+        if (!cancelled) setShareText(text);
+      } catch (err) {
+        if (!cancelled) setShareError(err instanceof Error ? err.message : t('reports.exportError'));
+      } finally {
+        if (!cancelled) setShareLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [showingShare, report, t]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -161,37 +193,46 @@ export function ReportViewPage() {
       </div>
     );
   }
+  /**
+   * The PDF and the message come from one place: `lib/report-share`, which the card uses too. The page keeps its
+   * own buttons for the reading view, and both paths print the same document.
+   */
   async function handleExportPdf() {
     if (!report) return;
     setPdfLoading(true);
     try {
-      const data = await api.get<{ text: string }>(`/reports/${report.id}/export`);
-
-      const tempDiv = document.createElement('div');
-      tempDiv.id = 'temp-pdf-export-text';
-      tempDiv.style.position = 'absolute';
-      tempDiv.style.left = '-9999px';
-      tempDiv.style.top = '-9999px';
-      tempDiv.style.width = '450px';
-      tempDiv.style.padding = '20px';
-      tempDiv.style.backgroundColor = '#f9fafb';
-      tempDiv.style.fontFamily = 'monospace';
-      tempDiv.style.fontSize = '12px';
-      tempDiv.style.whiteSpace = 'pre-wrap';
-      tempDiv.style.color = '#1f2937';
-      tempDiv.style.lineHeight = '1.6';
-      tempDiv.innerText = data.text;
-
-      document.body.appendChild(tempDiv);
-
-      const { exportPdf } = await import('../lib/exportPdf');
-      await exportPdf('temp-pdf-export-text', `relatorio-${report.id}`);
-
-      document.body.removeChild(tempDiv);
+      await exportReportPdf(report.id);
     } catch (err: any) {
       setError(err.message || t('reports.exportError'));
     } finally {
       setPdfLoading(false);
+    }
+  }
+
+  async function handleShareReport() {
+    if (!report) return;
+    setSharing(true);
+    setShareNote(null);
+    try {
+      const files = await reportPhotoFiles(photos);
+      const outcome = await shareReportMessage({ text: shareText, photos: files });
+      if (outcome === 'copied') setShareNote(t('reports.shareCopied'));
+      else if (outcome === 'failed') setShareNote(t('salida.shareFailed'));
+    } finally {
+      setSharing(false);
+    }
+  }
+
+  async function handleShareCardPdf() {
+    if (!report) return;
+    setPrinting(true);
+    setShareNote(null);
+    try {
+      await exportReportPdf(report.id);
+    } catch (err) {
+      setShareNote(err instanceof Error ? err.message : t('reports.exportError'));
+    } finally {
+      setPrinting(false);
     }
   }
 
@@ -216,6 +257,30 @@ export function ReportViewPage() {
   // Recebimento stops being a list of ticks: from the cutover day on, the day's supplies come from the
   // mirror and the stored ticks are not shown, or they would contradict the text that was exported.
   const erpReceipts = usesErpReceipts(report.report_date);
+
+  // The saved report opens as the message it becomes. The reading view is one tap away (Editar), and the card
+  // itself only needs the text, the photos and the four decisions.
+  if (showingShare && report) {
+    const turno = report.turno === 'tarde' ? t('reports.turnoTarde') : t('reports.turnoNoite');
+    return (
+      <div className="mx-auto w-full max-w-2xl p-4">
+        <ShareCard
+          title={`${t('reports.savedTitle')} — ${t('reports.turnoLabel')} ${turno}`}
+          subtitle={`${report.report_date} · ${report.user?.display_name ?? ''}`}
+          text={shareText}
+          loading={shareLoading}
+          error={shareError}
+          note={shareNote}
+          sharing={sharing}
+          printing={printing}
+          onShare={() => void handleShareReport()}
+          onPdf={() => void handleShareCardPdf()}
+          onEdit={() => navigate(`/reports/${report.id}/edit`)}
+          onClose={() => navigate('/reports')}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto" data-testid="report-detail">

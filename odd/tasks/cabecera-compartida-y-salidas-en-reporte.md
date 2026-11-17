@@ -168,3 +168,29 @@ Pedido del usuario: Massas do dia e Insumos cada una en su tarjeta, como ya esta
 
 Evidencia: Vitest **220/220**, typecheck y build limpios, los cuatro specs de movimientos del ERP 8/8, E2E completo
 **118/118** (8m 12s), deploy solo de `web` (healthy) y `/reports` 200 con los cuatro test ids servidos.
+
+## Tarjeta de compartir al guardar un reporte (2026-11-16)
+
+Pedido: al guardar el reporte, en vez de la vista del módulo, mostrar una tarjeta con la vista de WhatsApp del
+reporte y cuatro acciones —Compartir en WhatsApp, PDF, Editar y Cerrar—, con «Editar» volviendo a la vista anterior.
+
+Decisiones del usuario: (1) la tarjeta **reemplaza** la vista de lectura al guardar, con «Editar» detrás; (2) el
+compartir **incluye las fotos** del reporte; (3) **sin** botón de copiar.
+
+### Implementación
+
+- `lib/report-share.ts`: `fetchReportExportText` (el texto es del servidor, `GET /reports/:id/export`),
+  `reportPhotoFiles` (fotos del reporte como archivos para la hoja de compartir, con el mismo criterio que Salida:
+  una foto que no se puede leer se omite), `shareReportMessage` (hoja nativa con archivos cuando el navegador lo
+  admite; si no, el texto; si no hay hoja, copia) y `exportReportPdf` (el PDF que ya existía, extraído de la página).
+- `components/reports/ShareCard.tsx`: tarjeta genérica —título, subtítulo, texto, estado de carga/error y las cuatro
+  acciones—, sin saber nada de reportes, para poder montarla en Horario de Cargamento.
+- `ReportViewPage`: con `?saved=1` renderiza la tarjeta; sin el parámetro, la vista de lectura de siempre (que además
+  ahora usa `exportReportPdf`). «Editar» va a `/reports/:id/edit` y «Cerrar» a `/reports`.
+- `ReportsPage`: al guardar navega a `/reports/:id?saved=1`.
+- i18n: `reports.savedTitle`, `reports.shareSending`, `reports.shareCopied` en ambos idiomas.
+
+### Evidencia
+
+Vitest **227/227** (31 archivos) con dos tests nuevos de la tarjeta y dos de la página (con y sin `?saved=1`),
+`tsc` limpio y build verde. El botón de copiar no existe en la tarjeta.
