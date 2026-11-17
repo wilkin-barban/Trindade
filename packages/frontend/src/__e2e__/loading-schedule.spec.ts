@@ -427,8 +427,12 @@ test.describe('Loading Schedule — Export Modal', () => {
   });
 
   test('4.3 export modal opens and shows copy button', async ({ page }) => {
-    // Click the share button
-    await page.locator('[data-testid="open-export-btn"]').click();
+    // The day closes with Salvar, the same primary action the report has, and that opens the message.
+    const save = page.locator('[data-testid="loading-save-btn"]');
+    await expect(save).toBeVisible();
+    expect((await save.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await expect(save).toContainText(/Salvar/);
+    await save.click();
 
     // The card takes the grid's place: the message, and the decisions that follow it.
     const card = page.locator('[data-testid="loading-share-card"]');
@@ -480,7 +484,7 @@ test.describe('Loading Schedule — Export Modal', () => {
     // Reload and open export
     await page.reload();
     await page.waitForSelector('[data-testid="schedule-grid"]', { timeout: 10000 });
-    await page.locator('[data-testid="open-export-btn"]').click();
+    await page.locator('[data-testid="loading-save-btn"]').click();
 
     // Wait for export text to load
     const textContent = page.locator('[data-testid="loading-share-text"]');
@@ -497,7 +501,7 @@ test.describe('Loading Schedule — Export Modal', () => {
   test('4.3 export text uses the today batch even when a date query is present', async ({ page }) => {
     await page.goto('/loading?date=2099-12-31');
     await page.waitForSelector('[data-testid="schedule-grid"]', { timeout: 10000 });
-    await page.locator('[data-testid="open-export-btn"]').click();
+    await page.locator('[data-testid="loading-save-btn"]').click();
     await page.waitForSelector('[data-testid="loading-share-text"]', { timeout: 10000 });
 
     const text = await page.locator('[data-testid="loading-share-text"]').textContent();

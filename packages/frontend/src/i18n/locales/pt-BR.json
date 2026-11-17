@@ -231,6 +231,7 @@
     "emptyDay": "Nenhum carregamento agendado para este dia.",
     "timeSlot": "Horário",
     "exportError": "Erro ao gerar texto de exportação.",
+      "save": "Salvar",
       "shareCopied": "Texto copiado: cole no chat.",
       "shareUnavailable": "Não foi possível compartilhar.",
     "editEntry": "Editar",

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { LucideSend, LucideFileDown } from 'lucide-react';
+import { LucideSave, LucideFileDown } from 'lucide-react';
 import { api } from '../api/client';
 import { Button } from '../components/ui/button';
 import { LoadingSpinner } from '../components/ui/loading-spinner';
@@ -299,11 +299,11 @@ export function LoadingSchedulePage() {
           onClick={() => setParams({ ...Object.fromEntries(params), share: '1' }, { replace: false })}
           size="lg"
           className="w-full whitespace-nowrap px-2 text-xs sm:w-auto sm:px-4 sm:text-sm"
-          data-testid="open-export-btn"
+          data-testid="loading-save-btn"
           disabled={schedules.length === 0}
         >
-          <LucideSend className="h-4 w-4" />
-          {t('loading.export')}
+          <LucideSave className="h-4 w-4" />
+          {t('loading.save')}
         </Button>
       </div>
 

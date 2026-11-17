@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { LucideArrowLeft, LucidePencil, LucideX, LucideCheck, LucideSend, LucideFileDown } from 'lucide-react';
+import { LucideArrowLeft, LucidePencil, LucideX, LucideCheck, LucideSave, LucideFileDown } from 'lucide-react';
 import { api, ApiClientError } from '../api/client';
 import { Button } from '../components/ui/button';
 import { LoadingSpinner } from '../components/ui/loading-spinner';
@@ -349,14 +349,14 @@ export function LoadingEditPage() {
           {t('loading.exportPdf')}
         </Button>
         <Button
-          onClick={() => setExportOpen(true)}
+          onClick={() => navigate(`/loading?share=1&date=${date}`)}
           size="lg"
           className="w-full whitespace-nowrap px-2 text-xs sm:w-auto sm:px-4 sm:text-sm"
-          data-testid="open-export-btn"
+          data-testid="loading-save-btn"
           disabled={schedules.length === 0}
         >
-          <LucideSend className="h-4 w-4" />
-          {t('loading.export')}
+          <LucideSave className="h-4 w-4" />
+          {t('loading.save')}
         </Button>
       </div>
 
