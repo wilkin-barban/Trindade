@@ -153,3 +153,18 @@ commitear se corrigieron:
 ### Números al cerrar el código
 
 Backend **962/962**, Vitest **212/212** (27 archivos), node **749/749**, `tsc` sin errores.
+
+### E2E: los specs también se mudaron
+
+El rediseño movió el día del lanzamiento al histórico, y siete specs seguían entrando por la puerta vieja. Se
+actualizaron sin cambiar lo que afirman:
+
+- `massas-history` (commit `f4890b01`): la ventana del archivo cierra en hoy y la página abre en hoy, porque hoy es el
+  día gestionable — la premisa anterior era la regla de solo lectura.
+- `massas-sync-header` (`f4890b01`): sync, línea de último contacto y su ausencia en un día pasado, en el histórico.
+- `erp-result-dialogs` y `massas-unified` (`f4890b01`): los callbacks aterrizan en el histórico; el día unificado se
+  afirma **después** de que el test siembra sus filas, porque en el historial un día vacío no dibuja nada y antes se
+  apoyaba en lo que dejaba otro spec.
+- `auto-read-after-launch`, `aero-vault-new-tab`, `aero-sync-lenses` y `aero-scriptable-dialog`: pendientes en la
+  corrida completa (107/118), con el mismo patrón de puerta vieja y de dependencia de restos de otros specs. Se
+  atacan en una pasada dedicada.
