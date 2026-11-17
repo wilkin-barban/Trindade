@@ -6,6 +6,9 @@
 # SDD local artifacts
 .atl/
 
+# Vitest leaves this cache at the repository root when a suite runs from there.
+.vitest/
+
 # Android release signing. keystore.properties holds the store password in plain text and the
 # keystore is the one file that can never be regenerated, so neither may ever be tracked at any depth;
 # the unanchored rules follow the convention at the top of this file. Ignoring a keystore is not
