@@ -177,3 +177,15 @@ cerrado (CI verde y deploy real). Hasta entonces no se toca `packages/android`.
   ganó `saveAccessToken` con implementación por defecto para los stores de test.
   `AuthRefreshGraceTest`: 4 casos, más los de `AuthRepositoryTest`/`AuthInterceptorTest`.
 - **T0.3** contratos ya regenerados en la pasada web; `verify-openapi-artifact.sh` en verde, sin cambios.
+
+### Fase 1 — primera entrega
+
+- Catálogo de 19 (11/3/5), código de 4 dígitos en pantalla y 6 hacia el ERP, cantidades enteras y ×100, documentos con
+  los nombres certificados y viajes de 8 (`SalidaCatalog`, `SalidaErpPayload`), con tests.
+- `SalidaApi` (catálogo, alta, día, histórico, veredicto ERP) y `AeroErpClient.postExit`; `salida_sync` sumado a los
+  eventos de auditoría.
+- `SalidaOutboxStore`: la cola sobrevive al cierre con sus documentos y su fecha, con lector propio y tests.
+- `SalidaRepository` (local primero, veredicto, cola), `SalidaViewModel` (selección derivada, confirmación), pantallas
+  de lanzamiento e histórico, pestaña en el drawer y entradas en `RolePolicy`.
+- APK **0.8.0 / 8001** compilada con `-PapiBaseUrl` de producción e instalada en `emulator-5554` (verificado por
+  `dumpsys`); arranca en el login. Pendiente de una cuenta para las capturas de las pantallas internas.
