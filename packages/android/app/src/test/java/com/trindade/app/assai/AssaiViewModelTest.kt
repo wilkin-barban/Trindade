@@ -31,13 +31,13 @@ class AssaiViewModelTest {
     @Test
     fun `coming back into a field clears its warning`() {
         val vm = AssaiViewModel()
-        vm.onQuantityChange("Quadrada", "20")
-        vm.onBlur("Quadrada")
-        assertEquals(listOf("Quadrada"), vm.visibleErrors())
+        vm.onQuantityChange("Disco 200g", "20")
+        vm.onBlur("Disco 200g")
+        assertEquals(listOf("Disco 200g"), vm.visibleErrors())
 
-        vm.onFocus("Quadrada")
+        vm.onFocus("Disco 200g")
         assertEquals(emptyList<String>(), vm.visibleErrors())
-        vm.onQuantityChange("Quadrada", "28")
+        vm.onQuantityChange("Disco 200g", "160")
         assertEquals(emptyList<String>(), vm.visibleErrors())
         assertFalse(vm.hasError())
     }
@@ -47,7 +47,7 @@ class AssaiViewModelTest {
         val vm = AssaiViewModel()
         vm.onQuantityChange("Nhoque 1kg", "30")
         vm.onQuantityChange("Rolo 2kg", "20")
-        vm.onQuantityChange("Quadrada", "20")
+        vm.onQuantityChange("Disco 200g", "20")
         assertEquals(4, vm.totalBoxes())
     }
 

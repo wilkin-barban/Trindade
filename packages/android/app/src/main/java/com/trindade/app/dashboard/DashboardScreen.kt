@@ -76,6 +76,8 @@ fun DashboardScreen(
     onOpenLoadingDay: (String) -> Unit,
     onOpenMassas: () -> Unit = {},
     onOpenMassasHistory: () -> Unit = {},
+    onOpenSalida: () -> Unit = {},
+    onOpenSalidaHistory: () -> Unit = {},
     // Los tres accesos directos a las calculadoras: las pestañas ya existen, así que la tarjeta
     // solo tiene que llevar a ellas.
     onOpenStock: () -> Unit,
@@ -217,7 +219,7 @@ fun DashboardScreen(
                     }
                 }
 
-                // 3ra posição: Lançamento de Massas (entre Cronograma Ativo e Calculador de Estoque)
+                // 3ra posição: Lançamento de Massas (entre Cronograma Ativo e Saída / Baixa)
                 DashboardCard(
                     label = "🍝 " + stringResource(R.string.massas_title),
                     onClick = onOpenMassas,
@@ -239,6 +241,35 @@ fun DashboardScreen(
                         }
                         TextButton(
                             onClick = onOpenMassasHistory,
+                            modifier = Modifier.defaultMinSize(minHeight = 48.dp),
+                        ) {
+                            Text(text = stringResource(R.string.dashboard_massas_view_history))
+                        }
+                    }
+                }
+
+                // 4ta posição: Saída / Baixa (entre Massas e Calculador de Estoque)
+                DashboardCard(
+                    label = "📤 " + stringResource(R.string.nav_salida),
+                    onClick = onOpenSalida,
+                ) {
+                    Text(
+                        text = stringResource(R.string.dashboard_salida_hint),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        TextButton(
+                            onClick = onOpenSalida,
+                            modifier = Modifier.defaultMinSize(minHeight = 48.dp),
+                        ) {
+                            Text(text = stringResource(R.string.dashboard_massas_launch_now))
+                        }
+                        TextButton(
+                            onClick = onOpenSalidaHistory,
                             modifier = Modifier.defaultMinSize(minHeight = 48.dp),
                         ) {
                             Text(text = stringResource(R.string.dashboard_massas_view_history))
@@ -383,6 +414,8 @@ fun DashboardRoute(
     onOpenLoadingDay: (String) -> Unit,
     onOpenMassas: () -> Unit = {},
     onOpenMassasHistory: () -> Unit = {},
+    onOpenSalida: () -> Unit = {},
+    onOpenSalidaHistory: () -> Unit = {},
     // Los tres accesos directos: la pantalla los ofrece y la ruta los entrega.
     onOpenStock: () -> Unit,
     onOpenAssai: () -> Unit,
@@ -402,6 +435,8 @@ fun DashboardRoute(
         onOpenLoadingDay = onOpenLoadingDay,
         onOpenMassas = onOpenMassas,
         onOpenMassasHistory = onOpenMassasHistory,
+        onOpenSalida = onOpenSalida,
+        onOpenSalidaHistory = onOpenSalidaHistory,
         onOpenStock = onOpenStock,
         onOpenAssai = onOpenAssai,
         onOpenShare = onOpenShare,

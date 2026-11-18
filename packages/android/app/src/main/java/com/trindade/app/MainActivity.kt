@@ -651,6 +651,17 @@ class MainActivity : ComponentActivity() {
                                         massasLaunchDay = null
                                         massasDayFromHistory = false
                                     },
+                                    // La séptima tarjeta entra por el mismo camino que el cajón: la pestaña
+                                    // ya existe y la tarjeta solo decide si abre el lanzamiento o el
+                                    // histórico, que son las dos puertas de `Tab.SALIDA`.
+                                    onOpenSalida = {
+                                        tab = Tab.SALIDA
+                                        salidaHistoryOpen = false
+                                    },
+                                    onOpenSalidaHistory = {
+                                        tab = Tab.SALIDA
+                                        salidaHistoryOpen = true
+                                    },
                                 )
                                 Tab.REPORTS -> {
                                     BackHandler(enabled = !drawerState.isOpen, onBack = onBackReportsTab)

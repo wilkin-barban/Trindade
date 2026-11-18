@@ -81,6 +81,10 @@ class DashboardScreenTest {
         onOpenReports: () -> Unit = {},
         onOpenLoading: () -> Unit = {},
         onOpenLoadingDay: (String) -> Unit = {},
+        onOpenMassas: () -> Unit = {},
+        onOpenMassasHistory: () -> Unit = {},
+        onOpenSalida: () -> Unit = {},
+        onOpenSalidaHistory: () -> Unit = {},
         onOpenShare: () -> Unit = {},
     ) {
         composeRule.setContent {
@@ -91,6 +95,10 @@ class DashboardScreenTest {
                     onOpenReports = onOpenReports,
                     onOpenLoading = onOpenLoading,
                     onOpenLoadingDay = onOpenLoadingDay,
+                    onOpenMassas = onOpenMassas,
+                    onOpenMassasHistory = onOpenMassasHistory,
+                    onOpenSalida = onOpenSalida,
+                    onOpenSalidaHistory = onOpenSalidaHistory,
                     onOpenStock = {},
                     onOpenAssai = {},
                     onOpenShare = onOpenShare,
@@ -338,6 +346,41 @@ class DashboardScreenTest {
 
         card(copy(R.string.nav_share)).performClick()
         assertEquals("The share card is a door to the tab, not a label", 1, openedShare)
+    }
+
+    @Test
+    fun `dashboard displays all seven cards including salida with launch and history actions`() {
+        var salidaLaunched = 0
+        var salidaHistoryOpened = 0
+        render(
+            state = state(),
+            onOpenSalida = { salidaLaunched++ },
+            onOpenSalidaHistory = { salidaHistoryOpened++ },
+        )
+
+        // All seven operational cards matching web order
+        val expectedCards = listOf(
+            copy(R.string.dashboard_reports_today),
+            copy(R.string.dashboard_active_schedule),
+            "🍝 " + copy(R.string.massas_title),
+            "📤 " + copy(R.string.nav_salida),
+            copy(R.string.nav_stock_counter),
+            copy(R.string.nav_assai),
+            copy(R.string.nav_share),
+        )
+
+        for (label in expectedCards) {
+            composeRule.onNodeWithText(label).performScrollTo().assertIsDisplayed()
+        }
+
+        // Action buttons inside the Salida card
+        val launchButtons = composeRule.onAllNodesWithText(copy(R.string.dashboard_massas_launch_now))
+        launchButtons[1].performScrollTo().performClick()
+        assertEquals(1, salidaLaunched)
+
+        val historyButtons = composeRule.onAllNodesWithText(copy(R.string.dashboard_massas_view_history))
+        historyButtons[1].performScrollTo().performClick()
+        assertEquals(1, salidaHistoryOpened)
     }
 
     @Test

@@ -14,20 +14,29 @@ import org.junit.Test
 class AssaiOrderTest {
 
     @Test
-    fun `the catalogue carries the nine products and their boxes per box`() {
-        assertEquals(9, ASSAI_PRODUCTS.size)
-        val byName = ASSAI_PRODUCTS.associateBy { it.name }
-        assertEquals(15, byName.getValue("Nhoque 1kg").unitsPerBox)
-        assertEquals(80, byName.getValue("Disco 200g").unitsPerBox)
-        assertEquals(10, byName.getValue("Rolo 2kg").unitsPerBox)
+    fun `the catalogue carries the eight products and their boxes per box, and Quadrada is absent`() {
+        assertEquals(8, ASSAI_PRODUCTS.size)
+        assertFalse("Quadrada deve ser removida", ASSAI_PRODUCTS.any { it.name == "Quadrada" })
+
+        val expected = listOf(
+            AssaiProduct("Nhoque 1kg", 15),
+            AssaiProduct("Disco 200g", 80),
+            AssaiProduct("Disco 400g", 50),
+            AssaiProduct("Disco 500g", 40),
+            AssaiProduct("Lasanha", 45),
+            AssaiProduct("Rolo 500g", 30),
+            AssaiProduct("Rolo 1kg", 24),
+            AssaiProduct("Rolo 2kg", 10),
+        )
+        assertEquals(expected, ASSAI_PRODUCTS)
     }
 
     @Test
     fun `a quantity that closes whole boxes is exact, and one that does not is not`() {
-        val lines = assaiLines(mapOf("Nhoque 1kg" to "30", "Quadrada" to "20"))
+        val lines = assaiLines(mapOf("Nhoque 1kg" to "30", "Disco 200g" to "20"))
         assertTrue(lines.first { it.product == "Nhoque 1kg" }.exact)
         assertEquals(2, lines.first { it.product == "Nhoque 1kg" }.boxes)
-        assertFalse(lines.first { it.product == "Quadrada" }.exact)
+        assertFalse(lines.first { it.product == "Disco 200g" }.exact)
     }
 
     @Test
@@ -45,7 +54,7 @@ class AssaiOrderTest {
 
     @Test
     fun `the total adds the boxes of what can be served, and only that`() {
-        val lines = assaiLines(mapOf("Nhoque 1kg" to "30", "Rolo 2kg" to "20", "Quadrada" to "20"))
+        val lines = assaiLines(mapOf("Nhoque 1kg" to "30", "Rolo 2kg" to "20", "Disco 200g" to "20"))
         assertEquals(4, assaiTotalBoxes(lines))
     }
 
@@ -86,11 +95,11 @@ class AssaiOrderTest {
 
     @Test
     fun `the warning waits for the field to be left and leaves when it is re-entered`() {
-        val lines = assaiLines(mapOf("Quadrada" to "20"))
+        val lines = assaiLines(mapOf("Disco 200g" to "20"))
         assertTrue(assaiHasError(lines))
 
         assertEquals(emptyList<String>(), assaiVisibleErrors(lines, blurred = emptySet(), focused = null))
-        assertEquals(emptyList<String>(), assaiVisibleErrors(lines, blurred = setOf("Quadrada"), focused = "Quadrada"))
-        assertEquals(listOf("Quadrada"), assaiVisibleErrors(lines, blurred = setOf("Quadrada"), focused = null))
+        assertEquals(emptyList<String>(), assaiVisibleErrors(lines, blurred = setOf("Disco 200g"), focused = "Disco 200g"))
+        assertEquals(listOf("Disco 200g"), assaiVisibleErrors(lines, blurred = setOf("Disco 200g"), focused = null))
     }
 }

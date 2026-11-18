@@ -14,10 +14,9 @@ package com.trindade.app.assai
 /** A product of the order and how many units its box holds. */
 data class AssaiProduct(val name: String, val unitsPerBox: Int)
 
-/** The nine products, in the order the plant reads them. */
+/** The eight products, in the order the plant reads them. */
 val ASSAI_PRODUCTS: List<AssaiProduct> = listOf(
     AssaiProduct("Nhoque 1kg", 15),
-    AssaiProduct("Quadrada", 14),
     AssaiProduct("Disco 200g", 80),
     AssaiProduct("Disco 400g", 50),
     AssaiProduct("Disco 500g", 40),

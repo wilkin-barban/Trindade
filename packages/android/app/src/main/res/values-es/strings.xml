@@ -1029,4 +1029,5 @@
     <string name="share_card_edit">Editar</string>
     <string name="share_card_close">Cerrar</string>
     <string name="share_card_back">Volver</string>
+    <string name="dashboard_salida_hint">Registrar salida de producto</string>
 </resources>
