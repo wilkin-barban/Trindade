@@ -51,3 +51,43 @@ La salida elegida es **B**: el Relatório pide los dos lados en dos payloads sep
 > nunca null. 5) Si el ERP devuelve un error, mostrá un mensaje amigable/AERO_* y **nunca** la frase cruda de PHP;
 > test de regresión que fije ambos (`ENTSAI` no nulo y error no crudo). 6) Tests de contrato/script/parser, build,
 > CI y deploy **api+web**; actualizá la versión de la receta. No toques Android/APK ni la release.
+
+## Avance
+
+Cerrado el 2026-11-18. Causa confirmada antes de tocar código: el read del Relatório viajaba con `ENTSAI: null`, el
+PHP del ERP no arma consulta con ese filtro abierto y contestó `PDO::prepare(): Argument #1 ($query) cannot be empty`
+dentro de un 200; el puente guardó ese texto y el operario lo leyó como fallo del botón.
+
+- **T1** `movimentos` acepta hasta 2 payloads; `bodies` se publica para el viaje de dos lados y `body` conserva el
+  legacy de entradas (`b0d6c671`). El OpenAPI no cambia (`payloads` sigue `1..8`), así que no se regeneró cliente
+  alguno y Android quedó intacto.
+- **T2** `aeroMovementsPayload` recibe `side: 'E' | 'S'` (un lado abierto dejó de ser representable) y
+  `aeroMovementsPayloads` arma uno o dos cuerpos (`b3252dd5`).
+- **T3** Guion **v2.1.0**: ejecuta los dos cuerpos, fusiona en `{ success: true, data: [...E, ...S], skipped }` y, si
+  un lado falla, devuelve ese fallo en vez de medio día. Un guion viejo ignora `bodies` y completa las entradas.
+- **T4** El parser aplana una lista de listas; `PDO::prepare(...)` se clasifica `AERO_ERP_ERROR` y la pantalla muestra
+  `reports.receiptsError` mientras la frase cruda queda solo en la auditoría.
+- **T5** Tests: backend **976/976**, frontend node **754/754**, unit **235/235**.
+- **T6** CI `44394510058` verde; el primer intento falló porque el E2E fijaba `v2.0.0` literal en la receta
+  (`3c636474`). Deploy api+web: bundle `assets/index-DidEhsDF.js`, `/Aero32Bridge.js` con `v2.1.0`, contenedores
+  `healthy`.
+
+### Cierre verificado en producción (21:41)
+
+El botón funciona. La evidencia está en la auditoría y en la base:
+
+- `21:41:42` → `read_history` / `result`, nota `lens=recebimento · date=2026-11-18 · insumos=2 · via=bridge`, **sin
+  error**, y `POST /api/integration/aero/movements` con 201.
+- Espejo del día: `aero_movements` de `2026-11-18` con 13 asientos `E` y 823 `S`, `synced_at 21:41:41.292Z`. Los dos
+  lados llegaron, que es lo que el pedido único con `ENTSAI` nulo nunca podía traer.
+- La fila del ticket de esa pulsación (`aero_bridge_tickets`, creada `21:41:32.491Z`, usada `21:41:34.054Z`) lleva
+  `bodies` con dos elementos, `ENTSAI:"E"` y `ENTSAI:"S"`, y un `body` legacy con `E`.
+
+**El intento de 21:39:03 era el cliente viejo, no el nuevo.** Esa fila tiene `bodies: null` y un `body` con
+`"ENTSAI":null`: la pestaña se había cargado antes del deploy de las 20:56 y nunca se recargó. Dos minutos después,
+la misma pulsación desde la página nueva armó el sobre correcto. No hace falta arreglo de servidor: el cliente
+desplegado ya pide los dos lados y la planta ya sirve el guion v2.1.0.
+
+**Lección operativa**: un deploy de web no recarga las pestañas abiertas. Si vuelve a aparecer un `PDO::prepare` en
+la auditoría, lo primero que hay que mirar es si la fila del ticket trae `bodies` nulo: eso dice «cliente viejo», no
+«servidor roto».
