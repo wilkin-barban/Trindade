@@ -91,19 +91,15 @@ export function salidaProductsByBlock(
   return grouped;
 }
 
-/** The one account inside the private beta. The name is the server's `BETA_USERNAME`, spelled the same. */
-export const SALIDA_BETA_USERNAME = 'wilkin';
-
 /**
- * Whether this account is inside the private beta.
+ * Whether this account sees the module.
  *
- * The server is the authority and answers 403 to everybody else; this only decides whether the menu items and
- * the routes are drawn at all. The comparison is therefore the server's own: trimmed and case-sensitive. Being
- * *more* permissive here is not a harmless nicety -- a `Wilkin` account would be shown both menu items and then
- * refused by every route, which is the UI advertising access the authority denies.
+ * The beta is over: the server accepts every authenticated account, so the menu and the two routes do too, and
+ * an anonymous visitor is the only one left out. `user` is what the shell already has; a session without a
+ * username is still a session, and the server -- not this function -- decides what it may write.
  */
 export function isSalidaVisible(user: { username?: string } | null | undefined): boolean {
-  return String(user?.username ?? '').trim() === SALIDA_BETA_USERNAME;
+  return Boolean(user);
 }
 
 // ---- Date (S3) ----

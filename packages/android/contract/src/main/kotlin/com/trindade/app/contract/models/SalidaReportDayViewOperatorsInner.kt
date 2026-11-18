@@ -36,6 +36,7 @@ import kotlinx.serialization.Contextual
  * @param username 
  * @param units 
  * @param products 
+ * @param erpOnly 
  */
 @Serializable
 
@@ -51,7 +52,10 @@ data class SalidaReportDayViewOperatorsInner (
     val units: kotlin.Int,
 
     @SerialName(value = "products")
-    val products: kotlin.collections.List<SalidaReportOperatorProductsInner>
+    val products: kotlin.collections.List<SalidaReportOperatorProductsInner>,
+
+    @SerialName(value = "erpOnly")
+    val erpOnly: kotlin.Boolean
 
 ) {
 

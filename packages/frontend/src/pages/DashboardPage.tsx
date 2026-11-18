@@ -260,9 +260,9 @@ export function DashboardPage() {
           }
           icon="🍝"
         />
-        {/* La salida: beta privada, así que la tarjeta existe solo para la cuenta que está adentro. Como la de
-            masas, no es un enlace sino una superficie con dos puertas -- lanzar e histórico --, porque envolverla
-            en un ancla y dejar la otra adentro deja el ancla interna sin destino propio. */}
+        {/* La salida, para cualquier cuenta con sesión. Como la de masas, no es un enlace sino una superficie con
+            dos puertas -- lanzar e histórico --, porque envolverla en un ancla y dejar la otra adentro deja el ancla
+            interna sin destino propio. */}
         {isSalidaVisible(user) && (
           <SummaryCard
             title={t('nav.salida')}

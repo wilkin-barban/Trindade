@@ -321,14 +321,15 @@ const ADMINISTRATOR_OR_WORKER =
 /**
  * The sentence every baixa operation carries.
  *
- * This surface is a private beta of one account, and that is a decision of the delivery rather than a role: the
- * guard asks for the username `wilkin`, so a worker and even another administrator are refused with 403. OpenAPI
- * has no vocabulary for a username, so the only place a client's author can learn it is this text -- and the
- * suite asserts the same boundary against the running server, so the two cannot drift apart.
+ * The surface used to be a private beta of one account; it is open to every authenticated account now, and the
+ * only refusal left is a missing or invalid token. The guest keeps its platform-wide read-only rule for writes,
+ * which is a rule of the account and not of this module -- the suite asserts both against the running server.
  */
-const SALIDA_BETA_ONLY =
-  'Beta privada: only the account `wilkin` is admitted. A missing or invalid token answers 401, and any other ' +
-  'account -- a Trabalhador or another Administrador -- answers 403, because the guard is the username.';
+const SALIDA_AUTH_ONLY =
+  'Requires an authenticated account: a missing or invalid token answers 401. Every role of this API ' +
+  '(Administrador and Trabalhador) is admitted; the read-only guest may read but not write.';
+
+/** The public photo is a different contract: the token is its credential, so there is no session to ask for. */
 
 function buildRegistry(): OpenAPIRegistry {
   const registry = new OpenAPIRegistry();
@@ -1677,14 +1678,13 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
   // ---- salida (baixa) ----
 
   /**
-   * The baixa surface, which is a private beta of one account.
+   * The baixa surface, open to every account with a session.
    *
-   * Every operation but the tokenised photo is behind the same username guard, so each one declares both
-   * refusals: 401 without a session and 403 for any other account. The public photo route is the exception and
-   * says so, because the token is its credential.
+   * Every operation but the tokenised photo is behind the authentication guard, so the only refusal it declares
+   * is 401 without a session. The read-only guest may read and is refused on writes by the account's own rule.
    */
   const SALIDA_FORBIDDEN = errorResponse(
-    'Beta privada: only the account `wilkin` is admitted, so any other account answers 403',
+    'The read-only guest account cannot write; every other authenticated account is admitted',
   );
 
   registry.registerPath({
@@ -1692,7 +1692,7 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
     path: '/api/salida/catalog',
     summary: 'Read the fixed catalogue of products a baixa can give',
     description:
-      `${SALIDA_BETA_ONLY} Answers the 21 products, in the plant's order, each with its four-digit code, its ` +
+      `${SALIDA_AUTH_ONLY} Answers the 21 products, in the plant's order, each with its four-digit code, its ` +
       'Portuguese name and its block (`embalagens`, `bobinas` or `materia-prima`). The list is invariable in ' +
       'this delivery and has no CRUD: a client renders it and does not invent a copy of its own.',
     tags: ['salida'],
@@ -1708,7 +1708,7 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
     path: '/api/salida',
     summary: 'Launch one baixa movement',
     description:
-      `${SALIDA_BETA_ONLY} Persists the movement in Trindade before any attempt against the ERP: a failed ` +
+      `${SALIDA_AUTH_ONLY} Persists the movement in Trindade before any attempt against the ERP: a failed ` +
       'WebService leaves a pending movement in the history and never loses what the operator loaded. The date ' +
       'is the plant\'s current day in São Paulo and the operator is the session; neither is a field of the ' +
       'request. Each item stores the product name and block of that moment, so renaming the catalogue later ' +
@@ -1732,7 +1732,7 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
     path: '/api/salida',
     summary: 'Read one plant day of baixas',
     description:
-      `${SALIDA_BETA_ONLY} Answers the movements of the requested day, oldest launch first, each with its ` +
+      `${SALIDA_AUTH_ONLY} Answers the movements of the requested day, oldest launch first, each with its ` +
       'items, its photos and its reconciliation against the ERP. Without a `date` it answers the plant\'s ' +
       'current day rather than the server\'s. The reconciliation is computed on every read and never stored: ' +
       'the seats belong to the company and can arrive hours after the baixa.',
@@ -1753,7 +1753,7 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
     path: '/api/salida/history',
     summary: 'Read the days that carry baixas',
     description:
-      `${SALIDA_BETA_ONLY} One entry per day that has movements, newest first, with the day\'s total units and ` +
+      `${SALIDA_AUTH_ONLY} One entry per day that has movements, newest first, with the day\'s total units and ` +
       'the movements themselves. Read-only: nothing in this module edits or deletes a movement, so this is the ' +
       'only form the past has here.',
     tags: ['salida'],
@@ -1769,7 +1769,7 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
     path: '/api/salida/{id}/erp-result',
     summary: 'Record the ERP transmission verdict of one movement',
     description:
-      `${SALIDA_BETA_ONLY} Records the result of sending the movement to the ERP as its own state, ` +
+      `${SALIDA_AUTH_ONLY} Records the result of sending the movement to the ERP as its own state, ` +
       'independent of whether the ERP seat has been mirrored into Trindade yet. Calling this again overwrites ' +
       'the previous verdict, which is what a relaunch is.',
     tags: ['salida'],
@@ -1793,7 +1793,7 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
     path: '/api/salida/{id}/photos',
     summary: 'List the photos of one movement',
     description:
-      `${SALIDA_BETA_ONLY} Answers the photos in upload order, each with the authenticated route and the ` +
+      `${SALIDA_AUTH_ONLY} Answers the photos in upload order, each with the authenticated route and the ` +
       'tokenised one the share sheet hands to somebody without a session.',
     tags: ['salida'],
     request: { params: SALIDA_ID_PARAMS },
@@ -1811,7 +1811,7 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
     path: '/api/salida/{id}/photos',
     summary: 'Attach one optional photo to a movement',
     description:
-      `${SALIDA_BETA_ONLY} Uploaded after the movement exists, so a launch is never held back by a camera. The ` +
+      `${SALIDA_AUTH_ONLY} Uploaded after the movement exists, so a launch is never held back by a camera. The ` +
       'file must be JPEG, PNG, WebP, HEIC or HEIF both in what it declares and in what its bytes are, at most 5 MB, and a ' +
       'movement carries at most three: without photos it is still a valid movement.',
     tags: ['salida'],
@@ -1845,7 +1845,7 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
     method: 'get',
     path: '/api/salida/photos/{photoId}',
     summary: 'Serve one photo to a signed-in client',
-    description: `${SALIDA_BETA_ONLY} The bytes, with the stored MIME type as the content type.`,
+    description: `${SALIDA_AUTH_ONLY} The bytes, with the stored MIME type as the content type.`,
     tags: ['salida'],
     request: { params: SALIDA_PHOTO_ID_PARAMS },
     responses: {
@@ -1862,7 +1862,7 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
     path: '/api/salida/photos/{photoId}',
     summary: 'Delete one photo of a movement',
     description:
-      `${SALIDA_BETA_ONLY} Removes the row and then the file, best effort. The movement itself is never ` +
+      `${SALIDA_AUTH_ONLY} Removes the row and then the file, best effort. The movement itself is never ` +
       'touched: a baixa that already left the plant is a record of what happened, not a draft.',
     tags: ['salida'],
     request: { params: SALIDA_PHOTO_ID_PARAMS },

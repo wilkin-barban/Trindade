@@ -14,10 +14,10 @@ import { getSaoPauloDateString } from '../../utils/date.js';
 /**
  * The salida (baixa) endpoints over http.
  *
- * The rule of this module is a permission, not an arithmetic: the beta belongs to one account, and every
- * route that reads or writes a movement has to answer 403 to everybody else and 401 to nobody signed in.
- * What is asserted here is that boundary, the shape of the answer, and the photo edge — three, 5 MB, JPEG,
- * PNG or WebP by magic bytes and not by what the browser declares.
+ * The rule of this module is a permission, not an arithmetic: the beta is over, so every route that reads or
+ * writes a movement answers any signed-in account and 401 to nobody signed in. What is asserted here is that
+ * boundary, the shape of the answer, and the photo edge — three, 5 MB, JPEG, PNG or WebP by magic bytes and not by
+ * what the browser declares.
  */
 describe('salida routes', () => {
   let app: Awaited<ReturnType<typeof buildTestApp>>['app'];
@@ -502,8 +502,8 @@ describe('salida routes', () => {
     });
   });
 
-  describe('the beta guard', () => {
-    const guarded: { method: 'GET' | 'POST' | 'DELETE'; url: string; payload?: Record<string, unknown> }[] = [
+  describe('who may call the module', () => {
+    const routes: { method: 'GET' | 'POST' | 'DELETE'; url: string; payload?: Record<string, unknown> }[] = [
       { method: 'GET', url: '/api/salida/catalog' },
       { method: 'POST', url: '/api/salida', payload: { items: [{ code: '1357', quantity: 1 }] } },
       { method: 'GET', url: '/api/salida' },
@@ -515,26 +515,76 @@ describe('salida routes', () => {
       { method: 'DELETE', url: '/api/salida/photos/1' },
     ];
 
-    for (const route of guarded) {
+    for (const route of routes) {
       it(`${route.method} ${route.url} answers 401 without a session`, async () => {
         const response = await app.inject(route);
         assert.equal(response.statusCode, 401, response.body);
       });
-
-      it(`${route.method} ${route.url} answers 403 to a worker`, async () => {
-        const response = await app.inject({ ...route, headers: auth(workerToken) });
-        assert.equal(response.statusCode, 403, response.body);
-      });
-
-      it(`${route.method} ${route.url} answers 403 to the guest`, async () => {
-        const response = await app.inject({ ...route, headers: auth(guestToken) });
-        assert.equal(response.statusCode, 403, response.body);
-      });
     }
 
+    // La beta terminó: un trabajador y el invitado ya no reciben 403. Lo que cambia es el permiso, no la regla del
+    // recurso, así que cada ruta contesta lo suyo -- 200 en las lecturas, 400 en un alta inválida, 404 donde el id
+    // no existe.
+    it('gives a worker the catalogue and the history', async () => {
+      const catalog = await app.inject({ method: 'GET', url: '/api/salida/catalog', headers: auth(workerToken) });
+      assert.equal(catalog.statusCode, 200, catalog.body);
+      assert.equal((JSON.parse(catalog.body) as { products: unknown[] }).products.length, 19);
+
+      const history = await app.inject({ method: 'GET', url: '/api/salida/history', headers: auth(workerToken) });
+      assert.equal(history.statusCode, 200, history.body);
+    });
+
+    it('gives the guest the catalogue and the history', async () => {
+      const catalog = await app.inject({ method: 'GET', url: '/api/salida/catalog', headers: auth(guestToken) });
+      assert.equal(catalog.statusCode, 200, catalog.body);
+
+      const history = await app.inject({ method: 'GET', url: '/api/salida/history', headers: auth(guestToken) });
+      assert.equal(history.statusCode, 200, history.body);
+    });
+
+    it('lets a worker launch a movement and read the day back', async () => {
+      const created = await app.inject({
+        method: 'POST',
+        url: '/api/salida',
+        headers: { ...auth(workerToken), 'content-type': 'application/json' },
+        payload: { items: [{ code: '1357', quantity: 4 }] },
+      });
+      assert.equal(created.statusCode, 201, created.body);
+
+      const day = await app.inject({
+        method: 'GET',
+        url: `/api/salida?date=${getSaoPauloDateString()}`,
+        headers: auth(workerToken),
+      });
+      assert.equal(day.statusCode, 200, day.body);
+      assert.equal((JSON.parse(day.body) as { movements: unknown[] }).movements.length >= 1, true);
+    });
+
+    it('still refuses what the rules refuse', async () => {
+      // El alta vacía es inválida para un trabajador: abrir la beta no cambia la validación.
+      const empty = await app.inject({
+        method: 'POST',
+        url: '/api/salida',
+        headers: { ...auth(workerToken), 'content-type': 'application/json' },
+        payload: { items: [] },
+      });
+      assert.equal(empty.statusCode, 400, empty.body);
+
+      // El invitado sigue siendo de solo lectura: no es la beta de Salida, es la regla de la cuenta.
+      const guestWrite = await app.inject({
+        method: 'POST',
+        url: '/api/salida',
+        headers: { ...auth(guestToken), 'content-type': 'application/json' },
+        payload: { items: [{ code: '1357', quantity: 1 }] },
+      });
+      assert.equal(guestWrite.statusCode, 403, guestWrite.body);
+    });
+
     it('answers 404 instead of 401 for a photo id that does not exist', async () => {
-      const response = await app.inject({ method: 'GET', url: '/api/salida/photos/999999', headers: wilkin() });
-      assert.equal(response.statusCode, 404);
+      for (const token of [wilkinToken, workerToken, guestToken]) {
+        const response = await app.inject({ method: 'GET', url: '/api/salida/photos/999999', headers: auth(token) });
+        assert.equal(response.statusCode, 404, response.body);
+      }
     });
   });
 

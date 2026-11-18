@@ -75,18 +75,20 @@ beforeEach(async () => {
 });
 
 describe('DashboardPage', () => {
-  it('draws the six cards in the phone order, and not the counting history', async () => {
+  it('draws the seven cards in the phone order, and not the counting history', async () => {
     renderPage();
 
     const titles = await screen.findAllByTestId(/^dashboard-card-/);
     const texts = titles.map((card) => card.textContent ?? '');
-    expect(texts).toHaveLength(6);
+    // La beta terminó: cualquier cuenta con sesión ve Salida junto a Masas, y son siete tarjetas.
+    expect(texts).toHaveLength(7);
     expect(texts[0]).toContain('Reportes de Hoy');
     expect(texts[1]).toContain('Horario de Cargamento activo');
     expect(texts[2]).toContain('Lanzamiento de Masas');
-    expect(texts[3]).toContain('Calculador de Estoque');
-    expect(texts[4]).toContain('Calculadora de Assaí');
-    expect(texts[5]).toContain('Compartir App');
+    expect(texts[3]).toContain('Salida / Baixa');
+    expect(texts[4]).toContain('Calculador de Estoque');
+    expect(texts[5]).toContain('Calculadora de Assaí');
+    expect(texts[6]).toContain('Compartir App');
 
     expect(screen.queryByText('Historial de conteo')).not.toBeInTheDocument();
   });
@@ -121,14 +123,14 @@ describe('DashboardPage', () => {
     expect(within(card).getByTestId('dashboard-salida-history')).toHaveAttribute('href', '/salida-history');
   });
 
-  it('does not draw the Salida card for an account outside the beta', async () => {
+  it('draws the Salida card for every role, with a session', async () => {
     renderPage();
 
     await screen.findByTestId('dashboard-card-massas');
-    expect(screen.queryByTestId('dashboard-card-salida')).not.toBeInTheDocument();
-    // Nor its doors: a link drawn but not shown is still a link a screen reader can reach.
-    expect(screen.queryByTestId('dashboard-salida-launch')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('dashboard-salida-history')).not.toBeInTheDocument();
+    // La tarjeta ya no depende del nombre de la cuenta: el servidor admite a cualquier rol autenticado.
+    expect(screen.getByTestId('dashboard-card-salida')).toBeInTheDocument();
+    expect(screen.getByTestId('dashboard-salida-launch')).toHaveAttribute('href', '/salida');
+    expect(screen.getByTestId('dashboard-salida-history')).toHaveAttribute('href', '/salida-history');
   });
 
   it('reads every count in one panel, with the pairs as done/total', async () => {

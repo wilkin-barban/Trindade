@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { buildTestApp, type TestFixtures } from '../../test-helper.js';
 import { REFERENCE_DATASET } from '../../db/reference-data.js';
+import { GUEST_USERNAME } from '../../guest-user.js';
 import { hashBridgeTicket } from './aero.tickets.service.js';
 
 /**
@@ -14,9 +15,8 @@ import { hashBridgeTicket } from './aero.tickets.service.js';
  * counts, the endpoints and the envelope they had before it arrived. A regression here is a phone in the
  * plant that can no longer record an entry.
  *
- * The beta boundary is asserted from the same place: `saida` belongs to one account, so the ticket is refused
- * with 403 for anybody else while `entrada` keeps answering 201 for them. The guard is the server's, not the
- * menu's.
+ * Who may ask is asserted from the same place: the beta is over, so `saida` issues its ticket for any
+ * authenticated account -- another admin, a worker, the guest -- and anonymity is the only refusal.
  */
 describe('the saida bridge action', () => {
   let app: Awaited<ReturnType<typeof buildTestApp>>['app'];
@@ -24,6 +24,8 @@ describe('the saida bridge action', () => {
   let fixtures: TestFixtures;
   let wilkinToken: string;
   let otherAdminToken: string;
+  let workerToken: string;
+  let guestToken: string;
 
   const ORIGIN = 'https://salida.test';
   const auth = (token: string) => ({ authorization: `Bearer ${token}` });
@@ -74,9 +76,17 @@ describe('the saida bridge action', () => {
 
     wilkinToken = sign(wilkinId, 'wilkin');
     otherAdminToken = sign(fixtures.admin.id, fixtures.admin.username);
+    workerToken = sign(fixtures.worker.id, fixtures.worker.username);
+
+    // El invitado existe en los datos de referencia: es la cuenta de solo lectura que el servidor ya conoce.
+    const guest = db.prepare('SELECT id, username FROM users WHERE username = ?').get(GUEST_USERNAME) as
+      | { id: number; username: string }
+      | undefined;
+    assert.ok(guest, 'the reference dataset carries the guest account');
+    guestToken = jwt.sign({ sub: guest.id, username: guest.username, role: 'Trabalhador', security_version: 1 }, fixtures.jwtSecret);
 
     // The vault every issued ticket reads its envelope from.
-    for (const token of [wilkinToken, otherAdminToken]) {
+    for (const token of [wilkinToken, otherAdminToken, workerToken]) {
       const response = await app.inject({
         method: 'PUT',
         url: '/api/integration/aero/settings',
@@ -85,6 +95,7 @@ describe('the saida bridge action', () => {
       });
       assert.equal(response.statusCode, 200, response.body);
     }
+
   });
 
   after(async () => {
@@ -151,16 +162,37 @@ describe('the saida bridge action', () => {
       assert.equal((await issue(wilkinToken, 'saida', [])).statusCode, 400);
     });
 
-    it('answers 403 to any account that is not the beta user', async () => {
+    it('issues the ticket for any account with a session, and never without one', async () => {
       const saidaTickets = () =>
         (db.prepare("SELECT COUNT(*) AS n FROM aero_bridge_tickets WHERE action = 'saida'").get() as { n: number }).n;
-      const before = saidaTickets();
 
-      const refused = await issue(otherAdminToken, 'saida', [{ PRO_COD: '001474' }]);
-      assert.equal(refused.statusCode, 403, refused.body);
-      assert.equal(saidaTickets(), before, 'a refused request must not leave a ticket behind');
+      // La beta terminó: otro administrador y un trabajador piden su ticket como el dueño del módulo.
+      for (const [who, token] of [
+        ['another admin', otherAdminToken],
+        ['a worker', workerToken],
+      ] as [string, string][]) {
+        const before = saidaTickets();
+        const issued = await issue(token, 'saida', [{ PRO_COD: '001474' }]);
+        assert.equal(issued.statusCode, 201, `${who}: ${issued.body}`);
+        assert.equal(saidaTickets(), before + 1, `${who}: the ticket is written down`);
+      }
 
-      // The same account keeps its entry ticket: the beta narrows one action, not the whole bridge.
+      // El invitado no es un caso de la beta: la cuenta es de solo lectura en todo el servidor, así que su negativa
+      // viene de esa regla y no de esta acción. Se deja dicho acá para que nadie la confunda con un guard viejo.
+      const guest = await issue(guestToken, 'saida', [{ PRO_COD: '001474' }]);
+      assert.equal(guest.statusCode, 403, guest.body);
+      assert.match(guest.body, /cadastrar um usuário|solo lectura|somente leitura/i);
+
+      // Anonymity is the only thing the bridge still refuses.
+      const anonymous = await app.inject({
+        method: 'POST',
+        url: '/api/integration/aero/bridge-tickets',
+        headers: { 'content-type': 'application/json' },
+        payload: { action: 'saida', payloads: [{ PRO_COD: '001474' }] },
+      });
+      assert.equal(anonymous.statusCode, 401, anonymous.body);
+
+      // Y la entrada sigue igual para esa misma cuenta.
       const entrada = await issue(otherAdminToken, 'entrada', [{ PRO_COD: '000022' }]);
       assert.equal(entrada.statusCode, 201, entrada.body);
     });

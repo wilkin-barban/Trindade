@@ -109,8 +109,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           {/* Cada calculadora queda pegada a su propio histórico: el menú sigue el orden en que se
               usa cada módulo, y el del lanzamiento deja de estar en medio. */}
           <NavItem href="/massas-launch" icon={<Layers className="h-4 w-4" />} label={t('nav.massasLaunch')} />
-          {/* Beta privada: el lanzamiento vive junto al de masas, y su histórico junto al de masas. Los dos
-              ítems siguen existiendo solo para `wilkin`; el resto de los roles ve el menú de siempre. */}
+          {/* El lanzamiento vive junto al de masas, y su histórico junto al de masas. La beta terminó: los dos
+              ítems son para cualquier cuenta con sesión. */}
           {isSalidaVisible(user) && (
             <NavItem href="/salida" icon={<PackageMinus className="h-4 w-4" />} label={t('nav.salida')} />
           )}

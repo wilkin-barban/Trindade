@@ -5,11 +5,10 @@ import { LoadingSpinner } from '../../components/ui/loading-spinner';
 import { isSalidaVisible } from '../../lib/salida';
 
 /**
- * The gate of the private beta, above the two routes and nothing else.
+ * The gate of the two routes: a session, and nothing else.
  *
- * The server is the authority: every `/api/salida*` route and the `saida` bridge action answer 403 to anybody
- * but `wilkin`. This gate exists so the other roles never see a screen the server would refuse them, and so a
- * bookmark typed by hand lands on the dashboard instead of on an empty module with an error on it.
+ * The beta that used to keep everybody but one account out is over, so the only refusal left is anonymity -- a
+ * bookmark typed by hand without a session lands on the login instead of on a module that would answer 401.
  */
 export function SalidaRoute({ children }: { children: ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -22,8 +21,7 @@ export function SalidaRoute({ children }: { children: ReactNode }) {
     );
   }
 
-  if (!user) return <Navigate to="/login" replace />;
-  if (!isSalidaVisible(user)) return <Navigate to="/dashboard" replace />;
+  if (!isSalidaVisible(user)) return <Navigate to="/login" replace />;
 
   return <>{children}</>;
 }

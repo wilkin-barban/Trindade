@@ -493,9 +493,9 @@ describe('the Aero audit contract, pinned to the bodies each client sends', () =
     // different fields, and a contract pinned only to one of them drifts the moment the other changes.
     //
     // Two of the canonical events have one author on purpose. `queue_rejected` is only ever written by the
-    // phone, which is the side that holds a queue. `salida_sync` is only ever written by the web, because the
-    // baixa module is a private beta of one account and Android is out of this delivery; when the phone gets
-    // the screen, the row that pins it here is what will notice the second author is missing. The four local
+    // phone, which is the side that holds a queue. `salida_sync` is only ever written by the web: the baixa
+    // screen exists there and Android has not shipped it yet; when the phone gets it, the row that pins it here
+    // is what will notice the second author is missing. The four local
     // events have one author too, and it is not a client at all: the API writes them about its own database.
     const canonical = [
       'launch_sync',

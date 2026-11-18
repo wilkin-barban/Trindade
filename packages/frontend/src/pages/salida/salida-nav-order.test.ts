@@ -44,11 +44,11 @@ describe('salida navigation order', () => {
     }
   });
 
-  it('keeps both items behind the wilkin gate', () => {
+  it('keeps both items behind the session gate, which now admits every account', () => {
     for (const href of ['/salida', '/salida-history']) {
       const before = shell.slice(0, indexOf(href));
       const guard = before.lastIndexOf('isSalidaVisible(user)');
-      assert.notEqual(guard, -1, `${href} must still be rendered only for wilkin`);
+      assert.notEqual(guard, -1, `${href} must still be rendered only with a session`);
       // The guard wraps the single item, so nothing between it and the href can close the JSX expression.
       const between = shell.slice(guard, indexOf(href));
       assert.match(between, /isSalidaVisible\(user\) && \(/);

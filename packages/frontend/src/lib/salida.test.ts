@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   SALIDA_AUDIT_DESTINATION,
-  SALIDA_BETA_USERNAME,
   SALIDA_TICKET_REFUSED,
   buildSalidaPayloads,
   buildSalidaTrips,
@@ -125,22 +124,17 @@ describe('the fixed catalogue', () => {
 });
 
 describe('who sees the module', () => {
-  it('is the exact account the server guards, and nobody else', () => {
+  it('is every account with a session, and nobody without one', () => {
+    // La beta terminó: el servidor acepta cualquier cuenta autenticada y el menú la sigue.
     assert.equal(isSalidaVisible({ username: 'wilkin' }), true);
-    // A stray space from storage is not another account: the value is trimmed before it is compared.
-    assert.equal(isSalidaVisible({ username: ' wilkin ' }), true);
-    // The server's `requireUsername('wilkin')` compares exactly. A `Wilkin` login would be shown both menu items
-    // and then refused by every route, so the client rule is the same rule and not a friendlier one.
-    assert.equal(isSalidaVisible({ username: 'Wilkin' }), false);
-    assert.equal(isSalidaVisible({ username: 'WILKIN' }), false);
-    assert.equal(isSalidaVisible({ username: 'wilkin2' }), false);
-    assert.equal(isSalidaVisible({ username: 'admin' }), false);
+    assert.equal(isSalidaVisible({ username: 'admin' }), true);
+    assert.equal(isSalidaVisible({ username: 'worker' }), true);
+    assert.equal(isSalidaVisible({ username: 'invitado' }), true);
+    // Un inicio de sesión sin nombre sigue siendo una sesión: el servidor decide qué puede escribir.
+    assert.equal(isSalidaVisible({}), true);
+    // Sin sesión, no.
     assert.equal(isSalidaVisible(null), false);
-    assert.equal(isSalidaVisible({}), false);
-  });
-
-  it('names the beta account in the spelling the server uses', () => {
-    assert.equal(SALIDA_BETA_USERNAME, 'wilkin');
+    assert.equal(isSalidaVisible(undefined), false);
   });
 });
 

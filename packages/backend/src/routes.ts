@@ -47,7 +47,7 @@ export async function registerApiRoutes(
 ): Promise<void> {
   await fastify.register(stockRoutes, { prefix: '/api/stock' });
   await fastify.register(massasRoutes, { prefix: '/api/massas-launch' });
-  // The baixa module: a private beta, so every route inside it carries its own username guard.
+  // The baixa module: every route inside it carries its own authentication guard, and the photo has its token.
   await fastify.register(salidaRoutes, {
     prefix: '/api/salida',
     photosDir: options.photosDir,

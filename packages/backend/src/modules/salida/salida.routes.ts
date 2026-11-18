@@ -5,7 +5,6 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { apiError } from '../../utils/api-error.js';
-import { requireUsername } from '../auth/auth.middleware.js';
 import { getSaoPauloDateString } from '../../utils/date.js';
 import { SALIDA_PRODUCTS, findSalidaProduct } from './salida.catalog.js';
 import { CreateSalidaBodySchema, SALIDA_ERROR_CODES, SalidaErpResultBodySchema } from './salida.schema.js';
@@ -15,10 +14,9 @@ import { appendLocalAeroLog } from '../integration/aero.log.service.js';
 /**
  * The salida (baixa) endpoints, mounted at /api/salida.
  *
- * The delivery is a private beta: every route but the public photo belongs to one account, and the authority
- * is the server. `requireUsername` is what makes that true even if a client draws the menu item for somebody
- * else, and the guard is declared per route rather than as a plugin hook so the unauthenticated photo route
- * cannot inherit it by accident.
+ * Every route but the public photo belongs to any authenticated account: the beta was a delivery decision, not a
+ * rule of the plant, and it is over. The guard is declared per route rather than as a plugin hook so the
+ * unauthenticated photo route cannot inherit it by accident.
  *
  * The service owns the rules; this file owns the wire. A refusal carries a semantic code so the page can
  * branch on the reason instead of matching a sentence.
@@ -27,9 +25,6 @@ export interface SalidaRouteOptions {
   photosDir: string;
   publicBaseUrl?: string;
 }
-
-/** The account the beta belongs to. The literal is deliberate: this is a username, not a role. */
-const BETA_USERNAME = 'wilkin';
 
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'] as const;
@@ -92,7 +87,8 @@ function parseId(raw: string): number | null {
 
 export async function salidaRoutes(fastify: FastifyInstance, options: SalidaRouteOptions) {
   const { photosDir, publicBaseUrl } = options;
-  const betaGuard: preHandlerHookHandler[] = [fastify.authenticate, requireUsername(BETA_USERNAME)];
+  // Any authenticated account reaches the module; anonymity does not.
+  const signedIn: preHandlerHookHandler[] = [fastify.authenticate];
 
   const invalidId = (reply: FastifyReply) =>
     reply.status(400).send(apiError('Identificador inválido', SALIDA_ERROR_CODES.INVALID_ID));
@@ -105,7 +101,7 @@ export async function salidaRoutes(fastify: FastifyInstance, options: SalidaRout
    * The fixed 21 products, in the plant's order. Served from here so the screen does not carry a second copy
    * of a list that is invariable: a duplicated catalogue is the one that drifts.
    */
-  fastify.get('/catalog', { preHandler: betaGuard }, async (_request: FastifyRequest, reply: FastifyReply) => {
+  fastify.get('/catalog', { preHandler: signedIn }, async (_request: FastifyRequest, reply: FastifyReply) => {
     return reply.send({ products: SALIDA_PRODUCTS });
   });
 
@@ -118,7 +114,7 @@ export async function salidaRoutes(fastify: FastifyInstance, options: SalidaRout
    * whole module exists for: a failed WebService leaves a `Pendente` movement in the history, never a lost
    * load. The date is the plant's today and the operator is the session.
    */
-  fastify.post('/', { preHandler: betaGuard }, async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.post('/', { preHandler: signedIn }, async (request: FastifyRequest, reply: FastifyReply) => {
     const parsed = CreateSalidaBodySchema.safeParse(request.body);
     if (!parsed.success) {
       return reply
@@ -171,7 +167,7 @@ export async function salidaRoutes(fastify: FastifyInstance, options: SalidaRout
    * One plant day. Without a date it answers the plant's today rather than the server's, because the server
    * may be anywhere and the day the operator means is the day in São Paulo.
    */
-  fastify.get('/', { preHandler: betaGuard }, async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.get('/', { preHandler: signedIn }, async (request: FastifyRequest, reply: FastifyReply) => {
     const parsed = dateQuery.safeParse(request.query);
     const raw = parsed.success ? parsed.data.date : undefined;
     if (raw !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
@@ -190,7 +186,7 @@ export async function salidaRoutes(fastify: FastifyInstance, options: SalidaRout
    * The days that carry launches, newest first, each with its movements. Read-only: nothing in this module
    * edits or deletes a movement, so this is the only form the past has here.
    */
-  fastify.get('/history', { preHandler: betaGuard }, async (_request: FastifyRequest, reply: FastifyReply) => {
+  fastify.get('/history', { preHandler: signedIn }, async (_request: FastifyRequest, reply: FastifyReply) => {
     return reply.send({ days: service.salidaHistory(fastify.db, { publicBaseUrl }) });
   });
 
@@ -202,7 +198,7 @@ export async function salidaRoutes(fastify: FastifyInstance, options: SalidaRout
    * The trip to the ERP is its own state, separate from whether the ERP seat has been mirrored yet.
    * Persists erp_status, erp_message, and erp_sent_at. Idempotent: relaunching overwrites with the newer verdict.
    */
-  fastify.post('/:id/erp-result', { preHandler: betaGuard }, async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.post('/:id/erp-result', { preHandler: signedIn }, async (request: FastifyRequest, reply: FastifyReply) => {
     const movementId = parseId((request.params as { id: string }).id);
     if (movementId === null) return invalidId(reply);
     if (!service.salidaMovementExists(fastify.db, movementId)) {
@@ -244,7 +240,7 @@ export async function salidaRoutes(fastify: FastifyInstance, options: SalidaRout
    * The photos of one movement. The count is what the screen needs to know whether the add button still
    * applies, so the list is the whole answer.
    */
-  fastify.get('/:id/photos', { preHandler: betaGuard }, async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.get('/:id/photos', { preHandler: signedIn }, async (request: FastifyRequest, reply: FastifyReply) => {
     const movementId = parseId((request.params as { id: string }).id);
     if (movementId === null) return invalidId(reply);
     if (!service.salidaMovementExists(fastify.db, movementId)) {
@@ -260,7 +256,7 @@ export async function salidaRoutes(fastify: FastifyInstance, options: SalidaRout
    * back by a camera. The limit is three, and it is answered as 409 because the movement is valid and only the
    * count refuses.
    */
-  fastify.post('/:id/photos', { preHandler: betaGuard }, async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.post('/:id/photos', { preHandler: signedIn }, async (request: FastifyRequest, reply: FastifyReply) => {
     const movementId = parseId((request.params as { id: string }).id);
     if (movementId === null) return invalidId(reply);
     if (!service.salidaMovementExists(fastify.db, movementId)) {
@@ -386,7 +382,7 @@ export async function salidaRoutes(fastify: FastifyInstance, options: SalidaRout
    *
    * The bytes of one photo to a signed-in client, which is the same credential the movement card already has.
    */
-  fastify.get('/photos/:photoId', { preHandler: betaGuard }, async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.get('/photos/:photoId', { preHandler: signedIn }, async (request: FastifyRequest, reply: FastifyReply) => {
     const photoId = parseId((request.params as { photoId: string }).photoId);
     if (photoId === null) return invalidId(reply);
 
@@ -417,7 +413,7 @@ export async function salidaRoutes(fastify: FastifyInstance, options: SalidaRout
    * Removes the row first and the file after, best effort: a surviving file with no row is garbage, while a
    * row whose file is gone is a broken card. The movement itself is never touched.
    */
-  fastify.delete('/photos/:photoId', { preHandler: betaGuard }, async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.delete('/photos/:photoId', { preHandler: signedIn }, async (request: FastifyRequest, reply: FastifyReply) => {
     const photoId = parseId((request.params as { photoId: string }).photoId);
     if (photoId === null) return invalidId(reply);
 

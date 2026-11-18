@@ -67,8 +67,6 @@ const PASSWORD_REQUIRED_MESSAGE =
  * A literal on purpose, and on the server: the guard in front of these routes proves a role, and the role is not
  * what the beta narrows. The same literal the salida module guards its routes with.
  */
-const SAIDA_BETA_USERNAME = 'wilkin';
-
 const INVALID_ACTION_MESSAGE =
   'La acción del Atajo no es válida: use entrada, entrada_lote, saida, movimentos o test.';
 
@@ -82,10 +80,6 @@ const INVALID_PAYLOADS_MESSAGE =
  * It says what it is and not what to do about it, because there is nothing to do: the baixa module is a private
  * beta by decision, and the rest of the bridge (including `entrada`) keeps working for the same account.
  */
-const SAIDA_FORBIDDEN_MESSAGE =
-  'La acción saida está en beta privada: solo el usuario wilkin puede generar este ticket. ' +
-  'Las demás acciones del Atajo siguen funcionando igual.';
-
 const INVALID_CALLBACK_MESSAGE =
   'El destino de vuelta del Atajo no es válido: tiene que ser una ruta de esta misma aplicación, ' +
   'sin cambiar de dominio.';
@@ -217,15 +211,8 @@ export async function aeroVaultRoutes(fastify: FastifyInstance) {
         return reply.status(400).send(apiError(messages[parsed.code] ?? INVALID_PAYLOADS_MESSAGE, parsed.code));
       }
 
-      // The baixa action is a private beta, and the guard in front of this handler only proves the role. The
-      // account is what the beta narrows, so it is checked here -- after the shape, before any secret is read
-      // and before a row is written -- and it answers 403 to the accounts the bridge otherwise admits.
-      if (parsed.request.action === 'saida' && request.user!.username !== SAIDA_BETA_USERNAME) {
-        return reply
-          .status(403)
-          .send(apiError(SAIDA_FORBIDDEN_MESSAGE, AERO_BRIDGE_ERROR_CODES.FORBIDDEN));
-      }
-
+      // Any authenticated account may arm a `saida` trip; the beta that narrowed it is over, and the shape of the
+      // request was already checked above, before any secret is read or a row is written.
       if (vaultKeyForRequest() === null) return vaultNotConfigured(reply);
 
       const userId = request.user!.sub;

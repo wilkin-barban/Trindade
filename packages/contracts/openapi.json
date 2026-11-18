@@ -6782,13 +6782,17 @@
               ],
               "additionalProperties": false
             }
+          },
+          "erpOnly": {
+            "type": "boolean"
           }
         },
         "required": [
           "name",
           "username",
           "units",
-          "products"
+          "products",
+          "erpOnly"
         ],
         "additionalProperties": false
       },
@@ -6845,13 +6849,17 @@
                     ],
                     "additionalProperties": false
                   }
+                },
+                "erpOnly": {
+                  "type": "boolean"
                 }
               },
               "required": [
                 "name",
                 "username",
                 "units",
-                "products"
+                "products",
+                "erpOnly"
               ],
               "additionalProperties": false
             }
@@ -10957,7 +10965,7 @@
     "/api/salida/catalog": {
       "get": {
         "summary": "Read the fixed catalogue of products a baixa can give",
-        "description": "Beta privada: only the account `wilkin` is admitted. A missing or invalid token answers 401, and any other account -- a Trabalhador or another Administrador -- answers 403, because the guard is the username. Answers the 21 products, in the plant's order, each with its four-digit code, its Portuguese name and its block (`embalagens`, `bobinas` or `materia-prima`). The list is invariable in this delivery and has no CRUD: a client renders it and does not invent a copy of its own.",
+        "description": "Requires an authenticated account: a missing or invalid token answers 401. Every role of this API (Administrador and Trabalhador) is admitted; the read-only guest may read but not write. Answers the 21 products, in the plant's order, each with its four-digit code, its Portuguese name and its block (`embalagens`, `bobinas` or `materia-prima`). The list is invariable in this delivery and has no CRUD: a client renders it and does not invent a copy of its own.",
         "tags": [
           "salida"
         ],
@@ -10983,7 +10991,7 @@
             }
           },
           "403": {
-            "description": "Beta privada: only the account `wilkin` is admitted, so any other account answers 403",
+            "description": "The read-only guest account cannot write; every other authenticated account is admitted",
             "content": {
               "application/json": {
                 "schema": {
@@ -10998,7 +11006,7 @@
     "/api/salida": {
       "post": {
         "summary": "Launch one baixa movement",
-        "description": "Beta privada: only the account `wilkin` is admitted. A missing or invalid token answers 401, and any other account -- a Trabalhador or another Administrador -- answers 403, because the guard is the username. Persists the movement in Trindade before any attempt against the ERP: a failed WebService leaves a pending movement in the history and never loses what the operator loaded. The date is the plant's current day in São Paulo and the operator is the session; neither is a field of the request. Each item stores the product name and block of that moment, so renaming the catalogue later cannot rewrite what was launched.",
+        "description": "Requires an authenticated account: a missing or invalid token answers 401. Every role of this API (Administrador and Trabalhador) is admitted; the read-only guest may read but not write. Persists the movement in Trindade before any attempt against the ERP: a failed WebService leaves a pending movement in the history and never loses what the operator loaded. The date is the plant's current day in São Paulo and the operator is the session; neither is a field of the request. Each item stores the product name and block of that moment, so renaming the catalogue later cannot rewrite what was launched.",
         "tags": [
           "salida"
         ],
@@ -11043,7 +11051,7 @@
             }
           },
           "403": {
-            "description": "Beta privada: only the account `wilkin` is admitted, so any other account answers 403",
+            "description": "The read-only guest account cannot write; every other authenticated account is admitted",
             "content": {
               "application/json": {
                 "schema": {
@@ -11056,7 +11064,7 @@
       },
       "get": {
         "summary": "Read one plant day of baixas",
-        "description": "Beta privada: only the account `wilkin` is admitted. A missing or invalid token answers 401, and any other account -- a Trabalhador or another Administrador -- answers 403, because the guard is the username. Answers the movements of the requested day, oldest launch first, each with its items, its photos and its reconciliation against the ERP. Without a `date` it answers the plant's current day rather than the server's. The reconciliation is computed on every read and never stored: the seats belong to the company and can arrive hours after the baixa.",
+        "description": "Requires an authenticated account: a missing or invalid token answers 401. Every role of this API (Administrador and Trabalhador) is admitted; the read-only guest may read but not write. Answers the movements of the requested day, oldest launch first, each with its items, its photos and its reconciliation against the ERP. Without a `date` it answers the plant's current day rather than the server's. The reconciliation is computed on every read and never stored: the seats belong to the company and can arrive hours after the baixa.",
         "tags": [
           "salida"
         ],
@@ -11102,7 +11110,7 @@
             }
           },
           "403": {
-            "description": "Beta privada: only the account `wilkin` is admitted, so any other account answers 403",
+            "description": "The read-only guest account cannot write; every other authenticated account is admitted",
             "content": {
               "application/json": {
                 "schema": {
@@ -11117,7 +11125,7 @@
     "/api/salida/history": {
       "get": {
         "summary": "Read the days that carry baixas",
-        "description": "Beta privada: only the account `wilkin` is admitted. A missing or invalid token answers 401, and any other account -- a Trabalhador or another Administrador -- answers 403, because the guard is the username. One entry per day that has movements, newest first, with the day's total units and the movements themselves. Read-only: nothing in this module edits or deletes a movement, so this is the only form the past has here.",
+        "description": "Requires an authenticated account: a missing or invalid token answers 401. Every role of this API (Administrador and Trabalhador) is admitted; the read-only guest may read but not write. One entry per day that has movements, newest first, with the day's total units and the movements themselves. Read-only: nothing in this module edits or deletes a movement, so this is the only form the past has here.",
         "tags": [
           "salida"
         ],
@@ -11143,7 +11151,7 @@
             }
           },
           "403": {
-            "description": "Beta privada: only the account `wilkin` is admitted, so any other account answers 403",
+            "description": "The read-only guest account cannot write; every other authenticated account is admitted",
             "content": {
               "application/json": {
                 "schema": {
@@ -11158,7 +11166,7 @@
     "/api/salida/{id}/erp-result": {
       "post": {
         "summary": "Record the ERP transmission verdict of one movement",
-        "description": "Beta privada: only the account `wilkin` is admitted. A missing or invalid token answers 401, and any other account -- a Trabalhador or another Administrador -- answers 403, because the guard is the username. Records the result of sending the movement to the ERP as its own state, independent of whether the ERP seat has been mirrored into Trindade yet. Calling this again overwrites the previous verdict, which is what a relaunch is.",
+        "description": "Requires an authenticated account: a missing or invalid token answers 401. Every role of this API (Administrador and Trabalhador) is admitted; the read-only guest may read but not write. Records the result of sending the movement to the ERP as its own state, independent of whether the ERP seat has been mirrored into Trindade yet. Calling this again overwrites the previous verdict, which is what a relaunch is.",
         "tags": [
           "salida"
         ],
@@ -11213,7 +11221,7 @@
             }
           },
           "403": {
-            "description": "Beta privada: only the account `wilkin` is admitted, so any other account answers 403",
+            "description": "The read-only guest account cannot write; every other authenticated account is admitted",
             "content": {
               "application/json": {
                 "schema": {
@@ -11238,7 +11246,7 @@
     "/api/salida/{id}/photos": {
       "get": {
         "summary": "List the photos of one movement",
-        "description": "Beta privada: only the account `wilkin` is admitted. A missing or invalid token answers 401, and any other account -- a Trabalhador or another Administrador -- answers 403, because the guard is the username. Answers the photos in upload order, each with the authenticated route and the tokenised one the share sheet hands to somebody without a session.",
+        "description": "Requires an authenticated account: a missing or invalid token answers 401. Every role of this API (Administrador and Trabalhador) is admitted; the read-only guest may read but not write. Answers the photos in upload order, each with the authenticated route and the tokenised one the share sheet hands to somebody without a session.",
         "tags": [
           "salida"
         ],
@@ -11284,7 +11292,7 @@
             }
           },
           "403": {
-            "description": "Beta privada: only the account `wilkin` is admitted, so any other account answers 403",
+            "description": "The read-only guest account cannot write; every other authenticated account is admitted",
             "content": {
               "application/json": {
                 "schema": {
@@ -11307,7 +11315,7 @@
       },
       "post": {
         "summary": "Attach one optional photo to a movement",
-        "description": "Beta privada: only the account `wilkin` is admitted. A missing or invalid token answers 401, and any other account -- a Trabalhador or another Administrador -- answers 403, because the guard is the username. Uploaded after the movement exists, so a launch is never held back by a camera. The file must be JPEG, PNG, WebP, HEIC or HEIF both in what it declares and in what its bytes are, at most 5 MB, and a movement carries at most three: without photos it is still a valid movement.",
+        "description": "Requires an authenticated account: a missing or invalid token answers 401. Every role of this API (Administrador and Trabalhador) is admitted; the read-only guest may read but not write. Uploaded after the movement exists, so a launch is never held back by a camera. The file must be JPEG, PNG, WebP, HEIC or HEIF both in what it declares and in what its bytes are, at most 5 MB, and a movement carries at most three: without photos it is still a valid movement.",
         "tags": [
           "salida"
         ],
@@ -11371,7 +11379,7 @@
             }
           },
           "403": {
-            "description": "Beta privada: only the account `wilkin` is admitted, so any other account answers 403",
+            "description": "The read-only guest account cannot write; every other authenticated account is admitted",
             "content": {
               "application/json": {
                 "schema": {
@@ -11426,7 +11434,7 @@
     "/api/salida/photos/{photoId}": {
       "get": {
         "summary": "Serve one photo to a signed-in client",
-        "description": "Beta privada: only the account `wilkin` is admitted. A missing or invalid token answers 401, and any other account -- a Trabalhador or another Administrador -- answers 403, because the guard is the username. The bytes, with the stored MIME type as the content type.",
+        "description": "Requires an authenticated account: a missing or invalid token answers 401. Every role of this API (Administrador and Trabalhador) is admitted; the read-only guest may read but not write. The bytes, with the stored MIME type as the content type.",
         "tags": [
           "salida"
         ],
@@ -11485,7 +11493,7 @@
             }
           },
           "403": {
-            "description": "Beta privada: only the account `wilkin` is admitted, so any other account answers 403",
+            "description": "The read-only guest account cannot write; every other authenticated account is admitted",
             "content": {
               "application/json": {
                 "schema": {
@@ -11508,7 +11516,7 @@
       },
       "delete": {
         "summary": "Delete one photo of a movement",
-        "description": "Beta privada: only the account `wilkin` is admitted. A missing or invalid token answers 401, and any other account -- a Trabalhador or another Administrador -- answers 403, because the guard is the username. Removes the row and then the file, best effort. The movement itself is never touched: a baixa that already left the plant is a record of what happened, not a draft.",
+        "description": "Requires an authenticated account: a missing or invalid token answers 401. Every role of this API (Administrador and Trabalhador) is admitted; the read-only guest may read but not write. Removes the row and then the file, best effort. The movement itself is never touched: a baixa that already left the plant is a record of what happened, not a draft.",
         "tags": [
           "salida"
         ],
@@ -11554,7 +11562,7 @@
             }
           },
           "403": {
-            "description": "Beta privada: only the account `wilkin` is admitted, so any other account answers 403",
+            "description": "The read-only guest account cannot write; every other authenticated account is admitted",
             "content": {
               "application/json": {
                 "schema": {
