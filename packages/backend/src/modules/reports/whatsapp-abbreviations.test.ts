@@ -89,6 +89,17 @@ describe('abreviaturas del mensaje', () => {
     }
   });
 
+  it('prefiere el nombre que la planta escribió en ese asiento al nombre del catálogo', () => {
+    // El mismo código llega como `MASSA PARA PASTEL … CASEIRA 1 KG` en el libro y como `EMBALAG. CASEIRA` en el
+    // mostrador. Con el peso en el nombre, el grupo distingue el kilo del de dos kilos; sin él, no.
+    assert.equal(abbreviateProduct('MASSA PARA PASTEL TRINDADE CASEIRA 1 KG', '001045'), 'CASEIRA 1kg');
+    assert.equal(abbreviateProduct('MASSA PARA PASTEL QUADRADA 2 KG', '001192'), 'QUADRADA 2kg');
+    // Y el catálogo sigue nombrando lo suyo cuando el nombre no agrega nada.
+    assert.equal(abbreviateProduct('EMBALAG. CASEIRA', '1359'), 'CASEIRA');
+    assert.equal(abbreviateProduct('EMBALAG. QUADRADA', '1361'), 'QUADRADA');
+    assert.equal(abbreviateProduct('CASEIRA', '1045'), 'CASEIRA');
+  });
+
   it('reconoce el nombre cortado a 32 caracteres como el mismo producto', () => {
     // El ERP guarda la descripción truncada: el mismo insumo llega completo o cortado a mitad de palabra.
     const truncated: [string, string][] = [

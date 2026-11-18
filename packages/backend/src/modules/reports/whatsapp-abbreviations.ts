@@ -307,13 +307,16 @@ function titleCaseProduct(value: string): string {
  */
 export function abbreviateProduct(name: string, code?: string | number | null): string {
   const stripped = codeKey(code);
+  const key = lookupKey(name);
+  // The name the plant wrote for that line wins over the catalogue's own word: the same catalogue code arrives as
+  // `MASSA PARA PASTEL TRINDADE CASEIRA 1 KG` in the book and as `EMBALAG. CASEIRA` at the counter, and only the
+  // first one carries the weight the group needs to tell a 1 kg from a 2 kg.
+  const known = lookupName(CATALOGUE_BY_NAME, key) ?? lookupName(ERP_BY_NAME, key);
+  if (known) return known;
   if (stripped) {
     const byCode = CATALOGUE_BY_CODE.get(stripped);
     if (byCode) return byCode;
   }
-  const key = lookupKey(name);
-  const known = lookupName(CATALOGUE_BY_NAME, key) ?? lookupName(ERP_BY_NAME, key);
-  if (known) return known;
   // A name that already fits is the plant's own wording -- a product the operator picked from a list, say -- and
   // shortening it would only invent a word nobody uses.
   const clean = repairErpText(name).replace(/\s+/g, ' ').trim();

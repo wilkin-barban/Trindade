@@ -90,6 +90,9 @@ function seedReport80(): Database.Database {
   );
   let position = 0;
   for (const [code, name, block, quantity] of [
+    // Las dos masas que salieron del mostrador: el asiento guarda el nombre del libro, con su peso.
+    ['001045', 'MASSA PARA PASTEL TRINDADE CASEIRA 1 KG', 'materia-prima', 218],
+    ['001192', 'MASSA PARA PASTEL QUADRADA 2 KG', 'materia-prima', 217],
     ['1673', 'GORDURA VEGETAL', 'materia-prima', 4],
     ['1012', 'SORBATO', 'materia-prima', 1],
     ['1068', 'MICRO SAL', 'materia-prima', 8],
@@ -167,6 +170,11 @@ describe('el mensaje del reporte 80, abreviado', () => {
     assert.ok(text.includes('👤 Wilkin:'));
     // Sin código en el mensaje y con la cantidad exacta.
     assert.ok(text.includes('- AÇÚCAR 5kg: 6 un'));
+    // El peso viaja en la línea: el grupo distingue el de un kilo del de dos.
+    assert.ok(text.includes('- CASEIRA 1kg: 218 un'));
+    assert.ok(text.includes('- QUADRADA 2kg: 217 un'));
+    // 218 + 217 de las masas, más los insumos del día.
+    assert.ok(text.includes('📊 Total: 455 un'));
     assert.equal(/[Ă\u0080-\u009f]/.test(text), false, 'ninguna letra rota llega al grupo');
     assert.equal(text.includes('(VIVIANE)'), false, 'el operario no se repite en cada línea');
     assert.equal(text.includes('   - '), false, 'la lista usa el prefijo corto');
