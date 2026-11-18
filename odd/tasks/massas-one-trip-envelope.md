@@ -35,13 +35,13 @@ histórico deja de pedir el segundo.
 
 ## Tasks
 
-| ID | Specs | Tarea |
-| --- | --- | --- |
-| T1 | S1 | Sobre multi-paso en el backend, con el legacy intacto y sus tests |
-| T2 | S2, S4 | Scriptable con `steps`, resultado compuesto y la receta copiable versionada |
-| T3 | S3 | `MassasHistoryPage` leyendo el compuesto, con auto-read como fallback |
-| T4 | S5 | Tests de frontend, E2E del viaje único y de la receta |
-| T5 | S6 | Documentación en `docs/integracion-aero32.md`, `docs/paridad-android-web.md` y este ODD |
+| ID | Specs | Tarea | Commit |
+| --- | --- | --- | --- |
+| T1 | S1 | Sobre multi-paso en el backend, con el legacy intacto y sus tests | `b5454bc3` |
+| T2 | S2, S4 | Scriptable con `steps`, resultado compuesto y la receta copiable versionada | `cf6cc0f3` |
+| T3 | S3 | `MassasHistoryPage` leyendo el compuesto, con auto-read como fallback | `2bd0fea1` |
+| T4 | S5 | Tests de frontend, E2E del viaje único y de la receta | `2691b405` |
+| T5 | S6 | Documentación en `docs/integracion-aero32.md`, `docs/paridad-android-web.md` y este ODD | `4b68fa6e` |
 
 ## Log
 

@@ -45,11 +45,18 @@ Contratos del servidor:
 | `PUT /api/integration/aero/settings` | ídem | `{ wsUrl, username, password? }`; una contraseña no vacía reemplaza, vacía o ausente conserva |
 | `DELETE /api/integration/aero/settings` | ídem | Borra el cofre y los tickets pendientes del operador autenticado (`204`) |
 | `POST /api/integration/aero/bridge-tickets` | ídem | `{ action, payloads, callbackPath? }` → `{ ticket, ticketUrl, expiresAt }`, usando el cofre del operador autenticado |
-| `POST /api/integration/aero/bridge-tickets/redeem` | Ticket bearer (`X-Trindade-Ticket`) | Devuelve el sobre `{ url, method, headers, body, bodies?, callback }` |
+| `POST /api/integration/aero/bridge-tickets/redeem` | Ticket bearer (`X-Trindade-Ticket`) | Devuelve el sobre `{ url, method, headers, body, bodies?, callback, resultUrl, steps? }` |
 
 `redeem` es **unauthenticated por diseño**: la credencial es el ticket bearer de un solo uso y el llamador es
 Scriptable, que no tiene sesión. Exigir JWT rompería el caso que el diseño resuelve. El token se lee del header
 `X-Trindade-Ticket`, nunca de la URL, y la respuesta lleva `Cache-Control: no-store`.
+
+Para `entrada` y `entrada_lote` (Lanzamiento de Masas), el sobre canjeado agrega `steps` con dos pasos en orden:
+1. Paso 1 (lanzamiento): `url` = `${base}/${ticket.endpoint}`, `method: 'POST'`, `body`/`bodies` del ticket.
+2. Paso 2 (lectura del día): `url` = `${base}/movimentoitem?_method=PATCH`, `method: 'POST'`, `body` con `CODFOR: null`,
+   `NOMUSU: null`, `CODPRO: null`, `DTINI`/`DTFIM` desde `ENT_DTA` del primer payload, `ENTSAI: 'E'`, `_method: 'PATCH'`.
+Ambos pasos llevan los mismos encabezados Basic. Se conservan `url`, `method`, `body`/`bodies` legacy en el sobre
+para que un script viejo que ignore `steps` siga lanzando normalmente.
 
 El flujo completo:
 
@@ -101,11 +108,19 @@ Qué hace el script en cada ejecución:
    inventar callback.
 2. Canjea el ticket con `POST` a `ticketUrl`, header `X-Trindade-Ticket`, `Accept: application/json`, sin cuerpo,
    `allowInsecureRequest = true` y `timeoutInterval` explícito (8–10 s). Si el canje no llega (sin internet), muestra
-   un `Alert` corto y termina sin callback. La respuesta es el sobre `{ url, method, headers, body, bodies?, callback }`.
-3. Envía cada payload —`bodies` si es una lista no vacía, `body` si no— como texto JSON a `url` con los `headers`
-   del sobre, `allowInsecureRequest = true` y `timeoutInterval` explícito en **cada** `POST`.
-4. Devuelve el texto de la respuesta, o `[r1,r2,…]` cuando el sobre traía lote, y abre
-   `callback + encodeURIComponent(resultado)` en Safari. Termina con `Script.complete()`.
+   un `Alert` corto y termina sin callback. La respuesta es el sobre `{ url, method, headers, body, bodies?, callback, resultUrl?, steps? }`.
+3. Si el sobre incluye `steps` (sobre multi-paso de masas), ejecuta en orden cada paso en el mismo viaje:
+   - Paso 1 (lanzamiento): envía a la URL del paso con su método y encabezados cada cuerpo (`bodies` o `body`). Si el
+     primer intento falla por timeout/red, corta y vuelve por `aero_error=wifi_required`.
+   - Paso 2 (lectura del día): consulta `movimentoitem?_method=PATCH`. Si falla la lectura, no anula el lanzamiento
+     previo y registra el error.
+   - Empaqueta el resultado compuesto `{ launch, read }`. Si supera la guarda de 2 MB del cofre, descarta `read`
+     para asegurar el reporte de `launch` y permitir el fallback de auto-read.
+   Si el sobre no incluye `steps`, ejecuta el comportamiento legacy de un solo paso enviando `bodies` o `body`.
+4. Envía el resultado a `resultUrl` vía `POST` (con `X-Trindade-Ticket`), regresando con `&aero_result=stored`. Si
+   `resultUrl` no está presente, vuelve con el resultado codificado en la query string. Termina con `Script.complete()`.
+5. Al volver al frontend (`MassasHistoryPage`), si `read` está presente y válido, concilia el espejo directamente
+   sin armar ni consumir auto-read (un solo viaje). Si falta o falló la lectura, cae al auto-read como fallback.
 
 Diagnóstico de red: **el SSID no se puede leer**. iOS entrega el nombre de la red Wi-Fi solo a apps nativas con
 permiso de ubicación precisa y el entitlement correspondiente; Safari y Scriptable no exponen esa API. Lo que el

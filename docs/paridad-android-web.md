@@ -147,12 +147,16 @@ directa de código, pruebas y comportamiento.
 - **Problema en Web**: Safari HTTPS no puede invocar directamente un WebService HTTP privado (`http://192.168.25.250:1453/api`) por restricciones de *Mixed Content* y *Private Network Access*.
 - **Solución web**: Utiliza la app Scriptable mediante tickets cifrados:
   1. `POST /api/integration/aero/bridge-tickets`: genera un ticket efímero.
-  2. Scriptable canjea el ticket mediante `POST /api/integration/aero/bridge-tickets/redeem` enviando la cabecera `X-Trindade-Ticket`. Recibe las credenciales, payloads y `resultUrl`.
-  3. Scriptable llama al ERP.
-  4. Para evitar el fallo **HTTP 414 Request-URI Too Large** (cuando respuestas grandes desbordaban la query string del callback Safari), Scriptable almacena el resultado en el servidor vía `POST /api/integration/aero/bridge-tickets/result` (enviando `X-Trindade-Ticket`).
+  2. Scriptable canjea el ticket mediante `POST /api/integration/aero/bridge-tickets/redeem` enviando la cabecera `X-Trindade-Ticket`. Recibe las credenciales, payloads, `resultUrl` y opcionalmente `steps` para sobre multi-paso.
+  3. Scriptable llama al ERP. En lanzamiento de masas (`entrada` y `entrada_lote`), ejecuta en un solo viaje:
+     - Paso 1: lanzamiento (`/entradasitem`).
+     - Paso 2: consulta de movimientos del día (`/movimentoitem?_method=PATCH`).
+     Devuelve el resultado compuesto `{ launch, read }`.
+  4. Para evitar el fallo **HTTP 414 Request-URI Too Large** (cuando respuestas grandes desbordaban la query string del callback Safari), Scriptable almacena el resultado en el servidor vía `POST /api/integration/aero/bridge-tickets/result` (enviando `X-Trindade-Ticket`). Cuenta además con guarda de 2 MB: si el compuesto excede el tamaño, descarta `read` y conserva `launch`.
   5. Scriptable regresa a Safari con el callback corto `?aero_result=stored`.
   6. La web resuelve el marcador llamando a `GET /api/integration/aero/bridge-tickets/last-result?action=<action>` dentro de una ventana de 10 minutos.
-  7. Compatibilidad retroactiva: si un dispositivo corre un script antiguo que viaja con `aero_data=...` en la URL, la web aún lo procesa.
+  7. Si `read` viene presente y válido, concilia el espejo inmediatamente sin segundo viaje a Safari. Si falta (script legacy sin `steps`) o falla, cae automáticamente al auto-read como fallback.
+  8. Compatibilidad retroactiva: si un dispositivo corre un script antiguo que viaja con `aero_data=...` en la URL o sin `steps`, la web aún lo procesa y ejecuta el segundo viaje de auto-read tras cerrar el veredicto.
 
 ### 5.2 Comunicación directa en Android (sin puente)
 - **Android corre en la LAN nativa**: Dispone de conectividad directa con el WebService en `http://192.168.25.250:1453/api`.
