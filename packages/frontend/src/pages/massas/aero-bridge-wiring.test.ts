@@ -229,7 +229,9 @@ describe('aero bridge wiring: a launch of many products leaves once', () => {
 
   it('reads the batch answer against the products that were in the phone', () => {
     assert.ok(history.includes("parsed.action === 'entrada_lote'"));
-    assert.ok(history.includes('readAeroBatchResult(parsed.data, expected)'));
+    // El veredicto se lee del `launch` del compuesto, o del cuerpo entero cuando el script es viejo.
+    assert.ok(history.includes("'launch' in parsed.data"));
+    assert.ok(history.includes('readAeroBatchResult(launchData, expected)'));
     assert.ok(history.includes('const sent = queue?.inFlight ?? []'));
     assert.ok(history.includes('batchSyncFeedback(batch)'));
   });
