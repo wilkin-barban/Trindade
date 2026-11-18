@@ -34,6 +34,17 @@ interface AeroErpApi {
         @Body body: AeroEntryPayload,
     ): Response<JsonElement>
 
+    /**
+     * `POST /saidasitem`: one stock exit. The same envelope as an entry, with the series the plant uses and the
+     * quantity in hundredths; the ERP accepts at most eight documents per trip.
+     */
+    @POST
+    suspend fun postExit(
+        @Url url: String,
+        @Header("Authorization") authorization: String,
+        @Body body: com.trindade.app.salida.SaidaItemPayload,
+    ): Response<JsonElement>
+
     /** `POST /movimentoitem?_method=PATCH`: the day as the ERP recorded it. */
     @POST
     suspend fun postMovements(

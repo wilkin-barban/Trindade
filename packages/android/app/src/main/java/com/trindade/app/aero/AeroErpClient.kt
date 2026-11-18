@@ -159,6 +159,49 @@ class AeroErpClient @Inject constructor(
         )
     }
 
+    /**
+     * `POST /saidasitem`: one stock exit, with the certified exit payload.
+     *
+     * A rejection keeps its status instead of folding into a transport answer, the same rule as an entry: the
+     * difference between "the ERP refused this document" and "the phone never reached the plant" is what the
+     * launch screen tells the operator.
+     */
+    suspend fun postExit(
+        wsUrl: String,
+        username: String,
+        password: String,
+        payload: com.trindade.app.salida.SaidaItemPayload,
+    ): AeroWriteResult {
+        val url = aeroEndpoint(wsUrl, "saidasitem")
+        return runCatching {
+            api.postExit(url, basicAuthHeader(username, password), payload)
+        }.fold(
+            onSuccess = { response ->
+                if (!response.isSuccessful) {
+                    AeroWriteResult.Failed(
+                        "HTTP ${response.code()}",
+                        httpStatus = response.code(),
+                        code = AeroFailureCode.ERP_REFUSED,
+                    )
+                } else {
+                    val body = response.body()
+                    if (body != null) {
+                        val parsed = readAeroWriteResult(body)
+                        if (parsed is AeroWriteResult.Failed) {
+                            parsed.copy(httpStatus = response.code(), code = parsed.code ?: AeroFailureCode.ERP_REFUSED)
+                        } else {
+                            parsed
+                        }
+                    } else {
+                        // A 2xx with no body is the ERP accepting the exit.
+                        AeroWriteResult.Ok(null)
+                    }
+                }
+            },
+            onFailure = { error -> AeroWriteResult.Failed(null, code = error.toAeroFailureCode()) },
+        )
+    }
+
     /** `POST /movimentoitem?_method=PATCH`: the whole day, every operator. */
     suspend fun readMovements(
         wsUrl: String,

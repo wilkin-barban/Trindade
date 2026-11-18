@@ -48,6 +48,9 @@ object AeroAudit {
         const val TEST = "test_connection"
         const val IMPORT = "import"
         const val QUEUE_REJECTED = "queue_rejected"
+
+        /** La baja hacia el ERP: el mismo nombre que escribe la web, para que un filtro encuentre a los dos. */
+        const val SALIDA_SYNC = "salida_sync"
     }
 
     fun request(
