@@ -310,3 +310,74 @@ Además de R7:
 - No se rediseña la app; se usa el lenguaje visual existente (píldoras 36/48 dp, ShareCard, HistoryHeader).
 - El fix de `salida-report.service` (Gustavo H) ya está desplegado; cualquier cambio de este ODD no debe regresarlo.
 - Las decisiones de permisos (admin edita reportes/horarios de otros) deben quedar cubiertas por tests del backend, no solo por la UI.
+
+---
+
+## 6. Addendum — Historiales web hoy + paridad completa de Salidas Android
+
+Reporte adicional del usuario (2026-11-18). Este addendum es parte de la misma directiva y tiene prioridad dentro de F1/F2/F5.
+
+### A. Web · Historial de Cargamento: hoy abre ShareCard con Editar
+
+**Comportamiento pedido:** al elegir el Historial de Cargamento de **hoy**, se muestra la vista de compartir por WhatsApp, con botón **Editar** que abre la vista de edición/creación del horario. Editar solo lo ve el trabajador que creó el horario o un **administrador**; otro trabajador ve únicamente Compartir por WhatsApp. Las fechas pasadas siguen read-only, sin Editar.
+
+**Hoy web:** `LoadingHistoryPage.tsx` calcula `detailHref = affordances.closedDay ? shareHref : /loading/edit?date=...` (ver líneas ~190-215). Para hoy (día no cerrado) el resumen abre el **editor**, no la ShareCard. `LoadingSchedulePage.tsx:210-218` en `fromHistory` solo pasa `onClose`, nunca `onEdit`.
+
+**Cambios web:**
+1. `LoadingHistoryPage.tsx`: para **todos** los días, el resumen y el ojo abren `shareHref` (`/loading?share=1&date=<date>&from=history`); no abrir el editor directo. Pasar un flag/consulta de permiso confiable para la ShareCard: `canEdit=1` solo si `batch.canEdit` (el servidor ya lo calcula), o mejor un endpoint/estado del día; no confiar en el query para autorizar, solo para mostrar.
+2. `LoadingSchedulePage.tsx`: en la rama `fromHistory`, añadir `onEdit` cuando la fecha sea hoy y el usuario pueda editar (dueño/admin); navegar a `/loading/edit?date=<date>`. En pasado no pasar `onEdit`; en día abierto normal conservar el `onEdit` actual. Etiqueta “Editar”/“Editar horário”.
+3. Backend `history-permissions.ts` + `loading.service.ts`: `canEdit` debe ser verdadero para el creador o un administrador en el **día de hoy**; el pasado sigue read-only. Mantener la ventana/closed-day que corresponda y cubrir la decisión con tests. No permitir que un trabajador ajeno vea/ejecute Editar.
+4. Tests: `LoadingHistoryPage.test.tsx` (hoy abre ShareCard; otro trabajador no ve Editar), `LoadingSchedulePage.test.tsx` (desde histórico hoy muestra Editar y abre `/loading/edit`; pasado no), backend permission tests; E2E 390 px.
+
+**Criterio:** hoy desde Historial de Cargamento se ve la ShareCard con Compartir y, si corresponde, Editar; otro trabajador solo Compartir; pasado sin Editar.
+
+### B. Web · Historial de Reportes: Editar en la fecha de hoy
+
+**Comportamiento pedido:** el Historial de Reportes ya abre la ShareCard (`/reports/:id?share=1`); falta el botón **Editar** para el reporte de **hoy**, con la misma regla dueño/admin; otro trabajador solo Compartir; pasado sin Editar.
+
+**Cambios web:**
+1. `ReportHistoryPage.tsx`: en la tarjeta de hoy, añadir acción Editar (48 px, icono + label) si `r.canEdit` y `r.report_date === today`; abrir `/reports/<id>/edit`. No mostrarla en fechas pasadas.
+2. `ReportViewPage.tsx`: en la rama `showingShare && fromHistory`, añadir `onEdit` cuando `report.canEdit` y `report.report_date === today`; navegar a `/reports/:id/edit`. Mantener sin Editar en pasado y en `?share=1` sin `from=history` según corresponda.
+3. Backend `history-permissions.ts` / `reports.query.service.ts` / `reports.command.service.ts`: `canEdit` debe reconocer al administrador en el día de hoy, además del creador; no cambiar la inmutabilidad del pasado. Tests de autorización y de que un trabajador ajeno recibe 403/no ve botón.
+4. Tests: `ReportHistoryPage.test.tsx` (hoy dueño/admin ve Editar, otro no; pasado no), `ReportViewPage.test.tsx` (ShareCard fromHistory hoy con Editar, pasado sin), backend permissions; E2E.
+
+**Criterio:** el reporte de hoy desde el Historial muestra ShareCard + Editar para dueño/admin; otro trabajador solo Compartir; pasado solo Compartir.
+
+### C. Android · Historial de Salidas: paridad completa, no una lista plana
+
+El usuario confirma que en Android **no vio nunca la vista** del Historial de Salidas y pide paridad completa con la web, **incluida la foto y el botón Compartir**. Esto amplía R5: no basta con una lista de movimientos.
+
+**Referencia web obligatoria:** `packages/frontend/src/pages/salida/SalidaHistoryPage.tsx` y:
+- `components/salida/SalidaWhatsAppShare.tsx`: teléfono, preview del mensaje del día y botón WhatsApp; mensaje con abreviaturas.
+- `components/salida/SalidaPhotoPicker.tsx` y `SalidaMovementCard.tsx`: fotos por movimiento, cámara/galería, borrar, compartir con fotos.
+- `lib/salida.ts`: `salidaDaySummaryText`, `salidaSummaryText`, `filterSessionMovements`, estados ERP, abreviaturas.
+
+**Cambios Android:**
+1. `SalidaRepository.history()` debe devolver días completos (`SalidaHistoryDay`: date, total_units, movements), no `flatMap` de movimientos; conservar `day(date)`.
+2. Reescribir `SalidaHistoryScreen` con `HistoryHeader` (ayuda, volver), chip **Hoy** siempre, **5 fechas anteriores** y **“Todas las fechas”**; filtro por bloque; spinner/error/vacío; contador de pendientes; estado de outbox si aplica.
+3. El día de hoy se muestra con todas las operaciones; las fechas pasadas son **solo lectura** y muestran la **vista de compartir WhatsApp** del día con botón Compartir. El botón Compartir debe estar en la fecha seleccionada, con teléfono y preview, usando la tabla de abreviaturas.
+4. Fotos: implementar selector/cámara por movimiento, preview, borrar y subida usando los endpoints ya declarados en `SalidaApi` (`photos`, `uploadPhoto`, `deletePhoto`) y `SalidaRepository`; incluir las fotos en el share (misma semántica que web: si una foto no se puede obtener, se omite sin fallar el mensaje).
+5. Compartir/Reenviar: `Share` por movimiento con fotos; `Reenviar ao ERP` para pendientes usando `retryPending`; no ocultar errores.
+6. TestIDs Android equivalentes a web: `salida-history-date`, `salida-history-day-<date>`, `salida-history-readonly-note`, `salida-whatsapp-share-card`, `salida-share-day`, `salida-preview-message`, `salida-photo-picker`, `salida-share-<id>`, `salida-resend-<id>`, `salida-pending-count`.
+7. Tests: hoy muestra operaciones/Compartir; una fecha pasada es read-only y muestra ShareCard; “Todas” lista el resto; fotos se suben/borran/comparten; reenvío de pendiente; navegación desde el menú (R1) y desde Dashboard.
+8. No duplicar el módulo: el menú R1 debe abrir esta pantalla; no dejar una segunda ruta.
+
+**Criterio:** el Historial de Salidas Android se siente y opera como el web: día, fotos, compartir, reenviar, filtros y fechas; no una lista plana.
+
+### D. Fases afectadas
+
+- **F1:** menú/Historial de Salidas y botón canónico; ayuda.
+- **F2:** Historial de Salidas Android completo + historial de Masas; compartición con abreviaturas.
+- **F5:** web Historial de Cargamento/Reportes hoy con Editar; backend admin; Dashboard y permisos.
+- **F7:** capturas/verificación de estos tres puntos, incluida la vista de hoy en web y la paridad Android; PASS/FAIL.
+
+No cambiar el alcance de release: **sin release/tag/asset**.
+
+### E. Registro de aceptación
+
+- **2026-11-18** — el addendum se acepta tal cual y se reparte así: **A + B + backend** (historiales web de hoy con Editar y el `canEdit`
+  del servidor) viaja como una unidad propia de web/API en F5; **C** (Historial de Salidas Android completo) reemplaza el alcance
+  mínimo de R5 y se implementa en F2, después de que F1 cierre las pantallas de Salida para no chocar archivos. F1 no cambia de
+  alcance: menú/Historial de Salidas, botón canónico y ayudas siguen siendo suyos.
+- El punto 5 de R5 («como mínimo conservar el comportamiento actual») queda **superado** por C: fotos por movimiento, compartir con
+  fotos, reenviar pendientes y ShareCard del día son obligatorios, no opcionales.
