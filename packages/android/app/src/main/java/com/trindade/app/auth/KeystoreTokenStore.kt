@@ -48,6 +48,10 @@ class KeystoreTokenStore @Inject constructor(
             .apply()
     }
 
+    override fun saveAccessToken(accessToken: String) {
+        prefs.edit().putString(KEY_ACCESS_TOKEN, encrypt(accessToken)).apply()
+    }
+
     override fun saveRole(role: String) {
         prefs.edit().putString(KEY_ROLE, encrypt(role)).apply()
     }

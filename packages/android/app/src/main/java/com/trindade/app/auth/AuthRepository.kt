@@ -332,8 +332,14 @@ class AuthRepository @Inject constructor(
         val body = response?.body()
         if (response?.isSuccessful != true || body == null) return false
 
-        val rotatedRefreshToken = body.refreshToken ?: return false
-        tokenStore.save(body.token, rotatedRefreshToken)
+        // The grace window answers with a new access token and no rotated refresh token: the pair did not rotate,
+        // and the session is alive. Reading that as a failure is what signed operators out mid-shift.
+        val rotatedRefreshToken = body.refreshToken
+        if (rotatedRefreshToken != null) {
+            tokenStore.save(body.token, rotatedRefreshToken)
+        } else {
+            tokenStore.saveAccessToken(body.token)
+        }
         return true
     }
 

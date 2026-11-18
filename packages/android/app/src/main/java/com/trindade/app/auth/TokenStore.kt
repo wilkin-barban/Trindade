@@ -36,6 +36,20 @@ interface TokenStore {
     fun save(accessToken: String, refreshToken: String)
 
     /**
+     * Replace only the access token.
+     *
+     * The server has a grace window: a refresh made while the previous rotation is still being honoured answers
+     * 200 with a new access token and no new refresh token. The pair did not rotate, so the stored refresh token
+     * is still the valid one -- and the session is alive, which is the point of keeping it.
+     */
+    fun saveAccessToken(accessToken: String) {
+        // Default for the stores that only exist in tests: the pair did not rotate, so the refresh token that is
+        // already stored is the one to keep. A store with cheaper primitives overrides this.
+        val current = refreshToken() ?: return
+        save(accessToken, current)
+    }
+
+    /**
      * Record the role the session was opened with. Separate from [save] because the pair rotates and the role
      * does not -- the refresh response carries no role, a rotation is the same operator -- so only sign-in
      * calls this.

@@ -40,6 +40,10 @@ class AuthInterceptorTest {
             access = accessToken
             refresh = refreshToken
         }
+
+        override fun saveAccessToken(accessToken: String) {
+            access = accessToken
+        }
         override fun saveRole(role: String) {
             this.role = role
         }

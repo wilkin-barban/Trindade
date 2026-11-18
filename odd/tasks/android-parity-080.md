@@ -149,8 +149,8 @@ cerrado (CI verde y deploy real). Hasta entonces no se toca `packages/android`.
 
 | ID | Fase | Alcance |
 | --- | --- | --- |
-| T0.1 | 0 | Asset `whatsapp-abbreviations.table.json` copiado de la web + test de paridad Android contra él |
-| T0.2 | 0 | Refresh en la ventana de gracia sin cerrar sesión (`AuthRepository.refresh`) + tests |
+| T0.1 | 0 | Asset `whatsapp-abbreviations.table.json` copiado de la web + test de paridad Android contra él — hecho |
+| T0.2 | 0 | Refresh en la ventana de gracia sin cerrar sesión (`AuthRepository.refresh`) + tests — hecho |
 | T0.3 | 0 | Contratos: regenerar solo si el OpenAPI cambió; no editar modelos a mano |
 | T1.1 | 1 | `network/SalidaApi.kt` + DTOs + cobertura de contrato |
 | T1.2 | 1 | `salida/` repositorio, ViewModel y outbox (local primero, fotos, reintento) |
@@ -164,3 +164,16 @@ cerrado (CI verde y deploy real). Hasta entonces no se toca `packages/android`.
 | T3.2 | 3 | Admin en modal (seis pestañas), Assaí 8 productos, dashboard 7 tarjetas |
 | T4.1 | 4 | `testDebugUnitTest` + `assembleDebug` con `-PapiBaseUrl` de producción |
 | T4.2 | 4 | Instalación en `emulator-5554`, capturas y comparación con la web a 390 px |
+
+## Avance
+
+### Fase 0 — cerrada
+
+- **T0.1** `app/src/main/assets/whatsapp-abbreviations.table.json`, copiado del que sirve la web, con
+  `WhatsappAbbreviationsTableTest` comparando las cuatro secciones fila por fila contra
+  `packages/frontend/src/lib/whatsapp-abbreviations.table.json` y fijando algunas filas aprobadas.
+- **T0.2** `AuthRepository.refresh`: un 200 sin `refreshToken` (ventana de gracia) guarda sólo el access token y
+  **no** cierra la sesión; el par rotado se guarda entero; un 401 real sigue devolviendo `false`. `TokenStore`
+  ganó `saveAccessToken` con implementación por defecto para los stores de test.
+  `AuthRefreshGraceTest`: 4 casos, más los de `AuthRepositoryTest`/`AuthInterceptorTest`.
+- **T0.3** contratos ya regenerados en la pasada web; `verify-openapi-artifact.sh` en verde, sin cambios.
