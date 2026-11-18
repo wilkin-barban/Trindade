@@ -1,4 +1,4 @@
-// Puente Aero32 · Trindade Massas
+// Puente Aero32 · Trindade Massas · v2.0.0
 //
 // La web no puede hablar con el ERP desde HTTPS: el navegador bloquea el contenido mixto y la red de
 // la fábrica es HTTP dentro de la LAN. Por eso la página pide un ticket de un solo uso al backend y
@@ -7,8 +7,10 @@
 //   scriptable:///run/Aero32Bridge?ticket=<ticket>&ticketUrl=<url-encoded>
 //
 // El ticket viaja en la URL del deep link, no en este archivo. Acá sólo se canjea: el servidor
-// responde el sobre { url, headers, body, bodies?, callback } y el script lo reenvía tal cual. No hay
-// contraseñas, no hay estado guardado y no se registra ni se muestra nada del sobre.
+// responde el sobre { url, headers, body, bodies?, callback, steps? } y el script lo reenvía tal cual.
+// Si el sobre trae `steps`, ejecuta cada paso en orden en el mismo viaje (lanzamiento y lectura del día)
+// y devuelve un resultado compuesto { launch, read }. Si no trae `steps`, ejecuta el sobre simple legacy.
+// No hay contraseñas, no hay estado guardado y no se registra ni se muestra nada del sobre.
 
 const TITULO = 'Trindade';
 
@@ -16,6 +18,9 @@ const TITULO = 'Trindade';
 // una red de fábrica que no contesta deja la pantalla «enviando» hasta que iOS decide cortar, y un lote de
 // ocho cuerpos espera ese plazo ocho veces. Con el límite, el fallo llega en un plazo conocido y con veredicto.
 const TIEMPO_LIMITE = 10;
+
+// Límite de 2 MB para el cuerpo del resultado almacenado en el cofre del servidor.
+const LIMITE_BYTES_RESULTADO = 2 * 1024 * 1024;
 
 // Mensaje de alcance: no se puede leer el SSID desde Scriptable, así que se prueba el host del ERP. Si no
 // responde, el iPhone no está en la red de la empresa o la red de la fábrica no está disponible.
@@ -67,55 +72,127 @@ if (!sobre || !sobre.url || !sobre.callback) {
   return;
 }
 
-// El sobre trae uno o varios cuerpos: el lote repite el mismo endpoint una vez por producto.
-const cuerpos = Array.isArray(sobre.bodies) && sobre.bodies.length > 0 ? sobre.bodies : [sobre.body];
-const respuestas = [];
+let datoResultado = null;
 
-for (let indice = 0; indice < cuerpos.length; indice += 1) {
-  try {
-    const envio = new Request(sobre.url);
-    envio.method = 'POST';
-    envio.headers = sobre.headers;
-    envio.body = cuerpos[indice];
-    envio.allowInsecureRequest = true;
-    envio.timeoutInterval = TIEMPO_LIMITE;
-    respuestas.push(await envio.loadString());
-  } catch (error) {
-    // Una excepción es red o timeout: el ERP no contestó. Una respuesta HTTP 4xx/5xx no pasa por acá,
-    // porque `loadString()` devuelve el cuerpo igual y ese es un veredicto del ERP, no un problema de red.
-    if (indice === 0) {
-      // El primer cuerpo es la prueba de alcance: si no hay respuesta, el resto del lote tampoco la va a
-      // tener. Se corta acá en lugar de esperar el límite una vez por producto y se vuelve por el callback
-      // que ya trae `aero_action`/`aero_data`, con un código estable que la web traduce.
-      Safari.open(
-        sobre.callback +
-          '&aero_error=wifi_required&aero_msg=' +
-          encodeURIComponent(MENSAJE_SIN_ERP),
-      );
-      Script.complete();
-      return;
+if (Array.isArray(sobre.steps) && sobre.steps.length > 0) {
+  // Sobre multi-paso: ejecuta cada paso en orden en este mismo viaje a la LAN de la fábrica.
+  // Paso 1 (índice 0): lanzamiento de massas (entrada o entrada_lote).
+  // Paso 2 (índice 1): lectura de movimentos del día contra movimentoitem.
+  const pasoLanzamiento = sobre.steps[0];
+  const cuerposLanzamiento =
+    Array.isArray(pasoLanzamiento.bodies) && pasoLanzamiento.bodies.length > 0
+      ? pasoLanzamiento.bodies
+      : [pasoLanzamiento.body];
+  const respuestasLanzamiento = [];
+
+  for (let indice = 0; indice < cuerposLanzamiento.length; indice += 1) {
+    try {
+      const envio = new Request(pasoLanzamiento.url);
+      envio.method = pasoLanzamiento.method || 'POST';
+      envio.headers = pasoLanzamiento.headers || sobre.headers;
+      envio.body = cuerposLanzamiento[indice];
+      envio.allowInsecureRequest = true;
+      envio.timeoutInterval = TIEMPO_LIMITE;
+      respuestasLanzamiento.push(await envio.loadString());
+    } catch (error) {
+      if (indice === 0) {
+        // El primer cuerpo prueba el alcance: si no responde, no hay Wi-Fi o ERP.
+        Safari.open(
+          sobre.callback +
+            '&aero_error=wifi_required&aero_msg=' +
+            encodeURIComponent(MENSAJE_SIN_ERP),
+        );
+        Script.complete();
+        return;
+      }
+      respuestasLanzamiento.push(error && error.message ? String(error.message) : 'Error al enviar al ERP');
     }
-
-    // Un producto posterior que falla no cancela el lote: la web lee la respuesta de cada uno, en el mismo
-    // orden. El mensaje del error es lo único que se devuelve; nunca el ticket, los encabezados ni el cuerpo.
-    respuestas.push(error && error.message ? String(error.message) : 'Error al enviar al ERP');
   }
-}
 
-// Un solo cuerpo devuelve el texto tal cual; un lote devuelve [respuesta1,respuesta2,…], que es
-// exactamente lo que la página ya sabe leer.
-const resultado = respuestas.length === 1 ? respuestas[0] : '[' + respuestas.join(',') + ']';
+  const rawLanzamiento =
+    respuestasLanzamiento.length === 1 ? respuestasLanzamiento[0] : '[' + respuestasLanzamiento.join(',') + ']';
+  let launch = rawLanzamiento;
+  try {
+    launch = JSON.parse(rawLanzamiento);
+  } catch (error) {
+    launch = rawLanzamiento;
+  }
 
-// Si el servidor soporta almacenar el resultado en el cofre, se envía por POST con el ticket para
-// que la URL de retorno no desborde el límite de encabezados del proxy.
-if (sobre.resultUrl) {
-  let datoResultado = resultado;
+  let read = null;
+  if (sobre.steps.length > 1) {
+    const pasoLectura = sobre.steps[1];
+    try {
+      const envioLectura = new Request(pasoLectura.url);
+      envioLectura.method = pasoLectura.method || 'POST';
+      envioLectura.headers = pasoLectura.headers || sobre.headers;
+      envioLectura.body = pasoLectura.body;
+      envioLectura.allowInsecureRequest = true;
+      envioLectura.timeoutInterval = TIEMPO_LIMITE;
+      const rawLectura = await envioLectura.loadString();
+      try {
+        read = JSON.parse(rawLectura);
+      } catch (error) {
+        read = rawLectura;
+      }
+    } catch (error) {
+      // Un fallo en la lectura no anula el resultado del lanzamiento ya registrado.
+      read = {
+        success: false,
+        message: error && error.message ? String(error.message) : 'Error al leer movimentos del ERP',
+      };
+    }
+  }
+
+  datoResultado = { launch, read };
+
+  // Guarda de 2 MB: si el cuerpo compuesto excede el límite del cofre, se preserva launch y se omite read.
+  try {
+    const longitudSerializada = JSON.stringify({ data: datoResultado }).length;
+    if (longitudSerializada > LIMITE_BYTES_RESULTADO) {
+      datoResultado = { launch };
+    }
+  } catch (error) {
+    // Si la serialización fallara, se continúa con datoResultado
+  }
+} else {
+  // Sobre simple legacy (o acciones sin steps como saida, test, movimentos aislados).
+  const cuerpos = Array.isArray(sobre.bodies) && sobre.bodies.length > 0 ? sobre.bodies : [sobre.body];
+  const respuestas = [];
+
+  for (let indice = 0; indice < cuerpos.length; indice += 1) {
+    try {
+      const envio = new Request(sobre.url);
+      envio.method = 'POST';
+      envio.headers = sobre.headers;
+      envio.body = cuerpos[indice];
+      envio.allowInsecureRequest = true;
+      envio.timeoutInterval = TIEMPO_LIMITE;
+      respuestas.push(await envio.loadString());
+    } catch (error) {
+      if (indice === 0) {
+        Safari.open(
+          sobre.callback +
+            '&aero_error=wifi_required&aero_msg=' +
+            encodeURIComponent(MENSAJE_SIN_ERP),
+        );
+        Script.complete();
+        return;
+      }
+      respuestas.push(error && error.message ? String(error.message) : 'Error al enviar al ERP');
+    }
+  }
+
+  const resultado = respuestas.length === 1 ? respuestas[0] : '[' + respuestas.join(',') + ']';
   try {
     datoResultado = JSON.parse(resultado);
   } catch (error) {
     datoResultado = resultado;
   }
+}
 
+// Si el servidor soporta almacenar el resultado en el cofre, se envía por POST con el ticket para
+// que la URL de retorno no desborde el límite de encabezados del proxy.
+if (sobre.resultUrl) {
   let urlResultado = sobre.resultUrl;
   if (!/^https?:\/\//i.test(urlResultado)) {
     const origen = (ticketUrl.match(/^(https?:\/\/[^\/]+)/) || [])[1] || '';
@@ -140,6 +217,7 @@ if (sobre.resultUrl) {
 
   Safari.open(sobre.callback + '&aero_result=stored');
 } else {
-  Safari.open(sobre.callback + encodeURIComponent(resultado));
+  const resultadoTexto = typeof datoResultado === 'string' ? datoResultado : JSON.stringify(datoResultado);
+  Safari.open(sobre.callback + encodeURIComponent(resultadoTexto));
 }
 Script.complete();

@@ -11,8 +11,9 @@ import i18n from '../../i18n/config';
  * `execCommand` -- es la de Safari, y también se prueba: el teléfono no puede quedarse sin camino de copia.
  */
 const SOURCE = [
-  '// Puente Aero32',
+  '// Puente Aero32 · Trindade Massas · v2.0.0',
   'const ticket = args.queryParameters.ticket;',
+  'if (Array.isArray(sobre.steps)) { /* multi-step */ }',
   "Safari.open(`https://trindademasas.duckdns.org/api/aero/bridge/ticket/${ticket}`);",
 ].join('\n');
 

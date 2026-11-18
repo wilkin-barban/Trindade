@@ -187,4 +187,12 @@ describe('aero-scriptable-asset: the bridge carries no secret', () => {
   it('is not a Shortcuts recipe any more', () => {
     assert.equal(/\bshortcuts:\/\//.test(script), false);
   });
+
+  it('exposes a visible version in the header and handles multi-step envelopes (S2, S4)', () => {
+    assert.match(script, /v\d+\.\d+\.\d+/, 'el script debe llevar una versión visible en el encabezado');
+    assert.match(script, /sobre\.steps/, 'el script debe soportar steps');
+    assert.match(script, /launch/, 'el resultado compuesto debe incluir launch');
+    assert.match(script, /read/, 'el resultado compuesto debe incluir read');
+    assert.match(script, /LIMITE_BYTES_RESULTADO/, 'el script debe incluir la guarda de tamaño');
+  });
 });

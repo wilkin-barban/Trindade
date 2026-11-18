@@ -603,7 +603,7 @@
       "scriptableInstallHint": "O Scriptable é o app que roda a ponte: sem ele o iPhone não chega à rede da fábrica. Instala-se uma única vez, pela App Store.",
       "scriptableInstallButton": "Instalar o Scriptable no iPhone",
       "scriptableCopyButton": "Copiar código para o Scriptable",
-      "scriptableCopyHint": "Toque em Copiar, abra o Scriptable, toque +, cole o código e renomeie o script para Aero32Bridge. Se você já tinha instalado, copie de novo: a ponte mudou e precisa ser substituída.",
+      "scriptableCopyHint": "Toque em Copiar, abra o Scriptable, toque +, cole o código e renomeie o script para Aero32Bridge. Se já existia, substitua todo o código por este e salve mantendo o nome Aero32Bridge.",
       "scriptableCopied": "Copiado",
       "scriptableCopyFailed": "Não foi possível copiar o código. Abra /Aero32Bridge.js e copie de lá.",
       "scriptableLoadFailed": "Não foi possível carregar o código do script.",
