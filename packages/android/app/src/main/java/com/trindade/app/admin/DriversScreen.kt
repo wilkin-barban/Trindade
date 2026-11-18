@@ -174,13 +174,7 @@ fun DriversScreen(
             },
             saving = state.saving,
             submitEnabled = !state.saving && !state.loading,
-            submitLabel = if (state.saving) {
-                stringResource(R.string.drivers_saving)
-            } else if (isCreate) {
-                stringResource(R.string.drivers_create)
-            } else {
-                stringResource(R.string.drivers_save)
-            },
+            submitLabel = stringResource(R.string.admin_action_accept),
         ) {
             OutlinedTextField(
                 value = state.name,

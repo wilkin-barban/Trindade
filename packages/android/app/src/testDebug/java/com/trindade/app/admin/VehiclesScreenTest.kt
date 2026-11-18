@@ -159,7 +159,7 @@ class VehiclesScreenTest {
         composeRule.onNodeWithText("Placa").performTextInput("BRA1234")
         assertEquals("BRA1234", plateChanged)
 
-        composeRule.onNodeWithText("Criar").performClick()
+        composeRule.onNodeWithText("Aceitar").performClick()
         composeRule.onNodeWithText("Confirmar").performClick()
         assertEquals(1, saved)
     }
@@ -175,7 +175,7 @@ class VehiclesScreenTest {
 
         composeRule.onNodeWithText("Descrição").assertIsDisplayed()
         composeRule.onNodeWithText("Placa").assertIsDisplayed()
-        composeRule.onNodeWithText("Salvar").performClick()
+        composeRule.onNodeWithText("Aceitar").performClick()
         composeRule.onNodeWithText("Confirmar").performClick()
         assertEquals(1, saved)
         composeRule.onNodeWithText("Cancelar").performClick()
@@ -339,7 +339,7 @@ class VehiclesScreenTest {
         val expectedRefused = copy(R.string.vehicles_error_refused)
         composeRule.onNodeWithText(expectedRefused).assertIsDisplayed()
         composeRule.onNodeWithText("Status: 400").assertDoesNotExist()
-        composeRule.onNodeWithText("Salvando…").assertIsDisplayed().assertIsNotEnabled()
+        composeRule.onNodeWithText("Aceitar").assertIsDisplayed().assertIsNotEnabled()
         composeRule.onNodeWithText("Atualizar").assertDoesNotExist()
     }
 
@@ -385,7 +385,7 @@ class VehiclesScreenTest {
         var saved = 0
         render(state(editingId = 1, description = "Caminhão 9"), onSave = { saved++ })
 
-        composeRule.onNodeWithText("Salvar").performClick()
+        composeRule.onNodeWithText("Aceitar").performClick()
         val expectedBody = copy(R.string.admin_dialog_save_body, "Caminhão 9")
         composeRule.onNodeWithText(expectedBody).assertIsDisplayed()
 
@@ -398,7 +398,7 @@ class VehiclesScreenTest {
         var saved = 0
         render(state(editingId = 1, description = "Caminhão 9"), onSave = { saved++ })
 
-        composeRule.onNodeWithText("Salvar").performClick()
+        composeRule.onNodeWithText("Aceitar").performClick()
         val expectedBody = copy(R.string.admin_dialog_save_body, "Caminhão 9")
         composeRule.onNodeWithText(expectedBody).assertIsDisplayed()
 

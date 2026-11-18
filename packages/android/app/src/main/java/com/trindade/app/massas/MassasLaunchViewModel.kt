@@ -34,6 +34,7 @@ import com.trindade.app.share.deriveUsername
 import com.trindade.app.share.quickWorkerPassword
 import com.trindade.app.ui.UiText
 import com.trindade.app.ui.filterPhoneDigits
+import com.trindade.app.ui.whatsAppShareLink
 import com.trindade.app.ui.waMeLink
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.text.SimpleDateFormat
@@ -1265,7 +1266,9 @@ class MassasLaunchViewModel @Inject constructor(
     fun getWhatsAppLink(): String? {
         val view = _state.value.dayView ?: return null
         val message = formatMassasWhatsAppMessage(view, _state.value.unifiedRows, abbreviations())
-        return waMeLink(_state.value.phone, message)
+        // Con datos, la acción está disponible aunque todavía no se haya escrito un teléfono: WhatsApp deja
+        // elegir el chat. Sin datos no hay nada que mandar, y ahí sí no hay acción.
+        return waMeLink(_state.value.phone, message) ?: whatsAppShareLink(message)
     }
 
     fun getShareText(): String {

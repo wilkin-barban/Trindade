@@ -651,85 +651,14 @@ fun MassasLaunchScreen(
             }
         }
 
-        // PASO 6: Compartilhar no WhatsApp
-        Card(
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text(
-                    text = stringResource(R.string.massas_whatsapp_share),
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-
-                OutlinedTextField(
-                    value = state.phone,
-                    onValueChange = { viewModel.onPhoneChange(filterPhoneDigits(it)) },
-                    visualTransformation = BrazilianPhoneVisualTransformation(),
-                    label = { Text(stringResource(R.string.whatsapp_phone_label)) },
-                    placeholder = { Text(stringResource(R.string.whatsapp_phone_placeholder)) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-
-                // Pré-visualização da Mensagem
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    ),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Text(
-                            text = stringResource(R.string.share_preview_label),
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        // Un día sin nada que contar no manda un mensaje con solo el encabezado: la prévia
-                        // queda vacía y la acción deshabilitada, que es lo que el histórico enseña.
-                        val shareText = viewModel.getShareText()
-                        Text(
-                            text = shareText.ifBlank { stringResource(R.string.massas_share_empty) },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-                }
-
-                // Una sola acción: la hoja nativa ya lleva el texto, así que un botón de copiar al lado sería
-                // una segunda manera de hacer lo mismo y una que la planta nunca eligió.
-                val whatsappLink = viewModel.getWhatsAppLink()
-                Button(
-                    onClick = {
-                        if (whatsappLink != null) {
-                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(whatsappLink)))
-                        }
-                    },
-                    enabled = viewModel.getShareText().isNotBlank() && whatsappLink != null,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .defaultMinSize(minHeight = 48.dp),
-                ) {
-                    Text(
-                        text = "WhatsApp",
-                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                    )
-                }
-            }
-        }
+        // PASO 6: Compartilhar no WhatsApp. La pieza vive en `MassasWhatsAppShare` y solo el histórico la
+        // monta: el lanzamiento se queda con la grilla, la confirmación y la barra sticky.
+        MassasWhatsAppShare(
+            shareText = viewModel.getShareText(),
+            phone = state.phone,
+            onPhoneChange = viewModel::onPhoneChange,
+            whatsappLink = viewModel.getWhatsAppLink(),
+        )
         }
     }
 

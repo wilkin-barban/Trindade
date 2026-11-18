@@ -162,7 +162,7 @@ fun TimeSlotsAdminScreen(
             },
             saving = openForm.saving,
             submitEnabled = openForm.canSubmit,
-            submitLabel = stringResource(R.string.time_slots_add),
+            submitLabel = stringResource(R.string.admin_action_accept),
         ) {
             TimeSlotForm(
                 state = state,

@@ -781,6 +781,7 @@
     <!-- Audit remediation 509: administration screens -->
     <string name="admin_back">Volver</string>
     <string name="admin_refresh">Actualizar</string>
+    <string name="admin_action_accept">Aceptar</string>
     <string name="admin_action_cancel">Cancelar</string>
     <string name="admin_action_confirm">Confirmar</string>
     <string name="admin_action_create">Crear</string>

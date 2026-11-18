@@ -194,13 +194,7 @@ fun VehiclesScreen(
             },
             saving = state.saving,
             submitEnabled = !state.saving && !state.loading,
-            submitLabel = if (state.saving) {
-                stringResource(R.string.admin_action_saving)
-            } else if (isCreate) {
-                stringResource(R.string.admin_action_create)
-            } else {
-                stringResource(R.string.admin_action_save)
-            },
+            submitLabel = stringResource(R.string.admin_action_accept),
         ) {
             OutlinedTextField(
                 value = state.description,

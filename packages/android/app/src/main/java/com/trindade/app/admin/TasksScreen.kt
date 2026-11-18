@@ -169,13 +169,7 @@ fun TasksScreen(
                 )
             },
             saving = state.saving,
-            submitLabel = if (state.saving) {
-                stringResource(R.string.admin_action_saving)
-            } else if (isCreate) {
-                stringResource(R.string.admin_action_create)
-            } else {
-                stringResource(R.string.admin_action_save)
-            },
+            submitLabel = stringResource(R.string.admin_action_accept),
         ) {
             TaskForm(state, onCategoryChange, onNamePtChange, onNameEsChange, onReadingsChange)
         }

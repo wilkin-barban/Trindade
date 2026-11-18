@@ -156,7 +156,7 @@ class TimeSlotsAdminScreenTest {
         composeRule.onNodeWithText("09:30").performTextReplacement("11:00")
         assertEquals("11:00", inputCaptured)
 
-        composeRule.onNodeWithText(copy(R.string.time_slots_add)).performClick()
+        composeRule.onNodeWithText("Aceitar").performClick()
         composeRule.onNodeWithText("Confirmar").performClick()
         assertEquals(true, saveClicked)
     }
@@ -384,7 +384,7 @@ class TimeSlotsAdminScreenTest {
             onSave = { saved++ },
         )
 
-        composeRule.onNodeWithText(copy(R.string.time_slots_add)).performClick()
+        composeRule.onNodeWithText("Aceitar").performClick()
         val expectedBody = copy(R.string.admin_dialog_create_body, "09:00")
         composeRule.onNodeWithText(expectedBody).assertIsDisplayed()
 

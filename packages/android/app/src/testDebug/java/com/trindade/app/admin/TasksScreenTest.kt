@@ -156,7 +156,7 @@ class TasksScreenTest {
         composeRule.onNodeWithText("Leituras de temperatura").assertIsDisplayed()
         val expectedMsg = copy(R.string.tasks_error_readings)
         composeRule.onNodeWithText(expectedMsg).assertIsDisplayed()
-        composeRule.onNodeWithText("Salvando…").assertIsDisplayed().assertIsNotEnabled()
+        composeRule.onNodeWithText("Aceitar").assertIsDisplayed().assertIsNotEnabled()
     }
 
     @Test
@@ -320,7 +320,7 @@ class TasksScreenTest {
         render(state(editingId = 1, namePt = "Tarefa Teste"), onSave = { saved++ })
 
         // El pie del modal no scrollea, así que el botón se alcanza sin desplazar nada.
-        composeRule.onNodeWithText("Salvar").performClick()
+        composeRule.onNodeWithText("Aceitar").performClick()
         val expectedBody = copy(R.string.admin_dialog_save_body, "Tarefa Teste")
         composeRule.onNodeWithText(expectedBody).assertIsDisplayed()
 
@@ -334,7 +334,7 @@ class TasksScreenTest {
         render(state(editingId = 1, namePt = "Tarefa Teste"), onSave = { saved++ })
 
         // El pie del modal no scrollea, así que el botón se alcanza sin desplazar nada.
-        composeRule.onNodeWithText("Salvar").performClick()
+        composeRule.onNodeWithText("Aceitar").performClick()
         val expectedBody = copy(R.string.admin_dialog_save_body, "Tarefa Teste")
         composeRule.onNodeWithText(expectedBody).assertIsDisplayed()
 

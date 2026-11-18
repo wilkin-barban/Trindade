@@ -164,7 +164,7 @@ class CategoriesScreenTest {
         composeRule.onNodeWithText("Temperatura").performClick()
         assertEquals(CategoriesViewModel.TEMPERATURE, typeChanged)
 
-        composeRule.onNodeWithText("Criar").performClick()
+        composeRule.onNodeWithText("Aceitar").performClick()
         composeRule.onNodeWithText("Confirmar").performClick()
         assertEquals(1, saved)
     }
@@ -204,7 +204,7 @@ class CategoriesScreenTest {
         )
         composeRule.onNodeWithText("Português").assertIsDisplayed()
         composeRule.onNodeWithText("Español").assertIsDisplayed()
-        composeRule.onNodeWithText("Salvar").performClick()
+        composeRule.onNodeWithText("Aceitar").performClick()
         composeRule.onNodeWithText("Confirmar").performClick()
         assertEquals(1, saved)
         composeRule.onNodeWithText("Cancelar").performClick()
@@ -311,7 +311,7 @@ class CategoriesScreenTest {
         val expectedRefused = copy(R.string.categories_error_refused)
         composeRule.onNodeWithText(expectedRefused).assertIsDisplayed()
         composeRule.onNodeWithText("Status: 400").assertDoesNotExist()
-        composeRule.onNodeWithText("Salvando…").assertIsDisplayed().assertIsNotEnabled()
+        composeRule.onNodeWithText("Aceitar").assertIsDisplayed().assertIsNotEnabled()
         composeRule.onNodeWithText("Atualizar").assertDoesNotExist()
     }
 
@@ -365,7 +365,7 @@ class CategoriesScreenTest {
         render(state(editingId = 1, namePt = "Nova Categoria"), onSave = { saved++ })
 
         // El botón vive en el pie fijo del modal, así que se alcanza sin desplazar la pantalla.
-        composeRule.onNodeWithText("Salvar").performClick()
+        composeRule.onNodeWithText("Aceitar").performClick()
         val expectedBody = copy(R.string.admin_dialog_save_body, "Nova Categoria")
         composeRule.onNodeWithText(expectedBody).assertIsDisplayed()
 
@@ -379,7 +379,7 @@ class CategoriesScreenTest {
         render(state(editingId = 1, namePt = "Nova Categoria"), onSave = { saved++ })
 
         // El botón vive en el pie fijo del modal, así que se alcanza sin desplazar la pantalla.
-        composeRule.onNodeWithText("Salvar").performClick()
+        composeRule.onNodeWithText("Aceitar").performClick()
         val expectedBody = copy(R.string.admin_dialog_save_body, "Nova Categoria")
         composeRule.onNodeWithText(expectedBody).assertIsDisplayed()
 

@@ -27,6 +27,19 @@ fun waMeNumber(phone: String): String = phone.filter { it in '0'..'9' }
  * An action that would open an empty conversation is worse than no action at all, so the caller draws
  * the offer only when this answers with a link.
  */
+/**
+ * The link that opens WhatsApp with the text and lets the operator pick the chat.
+ *
+ * The web enables its button as soon as the day has something to say; a destination number is a convenience,
+ * not a requirement. Requiring one here left the button grey with a full day on screen, which is the state the
+ * plant reported.
+ */
+fun whatsAppShareLink(text: String): String? {
+    if (text.isBlank()) return null
+    val encoded = URLEncoder.encode(text, "UTF-8").replace("+", "%20")
+    return "https://api.whatsapp.com/send?text=$encoded"
+}
+
 fun waMeLink(phone: String, text: String): String? {
     val number = toWhatsAppNumber(phone)
     if (number.isEmpty()) return null

@@ -272,7 +272,7 @@ class UsersScreenTest {
         // Status control should not exist in create mode
         composeRule.onNodeWithText("Status").assertDoesNotExist()
 
-        composeRule.onNodeWithText("Criar").performClick()
+        composeRule.onNodeWithText("Aceitar").performClick()
         composeRule.onNodeWithText("Confirmar").performClick()
         assertEquals(1, saved)
     }
@@ -290,7 +290,7 @@ class UsersScreenTest {
         val expectedWarning = copy(R.string.admin_users_password_warning)
         composeRule.onNodeWithText(expectedWarning).assertIsDisplayed()
         // Save button remains enabled and clickable (warning is advisory only, non-blocking)
-        composeRule.onNodeWithText("Criar").assertIsEnabled().performClick()
+        composeRule.onNodeWithText("Aceitar").assertIsEnabled().performClick()
         composeRule.onNodeWithText("Confirmar").performClick()
         assertEquals(1, saved)
     }
@@ -466,7 +466,7 @@ class UsersScreenTest {
         val expectedRefused = copy(R.string.users_error_refused)
         composeRule.onNodeWithText(expectedRefused).assertIsDisplayed()
         composeRule.onNodeWithText("Status: 400").assertDoesNotExist()
-        composeRule.onNodeWithText("Salvando…").assertIsDisplayed().assertIsNotEnabled()
+        composeRule.onNodeWithText("Aceitar").assertIsDisplayed().assertIsNotEnabled()
         composeRule.onNodeWithText("Atualizar").assertDoesNotExist()
     }
 
@@ -550,7 +550,7 @@ class UsersScreenTest {
         var saved = 0
         render(state(editingId = 1, username = "alice"), onSave = { saved++ })
 
-        composeRule.onNodeWithText("Salvar").performClick()
+        composeRule.onNodeWithText("Aceitar").performClick()
         val expectedBody = copy(R.string.admin_dialog_save_body, "alice")
         composeRule.onNodeWithText(expectedBody).assertIsDisplayed()
 
@@ -563,7 +563,7 @@ class UsersScreenTest {
         var saved = 0
         render(state(editingId = 1, username = "alice"), onSave = { saved++ })
 
-        composeRule.onNodeWithText("Salvar").performClick()
+        composeRule.onNodeWithText("Aceitar").performClick()
         val expectedBody = copy(R.string.admin_dialog_save_body, "alice")
         composeRule.onNodeWithText(expectedBody).assertIsDisplayed()
 

@@ -174,7 +174,7 @@ class DriversScreenTest {
         composeRule.onNodeWithText("Carregando", substring = true).assertIsDisplayed()
         val expectedError = copy(R.string.admin_error_unreachable)
         composeRule.onNodeWithText(expectedError).assertIsDisplayed()
-        composeRule.onNodeWithText("Salvando…").assertIsDisplayed().assertIsNotEnabled()
+        composeRule.onNodeWithText("Aceitar").assertIsDisplayed().assertIsNotEnabled()
         composeRule.onNodeWithText("Atualizar").assertIsNotEnabled()
     }
 
@@ -193,7 +193,7 @@ class DriversScreenTest {
         assertTrue("Cancelar height >= 48dp", cancelBounds.bottom - cancelBounds.top >= 48.dp)
         assertTrue("Cancelar width >= 48dp", cancelBounds.right - cancelBounds.left >= 48.dp)
 
-        val saveNode = composeRule.onNodeWithText("Salvar")
+        val saveNode = composeRule.onNodeWithText("Aceitar")
         saveNode.assertIsDisplayed()
         val saveBounds = saveNode.getUnclippedBoundsInRoot()
         assertTrue("Salvar height >= 48dp", saveBounds.bottom - saveBounds.top >= 48.dp)
@@ -205,7 +205,7 @@ class DriversScreenTest {
         var saved = 0
         render(state(editingId = 1, name = "Carlos"), onSave = { saved++ })
 
-        composeRule.onNodeWithText("Salvar").performClick()
+        composeRule.onNodeWithText("Aceitar").performClick()
         val expectedBody = copy(R.string.admin_dialog_save_body, "Carlos")
         composeRule.onNodeWithText(expectedBody).assertIsDisplayed()
 
@@ -218,7 +218,7 @@ class DriversScreenTest {
         var saved = 0
         render(state(editingId = 1, name = "Carlos"), onSave = { saved++ })
 
-        composeRule.onNodeWithText("Salvar").performClick()
+        composeRule.onNodeWithText("Aceitar").performClick()
         val expectedBody = copy(R.string.admin_dialog_save_body, "Carlos")
         composeRule.onNodeWithText(expectedBody).assertIsDisplayed()
 
