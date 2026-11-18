@@ -5,6 +5,7 @@ import { api, ApiClientError } from '../../api/client';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
+import { Dialog } from '../../components/ui/dialog';
 import { LoadingSpinner } from '../../components/ui/loading-spinner';
 import { passwordIssue, passwordIssueKey } from '../../lib/password-policy';
 import { cleanPhone, filterPhoneInput } from '../../lib/phone';
@@ -111,46 +112,108 @@ function getTabs(t: (key: string) => string): Tab[] {
 
 // ---- Inline form component ----
 
+/** Las seis pestañas que crean algo. El nombre viaja hasta el `data-testid` del diálogo. */
+export type AdminFormTab = 'categories' | 'tasks' | 'drivers' | 'vehicles' | 'timeSlots' | 'workers';
+
+/**
+ * El marco del alta y de la edición en Administração.
+ *
+ * Las seis pestañas que crean algo abren su formulario en un diálogo, no debajo del botón: el `Dialog` que ya usa
+ * el resto de la aplicación pone el foco, cierra con Escape y devuelve el foco al abridor, y la pantalla de atrás
+ * queda intacta mientras el operador escribe. El título dice qué se está haciendo -- `Nuevo` o `Editar` -- y los
+ * dos botones son siempre los mismos: `Aceptar` envía el formulario de la pestaña, `Cancelar` lo cierra sin tocar
+ * nada.
+ */
+function AdminFormDialog({
+  tab,
+  title,
+  onClose,
+  children,
+}: {
+  tab: AdminFormTab;
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  const titleId = `admin-${tab}-modal-title`;
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      labelledBy={titleId}
+      panelTestId={`admin-${tab}-modal`}
+    >
+      <div className="max-h-[85vh] w-full max-w-md overflow-y-auto p-6">
+        <h2 id={titleId} className="mb-4 text-lg font-bold text-gray-900">
+          {title}
+        </h2>
+        {children}
+      </div>
+    </Dialog>
+  );
+}
+
 function InlineForm({
   fields,
   onSubmit,
   onCancel,
-  submitLabel,
-  cancelLabel,
+  title,
+  tab,
   loading,
+  acceptLabel,
+  cancelLabel,
+  savingLabel,
   children,
 }: {
   fields: { label: string; name: string; type?: string; value: string; onChange: (v: string) => void; required?: boolean }[];
   onSubmit: (e: FormEvent) => void;
   onCancel: () => void;
-  submitLabel: string;
-  cancelLabel: string;
+  title: string;
+  tab: AdminFormTab;
   loading: boolean;
+  acceptLabel: string;
+  cancelLabel: string;
+  savingLabel: string;
   children?: React.ReactNode;
 }) {
   return (
-    <form onSubmit={onSubmit} className="space-y-3 p-4 bg-gray-50 rounded-lg border mb-4">
-      {fields.map((f) => (
-        <div key={f.name} className="space-y-1">
-          <label className="block text-xs font-medium text-gray-600">{f.label}</label>
-          <Input
-            type={f.type ?? 'text'}
-            value={f.value}
-            onChange={(e) => f.onChange(e.target.value)}
-            required={f.required !== false}
-          />
+    <AdminFormDialog tab={tab} title={title} onClose={onCancel}>
+      <form onSubmit={onSubmit} className="space-y-3">
+        {fields.map((f) => (
+          <div key={f.name} className="space-y-1">
+            <label className="block text-xs font-medium text-gray-600">{f.label}</label>
+            <Input
+              type={f.type ?? 'text'}
+              value={f.value}
+              onChange={(e) => f.onChange(e.target.value)}
+              required={f.required !== false}
+            />
+          </div>
+        ))}
+        {children}
+        <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onCancel}
+            className="min-h-[44px] sm:min-h-0"
+            data-testid={`admin-${tab}-cancel`}
+          >
+            {cancelLabel}
+          </Button>
+          <Button
+            type="submit"
+            size="sm"
+            disabled={loading}
+            className="min-h-[44px] sm:min-h-0"
+            data-testid={`admin-${tab}-accept`}
+          >
+            {loading ? savingLabel : acceptLabel}
+          </Button>
         </div>
-      ))}
-      {children}
-      <div className="flex gap-2">
-        <Button type="submit" size="sm" disabled={loading}>
-          {submitLabel}
-        </Button>
-        <Button type="button" variant="outline" size="sm" onClick={onCancel}>
-          {cancelLabel}
-        </Button>
-      </div>
-    </form>
+      </form>
+    </AdminFormDialog>
   );
 }
 
@@ -874,17 +937,18 @@ export function AdminDashboard() {
       )}
 
       {/* Add button: only the tabs that have something to create. Integração ERP is configuration, and the
-          button there promised a form that does not exist. */}
+          button there promised a form that does not exist. It always opens the dialog: cancelar vive adentro. */}
       {!['profile', 'integration'].includes(activeTab) && (
       <div className="flex justify-end mb-3">
-        <Button size="sm" onClick={() => {
-          if (showForm) {
+        <Button
+          size="sm"
+          onClick={() => {
             handleCancel();
-          } else {
             setShowForm(true);
-          }
-        }}>
-          {showForm ? t('admin.cancel') : t('admin.addNew')}
+          }}
+          data-testid={`admin-${activeTab}-new`}
+        >
+          {t('admin.addNew')}
         </Button>
       </div>
       )}
@@ -892,6 +956,11 @@ export function AdminDashboard() {
       {/* Category form */}
       {showForm && activeTab === 'categories' && (
         <InlineForm
+          tab="categories"
+          title={editingId ? t('admin.edit') : t('admin.addNew')}
+          acceptLabel={t('admin.accept')}
+          cancelLabel={t('admin.cancel')}
+          savingLabel={t('admin.saving')}
           fields={[
             ...(editingId
               ? [
@@ -907,8 +976,6 @@ export function AdminDashboard() {
           ]}
           onSubmit={handleCreateCategory}
           onCancel={handleCancel}
-          submitLabel={editingId ? t('admin.update') : t('admin.create')}
-          cancelLabel={t('admin.cancel')}
           loading={formLoading}
         >
           <div className="space-y-1">
@@ -930,6 +997,11 @@ export function AdminDashboard() {
       {/* Task form */}
       {showForm && activeTab === 'tasks' && (
         <InlineForm
+          tab="tasks"
+          title={editingId ? t('admin.edit') : t('admin.addNew')}
+          acceptLabel={t('admin.accept')}
+          cancelLabel={t('admin.cancel')}
+          savingLabel={t('admin.saving')}
           fields={[
             ...(editingId
               ? [
@@ -944,8 +1016,6 @@ export function AdminDashboard() {
           ]}
           onSubmit={handleCreateTask}
           onCancel={handleCancel}
-          submitLabel={editingId ? t('admin.update') : t('admin.create')}
-          cancelLabel={t('admin.cancel')}
           loading={formLoading}
         >
           <div className="space-y-1">
@@ -988,6 +1058,11 @@ export function AdminDashboard() {
       {/* Driver form */}
       {showForm && activeTab === 'drivers' && (
         <InlineForm
+          tab="drivers"
+          title={editingId ? t('admin.edit') : t('admin.addNew')}
+          acceptLabel={t('admin.accept')}
+          cancelLabel={t('admin.cancel')}
+          savingLabel={t('admin.saving')}
           fields={[
             { label: t('admin.form.name'), name: 'name', value: driverName, onChange: setDriverName },
             {
@@ -1002,8 +1077,6 @@ export function AdminDashboard() {
           ]}
           onSubmit={handleCreateDriver}
           onCancel={handleCancel}
-          submitLabel={editingId ? t('admin.update') : t('admin.create')}
-          cancelLabel={t('admin.cancel')}
           loading={formLoading}
         >
           <div className="space-y-1">
@@ -1023,40 +1096,68 @@ export function AdminDashboard() {
       {/* Vehicle form */}
       {showForm && activeTab === 'vehicles' && (
         <InlineForm
+          tab="vehicles"
+          title={editingId ? t('admin.edit') : t('admin.addNew')}
+          acceptLabel={t('admin.accept')}
+          cancelLabel={t('admin.cancel')}
+          savingLabel={t('admin.saving')}
           fields={[
             { label: t('admin.form.description'), name: 'description', value: vehDesc, onChange: setVehDesc },
             { label: t('admin.form.plate'), name: 'license_plate', value: vehPlate, onChange: setVehPlate },
           ]}
           onSubmit={handleCreateVehicle}
           onCancel={handleCancel}
-          submitLabel={editingId ? t('admin.update') : t('admin.create')}
-          cancelLabel={t('admin.cancel')}
           loading={formLoading}
         />
       )}
 
       {/* Time Slot form */}
       {showForm && activeTab === 'timeSlots' && (
-        <form onSubmit={handleAddTimeSlot} className="space-y-3 p-4 bg-gray-50 rounded-lg border mb-4">
-          <div className="space-y-1">
-            <label className="block text-xs font-medium text-gray-600">{t('admin.form.newTimeSlot')}</label>
-            <Input
-              type="text"
-              placeholder="HH:MM"
-              value={slotInput}
-              onChange={(e) => setSlotInput(e.target.value)}
-              required
-            />
-          </div>
-          <Button type="submit" size="sm" disabled={formLoading}>
-            {formLoading ? t('admin.saving') : t('admin.add')}
-          </Button>
-        </form>
+        <AdminFormDialog tab="timeSlots" title={t('admin.addNew')} onClose={handleCancel}>
+          <form onSubmit={handleAddTimeSlot} className="space-y-3">
+            <div className="space-y-1">
+              <label className="block text-xs font-medium text-gray-600">{t('admin.form.newTimeSlot')}</label>
+              <Input
+                type="text"
+                placeholder="HH:MM"
+                value={slotInput}
+                onChange={(e) => setSlotInput(e.target.value)}
+                required
+              />
+            </div>
+            <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleCancel}
+                className="min-h-[44px] sm:min-h-0"
+                data-testid="admin-timeSlots-cancel"
+              >
+                {t('admin.cancel')}
+              </Button>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={formLoading}
+                className="min-h-[44px] sm:min-h-0"
+                data-testid="admin-timeSlots-accept"
+              >
+                {formLoading ? t('admin.saving') : t('admin.accept')}
+              </Button>
+            </div>
+          </form>
+        </AdminFormDialog>
       )}
 
       {/* Worker form */}
       {showForm && activeTab === 'workers' && (
-        <form onSubmit={handleCreateWorker} className="space-y-3 p-4 bg-gray-50 rounded-lg border mb-4">
+        <AdminFormDialog
+          tab="workers"
+          title={editingId ? t('admin.edit') : t('admin.addNew')}
+          onClose={handleCancel}
+        >
+        <form onSubmit={handleCreateWorker} className="space-y-3">
           <div className="space-y-1">
             <label className="block text-xs font-medium text-gray-600">{t('admin.workers.form.username')}</label>
             <Input
@@ -1115,15 +1216,29 @@ export function AdminDashboard() {
               </select>
             </div>
           )}
-          <div className="flex gap-2 pt-2">
-            <Button type="submit" size="sm" disabled={formLoading}>
-              {editingId ? t('admin.workers.update') : t('admin.workers.create')}
-            </Button>
-            <Button type="button" variant="outline" size="sm" onClick={handleCancel}>
+          <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleCancel}
+              className="min-h-[44px] sm:min-h-0"
+              data-testid="admin-workers-cancel"
+            >
               {t('admin.cancel')}
+            </Button>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={formLoading}
+              className="min-h-[44px] sm:min-h-0"
+              data-testid="admin-workers-accept"
+            >
+              {formLoading ? t('admin.saving') : t('admin.accept')}
             </Button>
           </div>
         </form>
+        </AdminFormDialog>
       )}
 
 

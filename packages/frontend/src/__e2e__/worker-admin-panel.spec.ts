@@ -24,18 +24,23 @@ test.describe('Limited Worker Admin Panel', () => {
     // The name carries a timestamp and the assertion uses that exact name, not a pattern: a retry runs
     // against the same database, so a pattern would resolve to the earlier run's row as well.
     const taskName = `Tarefa E2E ${Date.now()}`;
-    await page.getByRole('button', { name: '+ Novo' }).click();
-    await page.locator('select').selectOption({ index: 1 });
-    await page.locator('input').first().fill(taskName);
-    await page.getByRole('button', { name: /Criar|Crear/ }).click();
+    // El alta vive en un diálogo: `+ Novo` lo abre y `Aceptar` es el que envía.
+    await page.getByTestId('admin-tasks-new').click();
+    const taskDialog = page.getByTestId('admin-tasks-modal');
+    await expect(taskDialog).toBeVisible();
+    await taskDialog.locator('select').selectOption({ index: 1 });
+    await taskDialog.locator('input').first().fill(taskName);
+    await page.getByTestId('admin-tasks-accept').click();
     await expect(page.getByText(taskName)).toBeVisible();
 
     const driverName = `Fletero E2E ${Date.now()}`;
     await page.getByRole('button', { name: /Motoristas|Conductores/ }).click();
-    await page.getByRole('button', { name: '+ Novo' }).click();
-    await page.locator('input').first().fill(driverName);
-    await expect(page.locator('select option[value="casa"]')).toHaveCount(0);
-    await page.getByRole('button', { name: /Criar|Crear/ }).click();
+    await page.getByTestId('admin-drivers-new').click();
+    const driverDialog = page.getByTestId('admin-drivers-modal');
+    await expect(driverDialog).toBeVisible();
+    await driverDialog.locator('input').first().fill(driverName);
+    await expect(driverDialog.locator('select option[value="casa"]')).toHaveCount(0);
+    await page.getByTestId('admin-drivers-accept').click();
     await expect(page.getByText(driverName)).toBeVisible();
   });
 });

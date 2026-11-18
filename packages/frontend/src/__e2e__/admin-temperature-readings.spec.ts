@@ -15,7 +15,9 @@ test('admin configures and preserves temperature readings on a task', async ({ p
 
   await page.getByRole('button', { name: /Tarefas|Tareas/ }).click();
   await page.getByRole('button', { name: '+ Novo' }).click();
-  const categorySelect = page.locator('form select').first();
+  const taskDialog = page.getByTestId('admin-tasks-modal');
+  await expect(taskDialog).toBeVisible();
+  const categorySelect = taskDialog.locator('select').first();
 
   await categorySelect.selectOption(String(checkCategory!.id));
   await expect(page.getByTestId('temperature-readings-select')).toHaveCount(0);
@@ -26,8 +28,8 @@ test('admin configures and preserves temperature readings on a task', async ({ p
   await readings.selectOption('3');
 
   const taskName = `Câmara UI ${Date.now()}`;
-  await page.locator('form input').first().fill(taskName);
-  await page.getByRole('button', { name: /Criar|Crear/ }).click();
+  await taskDialog.locator('input').first().fill(taskName);
+  await page.getByTestId('admin-tasks-accept').click();
   const row = page.getByRole('row', { name: new RegExp(taskName) });
   await expect(row).toContainText('3');
 
