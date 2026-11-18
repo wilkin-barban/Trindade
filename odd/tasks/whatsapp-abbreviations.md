@@ -121,13 +121,13 @@ Pasada del 2026-11-17. Fuente de verdad: la propuesta aprobada por el dueño del
 | ID | Specs | Tarea | Commit |
 | --- | --- | --- | --- |
 | T1 | S1-S8 | Documento de la pasada con tablas, reglas y paridad Android | (este commit) |
-| T2 | S3, S4, S6 | Helper `whatsapp-abbreviations.ts`: mapa por código de catálogo, mapa de nombres del ERP, mapa de tareas, fallback determinístico y reparación local de `PĂO` | |
-| T3 | S2, S5, S7 | `generateWhatsAppText`: Recebimento agrupado por operario sin `(OPERADOR)`, tareas y productos seleccionados, Masas y Salidas con `- ` y abreviaturas; cantidades y emojis intactos | |
-| T4 | S2, S3, S4, S6 | Tests del helper: cada fila de las tres tablas, cantidades intactas, límite de 20, fallback estable y código solo cuando recorta | |
-| T5 | S2, S3-S7 | Golden del reporte 80 (o seed equivalente) con el texto esperado, y actualización de los tests que hoy afirman nombres completos | |
-| T6 | S8 | `docs/paridad-android-web.md`: la regla y las tablas como normativa, con el golden como fixture para Android | |
-| T7 | S1 | Backend, typecheck y build; deploy del API; verificación en producción con nombres largos | |
-| T8 | S9 | Quitar `Conferir no ERP` del histórico de Salida: botón, handler, estado y rama del callback `movimentos`; tests y ayuda del módulo | |
+| T2 | S3, S4, S6 | Helper `whatsapp-abbreviations.ts`: mapa por código de catálogo, mapa de nombres del ERP, mapa de tareas, fallback determinístico y reparación local de `PĂO` | `adac7a31` |
+| T3 | S2, S5, S7 | `generateWhatsAppText`: Recebimento agrupado por operario sin `(OPERADOR)`, tareas y productos seleccionados, Masas y Salidas con `- ` y abreviaturas; cantidades y emojis intactos | `adac7a31` |
+| T4 | S2, S3, S4, S6 | Tests del helper: cada fila de las tres tablas, cantidades intactas, límite de 20, fallback estable y código solo cuando recorta | `adac7a31` |
+| T5 | S2, S3-S7 | Golden del reporte 80 (o seed equivalente) con el texto esperado, y actualización de los tests que hoy afirman nombres completos | `adac7a31` |
+| T6 | S8 | `docs/paridad-android-web.md`: la regla y las tablas como normativa, con el golden como fixture para Android | `adac7a31` |
+| T7 | S1 | Backend, typecheck y build; deploy del API; verificación en producción con nombres largos | `adac7a31` |
+| T8 | S9 | Quitar `Conferir no ERP` del histórico de Salida: botón, handler, estado y rama del callback `movimentos`; tests y ayuda del módulo | `adac7a31` |
 
 ## S9 — El histórico de Salida no lee el ERP
 
@@ -160,3 +160,10 @@ Pasada del 2026-11-17. Fuente de verdad: la propuesta aprobada por el dueño del
 > tests, typecheck y build; desplegar el API (el export es backend); verificar en producción generando/exportando
 > un reporte con nombres largos y comparando el texto; commitear y pushear. No cierres hasta que todo esté verde,
 > desplegado y pusheado.
+
+## Evidencia
+
+- Backend **983/983** (helper 8/8, golden 1/1, export 26/26). Frontend **227/227** vitest y **750/750** node; `tsc` limpio; build `18.30s`.
+- El golden es `packages/backend/src/modules/reports/whatsapp-golden.test.ts`: siembra el día del reporte 80 y compara el texto de higiene, recebimento y salidas carácter por carácter.
+- La regla de truncación: el ERP guarda la descripción a 32 caracteres, así que el mismo insumo llega completo o cortado a mitad de palabra; el helper acepta la coincidencia solo cuando el corte cae dentro de una palabra (`… TR` → `… TRADICIONAL`), nunca cuando la tabla sigue con un espacio (`QUEIJO RALADO` no es `QUEIJO RALADO GROSSO …`).
+- Sin `Conferir no ERP`: la ayuda del módulo dice dónde se sincroniza, y la prueba del histórico comprueba que ni el botón ni su línea de error existen.
