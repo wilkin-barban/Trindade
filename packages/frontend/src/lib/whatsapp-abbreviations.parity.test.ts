@@ -7,7 +7,7 @@ import {
   abbreviateProduct,
   abbreviateTask,
 } from './whatsapp-abbreviations.js';
-import sharedTables from '../../../contracts/whatsapp-abbreviations.json' with { type: 'json' };
+import sharedTables from './whatsapp-abbreviations.table.json' with { type: 'json' };
 
 /**
  * Las dos tablas dicen lo mismo.
@@ -18,7 +18,7 @@ import sharedTables from '../../../contracts/whatsapp-abbreviations.json' with {
  */
 describe('la tabla del navegador y la del backend', () => {
   it('coincide fila por fila con el artefacto compartido', () => {
-    // `packages/contracts/whatsapp-abbreviations.json` se genera desde las tablas del backend y el backend tiene su
+    // `whatsapp-abbreviations.table.json` viaja con esta página y el backend compara sus tablas contra él, así que
     // propio test contra él: si alguna de las dos copias se mueve, una de las dos suites se pone en rojo.
     const sections: [keyof typeof WHATSAPP_TABLES, Record<string, string>][] = [
       ['catalogueByCode', sharedTables.catalogueByCode],

@@ -8,9 +8,9 @@ import { WHATSAPP_TABLES } from './whatsapp-abbreviations.js';
 /**
  * Las tablas del backend y el artefacto compartido son lo mismo.
  *
- * `packages/contracts/whatsapp-abbreviations.json` es lo que lee el navegador para escribir los históricos de
- * Masas y Salidas, y el backend lo genera desde estas tablas. Si alguien cambia una fila en un solo lado, este test
- * lo dice; el del navegador comprueba el otro extremo.
+ * `packages/frontend/src/lib/whatsapp-abbreviations.table.json` es lo que lee el navegador para escribir los
+ * históricos de Masas y Salidas, y se compara contra estas tablas. Si alguien cambia una fila en un solo lado,
+ * este test lo dice; el del navegador comprueba el otro extremo.
  */
 interface SharedTables {
   catalogueByCode: Record<string, string>;
@@ -20,7 +20,7 @@ interface SharedTables {
 }
 
 const shared = JSON.parse(
-  readFileSync(join(import.meta.dirname, '../../../../contracts/whatsapp-abbreviations.json'), 'utf-8'),
+  readFileSync(join(import.meta.dirname, '../../../../frontend/src/lib/whatsapp-abbreviations.table.json'), 'utf-8'),
 ) as SharedTables;
 
 describe('las tablas del backend contra el artefacto compartido', () => {

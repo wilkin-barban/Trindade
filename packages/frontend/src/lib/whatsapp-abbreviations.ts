@@ -154,6 +154,9 @@ export const WHATSAPP_TABLES = {
   taskByName: TASK_BY_NAME,
 } as const;
 
+/** La tabla, en el archivo que también lee el backend para su test de contrato. */
+export const WHATSAPP_TABLE_ARTIFACT = './whatsapp-abbreviations.table.json';
+
 const NOISE_WORDS = new Set([
   'MASSA', 'MASSAS', 'PARA', 'DE', 'DA', 'DO', 'DAS', 'DOS', 'E', 'EMBALAGEM', 'EMBALAG.', 'PLASTICA',
   'PLÁSTICA', 'TRINDADE', 'EXTRA', 'FINA', 'FINAS', 'GROSSO', 'RALADO', 'DIVERSAS', 'DIVERSOS', 'COM', 'SEM',

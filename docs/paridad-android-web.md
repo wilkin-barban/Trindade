@@ -274,7 +274,7 @@ de lanzamiento; el pasado se consulta en el histórico. En Android, lo mismo: si
   44 px.
 - **WhatsApp de Masas y Salidas (normativa)**: los históricos escriben el mismo texto que el Relatório — misma tabla
   de abreviaturas, `- nombre corto: N un`, `👤 Operador:`, `📦` en el resumen colectivo y cantidades exactas. La
-  tabla compartida es `packages/contracts/whatsapp-abbreviations.json`; el backend y el navegador la comparan fila por
+  tabla compartida es `packages/frontend/src/lib/whatsapp-abbreviations.table.json`; el backend y el navegador la comparan fila por
   fila en sus propias suites, y Android debe consumir esa misma tabla y compararse contra el golden del Relatório
   (`packages/backend/src/modules/reports/whatsapp-golden.test.ts`).
 - **Abreviaturas del WhatsApp del Relatório (normativa)**: el texto que se comparte por WhatsApp lo produce el

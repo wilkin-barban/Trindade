@@ -41,7 +41,7 @@ Pasada del 2026-11-18, con tres features que llegan juntas y se commitean por se
 
 - **S-C1.** Hay una sola tabla aprobada. Vive en el backend
   (`packages/backend/src/modules/reports/whatsapp-abbreviations.ts`) y se publica como artefacto compartido en
-  `packages/contracts/whatsapp-abbreviations.json`; el navegador tiene su copia en
+  `packages/frontend/src/lib/whatsapp-abbreviations.table.json`; el navegador tiene su copia en
   `packages/frontend/src/lib/whatsapp-abbreviations.ts`.
 - **S-C2.** Las dos copias no pueden separarse: `whatsapp-abbreviations.contract.test.ts` (backend) y
   `whatsapp-abbreviations.parity.test.ts` (frontend) comparan fila por fila contra el artefacto.
@@ -73,7 +73,7 @@ Pasada del 2026-11-18, con tres features que llegan juntas y se commitean por se
 - **Administración**: el alta y la edición usan un diálogo modal con Aceptar/Cancelar en las mismas seis pestañas;
   no se agregan formularios inline nuevos.
 - **WhatsApp de Masas y Salidas**: el teléfono debe escribir el mismo texto que la web — misma tabla
-  (`packages/contracts/whatsapp-abbreviations.json`), mismas abreviaturas, `- nombre: N un`, `👤 Operador:`,
+  (`packages/frontend/src/lib/whatsapp-abbreviations.table.json`), mismas abreviaturas, `- nombre: N un`, `👤 Operador:`,
   `📦` en el resumen, y las cantidades exactas. El fixture dorado del Relatório
   (`packages/backend/src/modules/reports/whatsapp-golden.test.ts`) sigue siendo la referencia de estilo.
 
