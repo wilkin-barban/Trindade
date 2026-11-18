@@ -155,6 +155,7 @@ import {
 import {
   AeroBridgeActionSchema,
   AeroBridgeEnvelopeSchema,
+  AeroBridgeStepSchema,
   AeroBridgeTicketLastResultResponseSchema,
   AeroBridgeTicketResultBodySchema,
 } from '../modules/integration/aero.vault.schema.js';
@@ -387,6 +388,7 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
   registerComponent(registry, 'AeroVaultSettingsRequest', AeroVaultSettingsRequestSchema);
   registerComponent(registry, 'AeroBridgeTicketRequest', AeroBridgeTicketRequestSchema);
   registerComponent(registry, 'AeroBridgeTicketResponse', AeroBridgeTicketResponseSchema);
+  registerComponent(registry, 'AeroBridgeStep', AeroBridgeStepSchema);
   registerComponent(registry, 'AeroBridgeEnvelope', AeroBridgeEnvelopeSchema);
   registerComponent(registry, 'AeroBridgeTicketResultBody', AeroBridgeTicketResultBodySchema);
   registerComponent(registry, 'AeroBridgeTicketLastResultResponse', AeroBridgeTicketLastResultResponseSchema);

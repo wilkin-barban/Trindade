@@ -23,6 +23,7 @@
 
 package com.trindade.app.contract.models
 
+import com.trindade.app.contract.models.AeroBridgeEnvelopeStepsInner
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -38,6 +39,7 @@ import kotlinx.serialization.Contextual
  * @param callback 
  * @param resultUrl 
  * @param bodies 
+ * @param steps 
  */
 @Serializable
 
@@ -62,7 +64,10 @@ data class AeroBridgeEnvelope (
     val resultUrl: kotlin.String,
 
     @SerialName(value = "bodies")
-    val bodies: kotlin.collections.List<kotlin.String>? = null
+    val bodies: kotlin.collections.List<kotlin.String>? = null,
+
+    @SerialName(value = "steps")
+    val steps: kotlin.collections.List<AeroBridgeEnvelopeStepsInner>? = null
 
 ) {
 

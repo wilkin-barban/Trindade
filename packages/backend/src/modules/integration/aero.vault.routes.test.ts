@@ -403,7 +403,9 @@ describe('ERP vault and bridge tickets', () => {
       assert.equal(redeemed.statusCode, 200);
       assert.equal(redeemed.headers['cache-control'], 'no-store');
       const envelope = redeemed.json() as Record<string, unknown>;
-      assert.deepEqual(Object.keys(envelope).sort(), ['body', 'callback', 'headers', 'method', 'resultUrl', 'url']);
+      assert.deepEqual(Object.keys(envelope).sort(), ['body', 'callback', 'headers', 'method', 'resultUrl', 'steps', 'url']);
+      assert.ok(Array.isArray(envelope.steps));
+      assert.equal((envelope.steps as unknown[]).length, 2);
       assert.equal(envelope.url, 'http://192.168.25.250:1453/api/entradasitem');
       assert.equal(envelope.method, 'POST');
       assert.equal(envelope.resultUrl, '/api/integration/aero/bridge-tickets/result');

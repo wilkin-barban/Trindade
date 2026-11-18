@@ -208,6 +208,21 @@ export const AeroBridgeTicketLastResultResponseSchema = z
 export type AeroBridgeTicketLastResultResponse = z.infer<typeof AeroBridgeTicketLastResultResponseSchema>;
 
 /**
+ * An executable step in a multi-step envelope.
+ */
+export const AeroBridgeStepSchema = z
+  .object({
+    url: z.string().min(1),
+    method: z.literal('POST'),
+    headers: z.record(z.string(), z.string()),
+    body: z.string(),
+    bodies: z.array(z.string()).optional(),
+  })
+  .strict();
+
+export type AeroBridgeStep = z.infer<typeof AeroBridgeStepSchema>;
+
+/**
  * What the iPhone shortcut receives on redemption. `resultUrl` tells the script where to POST
  * the result without hardcoding a path.
  */
@@ -220,6 +235,7 @@ export const AeroBridgeEnvelopeSchema = z
     bodies: z.array(z.string()).optional(),
     callback: z.string().min(1),
     resultUrl: z.string().min(1),
+    steps: z.array(AeroBridgeStepSchema).optional(),
   })
   .strict();
 

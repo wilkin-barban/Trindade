@@ -58,6 +58,125 @@ describe('aero bridge tickets service', () => {
     assert.equal(redeemed.ok, true);
     if (!redeemed.ok) return;
     assert.equal(redeemed.envelope.resultUrl, '/api/integration/aero/bridge-tickets/result');
+    assert.equal(redeemed.envelope.steps, undefined);
+  });
+
+  it('redeem envelope carries steps for entrada with step 1 launch and step 2 day read (S1)', () => {
+    const payload = { PRO_COD: '000001', ENT_DTA: '2026-11-18', PRO_QTD: 3000 };
+    const issued = issueBridgeTicket(db, {
+      userId: fixtures.admin.id,
+      action: 'entrada',
+      payloads: [payload],
+      callbackUrl: 'https://example.test/massas-history?aero_action=entrada&aero_data=',
+      publicAppUrl: 'https://example.test',
+    });
+
+    const redeemed = redeemBridgeTicket(db, issued.ticket, vaultKey);
+    assert.equal(redeemed.ok, true);
+    if (!redeemed.ok) return;
+
+    // Legacy fields intact
+    assert.equal(redeemed.envelope.url, 'http://192.168.25.250:1453/api/entradasitem');
+    assert.equal(redeemed.envelope.method, 'POST');
+    assert.equal(redeemed.envelope.body, JSON.stringify(payload));
+    assert.equal(redeemed.envelope.bodies, undefined);
+    assert.equal(redeemed.envelope.callback, 'https://example.test/massas-history?aero_action=entrada&aero_data=');
+    assert.equal(redeemed.envelope.resultUrl, '/api/integration/aero/bridge-tickets/result');
+
+    // Multi-step array
+    assert.ok(Array.isArray(redeemed.envelope.steps));
+    assert.equal(redeemed.envelope.steps.length, 2);
+
+    const [step1, step2] = redeemed.envelope.steps;
+    assert.equal(step1.url, 'http://192.168.25.250:1453/api/entradasitem');
+    assert.equal(step1.method, 'POST');
+    assert.deepEqual(step1.headers, redeemed.envelope.headers);
+    assert.equal(step1.body, JSON.stringify(payload));
+    assert.equal(step1.bodies, undefined);
+
+    assert.equal(step2.url, 'http://192.168.25.250:1453/api/movimentoitem?_method=PATCH');
+    assert.equal(step2.method, 'POST');
+    assert.deepEqual(step2.headers, redeemed.envelope.headers);
+    assert.deepEqual(JSON.parse(step2.body), {
+      CODFOR: null,
+      NOMUSU: null,
+      CODPRO: null,
+      DTINI: '2026-11-18',
+      DTFIM: '2026-11-18',
+      ENTSAI: 'E',
+      _method: 'PATCH',
+    });
+  });
+
+  it('redeem envelope carries steps for entrada_lote with bodies on step 1 and day read on step 2 (S1)', () => {
+    const payloads = [
+      { PRO_COD: '000001', ENT_DTA: '2026-11-18', PRO_QTD: 1000 },
+      { PRO_COD: '000002', ENT_DTA: '2026-11-18', PRO_QTD: 2000 },
+    ];
+    const issued = issueBridgeTicket(db, {
+      userId: fixtures.admin.id,
+      action: 'entrada_lote',
+      payloads,
+      callbackUrl: 'https://example.test/massas-history?aero_action=entrada_lote&aero_data=',
+      publicAppUrl: 'https://example.test',
+    });
+
+    const redeemed = redeemBridgeTicket(db, issued.ticket, vaultKey);
+    assert.equal(redeemed.ok, true);
+    if (!redeemed.ok) return;
+
+    // Legacy fields intact
+    assert.equal(redeemed.envelope.url, 'http://192.168.25.250:1453/api/entradasitem');
+    assert.equal(redeemed.envelope.body, JSON.stringify(payloads[0]));
+    assert.deepEqual(redeemed.envelope.bodies, payloads.map((p) => JSON.stringify(p)));
+
+    // Multi-step array
+    assert.ok(Array.isArray(redeemed.envelope.steps));
+    assert.equal(redeemed.envelope.steps.length, 2);
+
+    const [step1, step2] = redeemed.envelope.steps;
+    assert.equal(step1.url, 'http://192.168.25.250:1453/api/entradasitem');
+    assert.equal(step1.body, JSON.stringify(payloads[0]));
+    assert.deepEqual(step1.bodies, payloads.map((p) => JSON.stringify(p)));
+
+    assert.equal(step2.url, 'http://192.168.25.250:1453/api/movimentoitem?_method=PATCH');
+    assert.deepEqual(JSON.parse(step2.body), {
+      CODFOR: null,
+      NOMUSU: null,
+      CODPRO: null,
+      DTINI: '2026-11-18',
+      DTFIM: '2026-11-18',
+      ENTSAI: 'E',
+      _method: 'PATCH',
+    });
+  });
+
+  it('redeem envelope omits steps for saida and movimentos', () => {
+    const saidaIssued = issueBridgeTicket(db, {
+      userId: fixtures.admin.id,
+      action: 'saida',
+      payloads: [{ PRO_COD: '000002' }],
+      callbackUrl: 'https://example.test/salida-history',
+      publicAppUrl: 'https://example.test',
+    });
+    const saidaRedeemed = redeemBridgeTicket(db, saidaIssued.ticket, vaultKey);
+    assert.equal(saidaRedeemed.ok, true);
+    if (saidaRedeemed.ok) {
+      assert.equal(saidaRedeemed.envelope.steps, undefined);
+    }
+
+    const movIssued = issueBridgeTicket(db, {
+      userId: fixtures.admin.id,
+      action: 'movimentos',
+      payloads: [{ ENTSAI: 'E' }],
+      callbackUrl: 'https://example.test/massas-history',
+      publicAppUrl: 'https://example.test',
+    });
+    const movRedeemed = redeemBridgeTicket(db, movIssued.ticket, vaultKey);
+    assert.equal(movRedeemed.ok, true);
+    if (movRedeemed.ok) {
+      assert.equal(movRedeemed.envelope.steps, undefined);
+    }
   });
 
   it('stores a result for an already consumed ticket', () => {

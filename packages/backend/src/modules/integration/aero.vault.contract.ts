@@ -51,6 +51,18 @@ export const AeroBridgeTicketResponseSchema = z
   })
   .strict();
 
+export const AeroBridgeStepSchema = z
+  .object({
+    url: z.string().min(1),
+    method: z.literal('POST'),
+    headers: z.record(z.string(), z.string()),
+    body: z.string(),
+    bodies: z.array(z.string()).optional(),
+  })
+  .strict();
+
+export type AeroBridgeStep = z.infer<typeof AeroBridgeStepSchema>;
+
 /**
  * What the iPhone shortcut receives. `body` and `bodies` are JSON **text**, exactly what the shortcut sends as
  * the request body, so the actions that already exist do not change.
@@ -63,6 +75,7 @@ export const AeroBridgeEnvelopeSchema = z
     body: z.string(),
     bodies: z.array(z.string()).optional(),
     callback: z.string().min(1),
+    steps: z.array(AeroBridgeStepSchema).optional(),
   })
   .strict();
 

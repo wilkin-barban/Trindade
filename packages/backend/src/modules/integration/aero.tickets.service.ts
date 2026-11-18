@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import type Database from 'better-sqlite3';
 import { decryptSecret } from './vault.crypto.js';
 import { aeroVaultSettingsRow, type AeroVaultSettingsRow } from './aero.settings.service.js';
-import type { AeroBridgeActionName, AeroBridgeEnvelopeContract } from './aero.vault.schema.js';
+import type { AeroBridgeActionName, AeroBridgeEnvelopeContract, AeroBridgeStep } from './aero.vault.schema.js';
 
 /**
  * One-use bridge tickets: the credential the iPhone shortcut redeems for an envelope it does not build.
@@ -224,14 +224,15 @@ function buildBridgeEnvelope(
   password: string,
 ): AeroBridgeEnvelopeContract {
   const base = settings.ws_url.replace(/\/+$/, '');
+  const headers = {
+    Authorization: `Basic ${Buffer.from(`${settings.erp_username}:${password}`, 'utf8').toString('base64')}`,
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+  };
   const envelope: AeroBridgeEnvelopeContract = {
     url: `${base}/${ticket.endpoint}`,
     method: 'POST',
-    headers: {
-      Authorization: `Basic ${Buffer.from(`${settings.erp_username}:${password}`, 'utf8').toString('base64')}`,
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
+    headers,
     body: ticket.body,
     callback: ticket.callback_url,
     resultUrl: '/api/integration/aero/bridge-tickets/result',
@@ -239,6 +240,46 @@ function buildBridgeEnvelope(
   if (ticket.bodies !== null) {
     envelope.bodies = JSON.parse(ticket.bodies) as string[];
   }
+
+  if (ticket.action === 'entrada' || ticket.action === 'entrada_lote') {
+    let entDta: string | null = null;
+    try {
+      const first = JSON.parse(ticket.body) as Record<string, unknown>;
+      if (typeof first.ENT_DTA === 'string') {
+        entDta = first.ENT_DTA;
+      }
+    } catch {
+      // ignore
+    }
+
+    const step1: AeroBridgeStep = {
+      url: `${base}/${ticket.endpoint}`,
+      method: 'POST',
+      headers,
+      body: ticket.body,
+      ...(envelope.bodies !== undefined ? { bodies: envelope.bodies } : {}),
+    };
+
+    const step2Body = JSON.stringify({
+      CODFOR: null,
+      NOMUSU: null,
+      CODPRO: null,
+      DTINI: entDta,
+      DTFIM: entDta,
+      ENTSAI: 'E',
+      _method: 'PATCH',
+    });
+
+    const step2: AeroBridgeStep = {
+      url: `${base}/movimentoitem?_method=PATCH`,
+      method: 'POST',
+      headers,
+      body: step2Body,
+    };
+
+    envelope.steps = [step1, step2];
+  }
+
   return envelope;
 }
 
