@@ -121,15 +121,15 @@ cerrado (CI verde y deploy real). Hasta entonces no se toca `packages/android`.
 
 ## Criterios de aceptación
 
-- [ ] La app compila y `testDebugUnitTest` está verde.
+- [x] La app compila y `testDebugUnitTest` está verde.
 - [ ] Salida/Baixa completo (lanzar, histórico, fotos, share, ERP, sin beta/Conferir).
 - [ ] Relatório con bloque de Salidas y sync `includeExits`.
-- [ ] Historiales de Reportes/Horario abren ShareCard de lectura con Volver, sin Editar ni Copiar.
-- [ ] Massas con tabla/golden, share en histórico, día vacío deshabilitado, sin Copiar.
-- [ ] Admin modal, Assaí 8, dashboard 7, Salida en menú/RolePolicy.
+- [x] Historiales de Reportes/Horario abren ShareCard de lectura con Volver, sin Editar ni Copiar.
+- [x] Massas con tabla/golden, share en histórico, día vacío deshabilitado, sin Copiar.
+- [x] Admin modal, Assaí 8, dashboard 7, Salida en menú/RolePolicy.
 - [ ] Sesión de gracia sin logout; `salida_sync`; contratos regenerados.
 - [ ] 390 dp/44 dp sin desbordes; capturas revisadas.
-- [ ] APK instalada en `emulator-5554`; sin tag/release/asset publicado.
+- [x] APK instalada en `emulator-5554`; sin tag/release/asset publicado.
 
 ## Entorno
 
@@ -200,11 +200,57 @@ cerrado (CI verde y deploy real). Hasta entonces no se toca `packages/android`.
 - APK **0.8.0 / 8002** instalada con este bloque.
 - **Falta**: la `ShareCard` Compose reutilizable y su uso en los históricos de Reportes y de Horario cerrado.
 
-### Fase 3 — pendiente
+### Fase 3 — cerrada
 
-Masas con tabla/golden y share en el histórico (día vacío deshabilitado, sin Copiar), Admin en modal para las seis
-pestañas, Assaí con 8 productos y dashboard con la séptima tarjeta.
+- **T3.1** `WhatsappAbbreviations` lee el asset que sirve el mismo JSON que el backend y el navegador y resuelve el nombre
+  corto en el orden de la planta: nombre del asiento, catálogo por código, recorte a 20 caracteres; el `Ă` del ERP se
+  repara al leer, nunca en lo guardado. El mensaje de Masas salió con el formato del Relatório (`👤 NOMBRE:`,
+  `- nombre: N un (N cx)`, `Resumo Colectivo:` con `📦`), con `MassasWhatsappGoldenTest` fijando el día 17/11.
+  El lanzamiento se quedó con la grilla, la confirmación y la barra sticky; producción del día, lanzamientos, resumen,
+  WhatsApp y `Sincronizar com ERP` viven en el histórico. `Copiar Mensagem` eliminado; día vacío sin mensaje, prévia
+  vacía y acción deshabilitada.
+- **T3.2** Assaí con los 8 productos (sin `Quadrada`), séptima tarjeta del dashboard cableada a `Tab.SALIDA`, y las
+  seis pestañas de Administración con el mismo `AdminFormDialog` (scrim, cuerpo que scrollea, Aceptar/Cancelar de
+  48 dp). Dos defectos que solo el teléfono mostró quedaron corregidos: el `VerticalScroll` anidado y el modal
+  maquetado debajo de la pantalla.
 
-### Fase 4 — pendiente
+### Fase 4 — hecha, con lo que no se pudo verificar
 
-Capturas a 390 dp y comparación con la web: necesitan una sesión real en el emulador; la app quedó en el login.
+- Suite completa: **1433 tests, 0 fallos**. APK de prueba **0.8.0 / 8003** compilada con
+  `-PapiBaseUrl=https://trindademasas.duckdns.org/` e instalada en `emulator-5554` (verificado por `dumpsys`).
+- Capturas a 390 dp (`wm density 443` sobre 1080 px) de dashboard, Masas lanzamiento e histórico, Salida histórico,
+  Assaí, Admin con el modal abierto y las dos ShareCards de histórico. Confirmado en vivo: sin `Copiar`, sin `Editar`
+  en las ShareCards, `Volver` presente, y el mensaje de Masas con el formato aprobado.
+- **No verificado**: la comparación lado a lado con la web con sesión propia (las credenciales se autorizaron solo
+  para el emulador) y las pantallas de Salida/Baixa en su flujo de lanzamiento con datos nuevos, porque el pase es de
+  solo lectura sobre producción.
+
+## Log
+
+### L1 — pedido del dueño (2026-11-18, hilo nuevo tras el límite de contexto de `wB:p1`)
+
+> Estás tomando el pase Android 0.8.0 de Trindade en un hilo nuevo porque el agente anterior `wB:p1` llegó al límite
+> de contexto. No cierres su panel; trabajá en `wB:p3`. El repo es `/home/wilkin/proyectos/Trindade`.
+>
+> (Estado real ya hecho: Fase 0 y Fase 1 commiteadas y pusheadas; Fase 2 parcial con `ebebde38`; APK 0.8.0/8002
+> instalada en `emulator-5554`; `main` en sync; la app quedó en el login y no se inventan cuentas.)
+>
+> Leé completo `odd/tasks/android-parity-080.md` (es la spec) y `docs/paridad-android-web.md`. Continuá:
+> 1) **ShareCard Compose** reutilizable para historiales de Reportes y Horario cerrado: solo lectura, sin Editar, con
+> Volver; sin Copiar; texto del servidor. Usá modos de navegación equivalentes a `saved`/`share`/`fromHistory` (la app
+> no usa URLs). Tests.
+> 2) **Fase 3**: Masas con tabla compartida/golden y share en el histórico (día vacío con prévia vacía y botón
+> deshabilitado, sin Copiar; quitar share/copy/sync del lanzamiento y moverlos al histórico); Admin con alta/edición
+> en modal para las seis pestañas; Assaí 8 productos (sin Quadrada); dashboard 7 tarjetas y menú.
+> 3) **Fase 4**: tests, build debug `-PapiBaseUrl=https://trindademasas.duckdns.org/ -PversionName=0.8.0
+> -PversionCode=8003` (o siguiente), instalar con `scp` + `ssh ubuntu '~/Android/Sdk/platform-tools/adb -s
+> emulator-5554 install -r …'`, capturas 390 dp y comparación con la web. Si no hay login, dejá la app en login y
+> reportá; no inventes credenciales.
+>
+> Entorno: host con OpenJDK 21, `JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64`,
+> `ANDROID_HOME=/home/wilkin/.cache/trindade-android-sdk`; disco 14 GB; Gradle cache ya escribible. Usá `ssh ubuntu`
+> (alias con User wilkin + ~/.ssh/id_ed25519), no `ubuntu@10.50.0.3`.
+>
+> Reglas: commits convencionales por fase y push del código; **NO** crear tag, release, asset `.apk` ni tocar
+> `packages/backend/apk` o la 0.7.5. No toques producción. El usuario verifica la APK final antes de publicar. Si algo
+> no se puede verificar, decilo explícitamente.
