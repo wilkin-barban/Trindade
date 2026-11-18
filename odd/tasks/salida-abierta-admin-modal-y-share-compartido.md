@@ -112,3 +112,22 @@ debe replicarlo.»
 y esperar el run. Condiciones de cierre: todo a `main`, CI verde con el run del push, reconstrucción real de la
 imagen de producción con `docker compose up -d --build api web`, verificación del bundle servido, y la vista iPhone a
 390 px con modales que abren, scrollean y botones de 44 px.
+
+## Evidencia del cierre
+
+- Suites: backend **974/974**, vitest **229/229** (31 archivos), node **753/753**, `tsc` limpio, build **13.77s**.
+- E2E completo: **122/122** (6.3m), incluido el spec a 390 px de las cuatro superficies (`pass-390.spec.ts`), más
+  `salida-open-roles` y `admin-modal-forms`.
+- Contrato: `verify-openapi-artifact.sh` en verde y el cliente Kotlin regenerado con `erpOnly` y `AeroBridgeStep`.
+- CI: **success** en los runs `44226670822` y `44226647260` (`verify` y `android`).
+- Deploy: `api` y `web` reconstruidos (`StartedAt` nuevo, ambos healthy); bundle servido
+  `assets/index-DU5R27Q6.js` con «Confirmar saída» y sin `salida-check-erp`; `/Aero32Bridge.js` con `v2.0.0` y
+  `steps`.
+- Guardas en producción: `/api/salida/catalog`, `/api/salida/history` y el ticket `saida` responden **401** sin
+  sesión.
+
+### Verificación pendiente de credencial
+
+La comprobación «una cuenta que no sea `wilkin` ve el menú y obtiene 200 en catálogo, historial y ticket» necesita
+una sesión real de una cuenta de planta en producción; no hay credenciales de terceros en esta sesión y no
+corresponde leerlas.
