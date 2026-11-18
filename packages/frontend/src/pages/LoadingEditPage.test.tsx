@@ -69,6 +69,34 @@ beforeEach(() => {
 });
 
 describe('LoadingEditPage', () => {
+  it('offers no Salvar Horário in the read-only view nor on a closed day', async () => {
+    get.mockImplementation(async (url: string) => {
+      if (url.startsWith('/loading/schedules')) return { schedules: [schedule(1, '04:00', 'A')] };
+      return { timeSlots: ['04:00'] };
+    });
+
+    // La vista de consulta del horario no escribe nada: el botón del editor no aparece.
+    renderPage(`/loading/edit?date=${today}&view=1`);
+    await waitFor(() => expect(screen.getByTestId('edit-entry-1')).toBeInTheDocument());
+    expect(screen.queryByTestId('loading-save-btn')).not.toBeInTheDocument();
+
+    // Un día ya cerrado tampoco lo ofrece, aunque se entre sin `view=1`.
+    renderPage(`/loading/edit?date=${yesterday}`);
+    await waitFor(() => expect(get).toHaveBeenCalled());
+    expect(screen.queryByTestId('loading-save-btn')).not.toBeInTheDocument();
+  });
+
+  it('keeps Salvar Horário on a day that can still be edited', async () => {
+    get.mockImplementation(async (url: string) => {
+      if (url.startsWith('/loading/schedules')) return { schedules: [schedule(1, '04:00', 'A')] };
+      return { timeSlots: ['04:00'] };
+    });
+
+    renderPage(`/loading/edit?date=${today}`);
+
+    expect(await screen.findByTestId('loading-save-btn')).toBeInTheDocument();
+  });
+
   it('prices the row on its own hour without counting it twice', async () => {
     get.mockImplementation(async (url: string) => {
       if (url.startsWith('/loading/schedules')) {
