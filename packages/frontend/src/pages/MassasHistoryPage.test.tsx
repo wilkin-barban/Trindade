@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import i18n from '../i18n/config';
 import type { MassasLaunchDayView } from '../lib/massas';
 import { saoPauloDaysAgo, saoPauloToday, saoPauloYesterday } from '../lib/date';
+import { saveAeroSettings } from '../lib/aero-integration';
 
 const get = vi.fn();
 const post = vi.fn();
@@ -81,6 +82,7 @@ beforeEach(async () => {
   del.mockReset();
   currentUrl = '';
   await i18n.changeLanguage('es');
+  saveAeroSettings({ wsUrl: 'http://192.168.25.250:1453/api', username: 'APL', syncEnabled: true, hasPassword: true, lastSyncAt: null });
 
   get.mockImplementation(async (url: string) => {
     if (url.startsWith('/massas-launch/history')) {
@@ -96,7 +98,7 @@ beforeEach(async () => {
     if (url.startsWith('/integration/aero/movements')) {
       return { date: '2026-10-27', movements: [] };
     }
-    if (url.startsWith('/admin/aero/vault')) {
+    if (url.startsWith('/integration/aero/settings') || url.startsWith('/admin/aero/vault')) {
       return { configured: true, wsUrl: 'http://192.168.25.250:1453/api', username: 'APL', hasPassword: true };
     }
     return {};
@@ -153,6 +155,98 @@ describe('MassasHistoryPage', () => {
 
     expect(await screen.findByTestId('massa-result-modal')).toBeInTheDocument();
     expect(screen.getByTestId('massa-result-close')).toBeInTheDocument();
+  });
+
+  it('handles composite bridge return: updates mirror from read and does not request second trip on close (S3)', async () => {
+    const composite = {
+      launch: [{ success: true, data: { ENT_LAN: 101 } }],
+      read: {
+        success: true,
+        data: [
+          {
+            ENT_LAN: 101,
+            PRO_COD: '001192',
+            PRO_DES: 'MASSA DE PASTEL',
+            PRO_QTD: 30,
+            ENT_DTA: saoPauloToday(),
+            ENT_USU: 'WILKIN',
+            ENTSAI: 'E',
+          },
+        ],
+      },
+    };
+
+    renderPage(
+      `/massas-history?date=${saoPauloToday()}&aero_action=entrada_lote&aero_data=${encodeURIComponent(
+        JSON.stringify(composite),
+      )}`,
+    );
+
+    expect(await screen.findByTestId('massa-result-modal')).toBeInTheDocument();
+
+    // The mirror was updated with the read data directly
+    await waitFor(() => {
+      expect(post).toHaveBeenCalledWith(
+        '/integration/aero/movements',
+        expect.objectContaining({
+          date: saoPauloToday(),
+          movements: expect.arrayContaining([
+            expect.objectContaining({
+              ent_lan: 101,
+              product_code: '001192',
+              movement_type: 'E',
+            }),
+          ]),
+        }),
+        expect.anything(),
+      );
+    });
+
+    // Close the modal: since read was present and valid, it must NOT request a second movimentos ticket
+    const closeButton = screen.getByTestId('massa-result-close');
+    fireEvent.click(closeButton);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('massa-result-modal')).not.toBeInTheDocument();
+    });
+
+    // Verify post was NEVER called for bridge-tickets
+    const bridgeTicketCalls = post.mock.calls.filter(
+      (call) => typeof call[0] === 'string' && call[0].includes('bridge-tickets'),
+    );
+    expect(bridgeTicketCalls).toHaveLength(0);
+  });
+
+  it('falls back to auto-read when read is missing or failed (S3)', async () => {
+    post.mockImplementation(async (url: string) => {
+      if (url.includes('bridge-tickets')) {
+        return { ticket: 'tok-123', ticketUrl: 'http://test/redeem', expiresAt: '2099-01-01' };
+      }
+      return {};
+    });
+
+    // Legacy answer: bare array, no composite `read`
+    const legacyPayload = [{ success: true, data: { ENT_LAN: 101 } }];
+    renderPage(
+      `/massas-history?date=${saoPauloToday()}&aero_action=entrada_lote&aero_data=${encodeURIComponent(
+        JSON.stringify(legacyPayload),
+      )}`,
+    );
+
+    expect(await screen.findByTestId('massa-result-modal')).toBeInTheDocument();
+
+    // Closing the modal triggers the fallback auto-read, which requests a movimentos ticket
+    const closeButton = screen.getByTestId('massa-result-close');
+    fireEvent.click(closeButton);
+
+    await waitFor(() => {
+      expect(post).toHaveBeenCalledWith(
+        '/integration/aero/bridge-tickets',
+        expect.objectContaining({
+          action: 'movimentos',
+        }),
+      );
+    });
   });
 
   it('today is manageable (edit/delete/relaunch) and past days are read-only with visible notice (Item 7)', async () => {

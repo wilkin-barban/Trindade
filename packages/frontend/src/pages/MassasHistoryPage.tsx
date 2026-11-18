@@ -84,7 +84,7 @@ import {
 } from '../lib/aero-queue';
 import { AERO_BATCH_MAX, buildAeroLaunchTrips } from '../lib/aero-batch';
 import { AeroResultDialog } from './massas/AeroResultDialog';
-import { armAeroAutoRead, consumeAeroAutoRead } from '../lib/aero-auto-read';
+import { armAeroAutoRead, clearAeroAutoRead, consumeAeroAutoRead } from '../lib/aero-auto-read';
 import { AeroDeviceBanner } from '../components/aero/AeroDeviceBanner';
 import { useDevice } from '../contexts/DeviceContext';
 import { canControlAero } from '../lib/device-detection';
@@ -763,6 +763,27 @@ export function MassasHistoryPage() {
           return;
         }
 
+        const isComposite =
+          typeof parsed.data === 'object' &&
+          parsed.data !== null &&
+          !Array.isArray(parsed.data) &&
+          'launch' in parsed.data;
+
+        const launchData = isComposite
+          ? (parsed.data as { launch: unknown; read?: unknown }).launch
+          : parsed.data;
+        const readData = isComposite
+          ? (parsed.data as { launch: unknown; read?: unknown }).read
+          : undefined;
+
+        const hasValidRead =
+          readData !== undefined && readAeroMovements(readData).status === 'ok';
+
+        if (hasValidRead) {
+          clearAeroAutoRead();
+          void handleMovementsCallback(readData);
+        }
+
         if (parsed.action === 'entrada_lote') {
           const attempt = loadAeroPendingAttempt('entrada_lote');
           clearAeroPendingAttempt();
@@ -771,8 +792,8 @@ export function MassasHistoryPage() {
             : { client: 'web' as const };
           const queue = readAeroQueue();
           const sent = queue?.inFlight ?? [];
-          const expected = sent.length > 0 ? sent.length : Array.isArray(parsed.data) ? parsed.data.length : 1;
-          const batch = readAeroBatchResult(parsed.data, expected);
+          const expected = sent.length > 0 ? sent.length : Array.isArray(launchData) ? launchData.length : 1;
+          const batch = readAeroBatchResult(launchData, expected);
           const destination = aeroDestination();
 
           void postAeroAuditEvent({
@@ -803,7 +824,7 @@ export function MassasHistoryPage() {
             }
             clearAeroQueue();
             setSyncAwaiting(null);
-            if (batch.ok === 1) armAeroAutoRead(date);
+            if (batch.ok === 1 && !hasValidRead) armAeroAutoRead(date);
             setResultModal(
               batch.ok === 1
                 ? { type: 'success', message: t('massas.aero.syncConfirmYes'), sentToErp: true }
@@ -822,7 +843,7 @@ export function MassasHistoryPage() {
           else clearAeroQueue();
           setSyncAwaiting(rest && rest.items.length > 0 ? { date: rest.date, remaining: rest.items.length } : null);
 
-          if (batch.ok > 0 && !rest?.items.length) armAeroAutoRead(date);
+          if (batch.ok > 0 && !rest?.items.length && !hasValidRead) armAeroAutoRead(date);
           setResultModal({
             type: feedback.tone === 'ok' ? 'success' : feedback.tone === 'warn' ? 'warn' : 'error',
             title: t(feedback.titleKey),
@@ -838,7 +859,7 @@ export function MassasHistoryPage() {
           return;
         }
 
-        const outcome = readAeroBridgeResult(parsed.data);
+        const outcome = readAeroBridgeResult(launchData);
         const attempt = parsed.action === 'entrada' ? loadAeroPendingAttempt('entrada') : null;
         clearAeroPendingAttempt();
         const pairing = attempt
@@ -876,7 +897,7 @@ export function MassasHistoryPage() {
           setSyncAwaiting(null);
         }
 
-        if (outcome.status === 'ok') armAeroAutoRead(date);
+        if (outcome.status === 'ok' && !hasValidRead) armAeroAutoRead(date);
         setResultModal({
           type: outcome.status === 'ok' ? 'success' : 'error',
           title: outcome.status === 'ok' ? t('massas.successTitle') : t('massas.errorTitle'),
