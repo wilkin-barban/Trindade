@@ -12,6 +12,7 @@
  * hangs off the entry detail table.
  */
 import { saoPauloToday, formatDateLabel } from './date';
+import { abbreviateProduct } from './whatsapp-abbreviations.js';
 import { AERO_BATCH_MAX } from './aero-batch';
 import { buildSaidaItemPayload, type AeroSaidaPayload, type StorageLike } from './aero-integration';
 import { postAeroAuditEvent, type AeroAuditEvent } from './aero-audit';
@@ -597,7 +598,7 @@ export function salidaSummaryText(
 ): string {
   const lines: string[] = [];
   lines.push(`🚛 *${title} — ${formatDateLabel(movement.movement_date)}*`);
-  lines.push(`👤 *${String(movement.username ?? '').toUpperCase()}*`);
+  lines.push(`👤 ${String(movement.username ?? '').toUpperCase()}:`);
   lines.push('');
 
   const grouped = salidaProductsByBlock(
@@ -614,7 +615,7 @@ export function salidaSummaryText(
     if (products.length === 0) continue;
     lines.push(`*${SALIDA_BLOCK_EMOJIS[block]} ${labels[block]}*`);
     for (const product of products) {
-      lines.push(`• ${product.name} — ${salidaQuantity(quantities.get(product.code))} un`);
+      lines.push(`- ${abbreviateProduct(product.name, product.code)}: ${salidaQuantity(quantities.get(product.code))} un`);
     }
     lines.push('');
   }
@@ -649,7 +650,8 @@ function productsOf(items: SalidaDayShareMovement['items'], labels: Record<Salid
     if (products.length === 0) continue;
     lines.push(`*${SALIDA_BLOCK_EMOJIS[block]} ${labels[block]}*`);
     for (const product of products) {
-      lines.push(`• ${product.name} — ${salidaQuantity(quantities.get(product.code))} un`);
+      // El nombre corto sale de la tabla aprobada, la misma del Relatório, y la cantidad queda exacta.
+      lines.push(`- ${abbreviateProduct(product.name, product.code)}: ${salidaQuantity(quantities.get(product.code))} un`);
     }
   }
   return lines;
@@ -676,7 +678,7 @@ export function salidaDaySummaryText(
 
   movements.forEach((movement, index) => {
     if (index > 0) lines.push('');
-    lines.push(`👤 *${String(movement.username ?? '').toUpperCase()}*`);
+    lines.push(`👤 ${String(movement.username ?? '').toUpperCase()}:`);
     lines.push(...productsOf(movement.items, labels.blocks));
   });
 

@@ -95,16 +95,16 @@ describe('massas message formatting', () => {
       '🍝 *Lançamento de Massas — 20/10/2026*',
       '',
       '*Resumo Coletivo:*',
-      '• CASEIRA: 80 un (8 cx)',
-      '• DISCO 500G: 40 un (2 cx)',
+      '📦 CASEIRA: 80 un (8 cx)',
+      '📦 DISCO 500g: 40 un (2 cx)',
       '',
       '*Por Trabalhador:*',
-      '👤 *João Silva:*',
-      '• CASEIRA: 50 un (5 cx)',
-      '• DISCO 500G: 40 un (2 cx)',
+      '👤 João Silva:',
+      '- CASEIRA: 50 un (5 cx)',
+      '- DISCO 500g: 40 un (2 cx)',
       '',
-      '👤 *Maria Oliveira:*',
-      '• CASEIRA: 30 un (3 cx)',
+      '👤 Maria Oliveira:',
+      '- CASEIRA: 30 un (3 cx)',
     ].join('\n');
 
     assert.strictEqual(msg, expected);

@@ -260,6 +260,19 @@ de lanzamiento; el pasado se consulta en el histórico. En Android, lo mismo: si
 - **Datos**: `GET /api/reports/day/salidas?date=YYYY-MM-DD`, con sesión y **cualquier rol** (el reporte lo lee todo el
   mundo; `/api/salida` sigue siendo la beta privada de un usuario). Devuelve `{ date, operators[], totalUnits,
   movementCount }`, cada operario con `{ name, username, units, products[{ code, name, block, units }], erpOnly }`.
+- **Salida abierta (2026-11-18)**: la web admite a cualquier cuenta autenticada en Salida / Baixa y su histórico; la
+  beta de `wilkin` terminó y el servidor ya no filtra por nombre. Android no se toca todavía: cuando implemente el
+  módulo, su histórico tampoco muestra `Conferir no ERP`, porque el sync del ERP es del Relatório. El invitado
+  conserva su regla de solo lectura, que es de la cuenta y no del módulo.
+- **Administración en diálogo (normativa)**: el alta y la edición de `categories`, `tasks`, `drivers`, `vehicles`,
+  `timeSlots` y `workers` usan un diálogo modal con `Aceptar` / `Cancelar`, nunca un formulario inline. El trabajador
+  limitado sigue viendo solo `tasks` y `drivers`, y en el teléfono el diálogo abre, scrollea y tiene botones de
+  44 px.
+- **WhatsApp de Masas y Salidas (normativa)**: los históricos escriben el mismo texto que el Relatório — misma tabla
+  de abreviaturas, `- nombre corto: N un`, `👤 Operador:`, `📦` en el resumen colectivo y cantidades exactas. La
+  tabla compartida es `packages/contracts/whatsapp-abbreviations.json`; el backend y el navegador la comparan fila por
+  fila en sus propias suites, y Android debe consumir esa misma tabla y compararse contra el golden del Relatório
+  (`packages/backend/src/modules/reports/whatsapp-golden.test.ts`).
 - **Abreviaturas del WhatsApp del Relatório (normativa)**: el texto que se comparte por WhatsApp lo produce el
   backend (`generateWhatsAppText`) y **debe ser idéntico en web y Android**: mismas abreviaturas, mismo orden, mismos
   emojis, encabezados, cantidades y agrupación por operario. Las tablas aprobadas -- catálogo por código, nombres del

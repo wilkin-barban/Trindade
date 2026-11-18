@@ -150,6 +150,14 @@ const TASK_BY_NAME = new Map<string, string>([
   ['RECEBIMENTO DE SORBATO', 'Receb. sorbato'],
 ]);
 
+/** Las tablas, expuestas para el test que las compara con el artefacto compartido. */
+export const WHATSAPP_TABLES = {
+  catalogueByCode: CATALOGUE_BY_CODE,
+  catalogueByName: CATALOGUE_BY_NAME,
+  erpByName: ERP_BY_NAME,
+  taskByName: TASK_BY_NAME,
+} as const;
+
 /** Palabras que no distinguen nada y ocupan el ancho que necesita la cantidad. */
 const NOISE_WORDS = new Set([
   'MASSA', 'MASSAS', 'PARA', 'DE', 'DA', 'DO', 'DAS', 'DOS', 'E', 'EMBALAGEM', 'EMBALAG.', 'PLASTICA',

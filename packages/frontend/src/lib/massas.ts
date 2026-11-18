@@ -1,4 +1,5 @@
 import type { MassasUnifiedRow } from './massas-unified';
+import { abbreviateProduct } from './whatsapp-abbreviations.js';
 
 export interface MassaProductTotal {
   code: string;
@@ -106,7 +107,7 @@ export function massasMessage(view: MassasLaunchDayView, rows?: readonly MassasU
   lines.push('*Resumo Coletivo:*');
   for (const product of launchedProducts) {
     lines.push(
-      `• ${stripMassasPrefix(product.name)}: ${product.totalUnits} un (${product.totalBoxes} cx)`
+      `📦 ${abbreviateProduct(stripMassasPrefix(product.name), product.code)}: ${product.totalUnits} un (${product.totalBoxes} cx)`
     );
   }
 
@@ -116,10 +117,10 @@ export function massasMessage(view: MassasLaunchDayView, rows?: readonly MassasU
     lines.push('*Por Trabalhador:*');
     workers.forEach((worker, index) => {
       if (index > 0) lines.push('');
-      lines.push(`👤 *${worker.name}:*`);
+      lines.push(`👤 ${worker.name}:`);
       for (const product of worker.products) {
         lines.push(
-          `• ${stripMassasPrefix(product.name)}: ${product.totalUnits} un (${product.totalBoxes} cx)`
+          `- ${abbreviateProduct(stripMassasPrefix(product.name), product.code)}: ${product.totalUnits} un (${product.totalBoxes} cx)`
         );
       }
     });
@@ -187,7 +188,7 @@ function unifiedMessageLines(
   for (const code of Array.from(products.keys()).sort(byCatalog)) {
     const product = products.get(code)!;
     lines.push(
-      `• ${stripMassasPrefix(product.name)}: ${product.units} un (${boxesForUnits(product.units, product.unitsPerBox)} cx)`
+      `📦 ${abbreviateProduct(stripMassasPrefix(product.name), code)}: ${product.units} un (${boxesForUnits(product.units, product.unitsPerBox)} cx)`
     );
   }
 
@@ -198,11 +199,11 @@ function unifiedMessageLines(
     people.forEach((worker, index) => {
       if (index > 0) lines.push('');
       // The mark says the worker has no account here: the plant recorded him and Trindade only mirrors it.
-      lines.push(`👤 *${worker.name}${worker.erpOnly ? ' (só ERP)' : ''}:*`);
+      lines.push(`👤 ${worker.name}${worker.erpOnly ? ' (só ERP)' : ''}:`);
       for (const code of Array.from(worker.units.keys()).sort(byCatalog)) {
         const line = worker.units.get(code)!;
         lines.push(
-          `• ${stripMassasPrefix(line.name)}: ${line.units} un (${boxesForUnits(line.units, line.unitsPerBox)} cx)`
+          `- ${abbreviateProduct(stripMassasPrefix(line.name), code)}: ${line.units} un (${boxesForUnits(line.units, line.unitsPerBox)} cx)`
         );
       }
     });

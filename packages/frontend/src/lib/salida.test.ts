@@ -340,11 +340,13 @@ describe('the summary an operator forwards', () => {
 
   it('names the day with module emoji, the operator alone with emoji, blocks with emojis, and products without codes or total', () => {
     assert.match(text, /🚛 \*Salida \/ Baixa — 13\/11\/2026\*/);
-    assert.match(text, /👤 \*WILKIN\*/);
+    assert.match(text, /👤 WILKIN:/);
     assert.match(text, /📦 Embalagens/);
     assert.match(text, /🌾 Matéria-Prima/);
-    assert.match(text, /• EMBALAG\. NHOQUE 1kg — 20 un/);
-    assert.match(text, /• GORDURA VEGETAL — 5 un/);
+    // La línea sigue el formato del Relatório: nombre corto de la tabla aprobada y la cantidad exacta.
+    // `EMBALAG. NHOQUE 1kg` no está en la tabla y ya entra en veinte caracteres: se respeta tal cual.
+    assert.match(text, /- EMBALAG\. NHOQUE 1kg: 20 un/);
+    assert.match(text, /- GORDURA: 5 un/);
     assert.doesNotMatch(text, /Operador:/);
     assert.doesNotMatch(text, /Total:/);
   });

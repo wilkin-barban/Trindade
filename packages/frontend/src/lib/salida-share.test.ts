@@ -79,7 +79,7 @@ describe('salidaDaySummaryText', () => {
       { date: '2026-11-14', labels },
     );
 
-    assert.match(text, /👤 \*WILKIN\*/);
+    assert.match(text, /👤 WILKIN:/);
     assert.doesNotMatch(text, /ERP OK/);
     assert.doesNotMatch(text, /Parcial/);
     assert.doesNotMatch(text, /4242/);
