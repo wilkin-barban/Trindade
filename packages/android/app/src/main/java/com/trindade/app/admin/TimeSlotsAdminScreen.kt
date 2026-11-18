@@ -83,6 +83,7 @@ fun TimeSlotsAdminScreen(
         handleBack()
     }
 
+    Box(modifier = modifier.fillMaxSize()) {
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -170,6 +171,7 @@ fun TimeSlotsAdminScreen(
         }
     }
 
+    }
     val slotToDelete = state.deleteConfirmSlot
     val deleteConfirmation = slotToDelete?.let { slot ->
         AdminConfirmation(

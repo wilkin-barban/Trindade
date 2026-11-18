@@ -1,6 +1,7 @@
 package com.trindade.app.admin
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -62,8 +63,9 @@ fun TasksScreen(
     val context = LocalContext.current
     var showForm by remember { mutableStateOf(false) }
     var pendingConfirmation by remember { mutableStateOf<AdminConfirmation?>(null) }
+    Box(modifier = modifier.fillMaxSize()) {
     Column(
-        modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(
@@ -179,6 +181,7 @@ fun TasksScreen(
         }
     }
 
+    }
     val deleteConfirmation = state.deleteTarget?.takeIf { state.canDelete(it) }?.let { task ->
         val taskName = task.namePt.ifBlank { task.nameEs }
         AdminConfirmation(

@@ -1,6 +1,7 @@
 package com.trindade.app.admin
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -60,8 +61,9 @@ fun VehiclesScreen(
     var localDeleteTarget by remember { mutableStateOf<AdminVehicleResponseVehicle?>(null) }
     var pendingConfirmation by remember { mutableStateOf<AdminConfirmation?>(null) }
 
+    Box(modifier = modifier.fillMaxSize()) {
     Column(
-        modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(
@@ -151,6 +153,7 @@ fun VehiclesScreen(
         }
     }
 
+    }
     val targetToDelete = (state.deleteTarget ?: localDeleteTarget)?.takeIf { state.canDelete(it) }
     val deleteConfirmation = targetToDelete?.let { vehicle ->
         val vehicleName = vehicle.description.ifBlank { vehicle.licensePlate }

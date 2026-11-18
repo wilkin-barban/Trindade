@@ -1,6 +1,7 @@
 package com.trindade.app.admin
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -64,8 +65,9 @@ fun CategoriesScreen(
     var localDeleteTarget by remember { mutableStateOf<AdminCategoryResponseCategory?>(null) }
     var pendingConfirmation by remember { mutableStateOf<AdminConfirmation?>(null) }
 
+    Box(modifier = modifier.fillMaxSize()) {
     Column(
-        modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(
@@ -278,6 +280,7 @@ fun CategoriesScreen(
             }
         }
 
+    }
     val targetToDelete = (state.deleteTarget ?: localDeleteTarget)?.takeIf { state.canDelete(it) }
     val deleteConfirmation = targetToDelete?.let { category ->
         val categoryName = if (state.isSpanish && category.nameEs.isNotBlank()) {

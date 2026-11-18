@@ -1,6 +1,7 @@
 package com.trindade.app.admin
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -70,8 +71,9 @@ fun DriversScreen(
     val casaLabel = stringResource(R.string.drivers_casa)
     val fleteroLabel = stringResource(R.string.drivers_fletero)
 
+    Box(modifier = modifier.fillMaxSize()) {
     Column(
-        modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(
@@ -219,6 +221,7 @@ fun DriversScreen(
         }
     }
 
+    }
     AdminConfirmDialog(
         confirmation = pendingConfirmation,
         onDismiss = { pendingConfirmation = null },
