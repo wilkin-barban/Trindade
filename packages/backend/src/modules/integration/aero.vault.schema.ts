@@ -96,7 +96,9 @@ export const AERO_BRIDGE_PAYLOAD_RANGE: Record<AeroBridgeActionName, { min: numb
   entrada: { min: 1, max: 1 },
   entrada_lote: { min: AERO_BRIDGE_BATCH_MIN_PAYLOADS, max: AERO_BRIDGE_BATCH_MAX_PAYLOADS },
   saida: { min: 1, max: AERO_BRIDGE_BATCH_MAX_PAYLOADS },
-  movimentos: { min: 1, max: 1 },
+  // Dos lados del día: las entradas y las salidas viajan como dos payloads del mismo viaje, porque Aero32
+  // no sabe leer un `ENTSAI` abierto y contesta con un error de PHP cuando llega nulo.
+  movimentos: { min: 1, max: 2 },
   test: { min: 1, max: 1 },
 };
 

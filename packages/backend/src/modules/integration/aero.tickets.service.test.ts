@@ -179,6 +179,37 @@ describe('aero bridge tickets service', () => {
     }
   });
 
+  it('carries a two-sided movimentos trip as bodies, keeping the legacy entries body', () => {
+    // El Relatório pide el día entero en un viaje: entradas y salidas, dos peticiones que Aero32 entiende.
+    // Ninguna lleva `ENTSAI` nulo -- con ese filtro abierto el ERP arma una consulta vacía y falla.
+    const payloads = [
+      { _method: 'PATCH', CODFOR: null, NOMUSU: null, CODPRO: null, DTINI: '2026-11-18', DTFIM: '2026-11-18', ENTSAI: 'E' },
+      { _method: 'PATCH', CODFOR: null, NOMUSU: null, CODPRO: null, DTINI: '2026-11-18', DTFIM: '2026-11-18', ENTSAI: 'S' },
+    ];
+    const issued = issueBridgeTicket(db, {
+      userId: fixtures.admin.id,
+      action: 'movimentos',
+      payloads,
+      callbackUrl: 'https://example.test/reports?aero_action=movimentos&aero_data=',
+      publicAppUrl: 'https://example.test',
+    });
+
+    const redeemed = redeemBridgeTicket(db, issued.ticket, vaultKey);
+    assert.equal(redeemed.ok, true);
+    if (!redeemed.ok) return;
+
+    assert.equal(redeemed.envelope.url, 'http://192.168.25.250:1453/api/movimentoitem?_method=PATCH');
+    // El guion viejo ignora `bodies` y ejecuta el `body` legacy: completa las entradas y no rompe.
+    assert.equal(redeemed.envelope.body, JSON.stringify(payloads[0]));
+    assert.deepEqual(redeemed.envelope.bodies, payloads.map((payload) => JSON.stringify(payload)));
+    for (const body of redeemed.envelope.bodies ?? []) {
+      const parsed = JSON.parse(body) as { ENTSAI: string | null };
+      assert.ok(parsed.ENTSAI === 'E' || parsed.ENTSAI === 'S', 'ningún cuerpo puede pedir los dos lados');
+    }
+    // `movimentos` no arma `steps`: el guion recorre los cuerpos del sobre simple.
+    assert.equal(redeemed.envelope.steps, undefined);
+  });
+
   it('stores a result for an already consumed ticket', () => {
     const issued = issueBridgeTicket(db, {
       userId: fixtures.admin.id,

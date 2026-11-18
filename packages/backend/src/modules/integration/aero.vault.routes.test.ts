@@ -345,11 +345,23 @@ describe('ERP vault and bridge tickets', () => {
       }
     });
 
+    it('accepts two payloads for movimentos, one per side of the day', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/integration/aero/bridge-tickets',
+        headers: auth(wilkinToken),
+        payload: { action: 'movimentos', payloads: [{ ENTSAI: 'E' }, { ENTSAI: 'S' }] },
+      });
+      assert.equal(response.statusCode, 201);
+    });
+
     it('rejects payloads that do not match the action', async () => {
       const cases: Array<{ action: string; payloads: unknown[] }> = [
         { action: 'entrada', payloads: [] },
         { action: 'entrada', payloads: [{ a: 1 }, { b: 2 }] },
-        { action: 'movimentos', payloads: [{ a: 1 }, { b: 2 }] },
+        // `movimentos` acepta dos cuerpos desde que el Relatório pide los dos lados del día en un viaje;
+        // tres siguen siendo un sobre que nadie sabe ejecutar.
+        { action: 'movimentos', payloads: [{ a: 1 }, { b: 2 }, { c: 3 }] },
         { action: 'test', payloads: [] },
         { action: 'entrada_lote', payloads: [{ a: 1 }] },
         { action: 'entrada_lote', payloads: Array.from({ length: 9 }, () => ({ a: 1 })) },

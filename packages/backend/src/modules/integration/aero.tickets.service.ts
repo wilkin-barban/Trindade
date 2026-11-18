@@ -191,7 +191,13 @@ export function issueBridgeTicket(
   // `bodies` is the batch: every payload in order, for the actions that can carry more than one. `saida` is a
   // batch only when it really has several products, so a one-product baixa keeps the plain `body` the shortcut
   // already sends for the single actions.
-  const carriesEveryBody = input.action === 'entrada_lote' || (input.action === 'saida' && input.payloads.length > 1);
+  // `movimentos` entra acá cuando el Relatório pide los dos lados del día: entradas y salidas son dos
+  // peticiones que el ERP entiende, y viajan en el mismo ticket. Con un solo payload conserva el `body`
+  // legacy, que es lo que un guion instalado antes de este cambio sabe ejecutar.
+  const carriesEveryBody =
+    input.action === 'entrada_lote' ||
+    (input.action === 'saida' && input.payloads.length > 1) ||
+    (input.action === 'movimentos' && input.payloads.length > 1);
   const bodies = carriesEveryBody ? JSON.stringify(serialized) : null;
   const createdAt = now.toISOString();
   const expiresAt = new Date(now.getTime() + BRIDGE_TICKET_TTL_MS).toISOString();

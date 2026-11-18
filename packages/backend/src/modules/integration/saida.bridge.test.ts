@@ -199,8 +199,8 @@ describe('the saida bridge action', () => {
   });
 
   describe('the actions that already existed', () => {
-    it('keeps one payload for entrada, movimentos and test', async () => {
-      for (const action of ['entrada', 'movimentos', 'test']) {
+    it('keeps one payload for entrada and test, and two for the day read', async () => {
+      for (const action of ['entrada', 'test']) {
         assert.equal((await issue(wilkinToken, action, [{}])).statusCode, 201, `${action} accepts one payload`);
         assert.equal((await issue(wilkinToken, action, [])).statusCode, 400, `${action} refuses none`);
         assert.equal(
@@ -209,6 +209,15 @@ describe('the saida bridge action', () => {
           `${action} refuses two`,
         );
       }
+
+      // `movimentos` lleva los dos lados del día: entradas y salidas, una petición cada una.
+      assert.equal((await issue(wilkinToken, 'movimentos', [{}])).statusCode, 201);
+      assert.equal((await issue(wilkinToken, 'movimentos', [])).statusCode, 400);
+      assert.equal((await issue(wilkinToken, 'movimentos', [{ a: 1 }, { b: 2 }])).statusCode, 201);
+      assert.equal(
+        (await issue(wilkinToken, 'movimentos', [{ a: 1 }, { b: 2 }, { c: 3 }])).statusCode,
+        400,
+      );
     });
 
     it('keeps two to eight payloads for entrada_lote', async () => {
