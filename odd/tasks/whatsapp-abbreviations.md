@@ -127,7 +127,8 @@ Pasada del 2026-11-17. Fuente de verdad: la propuesta aprobada por el dueño del
 | T5 | S2, S3-S7 | Golden del reporte 80 (o seed equivalente) con el texto esperado, y actualización de los tests que hoy afirman nombres completos | `adac7a31` |
 | T6 | S8 | `docs/paridad-android-web.md`: la regla y las tablas como normativa, con el golden como fixture para Android | `adac7a31` |
 | T7 | S1 | Backend, typecheck y build; deploy del API; verificación en producción con nombres largos | `adac7a31` |
-| T8 | S9 | Quitar `Conferir no ERP` del histórico de Salida: botón, handler, estado y rama del callback `movimentos`; tests y ayuda del módulo | `adac7a31` |
+| T8 | S9 | Quitar `Conferir no ERP` del histórico de Salida: botón, handler, estado y rama del callback `movimentos`; tests y ayuda del módulo | `adac7a31`, imports muertos en `64fe7661` |
+| T9 | S3, S4 | El nombre del asiento manda sobre la abreviatura por código: `001045 … CASEIRA 1 KG` → `CASEIRA 1kg` y `001192 … QUADRADA 2 KG` → `QUADRADA 2kg`, con el código como respaldo (`1045 / MASSA CASEIRA` sigue `CASEIRA`) | `84129f33` |
 
 ## S9 — El histórico de Salida no lee el ERP
 
@@ -167,3 +168,15 @@ Pasada del 2026-11-17. Fuente de verdad: la propuesta aprobada por el dueño del
 - El golden es `packages/backend/src/modules/reports/whatsapp-golden.test.ts`: siembra el día del reporte 80 y compara el texto de higiene, recebimento y salidas carácter por carácter.
 - La regla de truncación: el ERP guarda la descripción a 32 caracteres, así que el mismo insumo llega completo o cortado a mitad de palabra; el helper acepta la coincidencia solo cuando el corte cae dentro de una palabra (`… TR` → `… TRADICIONAL`), nunca cuando la tabla sigue con un espacio (`QUEIJO RALADO` no es `QUEIJO RALADO GROSSO …`).
 - Sin `Conferir no ERP`: la ayuda del módulo dice dónde se sincroniza, y la prueba del histórico comprueba que ni el botón ni su línea de error existen.
+
+### Precedencia del nombre sobre el código (17/11)
+
+Las salidas reales del día llegan con el nombre del libro (`001045 / MASSA PARA PASTEL TRINDADE CASEIRA 1 KG`,
+`001192 / MASSA PARA PASTEL QUADRADA 2 KG`) y el mensaje decía `CASEIRA` y `QUADRADA`, perdiendo el peso que
+distingue un kilo de dos. La regla que lo resuelve: **el nombre que la planta escribió en ese asiento manda sobre la
+abreviatura del catálogo por código**, y el código queda como respaldo cuando el nombre no aporta nada. Con eso el
+mensaje de producción dice `- CASEIRA 1kg: 218 un` y `- QUADRADA 2kg: 217 un`, como el ejemplo aprobado, mientras el
+bloque de Masas sigue diciendo `CASEIRA` para `1045 / MASSA CASEIRA`. El golden fija ambas líneas y el total del día.
+
+Conteos finales de la pasada: backend **984/984**, vitest **227/227** (31 archivos), node **750/750**, `tsc` limpio,
+build `14.77s`, E2E **119/119**.

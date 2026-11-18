@@ -64,9 +64,9 @@ export interface SalidaHistoryDay {
 /**
  * The history of the exits: read-only, by day and by block, with the company's answer next to each card.
  *
- * Two things this screen is allowed to do and does: `Conferir no ERP`, which asks Aero32 for the day's exits and
- * stores the answer as the mirror of the day, and `Reenviar ao ERP`, which only a movement the ERP never
- * confirmed offers. Nothing here edits or deletes: an exit that reached Trindade is a record.
+ * One thing this screen is allowed to do and does: `Reenviar ao ERP`, which only a movement the ERP never
+ * confirmed offers. The day's ERP read is not here -- it belongs to the report -- and nothing edits or deletes: an
+ * exit that reached Trindade is a record.
  */
 function useOptionalAuth() {
   try {
