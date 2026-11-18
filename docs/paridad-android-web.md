@@ -260,6 +260,18 @@ de lanzamiento; el pasado se consulta en el histórico. En Android, lo mismo: si
 - **Datos**: `GET /api/reports/day/salidas?date=YYYY-MM-DD`, con sesión y **cualquier rol** (el reporte lo lee todo el
   mundo; `/api/salida` sigue siendo la beta privada de un usuario). Devuelve `{ date, operators[], totalUnits,
   movementCount }`, cada operario con `{ name, username, units, products[{ code, name, block, units }], erpOnly }`.
+- **Abreviaturas del WhatsApp del Relatório (normativa)**: el texto que se comparte por WhatsApp lo produce el
+  backend (`generateWhatsAppText`) y **debe ser idéntico en web y Android**: mismas abreviaturas, mismo orden, mismos
+  emojis, encabezados, cantidades y agrupación por operario. Las tablas aprobadas -- catálogo por código, nombres del
+  ERP y tareas largas con `Org.`/`Receb.` conservados -- están en `odd/tasks/whatsapp-abbreviations.md` y en
+  `packages/backend/src/modules/reports/whatsapp-abbreviations.ts`. Reglas: nombre ≤ 20 caracteres, prefijo `- `,
+  cantidades exactas con `un`, código de producto solo cuando la abreviatura recorta o queda ambigua, Recebimento
+  agrupado por operario (sin `(OPERADOR)` por línea) y `PĂO` → `PÃO` corregido **solo** en el mensaje. El fixture
+  dorado para replicarlo en Android es `packages/backend/src/modules/reports/whatsapp-golden.test.ts` (el reporte 80
+  del 17/11, texto esperado incluido).
+- **El sync del ERP es del Relatório**: el histórico de Salidas muestra lo que el operario lanzó y no consulta el
+  espejo. En web no hay botón `Conferir no ERP`; en Android tampoco debe existir. La lectura del día se pide desde
+  el Relatório (`triggerAeroMovementsSync`), que es el único lugar donde se sincroniza.
 - **Nombres de producto (encoding)**: el WebService de la empresa **no declara charset** y el puente lee el cuerpo
   como UTF-8. Cuando la heurística cae en ISO-8859-2, los bytes UTF-8 de `Ç` llegan como `Ă` más un carácter de
   control (`AĂ…UCAR 5 KG`), y queda así guardado en `aero_movements`. Regla obligatoria: **un código que existe en el

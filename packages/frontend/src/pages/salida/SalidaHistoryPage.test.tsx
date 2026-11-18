@@ -345,108 +345,18 @@ describe('SalidaHistoryPage', () => {
     expect(args.text).toContain('EMBALAG. NHOQUE 1kg');
   });
 
-  it('says the ERP could not be read instead of leaving the button spinning', async () => {
-    ticket.mockRejectedValue(new Error('vault refused'));
 
+
+
+
+  it('has no Conferir no ERP: the day is synchronised in the report, not here', async () => {
     await renderReady();
-    fireEvent.click(screen.getByTestId('salida-check-erp'));
 
-    await waitFor(() => expect(screen.getByTestId('salida-check-error')).toBeInTheDocument());
-    expect(screen.getByTestId('salida-check-erp')).toBeEnabled();
-    expect(ticket).toHaveBeenCalledTimes(1);
-    expect(ticket.mock.calls[0]?.[0]).toMatchObject({ action: 'movimentos' });
-  });
-
-  it('logs the read it asks for, with the attempt it can pair later', async () => {
-    ticket.mockImplementation(async () => ({ ticket: 't-1', ticketUrl: 'https://app.example/t/1', expiresAt: '' }));
-
-    await renderReady();
-    fireEvent.click(screen.getByTestId('salida-check-erp'));
-
-    await waitFor(() => expect(audit.length).toBeGreaterThan(0));
-    const requested = lineOf('requested', 'read_history');
-
-    expect(requested.event).toBe('read_history');
-    expect(requested.phase).toBe('requested');
-    expect(requested.client).toBe('web');
-    expect(requested.destinationUrl).toBe(SALIDA_AUDIT_DESTINATION);
-    expect(requested.payload).toEqual(expect.objectContaining({ date: '2026-11-13' }));
-    expect(ticket.mock.calls[0]?.[0]).toMatchObject({ action: 'movimentos' });
-
-    const stored = JSON.parse(localStorage.getItem(AERO_PENDING_ATTEMPT_STORAGE_KEY) ?? 'null') as {
-      action: string;
-      attemptId: string;
-      date?: string;
-    } | null;
-    expect(stored?.action).toBe('movimentos');
-    expect(stored?.date).toBe('2026-11-13');
-    expect(requested.attemptId).toBe(stored?.attemptId);
-    expectNoCredential(audit);
-  });
-
-  it('stores the answer of Conferir no ERP and closes the attempt it opened', async () => {
-    saveAeroPendingAttempt({
-      action: 'movimentos',
-      attemptId: 'attempt-read-7',
-      startedAt: 1_700_000_000_000,
-      date: '2026-11-13',
-    });
-    const seats = [
-      {
-        ENT_LAN: 4242,
-        PRO_COD: '001474',
-        PRO_DES: 'EMBALAG. NHOQUE 1kg',
-        PRO_QTD: 2000,
-        ENT_DTA: '2026-11-13',
-        ENT_USU: 'wilkin',
-        ENTSAI: 'S',
-      },
-      {
-        ENT_LAN: 4243,
-        PRO_COD: '001900',
-        PRO_DES: 'BOBINA ROLO',
-        PRO_QTD: 300,
-        ENT_DTA: '2026-11-13',
-        ENT_USU: 'wilkin',
-        ENTSAI: 'S',
-      },
-    ];
-    const data = encodeURIComponent(JSON.stringify({ success: true, data: seats }));
-
-    await renderReady(`/salida-history?date=2026-11-13&aero_action=movimentos&aero_data=${data}`);
-
-    await waitFor(() => expect(post).toHaveBeenCalledWith('/integration/aero/movements', expect.anything(), expect.anything()));
-
-    await waitFor(() => expect(audit.length).toBeGreaterThan(0));
-    const result = lineOf('result', 'read_history');
-    expect(result.event).toBe('read_history');
-    expect(result.phase).toBe('result');
-    expect(result.attemptId).toBe('attempt-read-7');
-    expect(result.httpStatus).toBe(200);
-    expect(String(result.note ?? '')).toMatch(/seats=2/);
-    expect(String(result.note ?? '')).toMatch(/stored=2/);
-    expect(localStorage.getItem(AERO_PENDING_ATTEMPT_STORAGE_KEY)).toBeNull();
-    expectNoCredential(audit);
-  });
-
-  it('closes the read attempt when the shortcut comes back with an error', async () => {
-    saveAeroPendingAttempt({
-      action: 'movimentos',
-      attemptId: 'attempt-read-8',
-      startedAt: 1_700_000_000_000,
-      date: '2026-11-13',
-    });
-
-    await renderReady('/salida-history?date=2026-11-13&aero_error=wifi_required&aero_msg=Sem%20rede');
-
-    await waitFor(() => expect(screen.getByTestId('salida-check-error')).toBeInTheDocument());
-    await waitFor(() => expect(audit.length).toBeGreaterThan(0));
-
-    const result = lineOf('result', 'read_history');
-    expect(result.attemptId).toBe('attempt-read-8');
-    expect(result.httpStatus).toBeNull();
-    expect(String(result.error ?? '')).toMatch(/^AERO_/);
-    expect(localStorage.getItem(AERO_PENDING_ATTEMPT_STORAGE_KEY)).toBeNull();
+    // The history shows what this operator launched. Reading the company's mirror belongs to the report, so the
+    // button that armed that trip is gone -- and with it the error line it used to write.
+    expect(screen.queryByTestId('salida-check-erp')).toBeNull();
+    expect(screen.queryByTestId('salida-check-error')).toBeNull();
+    expect(ticket).not.toHaveBeenCalled();
   });
 
   it('logs the resend before leaving, and closes it with the answer that comes back', async () => {

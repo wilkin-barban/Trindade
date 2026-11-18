@@ -2,7 +2,8 @@ import type Database from 'better-sqlite3';
 import { parseSelectedProducts } from './reports.schema.js';
 import { massasReportDayView } from '../massas/massas-report.service.js';
 import { salidaReportDayView } from './salida-report.service.js';
-import { ERP_RECEIPT_CATEGORY_ID, dayReceipts, usesErpReceipts } from './receipts.service.js';
+import { ERP_RECEIPT_CATEGORY_ID, dayReceipts, usesErpReceipts, type ReceiptLine } from './receipts.service.js';
+import { abbreviateProduct, abbreviateTask } from './whatsapp-abbreviations.js';
 
 /**
  * Generador Inteligente — WhatsApp text export engine.
@@ -22,6 +23,25 @@ export function stripMassasPrefix(name: string): string {
     .trim()
     .replace(/^MASSAS?\s+(?:DE\s+)?/i, '')
     .trim();
+}
+
+/**
+ * El recebimento, agrupado por el operario que lo cargó.
+ *
+ * Antes cada línea repetía el nombre entre paréntesis y el mensaje se leía como una lista plana donde el ojo tenía
+ * que buscar de quién era cada insumo. La propuesta aprobada pide la misma forma que las salidas: el operario
+ * arriba, sus productos abajo. El orden es el de llegada, así el mensaje sigue el día y no un criterio inventado.
+ */
+function groupReceiptsByOperator(receipts: ReceiptLine[]): { operator: string; lines: ReceiptLine[] }[] {
+  const groups = new Map<string, { operator: string; lines: ReceiptLine[] }>();
+  for (const receipt of receipts) {
+    const name = receipt.operatorName?.trim() ? receipt.operatorName.trim() : '—';
+    const key = name.toUpperCase();
+    const group = groups.get(key) ?? { operator: name, lines: [] };
+    group.lines.push(receipt);
+    groups.set(key, group);
+  }
+  return [...groups.values()];
 }
 
 interface ExportRow {
@@ -177,12 +197,18 @@ export function generateWhatsAppText(
       if (receiptDay.receipts.length === 0) {
         categoryLines.push('_Nenhum insumo recebido no dia._');
       } else {
-        for (const receipt of receiptDay.receipts) {
-          categoryLines.push(
-            // The operator is what the plant reads; the seat number is the ERP's own bookkeeping.
-            `• ${receipt.productDesc}: ${receipt.quantity} un (${receipt.operatorName})`,
-          );
-        }
+        // Same shape as the exits block: the operator is the heading, the products hang under it with the prefix
+        // every list in this message uses. The name on the line is the plant's, abbreviated.
+        groupReceiptsByOperator(receiptDay.receipts).forEach((group, index) => {
+          // Un renglón en blanco entre operarios, no después del último: la categoría ya cierra con el suyo.
+          if (index > 0) categoryLines.push('');
+          categoryLines.push(`👤 ${group.operator}:`);
+          for (const receipt of group.lines) {
+            categoryLines.push(
+              `- ${abbreviateProduct(receipt.productDesc, receipt.productCode)}: ${receipt.quantity} un`,
+            );
+          }
+        });
       }
     }
 
@@ -212,13 +238,13 @@ export function generateWhatsAppText(
       if (item.task_type === 'check_assai' || item.task_type === 'check_normal') {
         const selected = parseSelectedProducts(item.selected_products) ?? [];
         if (selected.length > 0) {
-          categoryLines.push(`✅ ${item.task_name}:`);
+          categoryLines.push(`✅ ${abbreviateTask(item.task_name)}:`);
           for (const p of selected) {
-            categoryLines.push(`   - ${p}`);
+            categoryLines.push(`- ${abbreviateProduct(p)}`);
           }
         }
       } else if (item.checked) {
-        categoryLines.push(`✅ ${item.task_name}`);
+        categoryLines.push(`✅ ${abbreviateTask(item.task_name)}`);
       }
     }
 
@@ -286,14 +312,14 @@ export function generateWhatsAppText(
     lines.push('🍝 *LANÇAMENTO DE MASSAS*');
     lines.push('');
 
-    lines.push('Por Operário:');
     for (const operator of massasView.operators) {
       lines.push(`👤 ${operator.name}:`);
       for (const item of operator.products) {
         if (item.units > 0) {
-          lines.push(`   - ${stripMassasPrefix(item.name)}: ${item.units} un`);
+          lines.push(`- ${abbreviateProduct(stripMassasPrefix(item.name), item.code)}: ${item.units} un`);
         }
       }
+      lines.push('');
     }
     lines.push('');
 
@@ -301,7 +327,7 @@ export function generateWhatsAppText(
     if (activeProducts.length > 0) {
       lines.push('Resumo Coletivo:');
       for (const product of activeProducts) {
-        lines.push(`📦 ${stripMassasPrefix(product.name)}: ${product.totalUnits} un`);
+        lines.push(`📦 ${abbreviateProduct(stripMassasPrefix(product.name), product.code)}: ${product.totalUnits} un`);
       }
       lines.push('');
     }
@@ -316,14 +342,14 @@ export function generateWhatsAppText(
     lines.push('📤 *SAÍDAS / BAIXA*');
     lines.push('');
 
-    lines.push('Por Operário:');
     for (const operator of salidaView.operators) {
       lines.push(`👤 ${operator.name}:`);
       for (const product of operator.products) {
         if (product.units > 0) {
-          lines.push(`   - ${product.name}: ${product.units} un`);
+          lines.push(`- ${abbreviateProduct(product.name, product.code)}: ${product.units} un`);
         }
       }
+      lines.push('');
     }
     lines.push('');
     lines.push(`📊 Total: ${salidaView.totalUnits} un`);

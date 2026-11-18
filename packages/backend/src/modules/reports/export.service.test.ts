@@ -4,6 +4,7 @@ import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { generateWhatsAppText, stripMassasPrefix } from './export.service.js';
+import { abbreviateProduct, abbreviateTask } from './whatsapp-abbreviations.js';
 
 /**
  * Creates an in-memory database with schema + seed, then inserts a test report
@@ -115,9 +116,10 @@ describe('Export Service (Generador Inteligente)', () => {
     const ptTerms = (db.prepare('SELECT name_pt FROM report_tasks WHERE id IN (1, 3, 4) ORDER BY id').all() as { name_pt: string }[]).map((row) => row.name_pt);
 
     for (const term of ptTerms) {
+      // The message carries the plant's short name for a task; the long catalogue name is what it abbreviates.
       assert.ok(
-        text.includes(term),
-        `Should include Portuguese task name: "${term}"`
+        text.includes(abbreviateTask(term)),
+        `Should include Portuguese task name: "${abbreviateTask(term)}" (from "${term}")`
       );
     }
 
@@ -133,13 +135,13 @@ describe('Export Service (Generador Inteligente)', () => {
 
     // Checked items should have ✅
     const tasks = db.prepare('SELECT id, name_pt FROM report_tasks WHERE id IN (1, 2, 3)').all() as { id: number; name_pt: string }[];
-    assert.ok(text.includes(`✅ ${tasks.find((task) => task.id === 1)!.name_pt}`), 'Checked item should have ✅');
-    assert.ok(text.includes(`✅ ${tasks.find((task) => task.id === 3)!.name_pt}`), 'Checked item should have ✅');
+    assert.ok(text.includes(`✅ ${abbreviateTask(tasks.find((task) => task.id === 1)!.name_pt)}`), 'Checked item should have ✅');
+    assert.ok(text.includes(`✅ ${abbreviateTask(tasks.find((task) => task.id === 3)!.name_pt)}`), 'Checked item should have ✅');
 
     // An item nobody marked is not work that was done, so it is not in the message: the text says what
     // the operator did, and a list of everything that was not done is noise in the group's chat -- and
     // the reason the counts in the message did not match the report.
-    assert.ok(!text.includes(tasks.find((task) => task.id === 2)!.name_pt), 'Unchecked item must not be exported');
+    assert.ok(!text.includes(abbreviateTask(tasks.find((task) => task.id === 2)!.name_pt)), 'Unchecked item must not be exported');
   });
 
   it('temperature section is formatted correctly', () => {
@@ -256,8 +258,8 @@ describe('Export Service (Generador Inteligente)', () => {
 
     for (const term of ptTerms) {
       assert.ok(
-        text.includes(term),
-        `Should include Portuguese term: "${term}"`
+        text.includes(abbreviateTask(term)),
+        `Should include Portuguese term: "${abbreviateTask(term)}" (from "${term}")`
       );
     }
   });
@@ -334,15 +336,17 @@ describe('Export Service (Generador Inteligente)', () => {
     const text = generateWhatsAppText(db, reportId)!;
 
     assert.ok(text.includes('🍝 *LANÇAMENTO DE MASSAS*'));
-    assert.ok(text.includes('Por Operário:'));
+    // The operator is the heading, as in Recebimento and Salidas: no `Por Operário:` line between the reader and
+    // the first name.
+    assert.ok(!text.includes('Por Operário:'));
     // The six boxes the tablet recorded are the company's answer; the six boxes the plant typed here and
     // never sent are not, so the local launch does not reach the group at all.
     assert.ok(!text.includes('👤 Test User:'), 'a launch the ERP never saw stays out of the message');
     assert.ok(!text.includes('CASEIRA'), 'and so does its product line');
     assert.ok(text.includes('👤 TIAGO:'));
-    assert.ok(text.includes('   - ROLO 2KG: 6 un'));
+    assert.ok(text.includes('- ROLO 2kg: 6 un'));
     assert.ok(text.includes('Resumo Coletivo:'));
-    assert.ok(text.includes('📦 ROLO 2KG: 6 un'));
+    assert.ok(text.includes('📦 ROLO 2kg: 6 un'));
     assert.ok(!text.includes('MASSA '), 'no product line keeps the MASSA prefix');
     assert.ok(!text.includes('Total de Massas'));
     assert.ok(!text.includes('cx'));
@@ -375,8 +379,9 @@ describe('Export Service (Generador Inteligente)', () => {
 
     assert.ok(text.includes('📤 *SAÍDAS / BAIXA*'));
     assert.ok(text.includes('👤 Test User:'));
-    assert.ok(text.includes('   - EMBALAG. DISCO 400g: 6000 un'));
-    assert.ok(text.includes('   - BOBINA ROLO: 13 un'));
+    // The list prefix and the plant's short names, with the quantity exactly as it was recorded.
+    assert.ok(text.includes('- DISCO 400g: 6000 un'));
+    assert.ok(text.includes('- BOBINA ROLO: 13 un'));
     assert.ok(text.includes('📊 Total: 6013 un'));
     // A code in the message is traceability leaking into a group chat.
     assert.ok(!text.includes('1356'), 'the product code must not travel in the message');
@@ -414,7 +419,7 @@ describe('Export Service (Generador Inteligente)', () => {
 
     const text = generateWhatsAppText(db, reportId)!;
 
-    assert.equal(text.split('   - CASEIRA: 40 un').length - 1, 1, 'the same boxes are not listed twice');
+    assert.equal(text.split('- CASEIRA: 40 un').length - 1, 1, 'the same boxes are not listed twice');
     assert.equal(text.split('👤 Test User:').length - 1, 1, 'the seat names the operator, the launch does not');
   });
 
@@ -513,10 +518,12 @@ describe('Export Service — recebimento desde el espejo del ERP', () => {
 
     const text = generateWhatsAppText(db, id)!;
 
-    // The plant reads who received it, not which seat the ERP numbered: the operator alone.
-    assert.ok(text.includes('• CAIXA DE PAPELAO PEQUENA MISTA: 3606 un (VIVIANE)'));
+    // The plant reads who received it, not which seat the ERP numbered, and the name goes once -- as the heading.
+    assert.ok(text.includes('👤 VIVIANE:'));
+    assert.ok(text.includes('- CX PAP P: 3606 un'));
+    assert.ok(!text.includes('(VIVIANE)'), 'the operator is not repeated on every line');
     assert.ok(!text.includes('Lançamento #'), 'the seat number is not part of the line');
-    assert.ok(text.includes('• QUEIJO RALADO: 40 un (VIVIANE)'), 'both lines of the document');
+    assert.ok(text.includes('- QUEIJO RALADO: 40 un'), 'both lines of the document');
     assert.ok(!text.includes('Recebimento de farinha'), 'a ticked task is not a receipt any more');
   });
 
@@ -549,7 +556,7 @@ describe('Export Service — recebimento desde el espejo del ERP', () => {
 
     const text = generateWhatsAppText(db, id)!;
 
-    assert.ok(text.includes('✅ Recebimento de farinha'));
+    assert.ok(text.includes('✅ Receb. farinha'));
     assert.ok(!text.includes('Pendente de sincronização'));
   });
 

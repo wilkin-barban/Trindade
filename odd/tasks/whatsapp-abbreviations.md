@@ -127,6 +127,16 @@ Pasada del 2026-11-17. Fuente de verdad: la propuesta aprobada por el dueño del
 | T5 | S2, S3-S7 | Golden del reporte 80 (o seed equivalente) con el texto esperado, y actualización de los tests que hoy afirman nombres completos | |
 | T6 | S8 | `docs/paridad-android-web.md`: la regla y las tablas como normativa, con el golden como fixture para Android | |
 | T7 | S1 | Backend, typecheck y build; deploy del API; verificación en producción con nombres largos | |
+| T8 | S9 | Quitar `Conferir no ERP` del histórico de Salida: botón, handler, estado y rama del callback `movimentos`; tests y ayuda del módulo | |
+
+## S9 — El histórico de Salida no lee el ERP
+
+- **S9.** El módulo **Histórico de Saídas** muestra lo que el operario autenticado lanzó y **no** lee el espejo del
+  ERP: se elimina el botón `Conferir no ERP`, su handler, el estado `checking`/`checkError` que solo él usaba y la
+  rama del callback `movimentos` que quedaba exclusiva de ese botón. El sync del ERP vive en **un solo lugar**, el
+  **Relatório** (`ReportsPage` con `triggerAeroMovementsSync` y `includeExits: true`). `Reenviar ao ERP`, el callback
+  `saida`, `aero-mirror` y `requestAeroBridgeTicket` no cambian. Android replica la misma regla: su histórico de
+  Saídas tampoco muestra el botón.
 
 ## Log
 

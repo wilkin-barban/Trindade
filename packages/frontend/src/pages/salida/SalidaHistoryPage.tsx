@@ -19,9 +19,6 @@ import {
   AERO_SCRIPTABLE_CODE_PATH,
   aeroBridgeCallbackFor,
   buildAeroBridgeTriggerUrl,
-  buildAeroMovementsSnapshot,
-  buildMovimentoItemPayload,
-  readAeroMovements,
   resolveAeroCallback,
 } from '../../lib/aero-integration';
 import { readAeroBatchResult } from '../../lib/aero-feedback';
@@ -48,8 +45,6 @@ import {
   salidaDaySummaryText,
   salidaPhotoFiles,
   salidaPrimaryStatus,
-  salidaReadRequestedEvent,
-  salidaReadResultEvent,
   salidaSummaryText,
   salidaSyncRequestedEvent,
   salidaSyncResultEvent,
@@ -98,8 +93,6 @@ export function SalidaHistoryPage() {
     list: [],
   });
   const [block, setBlock] = useState<SalidaBlock | 'all'>('all');
-  const [checking, setChecking] = useState(false);
-  const [checkError, setCheckError] = useState('');
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [resendingId, setResendingId] = useState<number | null>(null);
   const [outbox, setOutbox] = useState<SalidaOutbox | null>(null);
@@ -201,69 +194,8 @@ export function SalidaHistoryPage() {
     setParams(next === today ? {} : { date: next }, { replace: true });
   };
 
-  /**
-   * Asks the company for the day's exits and stores the answer as the mirror of the day.
-   *
-   * `ENTSAI: 'S'` because this module reconciles stock exits; the entries belong to the Recebimento screen and a
-   * query that returned both would let an entry settle an exit. The query carries `_method: 'PATCH'` in the body
-   * exactly as the certified request does, and the trip is requested before anything else so a refusal never
-   * leaves a spinner waiting for a shortcut that was never armed.
-   */
-  const handleCheckErp = async () => {
-    setChecking(true);
-    setCheckError('');
-    setNotice(null);
-    try {
-      const payload = {
-        _method: 'PATCH',
-        ...buildMovimentoItemPayload({
-          userName: null,
-          startDate: date,
-          endDate: date,
-          entrySaida: 'S',
-        }),
-      };
-      const auditPayload = { date, entrySaida: 'S' };
-      const ticket = await requestAeroBridgeTicket({
-        action: 'movimentos',
-        payloads: [payload],
-        callbackPath: aeroBridgeCallbackFor('movimentos', `/salida-history?date=${date}`),
-      }).catch(() => null);
-
-      if (!ticket) {
-        // Nothing left the page, so nothing is owed: one requested line with the refusal code and no attempt.
-        void postAeroAuditEvent(
-          salidaReadRequestedEvent({
-            date,
-            payload: auditPayload,
-            error: SALIDA_TICKET_REFUSED,
-            destinationUrl: SALIDA_AUDIT_DESTINATION,
-          }),
-        );
-        setCheckError(t('salida.erpCheckError'));
-        return;
-      }
-
-      const attempt = newAeroAttempt();
-      saveAeroPendingAttempt({ action: 'movimentos', ...attempt, date });
-      void postAeroAuditEvent(
-        salidaReadRequestedEvent({ date, payload: auditPayload, attempt }),
-      );
-
-      markAeroBridgePending({ action: 'movimentos', date });
-      window.location.href = buildAeroBridgeTriggerUrl({ ticket: ticket.ticket, ticketUrl: ticket.ticketUrl });
-    } catch {
-      // The ticket was armed but the trip never left the page: the attempt is forgotten so it cannot pair with
-      // an answer that will not come, and the operator is told the read did not start.
-      clearAeroPendingAttempt();
-      setCheckError(t('salida.erpCheckError'));
-    } finally {
-      setChecking(false);
-    }
-  };
-
-  // The shortcut comes back with the ERP's answer in the query. The seats are stored in the same mirror the other
-  // screens read, and the day is reloaded so every card shows what the company actually has.
+  // The shortcut comes back with the ERP's answer in the query. Only a resend arrives here now: the day's exits are
+  // read by the report, which is where the operator syncs the day.
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -273,58 +205,7 @@ export function SalidaHistoryPage() {
       const answered = new URLSearchParams(location.search).get('date');
       const answeredDate = answered && /^\d{4}-\d{2}-\d{2}$/.test(answered) ? answered : date;
 
-      if (callback.kind === 'bridge' && callback.action === 'movimentos') {
-        // The attempt this trip wrote before leaving pairs the answer with the request; it is read once here and
-        // forgotten, because the document that wrote it no longer exists.
-        const attempt = loadAeroPendingAttempt('movimentos');
-        if (attempt) clearAeroPendingAttempt();
-
-        const read = readAeroMovements(callback.data);
-        if (read.status === 'error') {
-          void postAeroAuditEvent(
-            salidaReadResultEvent({
-              date: answeredDate,
-              attempt,
-              seats: null,
-              error: read.message ?? 'movements_unreadable',
-            }),
-          );
-          setCheckError(read.message || t('salida.erpCheckError'));
-        } else {
-          try {
-            await api.post(
-              '/integration/aero/movements',
-              buildAeroMovementsSnapshot(answeredDate, read.movements),
-              // The refusal the server audits on its own has to name the same attempt this page's result line
-              // names; no attempt in memory means no header, never an invented one.
-              { headers: aeroAttemptHeaders(attempt) },
-            );
-            void postAeroAuditEvent(
-              salidaReadResultEvent({
-                date: answeredDate,
-                attempt,
-                seats: read.movements.length,
-                stored: read.movements.length,
-              }),
-            );
-            await load();
-            setNotice({ type: 'success', message: t('salida.erpOk') });
-          } catch {
-            // The seats came back but Trindade could not keep them: the log says how many arrived and that none
-            // were stored, which is the difference between an empty day and a failed write.
-            void postAeroAuditEvent(
-              salidaReadResultEvent({
-                date: answeredDate,
-                attempt,
-                seats: read.movements.length,
-                stored: 0,
-                error: 'snapshot_store_failed',
-              }),
-            );
-            setCheckError(t('salida.erpCheckError'));
-          }
-        }
-      } else if (callback.kind === 'bridge' && callback.action === 'saida') {
+      if (callback.kind === 'bridge' && callback.action === 'saida') {
         // A resend comes back here, not to the launch screen: same dialog, same trail, same attempt.
         const attempt = loadAeroPendingAttempt('saida');
         if (attempt) clearAeroPendingAttempt();
@@ -393,10 +274,10 @@ export function SalidaHistoryPage() {
         }
         void load();
       } else if (callback.kind === 'error') {
-        // The phone came back without the plant. Whichever trip it was, its result line is written with the code.
-        const readAttempt = loadAeroPendingAttempt('movimentos');
-        const syncAttempt = readAttempt ? null : loadAeroPendingAttempt('saida');
-        if (readAttempt || syncAttempt) clearAeroPendingAttempt();
+        // The phone came back without the plant. Only a resend can be owed an answer now: reading the day's exits
+        // is the report's job, not this history's.
+        const syncAttempt = loadAeroPendingAttempt('saida');
+        if (syncAttempt) clearAeroPendingAttempt();
 
         if (syncAttempt) {
           const lastMovement = readSalidaLastMovement();
@@ -419,17 +300,6 @@ export function SalidaHistoryPage() {
           );
           setNotice({ type: 'error', message: salidaActionableErrorMessage(callback.code, callback.message, t) });
           setOutbox(readSalidaOutbox());
-        } else {
-          void postAeroAuditEvent(
-            salidaReadResultEvent({
-              date: answeredDate,
-              attempt: readAttempt,
-              seats: null,
-              error: callback.code,
-              message: callback.message,
-            }),
-          );
-          setCheckError(salidaActionableErrorMessage(callback.code, callback.message, t));
         }
       }
 
@@ -664,29 +534,14 @@ export function SalidaHistoryPage() {
           </p>
         )}
 
+        {/* El filtro, y nada más: este histórico muestra lo que el operario lanzó. La lectura del espejo del ERP
+            vive en el Relatório, que es donde se sincroniza el día. */}
         <div
           data-testid="salida-history-actions"
           className="grid grid-cols-1 gap-2 border-t border-gray-100 pt-3 sm:flex sm:items-center sm:justify-between"
         >
           <SalidaBlockFilter value={block} onChange={setBlock} />
-          <div className="grid grid-cols-1 gap-2 sm:flex sm:items-center">
-            <Button
-              type="button"
-              onClick={() => void handleCheckErp()}
-              disabled={checking}
-              className="min-h-[44px] w-full sm:w-auto"
-              data-testid="salida-check-erp"
-            >
-              {checking ? t('salida.confering') : t('salida.conferir')}
-            </Button>
-          </div>
         </div>
-
-        {checkError && (
-          <p role="alert" className="text-sm text-red-700" data-testid="salida-check-error">
-            {checkError}
-          </p>
-        )}
 
         {pendingCount > 0 && (
           <p className="text-xs text-amber-800" data-testid="salida-pending-count">

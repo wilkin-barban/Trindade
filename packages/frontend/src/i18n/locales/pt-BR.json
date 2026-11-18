@@ -934,15 +934,11 @@
     "salidaHistory": {
       "title": "Histórico de Saídas",
       "subtitle": "Consulta de baixas e conciliação",
-      "description": "As saídas são um registro somente leitura. Escolha o dia, filtre por bloco e confira no ERP as que faltam.",
+      "description": "As saídas são um registro somente leitura. Escolha o dia e filtre por bloco; a sincronização com o ERP é feita no Relatório.",
       "sections": [
         {
           "title": "Estados",
           "description": "ERP OK quando o lançamento do ERP coincide com a saída, Parcial quando coincide uma parte e Pendente quando ainda não foi encontrado."
-        },
-        {
-          "title": "Conferir no ERP",
-          "description": "Consulta as saídas do dia no ERP, guarda o resultado e atualiza o estado de cada cartão."
         }
       ]
     }
@@ -1036,8 +1032,6 @@
     "dayLabel": "Dia",
     "filterBlock": "Bloco",
     "allBlocks": "Todos",
-    "conferir": "Conferir no ERP",
-    "confering": "Consultando o ERP...",
     "erpCheckError": "Não foi possível consultar o ERP. Revise o acesso configurado e tente de novo.",
     "erpOk": "ERP OK",
     "erpPending": "Pendente",
