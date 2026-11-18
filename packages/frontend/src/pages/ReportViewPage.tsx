@@ -270,7 +270,7 @@ export function ReportViewPage() {
       <div className="mx-auto w-full max-w-2xl space-y-3 p-4">
         {fromHistory && (
           <Link
-            to="/reports/history"
+            to="/loading/reports-history"
             className="inline-flex min-h-11 items-center gap-2 rounded px-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
             data-testid="report-share-back"
           >
@@ -292,7 +292,7 @@ export function ReportViewPage() {
           onShare={() => void handleShareReport()}
           onPdf={() => void handleShareCardPdf()}
           {...(fromHistory
-            ? { onClose: () => navigate('/reports/history') }
+            ? { onClose: () => navigate('/loading/reports-history') }
             : {
                 onEdit: () => navigate(`/reports/${report.id}/edit`),
                 onClose: () => navigate('/reports'),
