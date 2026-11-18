@@ -20,9 +20,10 @@ for (const viewport of VIEWPORTS) {
       await page.waitForSelector('[data-testid="dashboard-summary"]', { timeout: 15000 });
     });
 
-    test('shows the six cards and the summary panel', async ({ page }) => {
+    test('shows the seven cards and the summary panel', async ({ page }) => {
       const cards = page.locator('[data-testid^="dashboard-card-"]');
-      await expect(cards).toHaveCount(6);
+      // Siete desde que Salida dejó de ser una beta: la tarjeta aparece para cualquier cuenta con sesión.
+      await expect(cards).toHaveCount(7);
       await expect(page.getByTestId('dashboard-card-share-app')).toBeVisible();
       await expect(page.getByTestId('dashboard-summary')).toBeVisible();
       await expect(page.getByTestId('dashboard-summary-higiene')).toContainText('/');
