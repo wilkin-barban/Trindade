@@ -6,7 +6,8 @@ para iPhone / Safari) en los módulos de **Salida/Baja**, **Lanzamiento de Masas
 **Sesiones** y **Auditoría**.
 
 Cada sección identifica el archivo web que implementa o fija la regla de referencia para facilitar la comparación
-directa de código, pruebas y comportamiento.
+directa de código, pruebas y comportamiento. **Última actualización: 2026-11-18**; la sección final consolida las
+remediaciones de esa etapa y el checklist que Android debe cumplir.
 
 ---
 
@@ -226,16 +227,10 @@ Tanto la UI como el log de auditoría deben mapear los fallos a los siguientes c
 
 ---
 
-## 9. Puntos abiertos del repositorio (Open Items)
+## 9. Puntos abiertos del repositorio (histórico)
 
-1. **Verificación de campo con fotografías HEIC en iPhone real**:
-   - Backend y frontend validan firmas y tipos MIME para HEIC/HEIF (`ftypheic`, `ftypmif1` en `salida.service.ts` y `reports.service.ts`), pero la prueba física de captura directa desde la cámara/galería de iOS en producción sigue pendiente de confirmación en planta.
-2. **Cabecera externa `Server: nginx/1.27.5`**:
-   - La directiva `server_tokens off` está activa en el contenedor de Trindade, pero la cabecera `Server: nginx/1.27.5` sigue visible porque la terminación TLS la realiza el reverse proxy perimetral del host (`portfolio-nginx`), que está fuera del alcance de este repositorio.
-3. **Liberación de la beta privada de Salida**:
-   - El módulo Salida/Baja está actualmente restringido al usuario `wilkin` (`isBetaWorker` en servidor y cliente). Su apertura a todos los roles y trabajadores se realizará en una entrega posterior.
-4. **Implementación de vistas Android para Salida**:
-   - El contrato Kotlin ya cuenta con los modelos generados en `packages/android/contract/src/main/kotlin/com/trindade/app/contract/models/SalidaMovement.kt` (junto con `SalidaCreateRequest.kt`, `SalidaProduct.kt`, etc.), pero aún deben construirse las pantallas Jetpack Compose (`SalidaLaunchScreen`, `SalidaHistoryScreen`), sus ViewModels y el repositorio correspondiente en `packages/android/app/`.
+La lista vigente está en **11. Open Items actualizados**, al final del documento. La beta de Salida y la
+implementación Android que figuraban en esta sección ya fueron reemplazadas por esa lista.
 
 ## Históricos y reporte (pasada del 2026-11-16)
 
@@ -255,8 +250,10 @@ de lanzamiento; el pasado se consulta en el histórico. En Android, lo mismo: si
 
 - Abren en el día de planta.
 - Si el día está vacío no se dibujan tarjetas: se muestra el estado vacío con el acceso a lanzar.
-- Los días pasados son de solo lectura y **sin el compartir por tarjeta**; el botón del final, que comparte el día
-  completo, sigue disponible. Hoy conserva los dos.
+- Los días pasados son de solo lectura y **sin el compartir por tarjeta individual**; el compartir del día completo
+  sigue disponible: en Salida, el botón del final; en Masas, el bloque de WhatsApp, que se muestra siempre y queda
+  deshabilitado con la prévia vacía si no hay datos. La vista de detalle del histórico es la `ShareCard` de solo
+  lectura, con botón Volver y sin Editar (ver sección 2026-11-18).
 - El histórico de Salidas conserva además sus fotos (máximo 3) y el relanzar al ERP cuando el envío no fue aceptado.
 
 ### Bloque de Salidas dentro del reporte
@@ -322,8 +319,8 @@ El flujo de un reporte en la web/iPhone termina en el mensaje que el grupo recib
    - **Editar**: vuelve a la pantalla de edición (`/reports/:id/edit`).
    - **Cerrar**: sale a `/reports`.
    - **No hay botón de copiar**: la hoja de compartir ya lleva el texto.
-3. La **vista de lectura** completa sigue existiendo y se abre al entrar al reporte sin el flag (por ejemplo desde
-   el histórico); conserva sus botones de export y su diálogo.
+3. La **vista de lectura** completa sigue existiendo para el detalle directo sin flag; conserva sus botones de
+   export y su diálogo. El **Histórico de Relatórios** abre la `ShareCard` con `?share=1`, no la vista de lectura.
 
 Notas para Android: el texto sale del mismo endpoint, así que la app nativa debe pintar ese texto en vez de
 reconstruirlo; el compartir es el `Intent.ACTION_SEND` con el texto y, cuando el reporte tiene fotos, con
@@ -343,7 +340,217 @@ El módulo usa la misma tarjeta que el reporte, con su propio texto y su propio 
 - **PDF**: `horario-<fecha>.pdf`, generado desde ese mismo texto.
 - **Editar**: vuelve a la pantalla de edición del día. **Cerrar**: vuelve a la grilla del mismo día, conservando la
   fecha en la URL. La pantalla de edición lleva el mismo botón Salvar y desemboca en la misma tarjeta.
+- **Vista de solo lectura del histórico**: el “Ver horário de carregamento” abre la `ShareCard` con
+  `/loading?share=1&date=…&from=history`; no muestra Editar y tiene un botón Volver al histórico. El botón
+  `Salvar Horário` no existe en esa vista (solo en el editor).
 - **Sin botón de copiar**, igual que en el reporte.
 
 Para Android: el texto sale del mismo endpoint (no reconstruirlo), el compartir es `ACTION_SEND` con el texto, el PDF
 se genera del mismo texto y la tarjeta no se dispara sola al guardar un turno.
+
+---
+
+## Remediaciones consolidadas 2026-11-18 (normativa para Android)
+
+Esta sección consolida las remediaciones, cambios y decisiones de la etapa cerrada el 2026-11-18. El resto del
+documento sigue vigente; si una sección anterior contradice esta, mandan esta sección, el código y los tests.
+
+### 1. Salida / Baixa abierta y reglas de rol
+
+- **Sin beta por nombre**: `/salida`, `/salida-history` y las nueve rutas de `/api/salida*` aceptan cualquier cuenta
+  autenticada. Un anónimo sigue recibiendo **401**; el invitado conserva la regla de solo lectura de su cuenta.
+- **Puente**: la acción `saida` del ticket también acepta cualquier usuario autenticado. Se eliminaron
+  `SAIDA_BETA_USERNAME`, `SAIDA_FORBIDDEN_MESSAGE` y el `403` por nombre. `entrada`, `entrada_lote`, `movimentos` y
+  `test` no cambian.
+- **Histórico**: no tiene `Conferir no ERP`. El sync del espejo es **solo del Relatório** (`ReportsPage` con
+  `triggerAeroMovementsSync` e `includeExits: true`). `Reenviar ao ERP` sigue disponible solo cuando
+  `canRelaunchSalida(movement)` lo permite; si el ERP ya aceptó todo o parte, se bloquea para no duplicar asientos.
+- **Contrato**: el OpenAPI describe la superficie como autenticada y `SalidaReportOperator` lleva `erpOnly`; el
+  artefacto `packages/contracts/openapi.json` y el cliente Kotlin se regeneran en el mismo commit. Android debe
+  consumir esos modelos generados, no copiarlos a mano.
+- **Android**: nace sin beta, sin `Conferir no ERP` y con el mismo reparto de acciones. El invitado sigue siendo
+  solo lectura.
+
+### 2. Administración: alta y edición en diálogo
+
+- **Seis pestañas con alta**: `categories`, `tasks`, `drivers`, `vehicles`, `timeSlots` y `workers`.
+- El botón `+ Nuevo` abre un **diálogo modal** con `Aceptar` / `Cancelar`; ya no alterna a un formulario inline.
+- `Editar` reutiliza el mismo diálogo con los campos cargados. `Aceptar` ejecuta el handler de siempre; `Cancelar`
+  cierra y limpia. Se conservan campos, validaciones, estados de carga, mensajes de éxito/error, reset y visibilidad
+  por rol.
+- El trabajador limitado sigue viendo solo `tasks` y `drivers`. En iPhone el diálogo abre, scrollea y sus botones
+  tienen **44 px**.
+- **Android**: usar un modal o bottom sheet con el mismo contenido, las mismas validaciones y botones de 44 dp; no
+  agregar formularios inline nuevos.
+
+### 3. WhatsApp: una sola tabla y un solo formato
+
+- **Fuente única**: `packages/frontend/src/lib/whatsapp-abbreviations.table.json` publica la tabla aprobada. El
+  backend la refleja en `whatsapp-abbreviations.ts`; el navegador la consume desde
+  `packages/frontend/src/lib/whatsapp-abbreviations.ts`. Los tests `whatsapp-abbreviations.contract.test.ts` y
+  `whatsapp-abbreviations.parity.test.ts` comparan las copias fila por fila; no se aceptan duplicados sin test.
+- **Tablas**: catálogo/ERP con la versión agresiva aprobada (`EMBALAG. CASEIRA` → `CASEIRA`, `QUEIJO RALADO GROSSO
+  TRINDADE 40G` → `QUEIJO 40g`, etc.) y tareas largas con la versión moderada que conserva `Org.` y `Receb.`.
+- **Reglas del mensaje**: nombre de producto/tarea **≤ 20 caracteres**; línea de producto apuntando a **≤ 32**;
+  cantidades exactas con `un`; prefijo `- `; emojis, encabezados, agrupación por operario y diseño intactos;
+  Recebimento agrupado por operario (`👤 NOMBRE:`) sin `(OPERADOR)` por línea; código de producto solo si la
+  abreviatura recorta o queda ambigua; `PĂO` → `PÃO` corregido **solo en el texto**.
+- **Precedencia**: el nombre que la planta escribió en el asiento manda sobre la abreviatura del catálogo por código
+  (`001045 … CASEIRA 1 KG` → `CASEIRA 1kg`); el código queda como respaldo. Para un código ajeno al catálogo, el
+  texto del ERP se repara al leerlo; no se toca la ingesta compartida.
+- **Históricos**: Masas y Salidas escriben el mismo texto que el Relatório (mismos nombres cortos, `- nombre: N un`,
+  `👤 Operador:`, `📦` en el resumen colectivo y cantidades exactas). La fecha, la cantidad de movimientos y las
+  cajas de Masas se conservan.
+- **Estado vacío de Massas**: cuando no hay lanzamientos ni filas del espejo, el bloque `Compartilhar por WhatsApp`
+  **se muestra igual**, con la prévia vacía (`Sem lançamentos para compartilhar`) y el botón de WhatsApp
+  **deshabilitado**. No se muestra un mensaje con solo el encabezado. El botón `Copiar Relatório` fue eliminado: la
+  hoja nativa ya lleva el texto.
+- **Sin botón de copiar** en las superficies de compartir; la copia queda solo como fallback cuando el navegador no
+  puede abrir la hoja nativa.
+- **Android**: debe consumir la misma tabla JSON y el mismo golden
+  (`packages/backend/src/modules/reports/whatsapp-golden.test.ts`), no reconstruir el texto con nombres completos.
+  Mismos nombres, orden, emojis, encabezados, cantidades, agrupación y estado vacío.
+
+### 4. Masas: un solo viaje a Safari y resultado compuesto
+
+- **Alcance**: solo `entrada` y `entrada_lote`. No cambia `saida`, el Relatório ni la app Android.
+- `buildBridgeEnvelope` agrega `steps` al sobre del ticket:
+  1. lanzamiento: el `url`/`method`/`body`/`bodies` del ticket;
+  2. lectura del día: `movimentoitem?_method=PATCH`, con `CODFOR: null`, `NOMUSU: null`, `CODPRO: null`, `DTINI` y
+     `DTFIM` desde el `ENT_DTA` del primer payload, `ENTSAI: 'E'` y `_method: 'PATCH'`.
+- `Aero32Bridge.js` v2 ejecuta los pasos en orden en el mismo viaje, con timeout por paso y cuidado de errores, y
+  envía un resultado compuesto `{ launch, read }` a `resultUrl`. El sobre conserva `url`/`body`/`bodies` legacy para
+  que un script viejo siga lanzando.
+- **Límite**: si el compuesto supera **2 MB**, se descarta `read` y se conserva `launch`; el callback vuelve corto.
+- **Consumo web**: `MassasHistoryPage` usa `launch` para el veredicto y `read` para el espejo. Si `read` viene
+  presente y válido, **no** arma ni consume el auto-read ni pide un segundo `movimentos`; si falta o falló, cae al
+  auto-read actual. Se conservan la cola, el reintento de lotes parciales y el diálogo de veredicto.
+- **Receta**: el código copiable está en **Administración → Integração ERP / Aero32**
+  (`AeroScriptableDialog` → `packages/frontend/scriptable/Aero32Bridge.js`, publicado en
+  `packages/frontend/public/Aero32Bridge.js`). Si el script ya existía, se reemplaza **todo** el código y se guarda
+  manteniendo el nombre `Aero32Bridge`.
+- **Auditoría**: se conservan `launch_sync` y `read_history`, con `attemptId` correlacionador y fases `requested` /
+  `result`.
+- **Android**: no usa el puente ni tickets; llama directo por OkHttp/Retrofit con Basic Auth. Debe replicar el mismo
+  significado: `launch` para el veredicto, `read` para el espejo, sin segundo auto-read si `read` es válido, con el
+  mismo fallback y las mismas líneas de auditoría.
+
+### 5. Históricos: `ShareCard`, solo lectura y Volver
+
+La tarjeta canónica de compartir es `packages/frontend/src/components/reports/ShareCard.tsx`: título, subtítulo,
+texto del servidor, estado de carga/error y acciones de WhatsApp/PDF, con `Editar` opcional y botón de cierre.
+
+- **Relatório**: al guardar, `/reports/:id?saved=1` muestra la `ShareCard` con `Editar` y `Cerrar` a `/reports`.
+  El **Histórico de Relatórios** abre `/reports/:id?share=1`: misma tarjeta, sin `Editar`, con un botón **Volver** a
+  `/reports/history`. El detalle de lectura completo sigue existiendo para el acceso directo sin flag.
+- **Carregamento**: el editor usa `/loading?share=1&date=…` y conserva `Editar`/`Cerrar`. El **Histórico de
+  Carregamento** abre `/loading?share=1&date=…&from=history`: misma tarjeta, sin `Editar`, con **Volver** a
+  `/loading/history`. El botón `Salvar Horário` no existe en la vista de solo lectura; sí en el editor.
+- **Sin copiar**: la tarjeta no tiene botón de copiar; la hoja nativa es la acción primaria.
+- **Estados**: si el día no tiene datos, el histórico muestra su estado vacío y, en Masas, el bloque de compartir
+  deshabilitado con la prévia vacía. Si la lectura falla, se muestra el error, nunca “no hubo datos”.
+- **Android**: la vista de detalle de un histórico es una pantalla de solo lectura con el texto del servidor, acciones
+  de compartir/PDF y un botón Volver; no es el formulario de edición ni una grilla editable. El botón Volver y los
+  destinos deben coincidir con los de la web.
+- **Implementación**: la pasada web de estas dos vistas se estaba cerrando al escribir este documento; la norma de
+  arriba es la que Android debe replicar una vez validada por el E2E de 390 px.
+
+### 6. Menú y textos
+
+- Se eliminó la sección **Futuro** y el ítem deshabilitado **Exportación WhatsApp** del menú web. No quedan
+  placeholders de funciones ya implementadas.
+- **Android**: el menú no debe mostrar secciones “Futuro” ni entradas deshabilitadas para funciones que ya existen.
+
+### 7. i18n: no borrar claves compartidas
+
+La limpieza de las claves de Massas eliminó por error `reports.copied` y `loading.copied`, y el E2E de
+`report-view-export` detectó que el botón de copiar del Relatório dejó de decir «¡Copiado!». La regla es:
+
+- Borrar solo las claves propias del cambio (`massas.copyReport`, `massas.copied`).
+- No tocar claves compartidas por Report/Loading (`reports.copied`, `loading.copied`, `stock.copied`,
+  `share.copied`).
+- Android debe mantener los mismos textos visibles y el mismo comportamiento; si usa recursos propios, la paridad se
+  valida contra los textos de la web, no contra una traducción nueva.
+
+### 8. Evidencia de la etapa
+
+| Cambio | Commits / evidencia |
+| --- | --- |
+| Salida abierta a todos los roles web | `527e459e`; rutas 401 sin sesión; E2E no-wilkin y 390 px |
+| Administración en diálogo | `c0a4650f`; seis pestañas, `admin-<tab>-modal`, Aceptar/Cancelar |
+| WhatsApp de los históricos con la tabla del Relatório | `e076e51e`; tabla compartida y tests de paridad |
+| Sobre multi-paso de Masas | `b5454bc3`, `cf6cc0f3`, `2bd0fea1`, `2691b405`, `4b66d3a5`; E2E del viaje único |
+| Fix del wiring del veredicto compuesto | `347dba08` |
+| Dashboard con siete tarjetas | `9ace21f1` |
+| Tabla de abreviaturas dentro del paquete frontend | `fdbea06b`, `39ab31eb`; build de Docker autocontenido |
+| Tres arreglos de UI: Massas vacío, Loading solo lectura, menú | `c8452fe5`, `e04e0e7b`, `d0f01754`, `98613fc7`, `b57c5383` |
+| Verificación | Vitest **232/232**, node **753/753**, `tsc` limpio, build **15.21 s**, E2E **129/129** (6.4 m), CI **success**; deploy `StartedAt` 10:51, bundle `assets/index-Bp5uU5_M.js` con «Sin lanzamientos para compartir» y sin «Copiar Reporte» / «Exportación WhatsApp» |
+
+La pasada del sobre multi-paso y las abreviaturas dejó además backend **974/974**, contrato OpenAPI regenerado y
+cliente Kotlin con `erpOnly` y `AeroBridgeStep`. El E2E de 390 px cubre Salida, modales de Administración, share de
+históricos, Masas vacío, Loading solo lectura y menú.
+
+### 9. Ideas incorporadas (no perder)
+
+- **Un solo mensaje**: el texto de WhatsApp se genera en el servidor (o se lee de la tabla compartida); Android no
+  reconstruye nombres ni totales por su cuenta.
+- **Una sola tarjeta**: `ShareCard` es la vista de compartir del Relatório, de Horario y de los históricos. No crear
+  una variante nueva por pantalla.
+- **Una sola tabla**: las abreviaturas viven en un JSON compartido y se validan por los dos lados; la copia que usa
+  el navegador viaja dentro del paquete frontend para que el build de Docker sea autocontenido.
+- **Estado vacío visible**: si no hay nada que compartir, la tarjeta se muestra con la prévia vacía y la acción
+  deshabilitada; no se oculta el bloque ni se inventa un mensaje de solo encabezado.
+- **Solo lectura es una vista, no un formulario apagado**: el detalle del histórico es la tarjeta de compartir con
+  Volver, no la pantalla de edición con los controles deshabilitados.
+- **Un viaje, con fallback**: el sobre multi-paso de Masas evita el segundo viaje a Safari, pero un script viejo y
+  una lectura ausente siguen funcionando con el auto-read.
+- **Primero Trindade, después el ERP**: el registro local existe antes de cualquier despacho; el histórico no
+  reemplaza esa garantía.
+- **El sync del ERP es del Relatório**: ni Salida ni Masas Histórico consultan el espejo por su cuenta.
+- **44 px y 390 px**: los botones, modales y tarjetas se prueban en el teléfono, no solo en escritorio.
+- **Contrato generado e i18n compartido**: Kotlin sale del OpenAPI; las claves compartidas no se borran al limpiar
+  un módulo.
+
+### 10. Checklist de paridad para Android
+
+Antes de dar una pantalla por terminada, verificar:
+
+- [ ] **Contratos**: modelos generados desde `packages/contracts/openapi.json`; no editar a mano `SalidaReportOperator`
+  (`erpOnly`), `AeroBridgeEnvelope` ni `AeroBridgeStep`.
+- [ ] **Texto de WhatsApp**: sale del servidor o de la tabla compartida; mismas abreviaturas, orden, emojis,
+  encabezados, cantidades y agrupación. Comparar contra el golden del Relatório.
+- [ ] **Compartir**: `ACTION_SEND` con el texto (y fotos cuando el módulo las tenga); sin botón de copiar como acción
+  primaria; copia solo como fallback.
+- [ ] **Estado vacío**: el bloque de compartir de Masas se muestra con la prévia vacía y el botón deshabilitado; no
+  se inventa un mensaje con solo el encabezado.
+- [ ] **Históricos**: detalle de solo lectura con `ShareCard`/texto del servidor, sin Editar y con Volver; el editor
+  sigue siendo el único lugar con Salvar/Editar.
+- [ ] **Días pasados**: sin compartir por tarjeta individual; el compartir del día completo sigue disponible.
+- [ ] **Roles**: Salida/Baixa para toda cuenta autenticada; invitado solo lectura; sin beta por nombre; Administración
+  con el mismo alcance por rol.
+- [ ] **ERP**: sync del espejo solo desde el Relatório; sin `Conferir no ERP`; `Reenviar ao ERP` solo si
+  `canRelaunchSalida`.
+- [ ] **Masas**: `launch` para veredicto y `read` para espejo; sin segundo auto-read si `read` es válido; fallback y
+  auditoría equivalentes.
+- [ ] **Fechas**: día de planta en São Paulo, no la zona del teléfono; callbacks y flags de navegación equivalentes
+  (`?saved=1`, `?share=1`, `from=history`).
+- [ ] **UI**: objetivos de 44 dp, vista de 390 px, modales que abren/scrollean, sin desbordes.
+- [ ] **Datos**: operarios solo si son cuentas activas de Trindade; nombre canónico para códigos del catálogo;
+  reparación local de encoding sin tocar la ingesta.
+- [ ] **Auditoría**: `attemptId`, fases `requested`/`result`, códigos `AERO_*`, sin credenciales ni payloads sensibles.
+- [ ] **Tests**: golden de WhatsApp, paridad de tabla, E2E de 390 px y de solo lectura.
+
+### 11. Open Items actualizados
+
+1. **HEIC/HEIF en iPhone real**: backend y frontend validan las firmas; falta la prueba física de captura en planta.
+2. **Cabecera `Server`**: la terminación TLS la hace el reverse proxy del host; fuera del alcance de este repo.
+3. **Pantallas Android**: los modelos Kotlin de Salida, Masas y del sobre multi-paso están generados, pero faltan las
+   pantallas Compose, ViewModels y repositorios de Salida, Masas, Horario, Relatório e Administración.
+4. **Vistas de histórico web**: la `ShareCard` de solo lectura para Carregamento y Relatórios se estaba cerrando al
+   escribir esto; Android debe replicarla después de que el E2E de 390 px quede verde.
+5. **Medición real del sobre de 2 MB**: conviene medir un día de Masas con muchos movimientos en producción para
+   confirmar que el compuesto no descarta `read` con frecuencia.
+6. **Verificación con cuenta no-wilkin en producción**: la matriz de rutas está cubierta por tests, pero falta una
+   sesión real de planta para la comprobación manual.
+7. **Higiene de i18n**: no volver a borrar claves compartidas al limpiar un módulo; el E2E del botón de copiar del
+   Relatório es la guarda.
