@@ -61,6 +61,7 @@ class ReportDetailViewModel @Inject constructor(
         val massasDay: MassasReportDayView? = null,
         /** The incoming supplies registered in the ERP for this date. */
         val receipts: ReportReceipts? = null,
+        val salidaDay: com.trindade.app.contract.models.SalidaReportDayView? = null,
         /** Whether an ERP sync via bridge is currently in progress. */
         val isSyncingErp: Boolean = false,
     ) {
@@ -103,6 +104,8 @@ class ReportDetailViewModel @Inject constructor(
             refreshPhotos(reportId)
             refreshMassas(report)
             refreshReceipts(report)
+        refreshSalidaDay(report)
+            refreshSalidaDay(report)
         }
     }
 
@@ -142,6 +145,15 @@ class ReportDetailViewModel @Inject constructor(
         }
     }
 
+    private fun refreshSalidaDay(report: ReportResponseReport?) {
+        val date = report?.reportDate?.takeIf { it.isNotBlank() } ?: return
+        viewModelScope.launch {
+            val day = repository.salidaDay(date)
+            // A refresh that answered nothing does not erase the block the operator is reading.
+            if (day != null) _state.update { it.copy(salidaDay = day) }
+        }
+    }
+
     private fun refreshReceipts(report: ReportResponseReport?) {
         val date = report?.reportDate?.takeIf { it.isNotBlank() } ?: return
         viewModelScope.launch {
@@ -173,7 +185,8 @@ class ReportDetailViewModel @Inject constructor(
                 return@launch
             }
             _state.update { it.copy(isSyncingErp = true, message = null) }
-            when (val outcome = dispatcher.syncDay(settings, date)) {
+            // El bloque de salidas del reporte necesita los dos lados del día: ENTSAI null, no E.
+            when (val outcome = dispatcher.syncDay(settings, date, includeExits = true)) {
                 is AeroSyncOutcome.Synced -> {
                     store.markSynced(date, MassasLaunchViewModel.nowLabel())
                     val massas = massasRepository?.reportDay(date)

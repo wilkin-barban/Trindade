@@ -174,6 +174,12 @@ class FakeReportsApi(
         reportToReturn?.let { Response.success(ReportResponse(report = it)) }
             ?: Response.error(404, EMPTY_BODY)
 
+    /** El bloque de salidas del día: sin datos por defecto, como un día sin salidas. */
+    override suspend fun salidaDay(date: String): Response<com.trindade.app.contract.models.SalidaReportDayView> =
+        salidaDayToReturn?.let { Response.success(it) } ?: Response.error(404, EMPTY_BODY)
+
+    var salidaDayToReturn: com.trindade.app.contract.models.SalidaReportDayView? = null
+
     override suspend fun receipts(date: String): Response<com.trindade.app.contract.models.ReportReceipts> =
         receiptsToReturn?.let { Response.success(it) }
             ?: Response.error(404, EMPTY_BODY)

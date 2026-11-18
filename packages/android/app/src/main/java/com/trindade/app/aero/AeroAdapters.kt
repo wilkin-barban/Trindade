@@ -29,6 +29,11 @@ class AeroErpAdapter @Inject constructor(
         val url = settings.normalizedWsUrl ?: return AeroMovementsResult.Failed(null)
         return client.readMovements(url, settings.username, settings.password, date)
     }
+
+    override suspend fun readMovementsIncludingExits(settings: AeroSettings, date: String): AeroMovementsResult {
+        val url = settings.normalizedWsUrl ?: return AeroMovementsResult.Failed(null)
+        return client.readMovements(url, settings.username, settings.password, date, includeExits = true)
+    }
 }
 
 /**

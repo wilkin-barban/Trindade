@@ -17,6 +17,15 @@ interface AeroErpPort {
     suspend fun postEntry(settings: AeroSettings, payload: AeroEntryPayload): AeroWriteResult
 
     suspend fun readMovements(settings: AeroSettings, date: String): AeroMovementsResult
+
+    /**
+     * The same day, asking the ERP for both sides (`ENTSAI: null`) instead of the entries only.
+     *
+     * The report is the one surface that needs it: its exits block reads what the plant recorded on the other side.
+     * The default keeps every fake and every old caller on the entries-only read.
+     */
+    suspend fun readMovementsIncludingExits(settings: AeroSettings, date: String): AeroMovementsResult =
+        readMovements(settings, date)
 }
 
 interface AeroMirrorPort {
@@ -192,7 +201,17 @@ class AeroDispatcher(
      * The snapshot is written only when the ERP answered: a failed read must leave yesterday's stored day
      * untouched, because a mirror that empties itself on a network blip reads as "the plant produced nothing".
      */
-    suspend fun syncDay(settings: AeroSettings, date: String): AeroSyncOutcome {
+    /**
+     * Reads the day from the ERP and stores it as the mirror.
+     *
+     * `includeExits` is the report's own call: its exits block needs both sides of the day, so the ERP filter goes
+     * as `null` instead of `E`. Every other screen keeps the entries-only read it always had.
+     */
+    suspend fun syncDay(
+        settings: AeroSettings,
+        date: String,
+        includeExits: Boolean = false,
+    ): AeroSyncOutcome {
         val normalized = settings.normalizedWsUrl
         val configured = normalized != null && settings.ready
         val destination = if (configured) aeroMovementsUrl(normalized!!) else UNCONFIGURED
@@ -229,7 +248,7 @@ class AeroDispatcher(
             return AeroSyncOutcome.Failed(preflight)
         }
 
-        val read = erp.readMovements(settings, date)
+        val read = if (includeExits) erp.readMovementsIncludingExits(settings, date) else erp.readMovements(settings, date)
         val elapsed = System.currentTimeMillis() - startedAt
 
         return when (read) {

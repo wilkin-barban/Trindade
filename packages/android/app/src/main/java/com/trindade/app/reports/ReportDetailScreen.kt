@@ -169,6 +169,11 @@ fun ReportDetailScreen(
             )
         }
 
+        // El bloque de salidas del día, junto al de movimientos del ERP y antes de las fotos.
+        item {
+            SalidaReportCard(day = state.salidaDay, error = null)
+        }
+
         item {
             HorizontalDivider()
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {

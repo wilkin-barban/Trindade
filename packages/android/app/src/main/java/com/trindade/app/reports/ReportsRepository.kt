@@ -153,6 +153,12 @@ class ReportsRepository @Inject constructor(
             ?.report
 
     /** The incoming supplies registered in the ERP for this date. */
+    /** El bloque de salidas del día: espejo más lanzamientos locales, sin operarios ajenos a Trindade. */
+    suspend fun salidaDay(date: String): com.trindade.app.contract.models.SalidaReportDayView? =
+        runCatchingCancellable { api.salidaDay(date) }.getOrNull()
+            ?.takeIf { it.isSuccessful }
+            ?.body()
+
     suspend fun receipts(date: String): com.trindade.app.contract.models.ReportReceipts? =
         runCatchingCancellable { api.receipts(date) }.getOrNull()
             ?.takeIf { it.isSuccessful }

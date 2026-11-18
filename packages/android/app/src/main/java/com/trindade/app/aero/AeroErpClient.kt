@@ -202,12 +202,18 @@ class AeroErpClient @Inject constructor(
         )
     }
 
-    /** `POST /movimentoitem?_method=PATCH`: the whole day, every operator. */
+    /**
+     * `POST /movimentoitem?_method=PATCH`: the whole day, every operator.
+     *
+     * `includeExits` is the report's own request: it needs both sides of the day, so the filter travels as null
+     * instead of `E`. Every other caller keeps the entries-only default.
+     */
     suspend fun readMovements(
         wsUrl: String,
         username: String,
         password: String,
         date: String,
+        includeExits: Boolean = false,
     ): AeroMovementsResult {
         val url = aeroMovementsUrl(wsUrl)
         return runCatching {
@@ -216,7 +222,12 @@ class AeroErpClient @Inject constructor(
                 authorization = basicAuthHeader(username, password),
                 // The mirror is the entries side of Aero32, exactly like the certified web bridge: E,
                 // not null, and `_method` in the body so the Delphi router selects PATCH.
-                body = buildMovimentoItemPayload(userName = null, startDate = date, movementType = "E"),
+                body = buildMovimentoItemPayload(
+                    userName = null,
+                    startDate = date,
+                    // `null` es los dos lados del día; `E` es solo las entradas, el default de siempre.
+                    movementType = if (includeExits) null else "E",
+                ),
             )
         }.fold(
             onSuccess = { response ->

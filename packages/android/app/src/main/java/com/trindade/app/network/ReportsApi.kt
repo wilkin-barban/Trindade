@@ -137,6 +137,15 @@ interface ReportsApi {
     @GET("api/reports/{id}")
     suspend fun report(@Path("id") id: Int): Response<ReportResponse>
 
+    /**
+     * El bloque de salidas del día: los operarios con cuenta activa en Trindade, sus productos y sus unidades.
+     *
+     * Es lo que el Relatório muestra como `SAÍDAS / BAIXA`, y sale del mismo servicio que la web: el espejo unido
+     * a los lanzamientos locales, sin operarios ajenos a la aplicación.
+     */
+    @GET("api/reports/day/salidas")
+    suspend fun salidaDay(@Query("date") date: String): Response<com.trindade.app.contract.models.SalidaReportDayView>
+
     @GET("api/reports/receipts")
     suspend fun receipts(@Query("date") date: String): Response<com.trindade.app.contract.models.ReportReceipts>
 
