@@ -99,7 +99,19 @@ describe('ReportViewPage after a save', () => {
     expect(screen.queryByTestId('export-pdf-btn')).toBeNull();
   });
 
-  it('keeps the reading view for whoever opens the report from the history', async () => {
+  it('opens the share card, read-only, for whoever comes from the history', async () => {
+    renderAt('/reports/5?share=1');
+
+    // El histórico abre el reporte como el mensaje que es: la misma tarjeta, sin Editar y con Volver.
+    await waitFor(() => expect(screen.getByTestId('report-share-card')).toBeTruthy());
+    // El enlace de vuelta, y el texto sale de la traducción: acá se afirma la puerta, no la cadena.
+    expect(screen.getByTestId('report-share-back')).toHaveAttribute('href', '/reports/history');
+    expect(screen.queryByTestId('report-share-edit')).toBeNull();
+    expect(screen.getByTestId('report-share-close')).toBeTruthy();
+    expect(screen.queryByTestId('export-pdf-btn')).toBeNull();
+  });
+
+  it('keeps the reading view for whoever opens the report by its own URL', async () => {
     renderAt('/reports/5');
 
     await waitFor(() => expect(screen.getByTestId('export-pdf-btn')).toBeTruthy());

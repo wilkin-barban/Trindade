@@ -104,7 +104,10 @@ export function ReportViewPage() {
   const [pdfLoading, setPdfLoading] = useState(false);
   // The card an operator sees after saving, or when they ask to share: the message, not the form.
   const [params, setParams] = useSearchParams();
-  const showingShare = params.get('saved') === '1';
+  // Dos puertas a la misma tarjeta: el reporte recién guardado (`saved=1`) y el que se abre desde el histórico
+  // (`share=1`), que es de solo lectura y vuelve al historial.
+  const fromHistory = params.get('share') === '1';
+  const showingShare = params.get('saved') === '1' || fromHistory;
   const [shareText, setShareText] = useState('');
   const [shareLoading, setShareLoading] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
@@ -259,13 +262,26 @@ export function ReportViewPage() {
   const erpReceipts = usesErpReceipts(report.report_date);
 
   // The saved report opens as the message it becomes. The reading view is one tap away (Editar), and the card
-  // itself only needs the text, the photos and the four decisions.
+  // itself only needs the text, the photos and the four decisions. The history opens the same card as a read-only
+  // view: no Editar, and the way back is the history.
   if (showingShare && report) {
     const turno = report.turno === 'tarde' ? t('reports.turnoTarde') : t('reports.turnoNoite');
     return (
-      <div className="mx-auto w-full max-w-2xl p-4">
+      <div className="mx-auto w-full max-w-2xl space-y-3 p-4">
+        {fromHistory && (
+          <Link
+            to="/reports/history"
+            className="inline-flex min-h-11 items-center gap-2 rounded px-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+            data-testid="report-share-back"
+          >
+            <LucideArrowLeft className="h-4 w-4" />
+            {t('reports.backToHistory')}
+          </Link>
+        )}
         <ShareCard
-          title={`${t('reports.savedTitle')} — ${t('reports.turnoLabel')} ${turno}`}
+          title={`${
+            fromHistory ? t('reports.reportDetail') : t('reports.savedTitle')
+          } — ${t('reports.turnoLabel')} ${turno}`}
           subtitle={`${report.report_date} · ${report.user?.display_name ?? ''}`}
           text={shareText}
           loading={shareLoading}
@@ -275,8 +291,12 @@ export function ReportViewPage() {
           printing={printing}
           onShare={() => void handleShareReport()}
           onPdf={() => void handleShareCardPdf()}
-          onEdit={() => navigate(`/reports/${report.id}/edit`)}
-          onClose={() => navigate('/reports')}
+          {...(fromHistory
+            ? { onClose: () => navigate('/reports/history') }
+            : {
+                onEdit: () => navigate(`/reports/${report.id}/edit`),
+                onClose: () => navigate('/reports'),
+              })}
         />
       </div>
     );

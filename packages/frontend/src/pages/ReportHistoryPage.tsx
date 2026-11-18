@@ -162,7 +162,7 @@ export function ReportHistoryPage() {
             return (
             <Card key={r.id} className={`p-4 ${!r.isActive ? 'opacity-70' : ''}`} data-testid={`report-card-${r.id}`}>
               <div className="flex items-center justify-between gap-3">
-                <Link to={`/reports/${r.id}`} className="min-w-0 flex-1">
+                <Link to={`/reports/${r.id}?share=1`} className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-1"><span className="text-sm font-semibold">{formatDate(r.report_date)}</span><span className="text-xs px-2 py-0.5 rounded-full bg-gray-100">{r.turno === 'tarde' ? `🌅 ${t('reports.turnoTarde')}` : `🌙 ${t('reports.turnoNoite')}`}</span>{!r.isActive && <span className="text-xs text-amber-700">{t('history.inactive')}</span>}</div>
                   <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
                     {affordances.closedDay && (
@@ -177,7 +177,7 @@ export function ReportHistoryPage() {
                     button is what a thumb misses in the plant, and a missed press here deletes nothing
                     until it is pressed again. */}
                 <Link
-                  to={`/reports/${r.id}`}
+                  to={`/reports/${r.id}?share=1`}
                   aria-label={t('history.viewReport', { date: formatDate(r.report_date) })}
                   title={t('history.viewReport', { date: formatDate(r.report_date) })}
                   className="inline-flex min-h-12 min-w-12 items-center justify-center rounded text-gray-500 hover:bg-gray-50"
