@@ -399,4 +399,69 @@ class ReportDetailScreenTest {
         editNode.performClick()
         assertEquals(1, edited)
     }
+
+    @Test
+    fun `FROM_HISTORY mode in ReportDetailRoute shows ShareCard with Volver and no Editar or Copiar`() {
+        val fakeApi = FakeReportsApi(exportToReturn = "RELATORIO TEXT")
+        val noOpCompressor = object : PhotoCompressor {
+            override suspend fun compressToJpeg(path: String): ByteArray? = null
+        }
+        val vm = ReportDetailViewModel(
+            ReportsRepository(fakeApi),
+            noOpCompressor,
+        )
+        var backed = 0
+        composeRule.setContent {
+            TrindadeTheme {
+                ReportDetailRoute(
+                    reportId = 1,
+                    mode = com.trindade.app.ui.components.ShareCardMode.FROM_HISTORY,
+                    onEdit = {},
+                    onBack = { backed++ },
+                    viewModel = vm,
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(copy(R.string.share_card_back)).assertIsDisplayed()
+        composeRule.onNodeWithText(copy(R.string.share_card_edit)).assertDoesNotExist()
+        composeRule.onNodeWithText(copy(R.string.export_copy)).assertDoesNotExist()
+
+        composeRule.onNodeWithText(copy(R.string.share_card_back)).performClick()
+        assertEquals(1, backed)
+    }
+
+    @Test
+    fun `SAVED mode in ReportDetailRoute shows ShareCard with Editar and Cerrar`() {
+        val fakeApi = FakeReportsApi(exportToReturn = "RELATORIO TEXT")
+        val noOpCompressor = object : PhotoCompressor {
+            override suspend fun compressToJpeg(path: String): ByteArray? = null
+        }
+        val vm = ReportDetailViewModel(
+            ReportsRepository(fakeApi),
+            noOpCompressor,
+        )
+        var edited = 0
+        var closed = 0
+        composeRule.setContent {
+            TrindadeTheme {
+                ReportDetailRoute(
+                    reportId = 1,
+                    mode = com.trindade.app.ui.components.ShareCardMode.SAVED,
+                    onEdit = { edited++ },
+                    onBack = { closed++ },
+                    viewModel = vm,
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(copy(R.string.share_card_edit)).assertIsDisplayed()
+        composeRule.onNodeWithText(copy(R.string.share_card_close)).assertIsDisplayed()
+
+        composeRule.onNodeWithText(copy(R.string.share_card_edit)).performClick()
+        assertEquals(1, edited)
+
+        composeRule.onNodeWithText(copy(R.string.share_card_close)).performClick()
+        assertEquals(1, closed)
+    }
 }

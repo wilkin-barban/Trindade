@@ -1022,4 +1022,11 @@
         <item quantity="one">%1$d operador</item>
         <item quantity="other">%1$d operadores</item>
     </plurals>
+
+    <!-- ShareCard strings -->
+    <string name="share_card_share_whatsapp">Compartir por WhatsApp</string>
+    <string name="share_card_export_pdf">Exportar PDF</string>
+    <string name="share_card_edit">Editar</string>
+    <string name="share_card_close">Cerrar</string>
+    <string name="share_card_back">Volver</string>
 </resources>

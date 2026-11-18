@@ -104,6 +104,43 @@ class ReportDetailViewModelTest {
     }
 
     @Test
+    fun `sharePdf generates relatorio-id pdf and launches shareManager`() {
+        val shareManager = RecordingShareManager()
+        val pdfGenerator = RecordingPdfGenerator()
+        val model = ReportDetailViewModel(
+            ReportsRepository(FakeReportsApi(exportToReturn = "EXPORT TEXT")),
+            FakePhotoCompressor(),
+            shareManager = shareManager,
+            pdfGenerator = pdfGenerator,
+        )
+        model.load(REPORT_ID)
+        model.loadExport()
+        model.sharePdf()
+
+        assertEquals("relatorio-$REPORT_ID.pdf", pdfGenerator.lastFileName)
+        assertEquals("EXPORT TEXT", pdfGenerator.lastText)
+        assertEquals(File("/tmp/relatorio-$REPORT_ID.pdf"), shareManager.lastSharedPdfFile)
+    }
+
+    @Test
+    fun `sharePdf with no export text does nothing`() {
+        val shareManager = RecordingShareManager()
+        val pdfGenerator = RecordingPdfGenerator()
+        val model = ReportDetailViewModel(
+            ReportsRepository(FakeReportsApi()),
+            FakePhotoCompressor(),
+            shareManager = shareManager,
+            pdfGenerator = pdfGenerator,
+        )
+        model.load(REPORT_ID)
+
+        model.sharePdf()
+
+        assertNull(pdfGenerator.lastFileName)
+        assertNull(shareManager.lastSharedPdfFile)
+    }
+
+    @Test
     fun `opens the report and its photos`() {
         val photos = listOf(FakeReportsApi.aPhoto(1), FakeReportsApi.aPhoto(2))
         val model = viewModel(FakeReportsApi(photosToReturn = photos))
@@ -451,6 +488,7 @@ private class FakePhotoCompressor(
 private class RecordingShareManager : ShareManager {
     var lastSharedText: String? = null
     var lastSharedTitle: String? = null
+    var lastSharedPdfFile: File? = null
 
     override fun shareText(text: String, title: String?): Boolean {
         lastSharedText = text
@@ -458,11 +496,25 @@ private class RecordingShareManager : ShareManager {
         return true
     }
 
-    override fun sharePdf(file: File, title: String?): Boolean = true
+    override fun sharePdf(file: File, title: String?): Boolean {
+        lastSharedPdfFile = file
+        return true
+    }
 
     override fun shareApk(file: File, title: String?): Boolean = true
 
     override fun openLink(url: String): Boolean = true
+}
+
+private class RecordingPdfGenerator : com.trindade.app.export.PdfGenerator {
+    var lastText: String? = null
+    var lastFileName: String? = null
+
+    override suspend fun generate(text: String, fileName: String): File {
+        lastText = text
+        lastFileName = fileName
+        return File("/tmp/$fileName")
+    }
 }
 
 private class FakeReportErpPort : com.trindade.app.aero.AeroErpPort {

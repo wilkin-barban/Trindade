@@ -12,11 +12,14 @@ import com.trindade.app.massas.MassasDaySource
 import com.trindade.app.massas.MassasLaunchViewModel
 import com.trindade.app.contract.models.PhotosResponsePhotosInner
 import com.trindade.app.contract.models.ReportResponseReport
+import com.trindade.app.export.NoOpPdfGenerator
 import com.trindade.app.export.NoOpShareManager
+import com.trindade.app.export.PdfGenerator
 import com.trindade.app.export.ShareManager
 import com.trindade.app.ui.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -41,6 +44,7 @@ class ReportDetailViewModel @Inject constructor(
     // The platform seam for sharing, injected rather than reached for: the screen offers the action and
     // the default is the no-op the tests get, so a view model built without one shares nothing.
     private val shareManager: ShareManager = NoOpShareManager,
+    private val pdfGenerator: PdfGenerator = NoOpPdfGenerator,
     // Optional on purpose: without a source the card simply does not draw, which is what a test that is
     // only about the report's own answers asks for.
     private val massasRepository: MassasDaySource? = null,
@@ -56,6 +60,7 @@ class ReportDetailViewModel @Inject constructor(
         val uploadingPhoto: Boolean = false,
         val exportText: String? = null,
         val loadingExport: Boolean = false,
+        val exportingPdf: Boolean = false,
         val message: UiText? = null,
         /** The day the massas card draws, read from the report's own endpoint. */
         val massasDay: MassasReportDayView? = null,
@@ -291,6 +296,26 @@ class ReportDetailViewModel @Inject constructor(
     fun shareExport() {
         val text = state.value.exportText ?: return
         shareManager.shareText(text)
+    }
+
+    /**
+     * Generates a PDF named relatorio-<id>.pdf in cache exports and launches the platform chooser.
+     */
+    fun sharePdf() {
+        val text = state.value.exportText ?: return
+        if (state.value.exportingPdf) return
+        _state.update { it.copy(exportingPdf = true, message = null) }
+        viewModelScope.launch {
+            try {
+                val file = pdfGenerator.generate(text, "relatorio-${state.value.reportId}.pdf")
+                shareManager.sharePdf(file)
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                _state.update { it.copy(message = GENERIC) }
+            } finally {
+                _state.update { it.copy(exportingPdf = false) }
+            }
+        }
     }
 
     private fun deleteRefusal(state: UiState): UiText =

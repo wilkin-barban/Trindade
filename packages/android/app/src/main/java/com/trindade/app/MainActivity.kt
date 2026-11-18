@@ -72,10 +72,12 @@ import com.trindade.app.dashboard.DashboardRoute
 import com.trindade.app.loading.LoadingEditRoute
 import com.trindade.app.loading.LoadingHistoryRoute
 import com.trindade.app.loading.LoadingRoute
+import com.trindade.app.loading.LoadingShareRoute
 import com.trindade.app.reports.ReportDetailRoute
 import com.trindade.app.reports.ReportEditRoute
 import com.trindade.app.reports.ReportGeneratorRoute
 import com.trindade.app.reports.ReportsHistoryRoute
+import com.trindade.app.ui.components.ShareCardMode
 import com.trindade.app.ui.theme.TrindadeTheme
 import com.trindade.app.assai.AssaiCalculatorScreen
 import com.trindade.app.share.ShareAppScreen
@@ -85,6 +87,12 @@ import com.trindade.app.ui.components.DeveloperCredit
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+/** Target report opened with a specific viewing mode. */
+data class OpenReportTarget(
+    val id: Int,
+    val mode: ShareCardMode? = null,
+)
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -252,7 +260,7 @@ class MainActivity : ComponentActivity() {
                     var signedIn by remember { mutableStateOf(authRepository.hasSession()) }
                     var updateAvailable by remember { mutableStateOf(false) }
                     var showMandatoryUpdateDialog by remember { mutableStateOf(false) }
-                    var openReportId by remember { mutableStateOf<Int?>(null) }
+                    var openReportTarget by remember { mutableStateOf<OpenReportTarget?>(null) }
                     var registerOpen by remember { mutableStateOf(false) }
                     var editingReportId by remember { mutableStateOf<Int?>(null) }
                     var editingScheduleId by remember { mutableStateOf<Int?>(null) }
@@ -261,6 +269,7 @@ class MainActivity : ComponentActivity() {
                     var profileOpen by remember { mutableStateOf(false) }
                     var historyOpen by remember { mutableStateOf(false) }
                     var loadingHistoryOpen by remember { mutableStateOf(false) }
+                    var loadingShareDay by remember { mutableStateOf<String?>(null) }
                     var massasHistoryOpen by remember { mutableStateOf(false) }
                     var salidaHistoryOpen by remember { mutableStateOf(false) }
                     var stockHistoryOpen by remember { mutableStateOf(false) }
@@ -323,13 +332,14 @@ class MainActivity : ComponentActivity() {
                     fun endSession() {
                         profileOpen = false
                         registerOpen = false
-                        openReportId = null
+                        openReportTarget = null
                         editingReportId = null
                         editingScheduleId = null
                         editingScheduleDay = null
                         loadingStale = false
                         historyOpen = false
                         loadingHistoryOpen = false
+                        loadingShareDay = null
                         massasHistoryOpen = false
                         massasLaunchDay = null
                         massasDayFromHistory = false
@@ -347,7 +357,7 @@ class MainActivity : ComponentActivity() {
                         editingScheduleId = null
                         editingScheduleDay = null
                     }
-                    val onBackReportDetail = { openReportId = null }
+                    val onBackReportDetail = { openReportTarget = null }
                     val onBackProfile = { profileOpen = false }
                     val onBackReportsHistory = { historyOpen = false }
                     val onBackLoadingHistory = { loadingHistoryOpen = false }
@@ -418,12 +428,30 @@ class MainActivity : ComponentActivity() {
                                 },
                             )
                         }
-                        openReportId != null -> {
+                        openReportTarget != null -> {
                             BackHandler(onBack = onBackReportDetail)
                             ReportDetailRoute(
-                                reportId = openReportId!!,
-                                onEdit = { editingReportId = openReportId },
+                                reportId = openReportTarget!!.id,
+                                mode = openReportTarget!!.mode,
+                                onEdit = {
+                                    val targetId = openReportTarget!!.id
+                                    if (openReportTarget!!.mode == ShareCardMode.SAVED) {
+                                        openReportTarget = null
+                                    }
+                                    editingReportId = targetId
+                                },
                                 onBack = onBackReportDetail,
+                            )
+                        }
+                        loadingShareDay != null -> {
+                            val onBackLoadingShare = {
+                                loadingShareDay = null
+                                loadingHistoryOpen = true
+                            }
+                            BackHandler(onBack = onBackLoadingShare)
+                            LoadingShareRoute(
+                                date = loadingShareDay!!,
+                                onBack = onBackLoadingShare,
                             )
                         }
                         profileOpen -> {
@@ -437,7 +465,7 @@ class MainActivity : ComponentActivity() {
                             BackHandler(onBack = onBackReportsHistory)
                             ReportsHistoryRoute(
                                 onBack = onBackReportsHistory,
-                                onOpenReport = { openReportId = it },
+                                onOpenReport = { openReportTarget = OpenReportTarget(it, ShareCardMode.FROM_HISTORY) },
                             )
                         }
                         loadingHistoryOpen -> {
@@ -446,9 +474,7 @@ class MainActivity : ComponentActivity() {
                                 onBack = onBackLoadingHistory,
                                 onOpenDay = { date ->
                                     loadingHistoryOpen = false
-                                    loadingDay = date
-                                    loadingDayFromHistory = true
-                                    tab = Tab.LOADING
+                                    loadingShareDay = date
                                 },
                             )
                         }
@@ -598,7 +624,7 @@ class MainActivity : ComponentActivity() {
                                 }
                                 Tab.DASHBOARD -> DashboardRoute(
                                     sessionKey = sessionKey,
-                                    onOpenReport = { openReportId = it },
+                                    onOpenReport = { openReportTarget = OpenReportTarget(it, mode = null) },
                                     onOpenReports = { tab = Tab.REPORTS },
                                     onOpenLoading = { tab = Tab.LOADING },
                                     // A day that is not today's is opened as the day it is, which is the
@@ -629,7 +655,7 @@ class MainActivity : ComponentActivity() {
                                 Tab.REPORTS -> {
                                     BackHandler(enabled = !drawerState.isOpen, onBack = onBackReportsTab)
                                     ReportGeneratorRoute(
-                                        onCreated = { openReportId = it },
+                                        onCreated = { openReportTarget = OpenReportTarget(it, mode = ShareCardMode.SAVED) },
                                         onOpenHistory = { historyOpen = true },
                                     )
                                 }

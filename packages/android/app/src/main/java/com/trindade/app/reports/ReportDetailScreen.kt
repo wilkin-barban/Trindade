@@ -47,6 +47,8 @@ import com.trindade.app.R
 import com.trindade.app.ui.components.AdminDestructiveButton
 import com.trindade.app.ui.components.AdminPrimaryButton
 import com.trindade.app.ui.components.NavigationActionButton
+import com.trindade.app.ui.components.ShareCard
+import com.trindade.app.ui.components.ShareCardMode
 import com.trindade.app.ui.resolve
 import java.io.File
 
@@ -283,6 +285,7 @@ private const val MAX_PHOTOS = 5
 @Composable
 fun ReportDetailRoute(
     reportId: Int,
+    mode: ShareCardMode? = null,
     onEdit: () -> Unit,
     onBack: () -> Unit,
     viewModel: ReportDetailViewModel = hiltViewModel(),
@@ -313,14 +316,33 @@ fun ReportDetailRoute(
         viewModel.loadExport()
     }
 
-    ReportDetailScreen(
-        state = state,
-        onAddPhoto = viewModel::attachPhoto,
-        onDeletePhoto = viewModel::deletePhoto,
-        onLoadExport = viewModel::loadExport,
-        onShareExport = viewModel::shareExport,
-        onEdit = onEdit,
-        onBack = onBack,
-        onSyncErp = viewModel::syncErp,
-    )
+    if (mode != null) {
+        val title = state.report?.let { "${it.turno.value} • ${it.reportDate}" }
+            ?: "Relatório #$reportId"
+        val subtitle = state.report?.user?.displayName
+        ShareCard(
+            title = title,
+            subtitle = subtitle,
+            text = state.exportText,
+            loading = state.loadingExport || (state.loading && state.exportText == null),
+            error = state.message,
+            mode = mode,
+            onShare = viewModel::shareExport,
+            onPdf = viewModel::sharePdf,
+            onEdit = if (mode == ShareCardMode.SAVED) onEdit else null,
+            onClose = onBack,
+            modifier = Modifier.fillMaxSize().padding(16.dp),
+        )
+    } else {
+        ReportDetailScreen(
+            state = state,
+            onAddPhoto = viewModel::attachPhoto,
+            onDeletePhoto = viewModel::deletePhoto,
+            onLoadExport = viewModel::loadExport,
+            onShareExport = viewModel::shareExport,
+            onEdit = onEdit,
+            onBack = onBack,
+            onSyncErp = viewModel::syncErp,
+        )
+    }
 }
