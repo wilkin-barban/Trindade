@@ -16,7 +16,6 @@ import {
 } from '../../components/salida/SalidaSuccessDialog';
 import { saoPauloDaysAgo, saoPauloToday } from '../../lib/date';
 import {
-  AERO_SCRIPTABLE_CODE_PATH,
   aeroBridgeCallbackFor,
   buildAeroBridgeTriggerUrl,
   resolveAeroCallback,
@@ -24,10 +23,9 @@ import {
 import { readAeroBatchResult } from '../../lib/aero-feedback';
 import { markAeroBridgePending } from '../../lib/aero-watchdog';
 import { clearAeroPendingAttempt, loadAeroPendingAttempt, saveAeroPendingAttempt } from '../../lib/aero-pending-attempt';
-import { aeroAttemptHeaders, newAeroAttempt, postAeroAuditEvent } from '../../lib/aero-audit';
+import { newAeroAttempt, postAeroAuditEvent } from '../../lib/aero-audit';
 import { requestAeroBridgeTicket } from '../../lib/aero-vault';
 import {
-  SALIDA_AUDIT_DESTINATION,
   SALIDA_TICKET_REFUSED,
   buildSalidaPayloads,
   buildSalidaTrips,
@@ -41,7 +39,6 @@ import {
   salidaActionableErrorMessage,
   salidaBatchToDialogOutcome,
   salidaBatchToErpStatus,
-  salidaDateLine,
   salidaDaySummaryText,
   salidaPhotoFiles,
   salidaPrimaryStatus,
