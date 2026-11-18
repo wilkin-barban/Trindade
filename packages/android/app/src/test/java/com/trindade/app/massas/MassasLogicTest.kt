@@ -104,20 +104,21 @@ class MassasLogicTest {
         )
 
         val message = formatMassasWhatsAppMessage(view)
+        // El orden y la forma son los del Relatório: los operarios primero, cada uno con su encabezado 👤 y
+        // sus líneas de guion corto, y el resumen colectivo al final con 📦.
         val expected = listOf(
             "🍝 *Lançamento de Massas — 18/05/2025*",
             "",
-            "*Resumo Coletivo:*",
-            "• CASEIRA: 50 un (5 cx)",
-            "• TOKO: 20 un (2 cx)",
+            "👤 João Silva:",
+            "- CASEIRA: 50 un (5 cx)",
+            "- TOKO: 10 un (1 cx)",
             "",
-            "*Por Trabalhador:*",
-            "👤 *João Silva:*",
-            "• CASEIRA: 50 un (5 cx)",
-            "• TOKO: 10 un (1 cx)",
+            "👤 Maria Souza:",
+            "- TOKO: 20 un (2 cx)",
             "",
-            "👤 *Maria Souza:*",
-            "• TOKO: 20 un (2 cx)",
+            "Resumo Coletivo:",
+            "📦 CASEIRA: 50 un (5 cx)",
+            "📦 TOKO: 20 un (2 cx)",
         ).joinToString("\n")
 
         assertEquals(expected, message)

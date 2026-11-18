@@ -50,6 +50,7 @@ fun brazilianDate(date: String): String {
 fun formatMassasWhatsAppMessage(
     view: MassasLaunchDayView,
     rows: List<MassasUnifiedRow>? = null,
+    abbreviations: WhatsappAbbreviations = WhatsappAbbreviations.EMPTY,
 ): String {
     val lines = mutableListOf<String>()
     lines.add("🍝 *Lançamento de Massas — ${brazilianDate(view.date)}*")
@@ -59,7 +60,7 @@ fun formatMassasWhatsAppMessage(
     // plant recorded on its tablet, already deduplicated by `massasUnifiedRows`. Without them it falls back to
     // the local launches, which is what the screen had before the mirror existed.
     if (rows != null && rows.isNotEmpty()) {
-        val body = unifiedMessageLines(view, rows)
+        val body = unifiedMessageLines(view, rows, abbreviations)
         if (body != null) {
             lines.addAll(body)
             return lines.joinToString("\n")
@@ -72,26 +73,20 @@ fun formatMassasWhatsAppMessage(
         return lines.joinToString("\n")
     }
 
-    lines.add("*Resumo Coletivo:*")
-    for (product in launchedProducts) {
-        lines.add(
-            "• ${stripMassasPrefix(product.name)}: ${product.totalUnits} un (${product.totalBoxes} cx)"
-        )
+    // The same shape the report writes: the people first, then the day's collective summary. The heading carries
+    // no `Por Trabalhador` line because the 👤 already says it, and no asterisks because the group reads plain.
+    val workers = buildWorkerTotals(view)
+    workers.forEach { worker ->
+        lines.add("👤 ${worker.name}:")
+        for (product in worker.products) {
+            lines.add(workerLine(abbreviations, product.code, product.name, product.totalUnits, product.totalBoxes))
+        }
+        lines.add("")
     }
 
-    val workers = buildWorkerTotals(view)
-    if (workers.isNotEmpty()) {
-        lines.add("")
-        lines.add("*Por Trabalhador:*")
-        workers.forEachIndexed { index, worker ->
-            if (index > 0) lines.add("")
-            lines.add("👤 *${worker.name}:*")
-            for (product in worker.products) {
-                lines.add(
-                    "• ${stripMassasPrefix(product.name)}: ${product.totalUnits} un (${product.totalBoxes} cx)"
-                )
-            }
-        }
+    lines.add("Resumo Coletivo:")
+    for (product in launchedProducts) {
+        lines.add(collectiveLine(abbreviations, product.code, product.name, product.totalUnits, product.totalBoxes))
     }
 
     return lines.joinToString("\n")
@@ -106,6 +101,7 @@ fun formatMassasWhatsAppMessage(
 private fun unifiedMessageLines(
     view: MassasLaunchDayView,
     rows: List<MassasUnifiedRow>,
+    abbreviations: WhatsappAbbreviations,
 ): List<String>? {
     // The catalogue is the ten massas: a supply the mirror returned is not part of this message, and the
     // description never gets a vote.
@@ -148,33 +144,64 @@ private fun unifiedMessageLines(
     }
 
     val lines = mutableListOf<String>()
-    lines.add("*Resumo Coletivo:*")
+    val people = workers.values.sortedWith(compareBy { it.name.lowercase() })
+    for (worker in people) {
+        // The mark says the worker has no account here: the plant recorded him and Trindade only mirrors it.
+        lines.add("👤 ${worker.name}${if (worker.erpOnly) " (só ERP)" else ""}:")
+        for (code in worker.units.keys.sortedWith(byCatalog)) {
+            val line = worker.units.getValue(code)
+            lines.add(
+                workerLine(
+                    abbreviations,
+                    code,
+                    line.name,
+                    line.units,
+                    boxesForUnits(line.units, line.unitsPerBox),
+                )
+            )
+        }
+        lines.add("")
+    }
+
+    lines.add("Resumo Coletivo:")
     for (code in products.keys.sortedWith(byCatalog)) {
         val product = products.getValue(code)
         lines.add(
-            "• ${stripMassasPrefix(product.name)}: ${product.units} un (${boxesForUnits(product.units, product.unitsPerBox)} cx)"
+            collectiveLine(
+                abbreviations,
+                code,
+                product.name,
+                product.units,
+                boxesForUnits(product.units, product.unitsPerBox),
+            )
         )
-    }
-
-    val people = workers.values.sortedWith(compareBy { it.name.lowercase() })
-    if (people.isNotEmpty()) {
-        lines.add("")
-        lines.add("*Por Trabalhador:*")
-        people.forEachIndexed { index, worker ->
-            if (index > 0) lines.add("")
-            // The mark says the worker has no account here: the plant recorded him and Trindade only mirrors it.
-            lines.add("👤 *${worker.name}${if (worker.erpOnly) " (só ERP)" else ""}:*")
-            for (code in worker.units.keys.sortedWith(byCatalog)) {
-                val line = worker.units.getValue(code)
-                lines.add(
-                    "• ${stripMassasPrefix(line.name)}: ${line.units} un (${boxesForUnits(line.units, line.unitsPerBox)} cx)"
-                )
-            }
-        }
     }
 
     return lines
 }
+
+/**
+ * One product under a worker: the short name the table approved, the exact units and the boxes.
+ *
+ * Masas keeps its boxes where the report does not: the group reads "600 un (30 cx)" and knows how much of the
+ * load walks out, which is the question this module answers every day.
+ */
+private fun workerLine(
+    abbreviations: WhatsappAbbreviations,
+    code: String,
+    name: String,
+    units: Int,
+    boxes: Int,
+): String = "- ${abbreviations.shortName(code, name)}: $units un ($boxes cx)"
+
+/** The day's summary line: the 📦 the plant reads, and no code in sight. */
+private fun collectiveLine(
+    abbreviations: WhatsappAbbreviations,
+    code: String,
+    name: String,
+    units: Int,
+    boxes: Int,
+): String = "📦 ${abbreviations.shortName(code, name)}: $units un ($boxes cx)"
 
 private val MASSAS_PREFIX_REGEX = Regex("^MASSA\\s+(?:DE\\s+)?", RegexOption.IGNORE_CASE)
 

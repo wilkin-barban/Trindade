@@ -63,11 +63,11 @@ class MassasWhatsAppUnifiedTest {
 
         val message = formatMassasWhatsAppMessage(day(), rows)
 
-        assertTrue(message, message.contains("👤 *Jaime (só ERP):*"))
-        assertTrue(message, message.contains("• CASEIRA: 20 un (2 cx)"))
-        assertTrue(message, message.contains("• TOKO: 10 un (1 cx)"))
-        assertTrue(message, message.contains("*Resumo Coletivo:*"))
-        assertTrue(message, message.contains("*Por Trabalhador:*"))
+        assertTrue(message, message.contains("👤 Jaime (só ERP):"))
+        assertTrue(message, message.contains("- CASEIRA: 20 un (2 cx)"))
+        assertTrue(message, message.contains("- TOKO: 10 un (1 cx)"))
+        assertTrue(message, message.contains("Resumo Coletivo:"))
+        assertTrue(message, message.contains("📦 CASEIRA: 20 un (2 cx)"))
     }
 
     @Test
@@ -80,7 +80,7 @@ class MassasWhatsAppUnifiedTest {
 
         val message = formatMassasWhatsAppMessage(day(), rows)
 
-        assertTrue(message, message.contains("• CASEIRA: 10 un (1 cx)"))
+        assertTrue(message, message.contains("- CASEIRA: 10 un (1 cx)"))
         assertFalse(message, message.contains("PIZZA"))
     }
 
@@ -90,9 +90,11 @@ class MassasWhatsAppUnifiedTest {
 
         val message = formatMassasWhatsAppMessage(day(), rows)
 
-        assertTrue(message, message.contains("👤 *Jaime:*"))
+        assertTrue(message, message.contains("👤 Jaime:"))
         assertFalse(message, message.contains("só ERP"))
-        val workerSection = message.substringAfter("*Por Trabalhador:*")
+        // La sección del operario ahora va antes del resumen colectivo: se corta en el encabezado del resumen
+        // para no contar dos veces el mismo producto del día.
+        val workerSection = message.substringAfter("👤 Jaime:").substringBefore("Resumo Coletivo:")
         assertEquals(1, workerSection.lines().count { it.contains("CASEIRA") })
     }
 
@@ -120,7 +122,7 @@ class MassasWhatsAppUnifiedTest {
 
         val message = formatMassasWhatsAppMessage(view)
 
-        assertTrue(message, message.contains("👤 *Jaime:*"))
-        assertTrue(message, message.contains("• CASEIRA: 20 un (2 cx)"))
+        assertTrue(message, message.contains("👤 Jaime:"))
+        assertTrue(message, message.contains("- CASEIRA: 20 un (2 cx)"))
     }
 }

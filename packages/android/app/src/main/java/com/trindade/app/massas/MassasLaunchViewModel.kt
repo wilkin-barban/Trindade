@@ -66,6 +66,9 @@ class MassasLaunchViewModel @Inject constructor(
     private val aeroDispatcher: AeroDispatcher,
     private val tabletAckStore: TabletAckPort,
     private val usersRepository: UsersRepository? = null,
+    // The approved abbreviations travel with the message, not with a screen: a message built without them would
+    // be a message with full catalogue names, which is exactly what this pass removed.
+    private val abbreviationsSource: WhatsappAbbreviationsSource? = null,
 ) : ViewModel() {
 
     companion object {
@@ -1261,15 +1264,18 @@ class MassasLaunchViewModel @Inject constructor(
 
     fun getWhatsAppLink(): String? {
         val view = _state.value.dayView ?: return null
-        val message = formatMassasWhatsAppMessage(view, _state.value.unifiedRows)
+        val message = formatMassasWhatsAppMessage(view, _state.value.unifiedRows, abbreviations())
         return waMeLink(_state.value.phone, message)
     }
 
     fun getShareText(): String {
         val view = _state.value.dayView ?: return ""
         // The whole day, not only what this phone launched: an ERP-only worker and his massas travel too.
-        return formatMassasWhatsAppMessage(view, _state.value.unifiedRows)
+        return formatMassasWhatsAppMessage(view, _state.value.unifiedRows, abbreviations())
     }
+
+    private fun abbreviations(): WhatsappAbbreviations =
+        abbreviationsSource?.table ?: WhatsappAbbreviations.EMPTY
 
     fun toggleHelpDialog(show: Boolean) {
         _state.value = _state.value.copy(showHelpDialog = show)
