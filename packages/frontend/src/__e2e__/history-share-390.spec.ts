@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
-import { fillAllTemperatureInputs, getE2EIdentities, goToProtected, openSavedReportView } from './auth-helpers';
+import { apiToken, fillAllTemperatureInputs, getE2EIdentities, goToProtected, openSavedReportView } from './auth-helpers';
+
+const API_BASE = 'http://localhost:3099/api';
 
 /** Un día ya pasado: el historial lo lista y el editor de hoy no lo ve, así que no ensucia esa grilla. */
 function pastDay(): string {
@@ -47,8 +49,11 @@ test.describe('los históricos abren la tarjeta de compartir', () => {
     await openSavedReportView(page);
     await page.waitForSelector('[data-testid="report-detail"]', { timeout: 15000 });
 
+    // El reporte que este test creó se borra al final: el historial es compartido y otro spec lee el día.
+    const created = Number(new URL(page.url()).pathname.split('/').pop());
+
     await goToProtected(page, '/loading/reports-history', identities.admin);
-    const summary = page.locator('a[href^="/reports/"][href*="?share=1"]').first();
+    const summary = page.locator(`a[href="/reports/${created}?share=1"]`).first();
     await expect(summary).toBeVisible({ timeout: 15000 });
     await summary.click();
 
@@ -59,5 +64,10 @@ test.describe('los históricos abren la tarjeta de compartir', () => {
 
     await page.getByTestId('report-share-back').click();
     await expect(page).toHaveURL(/\/loading\/reports-history$/);
+
+    const token = await apiToken(page, identities.admin);
+    await page.request.delete(`${API_BASE}/reports/${created}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
   });
 });
