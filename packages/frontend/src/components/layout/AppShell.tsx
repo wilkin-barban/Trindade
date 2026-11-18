@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { DeveloperCredit } from '../ui/DeveloperCredit';
 import { useTranslation } from 'react-i18next';
-import { LucideMenu, LucideX, LayoutDashboard, ClipboardList, Truck, MessageCircle, ShieldCheck, History, Share2, Layers, Calculator, Boxes, CalendarDays, Archive, FileClock, FileSearch, PackageMinus, ClipboardX } from 'lucide-react';
+import { LucideMenu, LucideX, LayoutDashboard, ClipboardList, Truck, ShieldCheck, History, Share2, Layers, Calculator, Boxes, CalendarDays, Archive, FileClock, FileSearch, PackageMinus, ClipboardX } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { isSalidaVisible } from '../../lib/salida';
 import { Button } from '../ui/button';
@@ -138,11 +138,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             </>
           )}
 
-          <div className="px-3.5 pt-4 pb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-            {t('nav.future')}
-          </div>
-
-          <NavItem icon={<MessageCircle className="h-4 w-4" />} label={t('nav.whatsappExport')} disabled />
         </nav>
 
         {/* User footer */}
