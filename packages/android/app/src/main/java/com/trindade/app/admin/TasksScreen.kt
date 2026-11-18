@@ -83,37 +83,6 @@ fun TasksScreen(
                 text = stringResource(R.string.admin_new_task),
             )
         }
-        if (showForm || state.editingId != null) {
-            TaskForm(state, onCategoryChange, onNamePtChange, onNameEsChange, onReadingsChange)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AdminPrimaryButton(
-                    onClick = {
-                        val taskName = state.namePt.ifBlank { state.nameEs }
-                        val isCreate = state.editingId == null
-                        val titleRes = if (isCreate) R.string.admin_action_create else R.string.admin_action_save
-                        val bodyRes = if (isCreate) R.string.admin_dialog_create_body else R.string.admin_dialog_save_body
-                        pendingConfirmation = AdminConfirmation(
-                            title = context.getString(titleRes),
-                            message = context.getString(bodyRes, taskName),
-                            confirmLabel = context.getString(R.string.admin_action_confirm),
-                            onConfirm = {
-                                pendingConfirmation = null
-                                onSave()
-                            },
-                        )
-                    },
-                    enabled = !state.saving,
-                    loading = state.saving,
-                    text = if (state.saving) stringResource(R.string.admin_action_saving) else if (state.editingId == null) stringResource(R.string.admin_action_create) else stringResource(R.string.admin_action_save),
-                )
-                AdminSecondaryButton(
-                    onClick = { showForm = false; onCancel() },
-                    enabled = !state.saving,
-                    text = stringResource(R.string.admin_action_cancel),
-                )
-            }
-        }
-
         state.tasks.forEach { task ->
             val editable = state.canEdit(task)
             Card(
@@ -171,6 +140,43 @@ fun TasksScreen(
             }
         }
         if (!state.loading && state.tasks.isEmpty()) Text(stringResource(R.string.admin_no_tasks))
+    }
+
+    // El alta y la edición viven en el modal compartido, fuera del Column que scrollea: la lista queda detrás
+    // y el formulario no empuja las tarjetas.
+    if (showForm || state.editingId != null) {
+        val isCreate = state.editingId == null
+        AdminFormDialog(
+            title = stringResource(if (isCreate) R.string.admin_new_task else R.string.admin_action_edit),
+            onDismiss = {
+                showForm = false
+                onCancel()
+            },
+            onSubmit = {
+                val taskName = state.namePt.ifBlank { state.nameEs }
+                val titleRes = if (isCreate) R.string.admin_action_create else R.string.admin_action_save
+                val bodyRes = if (isCreate) R.string.admin_dialog_create_body else R.string.admin_dialog_save_body
+                pendingConfirmation = AdminConfirmation(
+                    title = context.getString(titleRes),
+                    message = context.getString(bodyRes, taskName),
+                    confirmLabel = context.getString(R.string.admin_action_confirm),
+                    onConfirm = {
+                        pendingConfirmation = null
+                        onSave()
+                    },
+                )
+            },
+            saving = state.saving,
+            submitLabel = if (state.saving) {
+                stringResource(R.string.admin_action_saving)
+            } else if (isCreate) {
+                stringResource(R.string.admin_action_create)
+            } else {
+                stringResource(R.string.admin_action_save)
+            },
+        ) {
+            TaskForm(state, onCategoryChange, onNamePtChange, onNameEsChange, onReadingsChange)
+        }
     }
 
     val deleteConfirmation = state.deleteTarget?.takeIf { state.canDelete(it) }?.let { task ->

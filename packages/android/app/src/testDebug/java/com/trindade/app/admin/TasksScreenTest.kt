@@ -150,13 +150,13 @@ class TasksScreenTest {
     fun `task form exposes category names and readings and reports validation and saving`() {
         render(state(saving = true, error = TasksViewModel.TEMPERATURE_READINGS, editingId = 1))
 
-        composeRule.onNodeWithText("Categoria").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Português").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Español").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Leituras de temperatura").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Categoria").assertIsDisplayed()
+        composeRule.onNodeWithText("Português").assertIsDisplayed()
+        composeRule.onNodeWithText("Español").assertIsDisplayed()
+        composeRule.onNodeWithText("Leituras de temperatura").assertIsDisplayed()
         val expectedMsg = copy(R.string.tasks_error_readings)
-        composeRule.onNodeWithText(expectedMsg).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Salvando…").performScrollTo().assertIsDisplayed().assertIsNotEnabled()
+        composeRule.onNodeWithText(expectedMsg).assertIsDisplayed()
+        composeRule.onNodeWithText("Salvando…").assertIsDisplayed().assertIsNotEnabled()
     }
 
     @Test
@@ -319,7 +319,8 @@ class TasksScreenTest {
         var saved = 0
         render(state(editingId = 1, namePt = "Tarefa Teste"), onSave = { saved++ })
 
-        composeRule.onNodeWithText("Salvar").performScrollTo().performClick()
+        // El pie del modal no scrollea, así que el botón se alcanza sin desplazar nada.
+        composeRule.onNodeWithText("Salvar").performClick()
         val expectedBody = copy(R.string.admin_dialog_save_body, "Tarefa Teste")
         composeRule.onNodeWithText(expectedBody).assertIsDisplayed()
 
@@ -332,7 +333,8 @@ class TasksScreenTest {
         var saved = 0
         render(state(editingId = 1, namePt = "Tarefa Teste"), onSave = { saved++ })
 
-        composeRule.onNodeWithText("Salvar").performScrollTo().performClick()
+        // El pie del modal no scrollea, así que el botón se alcanza sin desplazar nada.
+        composeRule.onNodeWithText("Salvar").performClick()
         val expectedBody = copy(R.string.admin_dialog_save_body, "Tarefa Teste")
         composeRule.onNodeWithText(expectedBody).assertIsDisplayed()
 
