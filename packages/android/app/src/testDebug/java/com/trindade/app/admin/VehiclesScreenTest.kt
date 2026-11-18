@@ -385,7 +385,7 @@ class VehiclesScreenTest {
         var saved = 0
         render(state(editingId = 1, description = "Caminhão 9"), onSave = { saved++ })
 
-        composeRule.onNodeWithText("Salvar").performScrollTo().performClick()
+        composeRule.onNodeWithText("Salvar").performClick()
         val expectedBody = copy(R.string.admin_dialog_save_body, "Caminhão 9")
         composeRule.onNodeWithText(expectedBody).assertIsDisplayed()
 
@@ -398,7 +398,7 @@ class VehiclesScreenTest {
         var saved = 0
         render(state(editingId = 1, description = "Caminhão 9"), onSave = { saved++ })
 
-        composeRule.onNodeWithText("Salvar").performScrollTo().performClick()
+        composeRule.onNodeWithText("Salvar").performClick()
         val expectedBody = copy(R.string.admin_dialog_save_body, "Caminhão 9")
         composeRule.onNodeWithText(expectedBody).assertIsDisplayed()
 

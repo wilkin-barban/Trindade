@@ -89,53 +89,6 @@ fun VehiclesScreen(
             )
         }
 
-        if (state.isAdmin && (showForm || state.editingId != null)) {
-            OutlinedTextField(
-                value = state.description,
-                onValueChange = onDescriptionChange,
-                label = { Text(stringResource(R.string.admin_field_description)) },
-                enabled = !state.saving,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            OutlinedTextField(
-                value = state.licensePlate,
-                onValueChange = onLicensePlateChange,
-                label = { Text(stringResource(R.string.admin_field_plate)) },
-                enabled = !state.saving,
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AdminPrimaryButton(
-                    onClick = {
-                        val isCreate = state.editingId == null
-                        val titleRes = if (isCreate) R.string.admin_action_create else R.string.admin_action_save
-                        val bodyRes = if (isCreate) R.string.admin_dialog_create_body else R.string.admin_dialog_save_body
-                        val vehicleName = state.description.ifBlank { state.licensePlate }
-                        pendingConfirmation = AdminConfirmation(
-                            title = context.getString(titleRes),
-                            message = context.getString(bodyRes, vehicleName),
-                            confirmLabel = context.getString(R.string.admin_action_confirm),
-                            onConfirm = {
-                                pendingConfirmation = null
-                                onSave()
-                            },
-                        )
-                    },
-                    enabled = !state.saving && !state.loading,
-                    loading = state.saving,
-                    text = if (state.saving) stringResource(R.string.admin_action_saving) else if (state.editingId == null) stringResource(R.string.admin_action_create) else stringResource(R.string.admin_action_save),
-                )
-                AdminSecondaryButton(
-                    onClick = {
-                        showForm = false
-                        onCancel()
-                    },
-                    enabled = !state.saving,
-                    text = stringResource(R.string.admin_action_cancel),
-                )
-            }
-        }
 
         state.vehicles.forEach { vehicle ->
             Card(
@@ -211,6 +164,56 @@ fun VehiclesScreen(
                 onConfirmDelete()
             },
         )
+    }
+
+    // El formulario de vehículos, en el modal compartido y fuera del Column que scrollea.
+    if (state.isAdmin && (showForm || state.editingId != null)) {
+        val isCreate = state.editingId == null
+        AdminFormDialog(
+            title = stringResource(if (isCreate) R.string.admin_new_vehicle else R.string.admin_action_edit),
+            onDismiss = {
+                showForm = false
+                onCancel()
+            },
+            onSubmit = {
+                val titleRes = if (isCreate) R.string.admin_action_create else R.string.admin_action_save
+                val bodyRes = if (isCreate) R.string.admin_dialog_create_body else R.string.admin_dialog_save_body
+                val vehicleName = state.description.ifBlank { state.licensePlate }
+                pendingConfirmation = AdminConfirmation(
+                    title = context.getString(titleRes),
+                    message = context.getString(bodyRes, vehicleName),
+                    confirmLabel = context.getString(R.string.admin_action_confirm),
+                    onConfirm = {
+                        pendingConfirmation = null
+                        onSave()
+                    },
+                )
+            },
+            saving = state.saving,
+            submitEnabled = !state.saving && !state.loading,
+            submitLabel = if (state.saving) {
+                stringResource(R.string.admin_action_saving)
+            } else if (isCreate) {
+                stringResource(R.string.admin_action_create)
+            } else {
+                stringResource(R.string.admin_action_save)
+            },
+        ) {
+            OutlinedTextField(
+                value = state.description,
+                onValueChange = onDescriptionChange,
+                label = { Text(stringResource(R.string.admin_field_description)) },
+                enabled = !state.saving,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = state.licensePlate,
+                onValueChange = onLicensePlateChange,
+                label = { Text(stringResource(R.string.admin_field_plate)) },
+                enabled = !state.saving,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
 
     AdminConfirmDialog(
