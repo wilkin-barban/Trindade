@@ -503,6 +503,7 @@
     <string name="audit_details_expand">Ver detalles</string>
     <string name="audit_details_collapse">Ocultar detalles</string>
     <string name="audit_error_fetch">Error al cargar registros de auditoría</string>
+    <string name="nav_salida">Salida / Baja</string>
     <string name="nav_assai">Calculadora de Assaí</string>
     <string name="nav_stock_counter">Calculador de Estoque</string>
     <string name="nav_stock_history">Historial de Conteo</string>

@@ -673,6 +673,7 @@ class MainActivityNavigationTest {
                 R.string.nav_reports,
                 R.string.nav_loading,
                 R.string.massas_title,
+                R.string.nav_salida,
                 R.string.nav_assai,
                 R.string.nav_stock_counter,
                 R.string.massas_history_title,
