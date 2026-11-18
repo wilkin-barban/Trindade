@@ -189,3 +189,22 @@ cerrado (CI verde y deploy real). Hasta entonces no se toca `packages/android`.
   de lanzamiento e histórico, pestaña en el drawer y entradas en `RolePolicy`.
 - APK **0.8.0 / 8001** compilada con `-PapiBaseUrl` de producción e instalada en `emulator-5554` (verificado por
   `dumpsys`); arranca en el login. Pendiente de una cuenta para las capturas de las pantallas internas.
+
+### Fase 2 — parcial
+
+- `GET api/reports/day/salidas` en `ReportsApi`, `ReportsRepository.salidaDay` y `SalidaReportCard` en el detalle del
+  Relatório: operarios con cuenta, `(só ERP)`, productos con su nombre corto y total del día; un día sin salidas lo
+  dice, y una lectura fallida también (commit `ebebde38`).
+- Sync del Relatório con los dos lados: `AeroErpPort.readMovementsIncludingExits` (default: la lectura de siempre) y
+  `syncDay(..., includeExits = true)` desde el detalle del reporte, que manda `ENTSAI: null`.
+- APK **0.8.0 / 8002** instalada con este bloque.
+- **Falta**: la `ShareCard` Compose reutilizable y su uso en los históricos de Reportes y de Horario cerrado.
+
+### Fase 3 — pendiente
+
+Masas con tabla/golden y share en el histórico (día vacío deshabilitado, sin Copiar), Admin en modal para las seis
+pestañas, Assaí con 8 productos y dashboard con la séptima tarjeta.
+
+### Fase 4 — pendiente
+
+Capturas a 390 dp y comparación con la web: necesitan una sesión real en el emulador; la app quedó en el login.
