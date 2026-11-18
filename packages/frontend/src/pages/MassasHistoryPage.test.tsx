@@ -309,5 +309,24 @@ describe('MassasHistoryPage', () => {
 
     expect(await screen.findByTestId('massas-history-empty')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+    // El bloque de compartir sigue ahí, como en Salidas, diciendo que no hay nada que mandar.
+    expect(screen.getByTestId('massas-share-day')).toBeDisabled();
+    expect(screen.getByTestId('massas-preview-message').textContent).toBe('Sin lanzamientos para compartir');
+    // Y el botón de copiar, que era un segundo camino al mismo texto, ya no existe.
+    expect(screen.queryByText(/Copiar Reporte|Copiar Relatório|Copiar Relatorio/)).not.toBeInTheDocument();
+  });
+
+  it('enables the share when the day has something to send', async () => {
+    get.mockImplementation(async (url: string) => {
+      if (url.startsWith('/massas-launch/history')) return { days: [] };
+      if (url.startsWith('/massas-launch?')) return dayView('2026-10-26', 'MASSA QUADRADA');
+      return { date: '2026-10-26', movements: [] };
+    });
+
+    renderPage('/massas-history?date=2026-10-26');
+
+    expect(await screen.findByTestId('massas-share-day')).toBeEnabled();
+    expect(screen.getByTestId('massas-preview-message').textContent).not.toBe('Sin lanzamientos para compartir');
   });
 });

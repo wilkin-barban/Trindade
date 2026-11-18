@@ -2,25 +2,24 @@ import { useTranslation } from 'react-i18next';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
-import { Send, Copy } from 'lucide-react';
+import { Send } from 'lucide-react';
 import { formatPhoneMask } from '../../lib/phone';
 
 interface MassasWhatsAppShareProps {
   phone: string;
   onPhoneChange: (val: string) => void;
   previewMessage: string;
-  onCopy: () => void;
   onOpenWhatsApp: () => void;
-  copyNote: string;
+  /** El día no tiene nada que mandar: la vista previa lo dice y el botón no se puede tocar. */
+  disabled?: boolean;
 }
 
 export function MassasWhatsAppShare({
   phone,
   onPhoneChange,
   previewMessage,
-  onCopy,
   onOpenWhatsApp,
-  copyNote,
+  disabled = false,
 }: MassasWhatsAppShareProps) {
   const { t } = useTranslation();
 
@@ -54,31 +53,18 @@ export function MassasWhatsAppShare({
               </span>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            <div className="flex flex-col gap-3 pt-2 sm:flex-row">
               <Button
                 type="button"
                 onClick={onOpenWhatsApp}
-                className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold"
+                disabled={disabled}
+                className="flex-1 bg-green-600 font-semibold text-white hover:bg-green-700"
+                data-testid="massas-share-day"
               >
-                <Send className="h-4 w-4 mr-2" />
+                <Send className="mr-2 h-4 w-4" />
                 {t('massas.openWhatsApp')}
               </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onCopy}
-                className="flex-1 font-semibold"
-              >
-                <Copy className="h-4 w-4 mr-2" />
-                {t('massas.copyReport')}
-              </Button>
             </div>
-
-            {copyNote && (
-              <div role="status" className="p-2.5 bg-green-50 text-green-800 text-xs rounded border border-green-200">
-                {copyNote}
-              </div>
-            )}
           </div>
 
           {/* Live Message Preview */}
@@ -86,8 +72,11 @@ export function MassasWhatsAppShare({
             <span className="text-xs font-semibold uppercase text-gray-500 block">
               {t('massas.previewTitle')}
             </span>
-            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 text-xs sm:text-sm font-mono whitespace-pre-wrap leading-relaxed text-gray-800 max-h-64 overflow-y-auto">
-              {previewMessage}
+            <div
+              className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded-lg border border-gray-200 bg-gray-50 p-4 font-mono text-xs leading-relaxed text-gray-800 sm:text-sm"
+              data-testid="massas-preview-message"
+            >
+              {previewMessage || t('massas.shareDayEmpty')}
             </div>
           </div>
         </div>

@@ -162,7 +162,8 @@ export function MassasHistoryPage() {
 
   // WhatsApp state
   const [phone, setPhone] = useState('');
-  const [copyNote, setCopyNote] = useState('');
+  // El aviso de la copia era del botón `Copiar Relatório`, que ya no existe: compartir y copiar son el mismo gesto.
+
 
   // Integration & Mirror state
   const aeroAllowed = isAeroAllowed(user ? { username: user.username, role: user.role } : null);
@@ -655,15 +656,6 @@ export function MassasHistoryPage() {
   };
 
   // WhatsApp handlers
-  const handleCopyReport = async () => {
-    if (!previewMessage) return;
-    setCopyNote('');
-    const outcome = await shareOrCopy(previewMessage);
-    if (outcome === 'copied' || outcome === 'shared') {
-      setCopyNote(t('massas.copied'));
-    }
-  };
-
   const handleOpenWhatsApp = () => {
     if (!previewMessage) return;
     const formattedNumber = toWhatsAppNumber(phone);
@@ -936,10 +928,14 @@ export function MassasHistoryPage() {
     [dayView, mirror.snapshot, ackedLaunchIds],
   );
 
+  // El día tiene algo que mandar sólo si hay lanzamientos o asientos del espejo: con el día vacío la vista previa
+  // queda en blanco y el bloque se dibuja igual, como en el histórico de Salidas.
+  const hasShareableData = Boolean(dayView && (dayView.launches.length > 0 || unifiedRows.length > 0));
+
   const previewMessage = useMemo(() => {
-    if (!dayView) return '';
+    if (!dayView || !hasShareableData) return '';
     return massasMessage(dayView, unifiedRows);
-  }, [dayView, unifiedRows]);
+  }, [dayView, unifiedRows, hasShareableData]);
 
   const closeResultModal = () => {
     setResultModal(null);
@@ -1136,9 +1132,8 @@ export function MassasHistoryPage() {
         phone={phone}
         onPhoneChange={setPhone}
         previewMessage={previewMessage}
-        onCopy={handleCopyReport}
         onOpenWhatsApp={handleOpenWhatsApp}
-        copyNote={copyNote}
+        disabled={!hasShareableData}
       />
 
       {/* ERP Movements Sync Result Dialog */}
