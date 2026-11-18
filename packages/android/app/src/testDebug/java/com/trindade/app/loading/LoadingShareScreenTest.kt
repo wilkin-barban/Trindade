@@ -77,9 +77,9 @@ class LoadingShareScreenTest {
             }
         }
 
-        // Title and subtitle
+        // Title and subtitle: the day as the plant writes it, not the ISO the navigation carries.
         composeRule.onNodeWithText(copy(R.string.loading_title)).assertIsDisplayed()
-        composeRule.onNodeWithText("2026-11-18").assertIsDisplayed()
+        composeRule.onNodeWithText("18/11/2026").assertIsDisplayed()
 
         // Verbatim text
         composeRule.onNodeWithText(verbatimText).assertIsDisplayed()

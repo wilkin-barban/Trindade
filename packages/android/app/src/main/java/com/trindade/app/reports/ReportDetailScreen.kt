@@ -317,7 +317,8 @@ fun ReportDetailRoute(
     }
 
     if (mode != null) {
-        val title = state.report?.let { "${it.turno.value} • ${it.reportDate}" }
+        // La fecha del día, en el orden que la planta la lee: la web no muestra ISO en ninguna cabecera.
+        val title = state.report?.let { "${it.turno.value} • ${com.trindade.app.massas.brazilianDate(it.reportDate)}" }
             ?: "Relatório #$reportId"
         val subtitle = state.report?.user?.displayName
         ShareCard(

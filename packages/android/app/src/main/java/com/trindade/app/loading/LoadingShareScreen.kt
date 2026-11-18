@@ -102,7 +102,8 @@ fun LoadingShareScreen(
 ) {
     ShareCard(
         title = stringResource(R.string.loading_title),
-        subtitle = date,
+        // El día tal como lo escribe la planta, no el ISO del parámetro de navegación.
+        subtitle = com.trindade.app.massas.brazilianDate(date),
         text = state.exportText,
         loading = state.loading,
         error = state.message,
