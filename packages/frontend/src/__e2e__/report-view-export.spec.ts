@@ -164,7 +164,11 @@ test.describe('Report View & Export', () => {
 
     const text = await page.locator('[data-testid="export-text-content"]').textContent();
     expect(text).toContain('🍝 *LANÇAMENTO DE MASSAS*');
-    expect(text).toContain('Por Operário:');
+    // El operario es el encabezado y sus productos cuelgan con el prefijo corto, como en Recebimento y Salida; la
+    // línea `Por Operário:` se fue con las abreviaturas y el resumen colectivo conserva su 📦.
+    expect(text).toContain('👤');
+    expect(text).not.toContain('Por Operário:');
+    expect(text).toContain('- CASEIRA: ');
     expect(text).toContain(`📦 CASEIRA: ${dayUnits} un`);
     expect(text).toContain('Resumo Coletivo:');
   });
