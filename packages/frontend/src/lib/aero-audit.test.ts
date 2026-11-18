@@ -234,6 +234,11 @@ describe('aeroErrorCode', () => {
     assert.equal(aeroErrorCode('timeout de 30s'), 'AERO_TIMEOUT');
     assert.equal(aeroErrorCode('blocked: mixed_content'), 'AERO_BLOCKED_MIXED_CONTENT');
     assert.equal(aeroErrorCode('Erro 502 no ERP'), 'AERO_ERP_ERROR');
+    // La frase que el WebService devuelve dentro de un 200 es una falla suya, no de este cliente.
+    assert.equal(
+      aeroErrorCode('PDO::prepare(): Argument #1 ($query) cannot be empty'),
+      'AERO_ERP_ERROR',
+    );
     assert.equal(aeroErrorCode('qualquer outra coisa'), 'AERO_CLIENT_ERROR');
   });
 

@@ -5,6 +5,7 @@ import {
   aeroImportPlan,
   aeroMirrorSeats,
   aeroMovementsPayload,
+  aeroMovementsPayloads,
   readAeroMovementsSnapshot,
 } from './aero-mirror';
 
@@ -232,11 +233,27 @@ describe('aero-mirror: the seats this tab is about', () => {
       [9],
     );
   });
-  it('asks for both sides of the day only when the caller says so', () => {
-    // The report states the whole day, exits included. Every other reader of the mirror wants the entries, and a
-    // query that asked for both everywhere would change what every module sees.
+  it('asks for both sides of the day as two payloads, never as an open side', () => {
+    // El Informe declara el día entero, salidas incluidas. Cualquier otro lector del espejo quiere las entradas,
+    // y una consulta abierta en todos lados cambiaría lo que ve cada módulo.
     assert.equal(aeroMovementsPayload({ date: '2026-10-28' }).ENTSAI, 'E');
-    assert.equal(aeroMovementsPayload({ date: '2026-10-28', includeExits: true }).ENTSAI, null);
+
+    const entries = aeroMovementsPayloads({ date: '2026-10-28' });
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].ENTSAI, 'E');
+
+    const both = aeroMovementsPayloads({ date: '2026-10-28', includeExits: true });
+    assert.equal(both.length, 2);
+    assert.equal(both[0].ENTSAI, 'E');
+    assert.equal(both[1].ENTSAI, 'S');
+    // Aero32 arma una consulta vacía con `ENTSAI` nulo y contesta con un error de PHP: ningún cuerpo puede
+    // viajar así, ni siquiera el de un día que sólo pide un lado.
+    for (const payload of [...both, ...entries]) {
+      assert.notEqual(payload.ENTSAI, null);
+      assert.ok(payload.ENTSAI === 'E' || payload.ENTSAI === 'S');
+      assert.equal(payload._method, 'PATCH');
+      assert.equal(payload.DTINI, payload.DTFIM);
+    }
   });
 
 });

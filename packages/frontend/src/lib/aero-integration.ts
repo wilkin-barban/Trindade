@@ -772,9 +772,18 @@ export function readAeroMovements(data: unknown): AeroMovementsReadResult {
     return { status: 'error', message };
   }
 
+  // Un viaje que pidió los dos lados del día puede devolver dos listas: se leen como una sola, en el orden
+  // en que llegaron. El puente ya las une; esto cubre un guion intermedio que todavía no lo hace, y una lista
+  // plana sigue entrando sin cambios.
+  const rows: unknown[] = [];
+  for (const row of record.data) {
+    if (Array.isArray(row)) rows.push(...row);
+    else rows.push(row);
+  }
+
   const movements: AeroErpMovementItem[] = [];
   let skipped = 0;
-  for (const raw of record.data) {
+  for (const raw of rows) {
     const seat = readAeroMovementSeat(raw);
     if (seat) movements.push(seat);
     else skipped += 1;

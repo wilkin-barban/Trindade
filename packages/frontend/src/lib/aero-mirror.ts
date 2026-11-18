@@ -39,8 +39,13 @@ export interface AeroMovementSnapshot {
 export function aeroMovementsPayload(args: {
   date: string;
   userName?: string | null;
-  /** Ask for both sides of the day. The report needs it; the mirror of massas and receipts does not. */
-  includeExits?: boolean;
+  /**
+   * The side of the day this payload asks for. It is never null: Aero32 builds an empty query when
+   * `ENTSAI` arrives null and answers `PDO::prepare(): Argument #1 ($query) cannot be empty`, which is the
+   * failure the report's sync hit on 2026-11-18. Both sides are asked for with two payloads, not with one
+   * open filter.
+   */
+  side?: 'E' | 'S';
 }): Record<string, unknown> {
   return {
     _method: 'PATCH',
@@ -48,9 +53,28 @@ export function aeroMovementsPayload(args: {
       userName: args.userName ?? null,
       startDate: args.date,
       endDate: args.date,
-      entrySaida: args.includeExits ? null : 'E',
+      entrySaida: args.side ?? 'E',
     }),
   };
+}
+
+/**
+ * The payloads one `movimentos` trip carries.
+ *
+ * The ordinary read asks for the entries, which is what the massas and receipts mirror consumes. The report's
+ * sync asks for the whole day, and "the whole day" is two requests the ERP understands -- `E` then `S` --
+ * not one request with an open side it cannot build. Both travel in the same ticket so the operator still
+ * makes one trip to Scriptable.
+ */
+export function aeroMovementsPayloads(args: {
+  date: string;
+  userName?: string | null;
+  /** Ask for both sides of the day. The report needs it; the mirror of massas and receipts does not. */
+  includeExits?: boolean;
+}): Record<string, unknown>[] {
+  const entries = aeroMovementsPayload({ date: args.date, userName: args.userName, side: 'E' });
+  if (!args.includeExits) return [entries];
+  return [entries, aeroMovementsPayload({ date: args.date, userName: args.userName, side: 'S' })];
 }
 
 export interface AeroMovementsSyncOptions {
@@ -89,9 +113,11 @@ export async function triggerAeroMovementsSync(
     ticket = await requestAeroBridgeTicket(
       {
         action: 'movimentos',
-        payloads: [
-          aeroMovementsPayload({ date: options.date, userName: null, includeExits: options.includeExits }),
-        ],
+        payloads: aeroMovementsPayloads({
+          date: options.date,
+          userName: null,
+          includeExits: options.includeExits,
+        }),
         callbackPath: aeroBridgeCallbackFor('movimentos', options.callbackPath),
       },
       options.client,

@@ -138,9 +138,12 @@ export function ReceiptsSection({
         void postAeroAuditEvent(
           aeroReceiptsAuditEvent({ ...passport, insumos: 0, error: read.message ?? 'aero_receipts_unreadable' }),
         );
+        // La frase del ERP va al registro de auditoría, no a la pantalla: el operario lee una instrucción de
+        // planta y el texto crudo (`PDO::prepare(): Argument #1 ($query) cannot be empty`) queda en el log,
+        // que es donde sirve.
         setSyncResult({
           feedback: receiptsSyncFeedback({ status: 'error', count: 0 }),
-          detail: read.message,
+          detail: t('reports.receiptsError'),
         });
         return;
       }

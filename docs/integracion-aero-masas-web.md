@@ -359,6 +359,7 @@ Content-Type: application/json
 | `/entradasitem` | `POST` | Entrada de producción (lanzamiento de masas) |
 | `/saidasitem` | `POST` | Baja de insumos, embalagens e bobinas desde el módulo Salida / Baixa |
 | `/movimentoitem` | `POST` | Consulta de movimientos por usuario, producto y rango de fechas |
+| `/movimentoitem` (día entero) | `POST` ×2 | El Relatório pide **dos veces** en el mismo viaje: una con `ENTSAI:"E"` y otra con `ENTSAI:"S"`. Nunca viaja `ENTSAI` nulo: con ese filtro abierto Aero32 arma una consulta vacía y contesta `PDO::prepare(): Argument #1 ($query) cannot be empty` dentro de un 200. El guion v2.1.0 ejecuta los dos cuerpos y guarda una sola lista; un guion viejo completa sólo las entradas. |
 
 Reglas de payload:
 

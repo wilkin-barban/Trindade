@@ -1,4 +1,4 @@
-// Puente Aero32 · Trindade Massas · v2.0.0
+// Puente Aero32 · Trindade Massas · v2.1.0
 //
 // La web no puede hablar con el ERP desde HTTPS: el navegador bloquea el contenido mixto y la red de
 // la fábrica es HTTP dentro de la LAN. Por eso la página pide un ticket de un solo uso al backend y
@@ -10,6 +10,11 @@
 // responde el sobre { url, headers, body, bodies?, callback, steps? } y el script lo reenvía tal cual.
 // Si el sobre trae `steps`, ejecuta cada paso en orden en el mismo viaje (lanzamiento y lectura del día)
 // y devuelve un resultado compuesto { launch, read }. Si no trae `steps`, ejecuta el sobre simple legacy.
+//
+// Desde v2.1.0 el Relatório pide los dos lados del día en un solo ticket: `bodies` trae el pedido de
+// entradas y el de salidas por separado, porque Aero32 no sabe leer un `ENTSAI` abierto. Cuando llegan dos
+// cuerpos de movimientos, el script une las dos listas y guarda un único resultado `{ success, data, skipped }`
+// que la página lee como el día entero. Un guion viejo que ignore `bodies` completa sólo las entradas y no rompe.
 // No hay contraseñas, no hay estado guardado y no se registra ni se muestra nada del sobre.
 
 const TITULO = 'Trindade';
@@ -187,6 +192,42 @@ if (Array.isArray(sobre.steps) && sobre.steps.length > 0) {
     datoResultado = JSON.parse(resultado);
   } catch (error) {
     datoResultado = resultado;
+  }
+
+  // Dos lados del día en un viaje: la página espera una sola lista de asientos, no una lista de listas.
+  // Se unen las respuestas buenas y se suman los asientos que cada lado no pudo leer; si un lado falló, el
+  // resultado es ese fallo, porque medio día presentado como el día entero es peor que un error.
+  if (cuerpos.length > 1 && /movimentoitem/i.test(String(sobre.url))) {
+    const partes = respuestas.map(function (respuesta) {
+      try {
+        return JSON.parse(respuesta);
+      } catch (error) {
+        return null;
+      }
+    });
+    const todasListas = partes.every(function (parte) {
+      return parte && parte.success === true && Array.isArray(parte.data);
+    });
+    if (todasListas) {
+      let asientos = [];
+      let saltados = 0;
+      for (let indice = 0; indice < partes.length; indice += 1) {
+        asientos = asientos.concat(partes[indice].data);
+        if (typeof partes[indice].skipped === 'number' && isFinite(partes[indice].skipped)) {
+          saltados += partes[indice].skipped;
+        }
+      }
+      datoResultado = { success: true, data: asientos, skipped: saltados };
+    } else {
+      const fallado = partes.find(function (parte) {
+        return !parte || parte.success !== true;
+      });
+      const mensaje =
+        fallado && typeof fallado.message === 'string' && fallado.message.trim()
+          ? fallado.message
+          : 'movements_unreadable';
+      datoResultado = { success: false, message: mensaje };
+    }
   }
 }
 

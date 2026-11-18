@@ -140,6 +140,11 @@ export function aeroErrorCode(error: string | null | undefined): string | null {
   if (lower.includes('404') || lower.includes('não encontrad') || lower.includes('nao encontrad')) {
     return 'AERO_NOT_FOUND';
   }
+  // El WebService de la empresa contesta sus propios errores de PHP dentro de un 200. "PDO::prepare(): Argument
+  // #1 ($query) cannot be empty" es una falla del ERP, no de este cliente, y el código tiene que decirlo.
+  if (lower.includes('pdo') || lower.includes('sqlstate') || lower.includes('prepare(') || lower.includes('php')) {
+    return 'AERO_ERP_ERROR';
+  }
   if (/\b5\d\d\b/.test(lower) || lower.includes('erp')) return 'AERO_ERP_ERROR';
   return 'AERO_CLIENT_ERROR';
 }

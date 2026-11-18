@@ -1365,6 +1365,24 @@ describe('aero-integration: ERP movements mirror', () => {
     assert.deepEqual(result, { status: 'error', message: 'Usuario invalido' });
   });
 
+  it('reads a two-sided trip as one list of seats', () => {
+    // El Relatório pide entradas y salidas en el mismo ticket, y el puente las une. Un guion intermedio que
+    // todavía devuelva dos listas tiene que leerse igual: una sola jornada, en el orden en que llegó.
+    const entries = [{ ...answer.data[0], ENTSAI: 'E' }];
+    const exits = [{ ...answer.data[1], ENTSAI: 'S', ENT_LAN: 20999 }];
+
+    const nested = readAeroMovements({ success: true, data: [entries, exits] });
+    const flat = readAeroMovements({ success: true, data: [...entries, ...exits] });
+    assert.equal(nested.status, 'ok');
+    assert.equal(flat.status, 'ok');
+    if (nested.status !== 'ok' || flat.status !== 'ok') return;
+    assert.deepEqual(
+      nested.movements.map((movement) => movement.entLan),
+      flat.movements.map((movement) => movement.entLan),
+    );
+    assert.equal(nested.skipped, flat.skipped);
+  });
+
   it('refuses a body that is not a list of seats', () => {
     assert.deepEqual(readAeroMovements(null), { status: 'error', message: null });
     assert.deepEqual(readAeroMovements({ success: true, data: 'none' }), { status: 'error', message: null });
