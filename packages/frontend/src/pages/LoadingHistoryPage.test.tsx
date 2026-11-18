@@ -130,12 +130,12 @@ describe('LoadingHistoryPage', () => {
     });
     renderPage();
 
-    // The day the plant already closed is history: the card still offers a way to see how it was distributed,
-    // but the URL carries the read-only view and never the editor. The card stays compact, like a report.
+    // El día que la planta ya cerró es historial: la tarjeta sigue ofreciendo ver cómo se distribuyó, y ahora
+    // abre la tarjeta de compartir del día -- la vista de solo lectura --, nunca el editor.
     await waitFor(() => expect(screen.getByTestId('loading-history-closed-2026-10-30')).toBeInTheDocument());
     expect(screen.getByTestId('loading-history-closed-2026-10-30')).toHaveTextContent('Solo lectura');
     const view = screen.getByTestId('view-loading-batch-2026-10-30');
-    expect(view).toHaveAttribute('href', '/loading/edit?date=2026-10-30&view=1');
+    expect(view).toHaveAttribute('href', '/loading?share=1&date=2026-10-30&from=history');
     expect(view).toHaveAttribute('aria-label', 'Ver horario de cargamento del 30/10/2026');
     expect(view).toHaveClass('min-h-12', 'min-w-12');
     expect(screen.queryByRole('link', { name: 'Editar' })).toBeNull();
@@ -164,9 +164,10 @@ describe('LoadingHistoryPage', () => {
 
     const edit = await screen.findByRole('link', { name: 'Editar carga del 02/11/2026' });
     expect(edit).toHaveAttribute('href', '/loading/edit?date=2026-11-02');
-    // The eye is the view action; it does not turn the whole card into a second editor.
+    // El ojo es la vista de solo lectura y ahora es la tarjeta de compartir del día; el resumen de un día abierto
+    // sigue abriendo el editor.
     const view = screen.getByTestId('view-loading-batch-2026-11-02');
-    expect(view).toHaveAttribute('href', '/loading/edit?date=2026-11-02&view=1');
+    expect(view).toHaveAttribute('href', '/loading?share=1&date=2026-11-02&from=history');
     expect(view).toHaveClass('min-h-12', 'min-w-12');
   });
 

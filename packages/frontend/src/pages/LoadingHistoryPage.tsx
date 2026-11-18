@@ -172,9 +172,10 @@ export function LoadingHistoryPage() {
           {items.map((batch) => {
             const affordances = historyAffordances(batch);
             const dateLabel = formatDate(batch.batch_date);
-            const detailHref = affordances.closedDay
-              ? `/loading/edit?date=${batch.batch_date}&view=1`
-              : `/loading/edit?date=${batch.batch_date}`;
+            // El ojo y el resumen de un día cerrado abren la tarjeta de compartir del día, que es su vista de
+            // solo lectura; el resumen de un día abierto sigue abriendo el editor.
+            const shareHref = `/loading?share=1&date=${batch.batch_date}&from=history`;
+            const detailHref = affordances.closedDay ? shareHref : `/loading/edit?date=${batch.batch_date}`;
             // The summary is the card's main target, like a report card: a closed day opens the read-only
             // view, an open day opens the editor. The eye repeats the view for a thumb and never changes
             // what the summary does.
@@ -197,7 +198,7 @@ export function LoadingHistoryPage() {
                   </Link>
                   <div className="flex shrink-0 items-center justify-end gap-1">
                     <Link
-                      to={`/loading/edit?date=${batch.batch_date}&view=1`}
+                      to={shareHref}
                       className="inline-flex min-h-12 min-w-12 items-center justify-center rounded text-gray-500 hover:bg-gray-50"
                       aria-label={t('history.viewLoading', { date: dateLabel })}
                       title={t('history.viewLoading', { date: dateLabel })}

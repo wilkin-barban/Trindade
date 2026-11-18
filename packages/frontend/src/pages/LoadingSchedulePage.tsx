@@ -1,13 +1,13 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { LucideSave } from 'lucide-react';
+import { LucideSave, LucideArrowLeft } from 'lucide-react';
 import { api } from '../api/client';
 import { Button } from '../components/ui/button';
 import { LoadingSpinner } from '../components/ui/loading-spinner';
 import { ScheduleGrid } from '../components/loading/ScheduleGrid';
 import { ScheduleExportView } from '../components/loading/ScheduleExportView';
 import { ShareCard } from '../components/reports/ShareCard';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { exportLoadingPdf, fetchLoadingExportText, shareLoadingMessage } from '../lib/loading-share';
 import { ModuleHelpModal } from '../components/ui/ModuleHelpModal';
 import type { ScheduleRow, DriverRow } from '../components/loading/ScheduleGrid';
@@ -64,6 +64,8 @@ export function LoadingSchedulePage() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const showingShare = params.get('share') === '1';
+  // El histórico abre esta misma tarjeta, pero como vista de solo lectura: sin Editar y con Volver al historial.
+  const fromHistory = params.get('from') === 'history';
   const [shareText, setShareText] = useState('');
   const [shareLoading, setShareLoading] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
@@ -180,7 +182,17 @@ export function LoadingSchedulePage() {
   // The share card takes the place of the grid: the day is already done, and what is left is sending it.
   if (showingShare) {
     return (
-      <div className="mx-auto w-full max-w-2xl p-4">
+      <div className="mx-auto w-full max-w-2xl space-y-3 p-4">
+        {fromHistory && (
+          <Link
+            to="/loading/history"
+            className="inline-flex min-h-11 items-center gap-2 rounded px-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+            data-testid="loading-share-back"
+          >
+            <LucideArrowLeft className="h-4 w-4" />
+            {t('reports.backToHistory')}
+          </Link>
+        )}
         <ShareCard
           testIdPrefix="loading"
           title={t('loading.exportTitle')}
@@ -193,12 +205,16 @@ export function LoadingSchedulePage() {
           printing={printing}
           onShare={() => void handleShareMessage()}
           onPdf={() => void handleSharePdf()}
-          onEdit={() => navigate(`/loading/edit?date=${date}`)}
-          onClose={() => {
-            const next = { ...Object.fromEntries(params) };
-            delete next.share;
-            setParams(next, { replace: true });
-          }}
+          {...(fromHistory
+            ? { onClose: () => navigate('/loading/history') }
+            : {
+                onEdit: () => navigate(`/loading/edit?date=${date}`),
+                onClose: () => {
+                  const next = { ...Object.fromEntries(params) };
+                  delete next.share;
+                  setParams(next, { replace: true });
+                },
+              })}
         />
       </div>
     );
