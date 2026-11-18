@@ -205,7 +205,7 @@ class DriversScreenTest {
         var saved = 0
         render(state(editingId = 1, name = "Carlos"), onSave = { saved++ })
 
-        composeRule.onNodeWithText("Salvar").performScrollTo().performClick()
+        composeRule.onNodeWithText("Salvar").performClick()
         val expectedBody = copy(R.string.admin_dialog_save_body, "Carlos")
         composeRule.onNodeWithText(expectedBody).assertIsDisplayed()
 
@@ -218,7 +218,7 @@ class DriversScreenTest {
         var saved = 0
         render(state(editingId = 1, name = "Carlos"), onSave = { saved++ })
 
-        composeRule.onNodeWithText("Salvar").performScrollTo().performClick()
+        composeRule.onNodeWithText("Salvar").performClick()
         val expectedBody = copy(R.string.admin_dialog_save_body, "Carlos")
         composeRule.onNodeWithText(expectedBody).assertIsDisplayed()
 

@@ -101,72 +101,6 @@ fun DriversScreen(
                 text = stringResource(R.string.drivers_new_driver),
             )
         }
-        if (showForm || state.editingId != null) {
-            OutlinedTextField(
-                value = state.name,
-                onValueChange = onNameChange,
-                label = { Text(stringResource(R.string.drivers_name)) },
-                enabled = !state.saving,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            // The number is optional, formatted with Brazilian phone mask.
-            OutlinedTextField(
-                value = state.phone,
-                onValueChange = { onPhoneChange(filterPhoneDigits(it)) },
-                visualTransformation = BrazilianPhoneVisualTransformation(),
-                label = { Text(stringResource(R.string.drivers_phone)) },
-                placeholder = { Text(stringResource(R.string.whatsapp_phone_placeholder)) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                singleLine = true,
-                enabled = !state.saving,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            if (state.isAdmin) {
-                Text(stringResource(R.string.drivers_type_label), style = MaterialTheme.typography.labelLarge)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AdminChoiceChip(
-                        selected = state.driverType == DriversViewModel.CASA,
-                        onClick = { onDriverTypeChange(DriversViewModel.CASA) },
-                        enabled = !state.saving,
-                        label = if (state.driverType == DriversViewModel.CASA) "$casaLabel ✓" else casaLabel,
-                    )
-                    AdminChoiceChip(
-                        selected = state.driverType == DriversViewModel.FLETERO,
-                        onClick = { onDriverTypeChange(DriversViewModel.FLETERO) },
-                        enabled = !state.saving,
-                        label = if (state.driverType == DriversViewModel.FLETERO) "$fleteroLabel ✓" else fleteroLabel,
-                    )
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AdminPrimaryButton(
-                    onClick = {
-                        val isCreate = state.editingId == null
-                        val titleRes = if (isCreate) R.string.admin_action_create else R.string.admin_action_save
-                        val bodyRes = if (isCreate) R.string.admin_dialog_create_body else R.string.admin_dialog_save_body
-                        pendingConfirmation = AdminConfirmation(
-                            title = context.getString(titleRes),
-                            message = context.getString(bodyRes, state.name),
-                            confirmLabel = context.getString(R.string.admin_action_confirm),
-                            onConfirm = {
-                                pendingConfirmation = null
-                                onSave()
-                            },
-                        )
-                    },
-                    enabled = !state.saving && !state.loading,
-                    loading = state.saving,
-                    text = if (state.saving) stringResource(R.string.drivers_saving)
-                    else if (state.editingId == null) stringResource(R.string.drivers_create)
-                    else stringResource(R.string.drivers_save),
-                )
-                AdminSecondaryButton(
-                    onClick = { showForm = false; onCancel() },
-                    enabled = !state.saving,
-                    text = stringResource(R.string.drivers_cancel),
-                )
-            }
-        }
 
         state.drivers.forEach { driver ->
             Card(
@@ -213,6 +147,76 @@ fun DriversScreen(
             }
         }
         if (!state.loading && state.drivers.isEmpty()) Text(stringResource(R.string.admin_no_drivers))
+    }
+
+    if (showForm || state.editingId != null) {
+        val isCreate = state.editingId == null
+        AdminFormDialog(
+            title = stringResource(if (isCreate) R.string.drivers_new_driver else R.string.admin_action_edit),
+            onDismiss = {
+                showForm = false
+                onCancel()
+            },
+            onSubmit = {
+                val titleRes = if (isCreate) R.string.admin_action_create else R.string.admin_action_save
+                val bodyRes = if (isCreate) R.string.admin_dialog_create_body else R.string.admin_dialog_save_body
+                pendingConfirmation = AdminConfirmation(
+                    title = context.getString(titleRes),
+                    message = context.getString(bodyRes, state.name),
+                    confirmLabel = context.getString(R.string.admin_action_confirm),
+                    onConfirm = {
+                        pendingConfirmation = null
+                        onSave()
+                    },
+                )
+            },
+            saving = state.saving,
+            submitEnabled = !state.saving && !state.loading,
+            submitLabel = if (state.saving) {
+                stringResource(R.string.drivers_saving)
+            } else if (isCreate) {
+                stringResource(R.string.drivers_create)
+            } else {
+                stringResource(R.string.drivers_save)
+            },
+        ) {
+            OutlinedTextField(
+                value = state.name,
+                onValueChange = onNameChange,
+                label = { Text(stringResource(R.string.drivers_name)) },
+                enabled = !state.saving,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            // The number is optional, formatted with Brazilian phone mask.
+            OutlinedTextField(
+                value = state.phone,
+                onValueChange = { onPhoneChange(filterPhoneDigits(it)) },
+                visualTransformation = BrazilianPhoneVisualTransformation(),
+                label = { Text(stringResource(R.string.drivers_phone)) },
+                placeholder = { Text(stringResource(R.string.whatsapp_phone_placeholder)) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                singleLine = true,
+                enabled = !state.saving,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (state.isAdmin) {
+                Text(stringResource(R.string.drivers_type_label), style = MaterialTheme.typography.labelLarge)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AdminChoiceChip(
+                        selected = state.driverType == DriversViewModel.CASA,
+                        onClick = { onDriverTypeChange(DriversViewModel.CASA) },
+                        enabled = !state.saving,
+                        label = if (state.driverType == DriversViewModel.CASA) "$casaLabel ✓" else casaLabel,
+                    )
+                    AdminChoiceChip(
+                        selected = state.driverType == DriversViewModel.FLETERO,
+                        onClick = { onDriverTypeChange(DriversViewModel.FLETERO) },
+                        enabled = !state.saving,
+                        label = if (state.driverType == DriversViewModel.FLETERO) "$fleteroLabel ✓" else fleteroLabel,
+                    )
+                }
+            }
+        }
     }
 
     AdminConfirmDialog(
