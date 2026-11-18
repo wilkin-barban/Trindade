@@ -1,7 +1,8 @@
 import type Database from 'better-sqlite3';
 import { z } from 'zod';
 import { SalidaBlockSchema } from '../salida/salida.schema.js';
-import { codeKey, operatorKey } from '../massas/massas-reconcile.js';
+import { codeKey } from '../massas/massas-reconcile.js';
+import { matchOperatorUserId, type OperatorCandidate } from '../massas/massas-operator.js';
 import { SALIDA_PRODUCTS, type SalidaProduct } from '../salida/salida.catalog.js';
 
 export const SalidaReportProductSchema = z
@@ -157,10 +158,12 @@ export function salidaReportDayView(db: Database.Database, date: string): Salida
    * touch Trindade -- and a report of this plant is not their ledger. A seat whose operator is not an active user
    * here is dropped, with its products: a product line without its operator would be an orphan row.
    */
+  // La llave lleva la cuenta y no el nombre: el espejo escribe el nombre que la empresa conoce, y la misma persona
+  // puede llegar escrita distinto en cada asiento. Emparejar por nombre dejaba pasar el mismo retiro dos veces.
   const localKeys = new Set<string>();
   for (const row of rows) {
     localKeys.add(
-      [codeKey(row.product_code), Math.round(row.quantity * 1000) / 1000, operatorKey(row.username)].join('|'),
+      [codeKey(row.product_code), Math.round(row.quantity * 1000) / 1000, row.user_id].join('|'),
     );
   }
 
@@ -179,37 +182,33 @@ export function salidaReportDayView(db: Database.Database, date: string): Salida
     operator_name: string;
   }[];
 
-  // Who is allowed in: the active accounts of this application, keyed by their username and by their display name,
-  // because the ERP writes the name the company knows and Trindade stores both.
-  const accounts = db
-    .prepare('SELECT username, display_name FROM users WHERE is_active = 1')
-    .all() as { username: string; display_name: string | null }[];
-  const accountByKey = new Map<string, { username: string; name: string }>();
-  for (const account of accounts) {
-    const entry = { username: account.username, name: (account.display_name || account.username).trim() };
-    accountByKey.set(operatorKey(account.username), entry);
-    if (account.display_name) accountByKey.set(operatorKey(account.display_name), entry);
-  }
+  // Who is allowed in: the active accounts of this application, resolved with the very comparator the rest of the
+  // mirror uses. A seat that signs `GUSTAVO H` belongs to the account `gustavo`; one that signs `TELEVENDAS`
+  // belongs to nobody here, and the company's own ledger is not this report.
+  const candidates = db
+    .prepare('SELECT id, username, display_name FROM users WHERE is_active = 1 ORDER BY id')
+    .all() as OperatorCandidate[];
 
-  const erpOnlyKeys = new Set<string>();
+  const erpOnlyIds = new Set<number>();
   for (const seat of seats) {
-    const key = [codeKey(seat.product_code), Math.round(seat.quantity * 1000) / 1000, operatorKey(seat.operator_name)].join('|');
+    const userId = matchOperatorUserId(candidates, seat.operator_name);
+    if (userId === null) continue;
+
+    const key = [codeKey(seat.product_code), Math.round(seat.quantity * 1000) / 1000, userId].join('|');
     if (localKeys.has(key)) continue;
 
-    const erpKey = operatorKey(seat.operator_name);
-    const account = accountByKey.get(erpKey);
-    // Not an operator of this application: the seat belongs to the company's own ledger, not to this report.
-    if (!account) continue;
-
-    // Keyed by the account, not by the name the ERP wrote: the badge, and the group, follow the operator and not
-    // the spelling. Searching by the ERP's spelling made a name like «JOAO H» open a new group per seat.
-    const accountKey = operatorKey(account.username);
-    erpOnlyKeys.add(accountKey);
-
-    let op = [...operatorMap.entries()].find(([, candidate]) => operatorKey(candidate.username) === accountKey)?.[1];
+    let op = operatorMap.get(userId);
     if (!op) {
-      op = { name: account.name, username: account.username, products: new Map() };
-      operatorMap.set(-(operatorMap.size + 1), op);
+      const account = candidates.find((candidate) => candidate.id === userId)!;
+      op = {
+        name: (account.display_name || account.username).trim(),
+        username: account.username,
+        products: new Map(),
+      };
+      operatorMap.set(userId, op);
+      // La insignia dice «só ERP» cuando la persona entra al reporte únicamente por el libro de la empresa: si ya
+      // había lanzado desde la tableta, no es sólo del ERP.
+      erpOnlyIds.add(userId);
     }
     const existing = op.products.get(seat.product_code);
     if (existing) existing.units += seat.quantity;
@@ -226,8 +225,8 @@ export function salidaReportDayView(db: Database.Database, date: string): Salida
     }
   }
 
-  const operators: SalidaReportOperator[] = [...operatorMap.values()]
-    .map((op) => {
+  const operators: SalidaReportOperator[] = [...operatorMap.entries()]
+    .map(([userId, op]) => {
       const products = [...op.products.values()];
       const units = products.reduce((sum, p) => sum + p.units, 0);
       return {
@@ -235,7 +234,7 @@ export function salidaReportDayView(db: Database.Database, date: string): Salida
         username: op.username,
         units,
         products,
-        erpOnly: erpOnlyKeys.has(operatorKey(op.username)),
+        erpOnly: erpOnlyIds.has(userId),
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name) || a.username.localeCompare(b.username));

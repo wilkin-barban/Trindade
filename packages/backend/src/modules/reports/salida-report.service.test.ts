@@ -213,4 +213,98 @@ describe('salidaReportDayView', () => {
     assert.equal(/[\u0080-\u009f]/.test(foreign!.name), false, 'no control character survives');
   });
 
+  it('recognises the operator the ERP spells short, and keeps the company book out', () => {
+    // `GUSTAVO H` es Gustavo: el asiento no escribe el nombre completo y el resolvedor compartido sí lo entiende.
+    // `TELEVENDAS` no es nadie de esta aplicación y sigue fuera, con sus productos.
+    db.exec('DELETE FROM salida_movement_items');
+    db.exec('DELETE FROM salida_movements');
+    db.exec('DELETE FROM aero_movements');
+    db.exec(`
+      INSERT OR IGNORE INTO users (id, username, password_hash, display_name, role_id, is_active)
+      VALUES (13, 'gustavo', 'hash', 'Gustavo', 2, 1)
+    `);
+    db.exec(`
+      INSERT INTO aero_movements
+        (movement_date, ent_lan, product_code, product_desc, quantity, entry_date, operator_name, movement_type, synced_at)
+      VALUES
+        ('2026-11-20', 7001, '1673', 'GORDURA VEGETAL DE PALMA 24KG', 6, '2026-11-20', 'GUSTAVO H', 'S', '2026-11-20T10:00:00.000Z'),
+        ('2026-11-20', 7002, '1011', 'PROPIONATO', 900, '2026-11-20', 'TELEVENDAS', 'S', '2026-11-20T10:05:00.000Z'),
+        ('2026-11-20', 7003, '1012', 'SORBATO', 21, '2026-11-20', 'JOSIANE', 'S', '2026-11-20T10:10:00.000Z')
+    `);
+
+    const day = salidaReportDayView(db, '2026-11-20');
+
+    assert.equal(day.operators.length, 1, 'sólo la cuenta de esta aplicación entra al bloque');
+    const gustavo = day.operators[0];
+    assert.equal(gustavo.username, 'gustavo');
+    assert.equal(gustavo.name, 'Gustavo');
+    assert.equal(gustavo.units, 6, 'las seis unidades del asiento de Gustavo');
+    assert.equal(gustavo.erpOnly, true, 'entró por el libro de la empresa');
+    assert.equal(
+      day.operators.some((operator) => /TELEVENDAS|JOSIANE/i.test(operator.username) || /TELEVENDAS|JOSIANE/i.test(operator.name)),
+      false,
+      'un nombre sin cuenta activa no entra, ni con sus productos',
+    );
+    assert.equal(day.totalUnits, 6);
+  });
+
+  it('counts one exit once when the launch here and the seat agree on the person', () => {
+    // Gustavo lanzó desde la tableta y la empresa registró el mismo retiro con su nombre corto: es la misma salida.
+    // Emparejar por el nombre escrito la contaba dos veces.
+    db.exec('DELETE FROM salida_movement_items');
+    db.exec('DELETE FROM salida_movements');
+    db.exec('DELETE FROM aero_movements');
+    db.exec(`
+      INSERT OR IGNORE INTO users (id, username, password_hash, display_name, role_id, is_active)
+      VALUES (13, 'gustavo', 'hash', 'Gustavo', 2, 1)
+    `);
+    db.exec(`
+      INSERT INTO salida_movements (id, movement_date, user_id, created_at)
+      VALUES (9301, '2026-11-21', 13, '2026-11-21T09:00:00.000Z')
+    `);
+    db.exec(`
+      INSERT INTO salida_movement_items (movement_id, product_code, product_name, block, quantity, position)
+      VALUES (9301, '1673', 'GORDURA VEGETAL', 'materia-prima', 6, 0)
+    `);
+    db.exec(`
+      INSERT INTO aero_movements
+        (movement_date, ent_lan, product_code, product_desc, quantity, entry_date, operator_name, movement_type, synced_at)
+      VALUES
+        ('2026-11-21', 7101, '001673', 'GORDURA VEGETAL DE PALMA 24KG', 6, '2026-11-21', 'GUSTAVO H', 'S', '2026-11-21T10:00:00.000Z')
+    `);
+
+    const day = salidaReportDayView(db, '2026-11-21');
+
+    assert.equal(day.operators.length, 1, 'una persona, un grupo');
+    assert.equal(day.operators[0].username, 'gustavo');
+    assert.equal(day.operators[0].units, 6, 'la salida se cuenta una sola vez');
+    assert.equal(day.operators[0].erpOnly, false, 'lanzó desde la tableta, no es sólo del ERP');
+    assert.equal(day.totalUnits, 6);
+  });
+
+  it('does not attribute a seat when the short name fits two accounts', () => {
+    // `GUSTAVO H` puede ser Gustavo o Gustavo Henrique: con dos candidatos no se atribuye, porque inventar el dueño
+    // de un retiro es peor que dejarlo afuera.
+    db.exec('DELETE FROM salida_movement_items');
+    db.exec('DELETE FROM salida_movements');
+    db.exec('DELETE FROM aero_movements');
+    db.exec(`
+      INSERT OR IGNORE INTO users (id, username, password_hash, display_name, role_id, is_active)
+      VALUES
+        (13, 'gustavo', 'hash', 'Gustavo', 2, 1),
+        (14, 'gustavo.h', 'hash', 'Gustavo Henrique', 2, 1)
+    `);
+    db.exec(`
+      INSERT INTO aero_movements
+        (movement_date, ent_lan, product_code, product_desc, quantity, entry_date, operator_name, movement_type, synced_at)
+      VALUES
+        ('2026-11-22', 7201, '1673', 'GORDURA VEGETAL DE PALMA 24KG', 6, '2026-11-22', 'GUSTAVO H', 'S', '2026-11-22T10:00:00.000Z')
+    `);
+
+    const day = salidaReportDayView(db, '2026-11-22');
+
+    assert.deepEqual(day.operators, [], 'un nombre ambiguo no atribuye el asiento a nadie');
+    assert.equal(day.totalUnits, 0);
+  });
+
 });
