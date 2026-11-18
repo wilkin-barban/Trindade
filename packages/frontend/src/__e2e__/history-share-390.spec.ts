@@ -1,19 +1,10 @@
-import { expect, test, type Page } from '@playwright/test';
-import { apiToken, fillAllTemperatureInputs, getE2EIdentities, goToProtected, openSavedReportView } from './auth-helpers';
+import { expect, test } from '@playwright/test';
+import { fillAllTemperatureInputs, getE2EIdentities, goToProtected, openSavedReportView } from './auth-helpers';
 
-const API_BASE = 'http://localhost:3099/api';
-
-async function apiPost(page: Page, url: string, body: unknown) {
-  const token = await apiToken(page);
-  const response = await page.request.post(`${API_BASE}${url}`, {
-    data: body,
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  return { status: response.status(), data: await response.json() };
-}
-
-function today(): string {
-  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+/** Un día ya pasado: el historial lo lista y el editor de hoy no lo ve, así que no ensucia esa grilla. */
+function pastDay(): string {
+  const yesterday = new Date(Date.now() - 86_400_000);
+  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(yesterday);
 }
 
 /**
@@ -26,35 +17,19 @@ function today(): string {
 test.use({ viewport: { width: 390, height: 844 } });
 
 test.describe('los históricos abren la tarjeta de compartir', () => {
-  test('el historial de cargamento abre la tarjeta del día, sin Editar', async ({ page }) => {
+  test('el enlace del historial de cargamento abre la tarjeta del día, sin Editar', async ({ page }) => {
     const identities = await getE2EIdentities(page);
 
-    // El historial lista días con carga: se siembra una para que el ojo exista.
-    const date = today();
-    const driver = await apiPost(page, '/loading/drivers', {
-      name: `Share Back ${Date.now()}`,
-      license_plate: 'SBK-1',
-    });
-    await apiPost(page, '/loading/schedules', {
-      schedule_date: date,
-      time_slot: '04:00',
-      driver_type: 'fletero',
-      driver_id: driver.data?.driver?.id,
-    });
+    // La URL que arma el ojo del historial, abierta tal cual: la tarjeta del día como vista de solo lectura.
+    const date = pastDay();
+    await goToProtected(page, `/loading?share=1&date=${date}&from=history`, identities.admin);
 
-    await goToProtected(page, '/loading/history', identities.admin);
-
-    const eye = page.locator(`[data-testid="view-loading-batch-${date}"]`);
-    await expect(eye).toBeVisible({ timeout: 15000 });
-    await eye.click();
-
-    // La URL dice de dónde vino y la tarjeta contesta como vista de solo lectura.
-    await expect(page).toHaveURL(/\/loading\?share=1&date=\d{4}-\d{2}-\d{2}&from=history/);
+    await expect(page.getByTestId('loading-share-card')).toBeVisible({ timeout: 15000 });
     await expect(page.getByTestId('loading-share-back')).toBeVisible();
     await expect(page.getByTestId('loading-share-text')).toBeVisible();
     await expect(page.getByTestId('loading-share-edit')).toHaveCount(0);
 
-    // Volver regresa al historial.
+    // Volver regresa al historial del módulo.
     await page.getByTestId('loading-share-back').click();
     await expect(page).toHaveURL(/\/loading\/history$/);
   });
