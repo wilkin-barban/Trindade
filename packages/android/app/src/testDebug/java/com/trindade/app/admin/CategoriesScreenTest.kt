@@ -364,7 +364,8 @@ class CategoriesScreenTest {
         var saved = 0
         render(state(editingId = 1, namePt = "Nova Categoria"), onSave = { saved++ })
 
-        composeRule.onNodeWithText("Salvar").performScrollTo().performClick()
+        // El botón vive en el pie fijo del modal, así que se alcanza sin desplazar la pantalla.
+        composeRule.onNodeWithText("Salvar").performClick()
         val expectedBody = copy(R.string.admin_dialog_save_body, "Nova Categoria")
         composeRule.onNodeWithText(expectedBody).assertIsDisplayed()
 
@@ -377,7 +378,8 @@ class CategoriesScreenTest {
         var saved = 0
         render(state(editingId = 1, namePt = "Nova Categoria"), onSave = { saved++ })
 
-        composeRule.onNodeWithText("Salvar").performScrollTo().performClick()
+        // El botón vive en el pie fijo del modal, así que se alcanza sin desplazar la pantalla.
+        composeRule.onNodeWithText("Salvar").performClick()
         val expectedBody = copy(R.string.admin_dialog_save_body, "Nova Categoria")
         composeRule.onNodeWithText(expectedBody).assertIsDisplayed()
 

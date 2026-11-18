@@ -93,7 +93,115 @@ fun CategoriesScreen(
             )
         }
 
+
+        state.categories.forEach { category ->
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                ),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    val primaryName = if (state.isSpanish && category.nameEs.isNotBlank()) {
+                        category.nameEs
+                    } else {
+                        category.namePt.ifBlank { category.nameEs }
+                    }
+                    Text(primaryName, style = MaterialTheme.typography.titleMedium)
+                    if (category.namePt.isNotBlank() && category.nameEs.isNotBlank() && category.namePt != category.nameEs) {
+                        val secondaryName = if (state.isSpanish) category.namePt else category.nameEs
+                        Text(secondaryName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Text(categoryTypeLabel(category.categoryType))
+                    Text(stringResource(R.string.admin_category_order, category.sortOrder))
+                    Text(if (category.isActive == 1) stringResource(R.string.admin_status_active_fem) else stringResource(R.string.admin_status_inactive_fem))
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    ) {
+                        if (state.canEdit(category)) {
+                            AdminSecondaryButton(onClick = { onEdit(category) }, text = stringResource(R.string.admin_action_edit))
+                        } else {
+                            Text(stringResource(R.string.admin_read_only), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        if (state.canToggle(category)) {
+                            AdminSecondaryButton(
+                                onClick = {
+                                    val isActivating = category.isActive != 1
+                                    val titleRes = if (isActivating) R.string.admin_action_activate else R.string.admin_action_deactivate
+                                    val bodyRes = if (isActivating) R.string.admin_dialog_toggle_on_body else R.string.admin_dialog_toggle_off_body
+                                    pendingConfirmation = AdminConfirmation(
+                                        title = context.getString(titleRes),
+                                        message = context.getString(bodyRes, primaryName),
+                                        confirmLabel = context.getString(R.string.admin_action_confirm),
+                                        onConfirm = {
+                                            pendingConfirmation = null
+                                            onToggle(category)
+                                        },
+                                    )
+                                },
+                                text = if (category.isActive == 1) stringResource(R.string.admin_action_deactivate) else stringResource(R.string.admin_action_activate),
+                            )
+                        }
+                        if (state.canDelete(category)) {
+                            AdminDestructiveButton(
+                                onClick = {
+                                    onRequestDelete(category)
+                                    localDeleteTarget = category
+                                },
+                                enabled = !state.saving,
+                                text = stringResource(R.string.admin_action_delete),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!state.loading && state.categories.isEmpty()) {
+            Text(stringResource(R.string.admin_no_categories))
+        }
+    }
+
+        // El alta y la edición viven en un diálogo modal: la lista sigue detrás y el formulario no empuja las
+        // tarjetas hacia abajo. Mismos campos, mismas validaciones y la misma confirmación de siempre.
         if (state.isAdmin && (showForm || state.editingId != null)) {
+            val isCreate = state.editingId == null
+            AdminFormDialog(
+                title = stringResource(if (isCreate) R.string.admin_new_category else R.string.admin_action_edit),
+                onDismiss = {
+                    showForm = false
+                    onCancel()
+                },
+                onSubmit = {
+                    val currentName = if (isCreate) {
+                        if (state.isSpanish) state.nameEs.ifBlank { state.namePt } else state.namePt.ifBlank { state.nameEs }
+                    } else {
+                        state.namePt.ifBlank { state.nameEs }
+                    }
+                    val titleRes = if (isCreate) R.string.admin_action_create else R.string.admin_action_save
+                    val bodyRes = if (isCreate) R.string.admin_dialog_create_body else R.string.admin_dialog_save_body
+                    pendingConfirmation = AdminConfirmation(
+                        title = context.getString(titleRes),
+                        message = context.getString(bodyRes, currentName),
+                        confirmLabel = context.getString(R.string.admin_action_confirm),
+                        onConfirm = {
+                            pendingConfirmation = null
+                            onSave()
+                        },
+                    )
+                },
+                saving = state.saving,
+                submitEnabled = !state.saving && !state.loading,
+                submitLabel = if (state.saving) {
+                    stringResource(R.string.admin_action_saving)
+                } else if (isCreate) {
+                    stringResource(R.string.admin_action_create)
+                } else {
+                    stringResource(R.string.admin_action_save)
+                },
+            ) {
             if (state.editingId == null) {
                 if (state.isSpanish) {
                     OutlinedTextField(
@@ -167,111 +275,8 @@ fun CategoriesScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AdminPrimaryButton(
-                    onClick = {
-                        val currentName = if (state.editingId == null) {
-                            if (state.isSpanish) state.nameEs.ifBlank { state.namePt } else state.namePt.ifBlank { state.nameEs }
-                        } else {
-                            state.namePt.ifBlank { state.nameEs }
-                        }
-                        val isCreate = state.editingId == null
-                        val titleRes = if (isCreate) R.string.admin_action_create else R.string.admin_action_save
-                        val bodyRes = if (isCreate) R.string.admin_dialog_create_body else R.string.admin_dialog_save_body
-                        pendingConfirmation = AdminConfirmation(
-                            title = context.getString(titleRes),
-                            message = context.getString(bodyRes, currentName),
-                            confirmLabel = context.getString(R.string.admin_action_confirm),
-                            onConfirm = {
-                                pendingConfirmation = null
-                                onSave()
-                            },
-                        )
-                    },
-                    enabled = !state.saving && !state.loading,
-                    loading = state.saving,
-                    text = if (state.saving) stringResource(R.string.admin_action_saving) else if (state.editingId == null) stringResource(R.string.admin_action_create) else stringResource(R.string.admin_action_save),
-                )
-                AdminSecondaryButton(
-                    onClick = {
-                        showForm = false
-                        onCancel()
-                    },
-                    enabled = !state.saving,
-                    text = stringResource(R.string.admin_action_cancel),
-                )
             }
         }
-
-        state.categories.forEach { category ->
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                ),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    val primaryName = if (state.isSpanish && category.nameEs.isNotBlank()) {
-                        category.nameEs
-                    } else {
-                        category.namePt.ifBlank { category.nameEs }
-                    }
-                    Text(primaryName, style = MaterialTheme.typography.titleMedium)
-                    if (category.namePt.isNotBlank() && category.nameEs.isNotBlank() && category.namePt != category.nameEs) {
-                        val secondaryName = if (state.isSpanish) category.namePt else category.nameEs
-                        Text(secondaryName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Text(categoryTypeLabel(category.categoryType))
-                    Text(stringResource(R.string.admin_category_order, category.sortOrder))
-                    Text(if (category.isActive == 1) stringResource(R.string.admin_status_active_fem) else stringResource(R.string.admin_status_inactive_fem))
-
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                    ) {
-                        if (state.canEdit(category)) {
-                            AdminSecondaryButton(onClick = { onEdit(category) }, text = stringResource(R.string.admin_action_edit))
-                        } else {
-                            Text(stringResource(R.string.admin_read_only), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        if (state.canToggle(category)) {
-                            AdminSecondaryButton(
-                                onClick = {
-                                    val isActivating = category.isActive != 1
-                                    val titleRes = if (isActivating) R.string.admin_action_activate else R.string.admin_action_deactivate
-                                    val bodyRes = if (isActivating) R.string.admin_dialog_toggle_on_body else R.string.admin_dialog_toggle_off_body
-                                    pendingConfirmation = AdminConfirmation(
-                                        title = context.getString(titleRes),
-                                        message = context.getString(bodyRes, primaryName),
-                                        confirmLabel = context.getString(R.string.admin_action_confirm),
-                                        onConfirm = {
-                                            pendingConfirmation = null
-                                            onToggle(category)
-                                        },
-                                    )
-                                },
-                                text = if (category.isActive == 1) stringResource(R.string.admin_action_deactivate) else stringResource(R.string.admin_action_activate),
-                            )
-                        }
-                        if (state.canDelete(category)) {
-                            AdminDestructiveButton(
-                                onClick = {
-                                    onRequestDelete(category)
-                                    localDeleteTarget = category
-                                },
-                                enabled = !state.saving,
-                                text = stringResource(R.string.admin_action_delete),
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        if (!state.loading && state.categories.isEmpty()) {
-            Text(stringResource(R.string.admin_no_categories))
-        }
-    }
 
     val targetToDelete = (state.deleteTarget ?: localDeleteTarget)?.takeIf { state.canDelete(it) }
     val deleteConfirmation = targetToDelete?.let { category ->
