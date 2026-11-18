@@ -225,7 +225,8 @@ fun MassasLaunchScreen(
             date = state.date,
             syncedAt = state.aeroSyncedAt,
             isSyncing = state.isSyncingAero,
-            onSync = viewModel::syncAeroDay,
+            // El sync del espejo es del histórico: el lanzamiento lanza y el día se consulta donde se lee.
+            onSync = if (onBackToHistory != null) viewModel::syncAeroDay else null,
             readOnly = state.isReadOnly,
         )
 
@@ -347,6 +348,9 @@ fun MassasLaunchScreen(
             }
         }
 
+        // Del PASO 3 al PASO 6 la pantalla es el histórico del día: producción, lanzamientos, resumen y el
+        // mensaje que se comparte. El lanzamiento se queda con la grilla, la confirmación y la barra sticky.
+        if (onBackToHistory != null) {
         // PASO 3: Produção do Dia (tabela unificada: lançado aqui, no ERP e só no ERP).
         MassasUnifiedTable(
             state = state,
@@ -694,54 +698,38 @@ fun MassasLaunchScreen(
                             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        // Un día sin nada que contar no manda un mensaje con solo el encabezado: la prévia
+                        // queda vacía y la acción deshabilitada, que es lo que el histórico enseña.
+                        val shareText = viewModel.getShareText()
                         Text(
-                            text = viewModel.getShareText(),
+                            text = shareText.ifBlank { stringResource(R.string.massas_share_empty) },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                     }
                 }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                // Una sola acción: la hoja nativa ya lleva el texto, así que un botón de copiar al lado sería
+                // una segunda manera de hacer lo mismo y una que la planta nunca eligió.
+                val whatsappLink = viewModel.getWhatsAppLink()
+                Button(
+                    onClick = {
+                        if (whatsappLink != null) {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(whatsappLink)))
+                        }
+                    },
+                    enabled = viewModel.getShareText().isNotBlank() && whatsappLink != null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .defaultMinSize(minHeight = 48.dp),
                 ) {
-                    val whatsappLink = viewModel.getWhatsAppLink()
-                    Button(
-                        onClick = {
-                            if (whatsappLink != null) {
-                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(whatsappLink)))
-                            }
-                        },
-                        enabled = whatsappLink != null,
-                        modifier = Modifier
-                            .weight(1f)
-                            .defaultMinSize(minHeight = 48.dp),
-                    ) {
-                        Text(
-                            text = "WhatsApp",
-                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                        )
-                    }
-
-                    OutlinedButton(
-                        onClick = {
-                            val text = viewModel.getShareText()
-                            if (text.isNotBlank()) {
-                                clipboardManager.setText(AnnotatedString(text))
-                            }
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .defaultMinSize(minHeight = 48.dp),
-                    ) {
-                        Text(
-                            text = stringResource(R.string.massas_copy_report),
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                        )
-                    }
+                    Text(
+                        text = "WhatsApp",
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                    )
                 }
             }
+        }
         }
     }
 

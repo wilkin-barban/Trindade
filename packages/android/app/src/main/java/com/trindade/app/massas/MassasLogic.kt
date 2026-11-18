@@ -68,10 +68,9 @@ fun formatMassasWhatsAppMessage(
     }
 
     val launchedProducts = view.products.filter { it.totalUnits > 0 }
-    if (launchedProducts.isEmpty()) {
-        lines.add("Nenhum lançamento registrado até agora.")
-        return lines.joinToString("\n")
-    }
+    // Un día vacío no tiene mensaje: devolver el encabezado solo sería mandarle al grupo una línea sin datos. Quien
+    // dibuja la prévia decide cómo se lee el vacío ("Sem lançamentos para compartilhar") y deshabilita la acción.
+    if (launchedProducts.isEmpty()) return ""
 
     // The same shape the report writes: the people first, then the day's collective summary. The heading carries
     // no `Por Trabalhador` line because the 👤 already says it, and no asterisks because the group reads plain.

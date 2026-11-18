@@ -34,7 +34,7 @@ class MassasLogicTest {
     }
 
     @Test
-    fun formatMassasWhatsAppMessage_whenEmpty_returnsEmptyNoticeWithoutTotalGeral() {
+    fun formatMassasWhatsAppMessage_whenEmpty_returnsNoMessageWithoutTotalGeral() {
         val emptyView = MassasLaunchDayView(
             date = "2025-05-18",
             products = emptyList(),
@@ -44,8 +44,9 @@ class MassasLogicTest {
         )
 
         val message = formatMassasWhatsAppMessage(emptyView)
-        val expected = "🍝 *Lançamento de Massas — 18/05/2025*\n\nNenhum lançamento registrado até agora."
-        assertEquals(expected, message)
+        // Un día vacío no produce mensaje: la pantalla dibuja su propia prévia vacía y deshabilita la acción, en
+        // vez de mandarle al grupo un encabezado sin datos.
+        assertEquals("", message)
         assertFalse(message.contains("Total Geral"))
     }
 

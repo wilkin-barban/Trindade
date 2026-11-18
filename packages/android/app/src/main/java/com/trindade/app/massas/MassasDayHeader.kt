@@ -42,7 +42,13 @@ fun MassasDayHeader(
     date: String,
     syncedAt: String?,
     isSyncing: Boolean,
-    onSync: () -> Unit,
+    /**
+     * The sync action, or null when this surface does not own it.
+     *
+     * Sincronizar com o ERP é do histórico: a tela de lançamento lança, e o espelho do dia se lê onde o dia se
+     * consulta. Null hides the action instead of drawing a dead button.
+     */
+    onSync: (() -> Unit)?,
     modifier: Modifier = Modifier,
     /**
      * Whether the day still accepts writes. A closed day keeps its date and its last read, and loses the one
@@ -74,7 +80,7 @@ fun MassasDayHeader(
                 // Tonal, not outlined: it is the screen's one refresh, it sits next to the date it refreshes,
                 // and it keeps the 48dp the rest of the module's actions use. A closed day draws no button at
                 // all: an action that cannot run is not explained by dimming it.
-                if (!readOnly) FilledTonalButton(
+                if (!readOnly && onSync != null) FilledTonalButton(
                     onClick = onSync,
                     // Only the sync itself withholds the action: a bridge without settings is a reason the
                     // press explains in the result dialog, not a reason to remove the press.
