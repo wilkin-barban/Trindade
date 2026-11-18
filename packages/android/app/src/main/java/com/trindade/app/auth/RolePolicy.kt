@@ -96,6 +96,10 @@ object RolePolicy {
 
         /** Session only: the massas historical views. */
         MASSAS_HISTORY,
+
+        /** Session only: the baixa and its history. The web opened it to every account when the beta ended. */
+        SALIDA,
+        SALIDA_HISTORY,
     }
 
     /**
@@ -119,6 +123,8 @@ object RolePolicy {
         EntryPoint.SHARE_APP,
         EntryPoint.MASSAS_LAUNCH,
         EntryPoint.MASSAS_HISTORY,
+        EntryPoint.SALIDA,
+        EntryPoint.SALIDA_HISTORY,
     )
 
     /**

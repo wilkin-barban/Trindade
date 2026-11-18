@@ -37,6 +37,9 @@ class RolePolicyTest {
                 EntryPoint.SHARE_APP,
                 EntryPoint.MASSAS_LAUNCH,
                 EntryPoint.MASSAS_HISTORY,
+                // La baja está abierta a cualquier cuenta desde que la beta de la web terminó.
+                EntryPoint.SALIDA,
+                EntryPoint.SALIDA_HISTORY,
             ),
             RolePolicy.visibleEntryPoints(RolePolicy.WORKER),
         )

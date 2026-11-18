@@ -15,6 +15,7 @@ import com.trindade.app.network.ReportsApi
 import com.trindade.app.network.StockApi
 import com.trindade.app.network.SystemApi
 import dagger.Module
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
@@ -194,6 +195,18 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideReportsApi(@BackendClient retrofit: Retrofit): ReportsApi = retrofit.create(ReportsApi::class.java)
+
+    /** La baja, sobre el mismo cliente que el resto de la app: habla con Trindade, no con el ERP. */
+    @Provides
+    @Singleton
+    fun provideSalidaApi(@BackendClient retrofit: Retrofit): com.trindade.app.network.SalidaApi =
+        retrofit.create(com.trindade.app.network.SalidaApi::class.java)
+
+    /** La cola de la baja vive en las preferencias de la app, junto al resto de lo local. */
+    @Provides
+    @Singleton
+    fun provideSalidaOutboxStore(@ApplicationContext context: android.content.Context): com.trindade.app.salida.SalidaOutboxStore =
+        com.trindade.app.salida.SalidaOutboxStore(context)
 
     @Provides
     @Singleton

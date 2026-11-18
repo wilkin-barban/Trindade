@@ -154,6 +154,7 @@ class AuthRepository @Inject constructor(
             // The role arrives once per session, with the pair, and is recorded here rather than derived anywhere
             // else: every surface that asks what this operator may open reads it from the store.
             tokenStore.saveRole(body.user.role)
+            tokenStore.saveUsername(body.user.username)
             // A session begins here, whoever the operator is: see [sessionGeneration] for why this is the
             // only beginning that counts, and why the rotation in [refresh] is not a second one.
             sessionGeneration++
@@ -372,6 +373,9 @@ class AuthRepository @Inject constructor(
      * less, which is the one to fail towards, and the state resolves at the next sign-in.
      */
     fun sessionRole(): String? = tokenStore.role()
+
+    /** El nombre con el que se abrió la sesión, o null cuando no se guardó: es el operario del payload ERP. */
+    fun sessionUsername(): String? = tokenStore.username()
 
     /**
      * Requests worker self-registration pending administrator approval.

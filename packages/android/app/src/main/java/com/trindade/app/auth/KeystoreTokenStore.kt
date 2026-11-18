@@ -52,6 +52,12 @@ class KeystoreTokenStore @Inject constructor(
         prefs.edit().putString(KEY_ACCESS_TOKEN, encrypt(accessToken)).apply()
     }
 
+    override fun username(): String? = prefs.getString(KEY_USERNAME, null)
+
+    override fun saveUsername(username: String) {
+        prefs.edit().putString(KEY_USERNAME, username).apply()
+    }
+
     override fun saveRole(role: String) {
         prefs.edit().putString(KEY_ROLE, encrypt(role)).apply()
     }
@@ -116,6 +122,7 @@ class KeystoreTokenStore @Inject constructor(
         // saves: a second, plaintext path into the same preferences is a second thing to remember when the file
         // is read or cleared.
         private const val KEY_ROLE = "role"
+        private const val KEY_USERNAME = "username"
 
         const val KEY_ALIAS = "trindade.session.key"
         const val PROVIDER = "AndroidKeyStore"

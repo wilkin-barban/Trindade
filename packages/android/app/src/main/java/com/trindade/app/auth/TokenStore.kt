@@ -30,6 +30,15 @@ interface TokenStore {
     fun role(): String?
 
     /**
+     * El usuario con el que se abrió la sesión, o null cuando la sesión no lo guardó.
+     *
+     * Lo escribe el login: es el nombre que el ERP recibe en cada documento de la baja y el que la pantalla
+     * muestra como operario. Se guarda en claro porque no es un secreto -- el servidor ya lo conoce -- y porque
+     * el token cifrado no lo contiene.
+     */
+    fun username(): String? = null
+
+    /**
      * Replace both tokens. Called on login and on every refresh, because the server rotates the pair
      * and the old refresh token stops being valid the moment the new one is issued.
      */
@@ -55,6 +64,9 @@ interface TokenStore {
      * calls this.
      */
     fun saveRole(role: String)
+
+    /** El nombre de la sesión. El login lo escribe; `clear` lo borra con el resto. */
+    fun saveUsername(username: String) = Unit
 
     /**
      * Forget the session. Called on logout, and whenever a refresh fails: a store holding a token

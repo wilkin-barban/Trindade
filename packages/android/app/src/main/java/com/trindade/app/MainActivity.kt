@@ -102,6 +102,7 @@ class MainActivity : ComponentActivity() {
         REPORTS(R.string.nav_reports),
         LOADING(R.string.nav_loading),
         MASSAS_LAUNCH(R.string.massas_title),
+        SALIDA(R.string.nav_salida),
         ADMIN(R.string.admin_panel_title),
         ASSAI(R.string.nav_assai),
         STOCK_COUNTER(R.string.nav_stock_counter),
@@ -187,6 +188,7 @@ class MainActivity : ComponentActivity() {
             DrawerEntry.Link(Destination(RolePolicy.EntryPoint.REPORTS, R.string.nav_reports, R.drawable.ic_reports, NavTarget(Tab.REPORTS))),
             DrawerEntry.Link(Destination(RolePolicy.EntryPoint.LOADING, R.string.nav_loading, R.drawable.ic_truck, NavTarget(Tab.LOADING))),
             DrawerEntry.Link(Destination(RolePolicy.EntryPoint.MASSAS_LAUNCH, R.string.massas_title, R.drawable.ic_layers, NavTarget(Tab.MASSAS_LAUNCH))),
+            DrawerEntry.Link(Destination(RolePolicy.EntryPoint.SALIDA, R.string.nav_salida, R.drawable.ic_package_minus, NavTarget(Tab.SALIDA))),
             DrawerEntry.Link(Destination(RolePolicy.EntryPoint.ASSAI_ORDER, R.string.nav_assai, R.drawable.ic_calculator, NavTarget(Tab.ASSAI))),
             DrawerEntry.Link(Destination(RolePolicy.EntryPoint.STOCK_COUNTER, R.string.nav_stock_counter, R.drawable.ic_boxes, NavTarget(Tab.STOCK_COUNTER))),
             DrawerEntry.Link(
@@ -260,6 +262,7 @@ class MainActivity : ComponentActivity() {
                     var historyOpen by remember { mutableStateOf(false) }
                     var loadingHistoryOpen by remember { mutableStateOf(false) }
                     var massasHistoryOpen by remember { mutableStateOf(false) }
+                    var salidaHistoryOpen by remember { mutableStateOf(false) }
                     var stockHistoryOpen by remember { mutableStateOf(false) }
                     var massasLaunchDay by remember { mutableStateOf<String?>(null) }
                     var massasDayFromHistory by remember { mutableStateOf(false) }
@@ -272,6 +275,8 @@ class MainActivity : ComponentActivity() {
                     var adminRequestedSection by remember { mutableStateOf<com.trindade.app.admin.AdminSection?>(null) }
                     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                     val role = remember(signedIn) { authRepository.sessionRole() }
+                    // El nombre viaja al ERP en cada documento: se guarda con la sesión, como el rol.
+                    val sessionUsername = remember(signedIn) { authRepository.sessionUsername() }
                     val sessionKey = remember(signedIn) { authRepository.sessionGeneration.toString() }
                     val sessionScope = rememberCoroutineScope()
                     val lifecycleOwner = LocalLifecycleOwner.current
@@ -536,6 +541,22 @@ class MainActivity : ComponentActivity() {
                                 Tab.ASSAI -> {
                                     BackHandler(enabled = !drawerState.isOpen, onBack = onBackAssaiTab)
                                     AssaiCalculatorScreen()
+                                }
+                                Tab.SALIDA -> {
+                                    BackHandler(enabled = !drawerState.isOpen, onBack = { tab = Tab.DASHBOARD })
+                                    val salidaViewModel: com.trindade.app.salida.SalidaViewModel = hiltViewModel()
+                                    if (salidaHistoryOpen) {
+                                        com.trindade.app.salida.SalidaHistoryScreen(
+                                            viewModel = salidaViewModel,
+                                            onBack = { salidaHistoryOpen = false },
+                                        )
+                                    } else {
+                                        com.trindade.app.salida.SalidaLaunchScreen(
+                                            viewModel = salidaViewModel,
+                                            username = sessionUsername,
+                                            onOpenHistory = { salidaHistoryOpen = true },
+                                        )
+                                    }
                                 }
                                 Tab.SHARE -> {
                                     BackHandler(enabled = !drawerState.isOpen, onBack = onBackShareTab)

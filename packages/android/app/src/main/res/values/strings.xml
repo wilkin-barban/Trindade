@@ -509,6 +509,7 @@
     <string name="nav_stock_counter">Calculador de Estoque</string>
     <string name="nav_stock_history">Histórico de Contagem</string>
     <string name="nav_share">Compartilhar App</string>
+    <string name="nav_salida">Saída / Baixa</string>
     <string name="dashboard_stock_counter">Conte e some as caixas do dia</string>
     <string name="dashboard_share_app">Envie o aplicativo e os acessos para o próximo celular.</string>
     <string name="dashboard_stock_history">Os dias já contados, só com o que foi contado</string>
