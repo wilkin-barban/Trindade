@@ -142,10 +142,8 @@ class MassasWhatsappGoldenTest {
     fun `a day without launches says nothing instead of an empty message`() {
         val empty = MassasLaunchDayView(date = "2026-11-17", products = emptyList(), launches = emptyList())
 
-        assertEquals(
-            "🍝 *Lançamento de Massas — 17/11/2026*\n\nNenhum lançamento registrado até agora.",
-            formatMassasWhatsAppMessage(empty, abbreviations = table),
-        )
+        // Ni el encabezado solo: el día vacío no tiene mensaje y la pantalla muestra su propia prévia vacía.
+        assertEquals("", formatMassasWhatsAppMessage(empty, abbreviations = table))
     }
 
     @Test
