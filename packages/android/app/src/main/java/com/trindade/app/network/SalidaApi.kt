@@ -1,4 +1,4 @@
-package com.trindade.app.salida
+package com.trindade.app.network
 
 import com.trindade.app.contract.models.SalidaCatalogResponse
 import com.trindade.app.contract.models.SalidaCreateRequest
@@ -9,6 +9,8 @@ import com.trindade.app.contract.models.SalidaErpResultResponse
 import com.trindade.app.contract.models.SalidaHistoryResponse
 import com.trindade.app.contract.models.SalidaPhotoResponse
 import com.trindade.app.contract.models.SalidaListResponse
+import com.trindade.app.salida.SalidaLine
+import com.trindade.app.salida.SalidaSelection
 import okhttp3.MultipartBody
 import retrofit2.Response
 import retrofit2.http.Body
