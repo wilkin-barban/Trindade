@@ -61,7 +61,11 @@ test.describe('la pasada en el teléfono', () => {
     const response = await page.request.get('/Aero32Bridge.js');
     expect(response.ok()).toBeTruthy();
     const code = await response.text();
-    expect(code).toContain('v2.0.0');
+    // La versión es la que el operador lee para saber qué receta tiene instalada: se pide una versión
+    // visible, no un número fijo, para que subirla no rompa el E2E mientras el archivo la siga mostrando.
+    expect(code).toMatch(/Puente Aero32[^\n]*v\d+\.\d+\.\d+/);
     expect(code).toContain('steps');
+    // Desde v2.1.0 el sobre lleva los dos lados del día en `bodies`.
+    expect(code).toContain('bodies');
   });
 });
