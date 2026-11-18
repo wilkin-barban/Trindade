@@ -122,43 +122,51 @@ fun TimeSlotsAdminScreen(
             )
         }
 
-        if (state.form != null) {
+        if (state.isAdmin) {
+            AdminPrimaryButton(
+                onClick = onOpenCreate,
+                modifier = Modifier.fillMaxWidth(),
+                text = stringResource(R.string.time_slots_add_new),
+            )
+        }
+        if (state.timeSlots.isEmpty()) {
+            Text(stringResource(R.string.time_slots_empty))
+        } else {
+            state.timeSlots.forEach { slot ->
+                TimeSlotRow(
+                    slot = slot,
+                    isAdmin = state.isAdmin,
+                    onRequestDelete = { onRequestDelete(slot) },
+                )
+            }
+        }
+    }
+
+    // El alta de un horario se pide en el modal compartido: la lista no se mueve mientras se escribe la hora.
+    val openForm = state.form
+    if (openForm != null) {
+        AdminFormDialog(
+            title = stringResource(R.string.time_slots_new_slot),
+            onDismiss = onCancelForm,
+            onSubmit = {
+                pendingConfirmation = AdminConfirmation(
+                    title = context.getString(R.string.admin_action_create),
+                    message = context.getString(R.string.admin_dialog_create_body, openForm.slotInput),
+                    confirmLabel = context.getString(R.string.admin_action_confirm),
+                    onConfirm = {
+                        pendingConfirmation = null
+                        onSave()
+                    },
+                )
+            },
+            saving = openForm.saving,
+            submitEnabled = openForm.canSubmit,
+            submitLabel = stringResource(R.string.time_slots_add),
+        ) {
             TimeSlotForm(
                 state = state,
                 onSlotInputChanged = onSlotInputChanged,
-                onSave = {
-                    val slotInput = state.form.slotInput
-                    pendingConfirmation = AdminConfirmation(
-                        title = context.getString(R.string.admin_action_create),
-                        message = context.getString(R.string.admin_dialog_create_body, slotInput),
-                        confirmLabel = context.getString(R.string.admin_action_confirm),
-                        onConfirm = {
-                            pendingConfirmation = null
-                            onSave()
-                        },
-                    )
-                },
-                onCancel = onCancelForm,
             )
-        } else {
-            if (state.isAdmin) {
-                AdminPrimaryButton(
-                    onClick = onOpenCreate,
-                    modifier = Modifier.fillMaxWidth(),
-                    text = stringResource(R.string.time_slots_add_new),
-                )
-            }
-            if (state.timeSlots.isEmpty()) {
-                Text(stringResource(R.string.time_slots_empty))
-            } else {
-                state.timeSlots.forEach { slot ->
-                    TimeSlotRow(
-                        slot = slot,
-                        isAdmin = state.isAdmin,
-                        onRequestDelete = { onRequestDelete(slot) },
-                    )
-                }
-            }
         }
     }
 
@@ -226,25 +234,15 @@ private fun TimeSlotRow(
 private fun TimeSlotForm(
     state: TimeSlotsAdminViewModel.UiState,
     onSlotInputChanged: (String) -> Unit,
-    onSave: () -> Unit,
-    onCancel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val form = state.form ?: return
     val context = LocalContext.current
 
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        modifier = modifier.fillMaxWidth(),
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.time_slots_new_slot),
-                style = MaterialTheme.typography.titleMedium,
-            )
 
             OutlinedTextField(
                 value = form.slotInput,
@@ -277,22 +275,8 @@ private fun TimeSlotForm(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AdminPrimaryButton(
-                    onClick = onSave,
-                    enabled = form.canSubmit,
-                    loading = form.saving,
-                    text = stringResource(R.string.time_slots_add),
-                )
-                AdminSecondaryButton(
-                    onClick = onCancel,
-                    enabled = !form.saving,
-                    text = stringResource(R.string.time_slots_cancel),
-                )
-            }
         }
     }
-}
 
 @Composable
 fun TimeSlotsAdminRoute(
