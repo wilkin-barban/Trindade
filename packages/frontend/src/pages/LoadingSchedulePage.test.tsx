@@ -23,6 +23,14 @@ vi.mock('../api/client', () => ({
   ApiClientError: class ApiClientError extends Error {},
 }));
 
+const fetchExport = vi.fn(async (date: string) => `RELATÓRIO ${date}`);
+
+vi.mock('../lib/loading-share', async () => ({
+  fetchLoadingExportText: (date: string) => fetchExport(date),
+  exportLoadingPdf: vi.fn(),
+  shareLoadingMessage: vi.fn(async () => 'copied'),
+}));
+
 const { LoadingSchedulePage } = await import('./LoadingSchedulePage');
 
 function driver(id: number, name: string) {
@@ -32,6 +40,7 @@ function driver(id: number, name: string) {
 let dayRequests = 0;
 
 beforeEach(() => {
+  fetchExport.mockClear();
   dayRequests = 0;
   get.mockReset();
   post.mockReset();
@@ -55,6 +64,36 @@ beforeAll(async () => {
 });
 
 describe('LoadingSchedulePage', () => {
+  it('asks for the day the history sent, not for today', async () => {
+    render(
+      <MemoryRouter initialEntries={['/loading?share=1&date=2026-11-10&from=history']}>
+        <LoadingSchedulePage />
+      </MemoryRouter>,
+    );
+
+    // La grilla sigue leyendo el día en curso, pero la tarjeta habla del día que el historial pidió.
+    await waitFor(() => expect(fetchExport).toHaveBeenCalledWith('2026-11-10'));
+    await waitFor(() => expect(screen.getByTestId('loading-share-text').textContent).toBe('RELATÓRIO 2026-11-10'));
+    expect(screen.getByTestId('loading-share-subtitle').textContent).toContain('10/11/2026');
+    // Y la vista es de solo lectura, con su vuelta al historial.
+    expect(screen.getByTestId('loading-share-back')).toBeInTheDocument();
+    expect(screen.queryByTestId('loading-share-edit')).toBeNull();
+    expect(get.mock.calls.some(([url]) => String(url).includes('date=2026-11-10'))).toBe(false);
+  });
+
+  it('keeps today for the share card the grid opens by itself', async () => {
+    render(
+      <MemoryRouter initialEntries={['/loading?share=1&date=2026-11-10']}>
+        <LoadingSchedulePage />
+      </MemoryRouter>,
+    );
+
+    // Sin `from=history` la tarjeta es la del módulo: su día es hoy, como siempre.
+    const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+    await waitFor(() => expect(fetchExport).toHaveBeenCalledWith(today));
+    expect(screen.queryByTestId('loading-share-back')).toBeNull();
+  });
+
   it('keeps the open modal, and the rows it still owes, through the reload of a half-sent batch', async () => {
     post.mockImplementation(async (_url: string, body: { driver_id: number }) => {
       if (body.driver_id === 4) throw Object.assign(new Error('Veículo já agendado nesta data.'), { status: 409 });

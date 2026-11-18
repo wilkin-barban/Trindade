@@ -66,6 +66,10 @@ export function LoadingSchedulePage() {
   const showingShare = params.get('share') === '1';
   // El histórico abre esta misma tarjeta, pero como vista de solo lectura: sin Editar y con Volver al historial.
   const fromHistory = params.get('from') === 'history';
+  // La grilla y su lectura siguen siendo las de hoy -- esta pantalla es el día en curso --, pero la tarjeta que
+  // pide el historial habla del día que el historial pidió: su texto, su fecha y su PDF.
+  const requestedDate = /^\d{4}-\d{2}-\d{2}$/.test(params.get('date') ?? '') ? (params.get('date') as string) : null;
+  const shareDate = fromHistory && requestedDate ? requestedDate : date;
   const [shareText, setShareText] = useState('');
   const [shareLoading, setShareLoading] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
@@ -109,7 +113,7 @@ export function LoadingSchedulePage() {
     setShareError(null);
     void (async () => {
       try {
-        const text = await fetchLoadingExportText(date);
+        const text = await fetchLoadingExportText(shareDate);
         if (!cancelled) setShareText(text);
       } catch (err) {
         if (!cancelled) setShareError(err instanceof Error ? err.message : t('loading.exportError'));
@@ -120,7 +124,7 @@ export function LoadingSchedulePage() {
     return () => {
       cancelled = true;
     };
-  }, [showingShare, date, t]);
+  }, [showingShare, shareDate, t]);
 
   async function handleShareMessage() {
     setSharing(true);
@@ -138,7 +142,7 @@ export function LoadingSchedulePage() {
     setPrinting(true);
     setShareNote(null);
     try {
-      await exportLoadingPdf(date, shareText);
+      await exportLoadingPdf(shareDate, shareText);
     } catch (err) {
       setShareNote(err instanceof Error ? err.message : t('loading.exportError'));
     } finally {
@@ -196,7 +200,7 @@ export function LoadingSchedulePage() {
         <ShareCard
           testIdPrefix="loading"
           title={t('loading.exportTitle')}
-          subtitle={formatDisplayDate(date)}
+          subtitle={formatDisplayDate(shareDate)}
           text={shareText}
           loading={shareLoading}
           error={shareError}
