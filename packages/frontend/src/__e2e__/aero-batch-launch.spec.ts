@@ -194,4 +194,44 @@ test.describe('a launch of many products leaves once', () => {
     await expect(result).toBeVisible({ timeout: 28_000 });
     await expect(result).toContainText('Sincronizado com o ERP');
   });
+
+  test('a composite launch and read returns in one trip without triggering a second ticket (S3, S5)', async ({ page }) => {
+    await loginAsAeroOwner(page);
+    await openLaunchPage(page);
+    await launchProducts(page, 1, '2', 8);
+    await waitForInFlight(page, 1);
+
+    // The bridge returns the composite payload: launch verdict + day's movements read
+    const compositePayload = {
+      launch: { success: true, data: { ENT_LAN: 42001 } },
+      read: {
+        success: true,
+        data: [
+          {
+            ENT_LAN: 42001,
+            PRO_COD: '001192',
+            PRO_DES: 'MASSA DE PASTEL',
+            PRO_QTD: 20,
+            ENT_DTA: DAY,
+            ENT_USU: 'WILKIN',
+            ENTSAI: 'E',
+          },
+        ],
+      },
+    };
+
+    await answer(page, 'entrada', compositePayload);
+
+    const result = page.locator('[data-testid="massa-result-modal"]');
+    await expect(result).toBeVisible({ timeout: 28_000 });
+    await expect(result).toContainText('Sincronizado com o ERP');
+
+    // Close the verdict dialog: it must NOT navigate to scriptable:///run/... (no second trip)
+    const close = result.locator('[data-testid="massa-result-close"]');
+    await close.click();
+    await expect(result).toHaveCount(0);
+
+    // Remains on massas-history without launching another bridge trip
+    expect(page.url()).toContain('/massas-history');
+  });
 });
