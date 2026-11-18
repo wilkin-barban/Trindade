@@ -108,7 +108,124 @@ fun UsersScreen(
             )
         }
 
-        if (state.isAdmin && (showForm || state.editingId != null)) {
+
+        state.users.forEach { user ->
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                ),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(user.username, style = MaterialTheme.typography.titleMedium)
+                    if (user.displayName.isNotBlank()) {
+                        Text(user.displayName)
+                    }
+                    val roleText = when (user.roleId) {
+                        1 -> stringResource(R.string.admin_role_admin)
+                        2 -> stringResource(R.string.admin_role_worker)
+                        else -> user.roleName.ifBlank { stringResource(R.string.admin_role_unknown, user.roleId) }
+                    }
+                    Text(roleText)
+                    Text(if (user.isActive == 1) stringResource(R.string.admin_status_active) else stringResource(R.string.admin_status_inactive))
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (state.canEdit(user)) {
+                            AdminSecondaryButton(onClick = { onEdit(user) }, text = stringResource(R.string.admin_action_edit))
+                        } else {
+                            Text(stringResource(R.string.admin_read_only), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        if (state.canToggle(user)) {
+                            AdminSecondaryButton(
+                                onClick = {
+                                    val isActivating = user.isActive != 1
+                                    val titleRes = if (isActivating) R.string.admin_action_activate else R.string.admin_action_deactivate
+                                    val bodyRes = if (isActivating) R.string.admin_dialog_toggle_on_body else R.string.admin_dialog_toggle_off_body
+                                    val name = user.username.ifBlank { user.displayName }
+                                    pendingConfirmation = AdminConfirmation(
+                                        title = context.getString(titleRes),
+                                        message = context.getString(bodyRes, name),
+                                        confirmLabel = context.getString(R.string.admin_action_confirm),
+                                        onConfirm = {
+                                            pendingConfirmation = null
+                                            onToggle(user)
+                                        },
+                                    )
+                                },
+                                text = if (user.isActive == 1) stringResource(R.string.admin_action_deactivate) else stringResource(R.string.admin_action_activate),
+                            )
+                        }
+                        if (state.canDelete(user)) {
+                            AdminDestructiveButton(
+                                onClick = {
+                                    onRequestDelete(user)
+                                    localDeleteTarget = user
+                                },
+                                enabled = !state.saving,
+                                text = stringResource(R.string.admin_action_delete),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!state.loading && state.users.isEmpty()) {
+            Text(stringResource(R.string.admin_no_users))
+        }
+    }
+
+    val targetToDelete = (state.deleteTarget ?: localDeleteTarget)?.takeIf { state.canDelete(it) }
+    val deleteConfirmation = targetToDelete?.let { user ->
+        val name = user.username.ifBlank { user.displayName }
+        AdminConfirmation(
+            title = stringResource(R.string.admin_action_delete),
+            message = stringResource(R.string.admin_dialog_delete_body, name),
+            confirmLabel = stringResource(R.string.admin_action_delete),
+            isDestructive = true,
+            onConfirm = {
+                localDeleteTarget = null
+                onConfirmDelete()
+            },
+        )
+    }
+
+    // El alta y la edición de una cuenta, en el modal compartido y fuera del Column que scrollea.
+    if (state.isAdmin && (showForm || state.editingId != null)) {
+        val isCreate = state.editingId == null
+        AdminFormDialog(
+            title = stringResource(if (isCreate) R.string.admin_new_user else R.string.admin_action_edit),
+            onDismiss = {
+                showForm = false
+                onCancel()
+            },
+            onSubmit = {
+                val titleRes = if (isCreate) R.string.admin_action_create else R.string.admin_action_save
+                val bodyRes = if (isCreate) R.string.admin_dialog_create_body else R.string.admin_dialog_save_body
+                val userName = state.username.ifBlank { state.displayName }
+                pendingConfirmation = AdminConfirmation(
+                    title = context.getString(titleRes),
+                    message = context.getString(bodyRes, userName),
+                    confirmLabel = context.getString(R.string.admin_action_confirm),
+                    onConfirm = {
+                        pendingConfirmation = null
+                        onSave()
+                    },
+                )
+            },
+            saving = state.saving,
+            submitEnabled = !state.saving && !state.loading,
+            submitLabel = if (state.saving) {
+                stringResource(R.string.admin_action_saving)
+            } else if (isCreate) {
+                stringResource(R.string.admin_action_create)
+            } else {
+                stringResource(R.string.admin_action_save)
+            },
+        ) {
             OutlinedTextField(
                 value = state.username,
                 onValueChange = onUsernameChange,
@@ -218,121 +335,7 @@ fun UsersScreen(
                     }
                 }
             }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AdminPrimaryButton(
-                    onClick = {
-                        val isCreate = state.editingId == null
-                        val titleRes = if (isCreate) R.string.admin_action_create else R.string.admin_action_save
-                        val bodyRes = if (isCreate) R.string.admin_dialog_create_body else R.string.admin_dialog_save_body
-                        val userName = state.username.ifBlank { state.displayName }
-                        pendingConfirmation = AdminConfirmation(
-                            title = context.getString(titleRes),
-                            message = context.getString(bodyRes, userName),
-                            confirmLabel = context.getString(R.string.admin_action_confirm),
-                            onConfirm = {
-                                pendingConfirmation = null
-                                onSave()
-                            },
-                        )
-                    },
-                    enabled = !state.saving && !state.loading,
-                    loading = state.saving,
-                    text = if (state.saving) stringResource(R.string.admin_action_saving) else if (state.editingId == null) stringResource(R.string.admin_action_create) else stringResource(R.string.admin_action_save),
-                )
-                AdminSecondaryButton(
-                    onClick = {
-                        showForm = false
-                        onCancel()
-                    },
-                    enabled = !state.saving,
-                    text = stringResource(R.string.admin_action_cancel),
-                )
-            }
         }
-
-        state.users.forEach { user ->
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                ),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(user.username, style = MaterialTheme.typography.titleMedium)
-                    if (user.displayName.isNotBlank()) {
-                        Text(user.displayName)
-                    }
-                    val roleText = when (user.roleId) {
-                        1 -> stringResource(R.string.admin_role_admin)
-                        2 -> stringResource(R.string.admin_role_worker)
-                        else -> user.roleName.ifBlank { stringResource(R.string.admin_role_unknown, user.roleId) }
-                    }
-                    Text(roleText)
-                    Text(if (user.isActive == 1) stringResource(R.string.admin_status_active) else stringResource(R.string.admin_status_inactive))
-
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        if (state.canEdit(user)) {
-                            AdminSecondaryButton(onClick = { onEdit(user) }, text = stringResource(R.string.admin_action_edit))
-                        } else {
-                            Text(stringResource(R.string.admin_read_only), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        if (state.canToggle(user)) {
-                            AdminSecondaryButton(
-                                onClick = {
-                                    val isActivating = user.isActive != 1
-                                    val titleRes = if (isActivating) R.string.admin_action_activate else R.string.admin_action_deactivate
-                                    val bodyRes = if (isActivating) R.string.admin_dialog_toggle_on_body else R.string.admin_dialog_toggle_off_body
-                                    val name = user.username.ifBlank { user.displayName }
-                                    pendingConfirmation = AdminConfirmation(
-                                        title = context.getString(titleRes),
-                                        message = context.getString(bodyRes, name),
-                                        confirmLabel = context.getString(R.string.admin_action_confirm),
-                                        onConfirm = {
-                                            pendingConfirmation = null
-                                            onToggle(user)
-                                        },
-                                    )
-                                },
-                                text = if (user.isActive == 1) stringResource(R.string.admin_action_deactivate) else stringResource(R.string.admin_action_activate),
-                            )
-                        }
-                        if (state.canDelete(user)) {
-                            AdminDestructiveButton(
-                                onClick = {
-                                    onRequestDelete(user)
-                                    localDeleteTarget = user
-                                },
-                                enabled = !state.saving,
-                                text = stringResource(R.string.admin_action_delete),
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        if (!state.loading && state.users.isEmpty()) {
-            Text(stringResource(R.string.admin_no_users))
-        }
-    }
-
-    val targetToDelete = (state.deleteTarget ?: localDeleteTarget)?.takeIf { state.canDelete(it) }
-    val deleteConfirmation = targetToDelete?.let { user ->
-        val name = user.username.ifBlank { user.displayName }
-        AdminConfirmation(
-            title = stringResource(R.string.admin_action_delete),
-            message = stringResource(R.string.admin_dialog_delete_body, name),
-            confirmLabel = stringResource(R.string.admin_action_delete),
-            isDestructive = true,
-            onConfirm = {
-                localDeleteTarget = null
-                onConfirmDelete()
-            },
-        )
     }
 
     AdminConfirmDialog(

@@ -550,7 +550,7 @@ class UsersScreenTest {
         var saved = 0
         render(state(editingId = 1, username = "alice"), onSave = { saved++ })
 
-        composeRule.onNodeWithText("Salvar").performScrollTo().performClick()
+        composeRule.onNodeWithText("Salvar").performClick()
         val expectedBody = copy(R.string.admin_dialog_save_body, "alice")
         composeRule.onNodeWithText(expectedBody).assertIsDisplayed()
 
@@ -563,7 +563,7 @@ class UsersScreenTest {
         var saved = 0
         render(state(editingId = 1, username = "alice"), onSave = { saved++ })
 
-        composeRule.onNodeWithText("Salvar").performScrollTo().performClick()
+        composeRule.onNodeWithText("Salvar").performClick()
         val expectedBody = copy(R.string.admin_dialog_save_body, "alice")
         composeRule.onNodeWithText(expectedBody).assertIsDisplayed()
 
