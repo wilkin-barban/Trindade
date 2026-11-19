@@ -1079,4 +1079,5 @@
     <string name="share_card_back">Voltar</string>
     <string name="dashboard_salida_hint">Registrar saída de produto</string>
     <string name="massas_share_empty">Sem lançamentos para compartilhar</string>
+    <string name="salida_report_block">Salidas / Baixas</string>
 </resources>

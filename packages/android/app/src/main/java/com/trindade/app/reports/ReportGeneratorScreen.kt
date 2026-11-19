@@ -23,6 +23,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.ui.platform.testTag
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -289,6 +291,22 @@ fun ReportGeneratorScreen(
                         receipts = state.receipts,
                         isSyncing = state.isSyncingErp,
                         onSync = onSyncErp,
+                    )
+                }
+
+                // Las salidas del día, antes de guardar: el reporte las declara y la web las muestra en este
+                // mismo punto. Es la misma tarjeta del detalle, no una segunda versión. Sin día leído no se
+                // dibuja: una tarjeta vacía empujando el formulario no informa nada.
+                if (state.salidaDay != null) item {
+                    Text(
+                        text = stringResource(R.string.salida_report_block),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    SalidaReportCard(
+                        day = state.salidaDay,
+                        error = null,
+                        modifier = Modifier.testTag("report-salida-block"),
                     )
                 }
 

@@ -103,6 +103,8 @@ class ReportGeneratorViewModel @Inject constructor(
         val showValidation: Boolean = false,
         /** The day's massas, under the temperatures the operator has just read. */
         val massasDay: MassasReportDayView? = null,
+        /** Las salidas del día, que el reporte declara antes de guardarse igual que la web. */
+        val salidaDay: com.trindade.app.contract.models.SalidaReportDayView? = null,
         /** The incoming supplies the ERP registered for that same day. */
         val receipts: ReportReceipts? = null,
         /** Whether an ERP sync via bridge is currently in progress. */
@@ -288,11 +290,26 @@ class ReportGeneratorViewModel @Inject constructor(
      * The generator's day is the server's today (see [loadMassasDay]), so both halves of the card are about
      * the day the report will be filed against rather than about a date the operator picked.
      */
+    /**
+     * Lee las salidas del día para el bloque del formulario.
+     *
+     * Un día sin salidas llega como un objeto vacío y el bloque lo dice; una lectura fallida deja el bloque en
+     * blanco con su error, que no es lo mismo que un día sin bajas.
+     */
+    private fun refreshSalidaDay(date: String) {
+        if (date.isBlank()) return
+        viewModelScope.launch {
+            val day = runCatching { repository.salidaDay(date) }.getOrNull()
+            _state.update { it.copy(salidaDay = day ?: it.salidaDay) }
+        }
+    }
+
     private fun loadReceipts() {
         viewModelScope.launch {
             val receipts = repository.receipts(MassasLaunchViewModel.saopauloToday())
             _state.update { it.copy(receipts = receipts) }
         }
+        refreshSalidaDay(MassasLaunchViewModel.saopauloToday())
     }
 
     /**

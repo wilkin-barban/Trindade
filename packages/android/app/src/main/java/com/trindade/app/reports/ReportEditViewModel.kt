@@ -40,6 +40,8 @@ class ReportEditViewModel @Inject constructor(
 
     data class UiState(
         val loading: Boolean = true,
+        /** Las salidas del día del reporte, que se declaran al editarlo igual que al crearlo. */
+        val salidaDay: com.trindade.app.contract.models.SalidaReportDayView? = null,
         val report: ReportResponseReport? = null,
         val categories: List<CategoriesResponseCategoriesInner> = emptyList(),
         val offers: ProductsResponse? = null,
@@ -169,6 +171,10 @@ class ReportEditViewModel @Inject constructor(
             val categories = repository.categories()
             val offers = repository.productOffers()
             val tasks = categories.orEmpty().flatMap { it.tasks }
+
+            // Las salidas del día se piden al llegar el reporte: la tarjeta las declara con la misma forma
+            // que en el alta y en el detalle.
+            report?.reportDate?.takeIf { it.isNotBlank() }?.let { refreshSalidaDay(it) }
 
             _state.update { current ->
                 current.copy(
@@ -466,5 +472,14 @@ class ReportEditViewModel @Inject constructor(
 
         /** The generator's own generic failure, which fits a screen that saves as much as it fits that one. */
         const val GENERIC = "Não foi possível salvar o relatório. Tente de novo."
+    }
+
+    /** Lee las salidas del día del reporte; una lectura fallida no borra lo que ya se ve. */
+    fun refreshSalidaDay(date: String) {
+        if (date.isBlank()) return
+        viewModelScope.launch {
+            val day = runCatching { repository.salidaDay(date) }.getOrNull()
+            if (day != null) _state.update { it.copy(salidaDay = day) }
+        }
     }
 }

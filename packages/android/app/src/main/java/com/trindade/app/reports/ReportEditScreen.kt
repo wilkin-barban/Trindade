@@ -13,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.platform.testTag
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -120,6 +121,19 @@ fun ReportEditScreen(
             enabled = !state.readOnly,
             modifier = Modifier.fillMaxWidth(),
         )
+
+        // Las salidas del día del reporte, con la misma tarjeta que el alta y el detalle.
+        if (state.salidaDay != null) Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = stringResource(R.string.salida_report_block),
+                style = MaterialTheme.typography.titleLarge,
+            )
+            SalidaReportCard(
+                day = state.salidaDay,
+                error = null,
+                modifier = Modifier.testTag("report-salida-block"),
+            )
+        }
 
         // One form per root category, with its children filtered out of the same list the generator
         // serves them from: the endpoint sends one level, ordered `COALESCE(parent_category_id, id),
