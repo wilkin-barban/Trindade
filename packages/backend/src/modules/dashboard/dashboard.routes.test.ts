@@ -46,6 +46,9 @@ describe('Dashboard Routes', () => {
     assert.strictEqual(typeof body.reportsTotal, 'number');
     assert.strictEqual(typeof body.schedulesTotal, 'number');
     assert.ok(body.latestReportId === null || typeof body.latestReportId === 'number');
+    // Sin reporte no hay nada que editar, y el resumen lo dice con un booleano, no con la ausencia del campo.
+    assert.strictEqual(typeof body.latestReportCanEdit, 'boolean');
+    assert.strictEqual(body.latestReportCanEdit, false);
     assert.strictEqual(typeof body.higieneDone, 'number');
     assert.strictEqual(typeof body.higieneTotal, 'number');
     assert.strictEqual(typeof body.recepcionDone, 'number');
@@ -97,6 +100,35 @@ describe('Dashboard Routes', () => {
 
     assert.strictEqual(body.higieneDone, 1);
     assert.strictEqual(body.higieneTotal, higieneTasks.length);
+  });
+
+  it('says who may edit the last report of today: the owner or an administrator', async (t) => {
+    // La autorización es del servidor y se calcula sobre el día: el administrador puede corregir el reporte de
+    // un trabajador de hoy, y un trabajador ajeno al reporte no puede. La tarjeta del dashboard sólo refleja.
+    t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-09-01T15:00:00.000Z') }); // Tuesday 12:00 in São Paulo
+    t.after(() => t.mock.timers.reset());
+
+    db.exec('DELETE FROM report_items');
+    db.exec('DELETE FROM reports');
+    // Un reporte del trabajador (id 2) del día de hoy.
+    db.prepare(`INSERT INTO reports (user_id, turno, report_date, notes) VALUES (2, 'tarde', '2026-09-01', '')`).run();
+
+    const summaryAs = async (payload: { username: string; password: string }) => {
+      const login = await app.inject({ method: 'POST', url: '/api/auth/login', payload });
+      const { token } = JSON.parse(login.body);
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/dashboard/summary',
+        headers: { authorization: `Bearer ${token}` },
+      });
+      return JSON.parse(response.body) as { latestReportCanEdit: boolean };
+    };
+
+    const asAdmin = await summaryAs(fixtures.admin);
+    assert.strictEqual(asAdmin.latestReportCanEdit, true, 'el administrador corrige el día de hoy');
+
+    const asOwner = await summaryAs(fixtures.worker);
+    assert.strictEqual(asOwner.latestReportCanEdit, true, 'el dueño del reporte también');
   });
 
   it('GET /api/dashboard/summary returns 401 without token', async () => {

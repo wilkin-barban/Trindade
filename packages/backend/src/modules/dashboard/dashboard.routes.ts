@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { getSaoPauloDateString } from '../../utils/date.js';
 import { activeScheduleBatchDate, activeScheduleDate } from './active-schedule.js';
 import { GUEST_USERNAME } from '../../guest-user.js';
+import { isAdmin } from '../history-permissions.js';
 
 interface CountRow {
   count: number;
@@ -11,7 +12,7 @@ export async function dashboardRoutes(fastify: FastifyInstance) {
   fastify.get(
     '/summary',
     { preHandler: [fastify.authenticate] },
-    async (_request: FastifyRequest, reply: FastifyReply) => {
+    async (request: FastifyRequest, reply: FastifyReply) => {
       const db = fastify.db;
       const today = getSaoPauloDateString();
       const tomorrow = getSaoPauloDateString(new Date(Date.now() + 24 * 60 * 60 * 1000));
@@ -29,7 +30,7 @@ export async function dashboardRoutes(fastify: FastifyInstance) {
 
       const latestReport = db
         .prepare(
-          `SELECT id FROM reports
+          `SELECT id, user_id FROM reports
            WHERE report_date = ? AND is_active = 1
            ORDER BY created_at DESC
            LIMIT 1`
@@ -118,6 +119,15 @@ export async function dashboardRoutes(fastify: FastifyInstance) {
         )
         .get() as CountRow;
 
+      // Editar es del dueño o del administrador **hoy**, y sólo hoy: el pasado es inmutable. Lo decide el
+      // servidor y la UI sólo lo refleja; el resumen es de hoy por definición, así que el día no hay que
+      // compararlo otra vez.
+      const actor = request.user!;
+      const isAdminToday = isAdmin({ sub: actor.sub, role: actor.role });
+      const latestReportCanEdit =
+        latestReport !== undefined &&
+        (isAdminToday || (latestReport as { user_id?: number }).user_id === actor.sub);
+
       return reply.send({
         reportsToday: reportsToday.count,
         schedulesTomorrow: schedulesTomorrow.count,
@@ -128,6 +138,7 @@ export async function dashboardRoutes(fastify: FastifyInstance) {
         reportsTotal: reportsTotal.count,
         schedulesTotal: schedulesTotal.count,
         latestReportId: latestReport?.id || null,
+        latestReportCanEdit,
         higieneDone: higieneDone.count,
         higieneTotal: higieneTotal.count,
         recepcionDone: recepcionDone.count,

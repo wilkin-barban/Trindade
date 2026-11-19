@@ -20,6 +20,8 @@ interface DashboardSummary {
   reportsTotal: number;
   schedulesTotal: number;
   latestReportId: number | null;
+  /** Lo decide el servidor: dueño o administrador del reporte de hoy. */
+  latestReportCanEdit: boolean;
   higieneDone: number;
   higieneTotal: number;
   recepcionDone: number;
@@ -27,6 +29,8 @@ interface DashboardSummary {
 }
 
 interface SummaryCardProps {
+  /** Acciones de la tarjeta; si existen, la tarjeta no se envuelve en un enlace. */
+  actions?: React.ReactNode;
   title: string;
   value: React.ReactNode;
   icon: React.ReactNode;
@@ -43,7 +47,7 @@ interface SummaryCardProps {
  * to hand the same destination to "Ver historial" as to the card itself. So a card is either a single door --
  * `to` -- or a plain surface whose body holds the two doors it needs, and never both.
  */
-function SummaryCard({ title, value, icon, to, testId }: SummaryCardProps) {
+function SummaryCard({ title, value, icon, to, testId, actions }: SummaryCardProps) {
   const body = (
     <CardContent className="pt-6">
       <div className="flex items-center justify-between gap-3">
@@ -56,7 +60,9 @@ function SummaryCard({ title, value, icon, to, testId }: SummaryCardProps) {
     </CardContent>
   );
 
-  if (to) {
+  // Con acciones adentro la tarjeta deja de ser un enlace: un ancla dentro de otra la gana el navegador y el
+  // toque termina en el destino equivocado.
+  if (to && !actions) {
     return (
       <Card className="border transition-all duration-200 hover:scale-[1.02] hover:border-gray-300 hover:shadow-md" data-testid={testId}>
         <Link to={to} className="block no-underline">
@@ -66,7 +72,22 @@ function SummaryCard({ title, value, icon, to, testId }: SummaryCardProps) {
     );
   }
 
-  return <Card data-testid={testId}>{body}</Card>;
+  return (
+    <Card data-testid={testId}>
+      {to ? (
+        <Link to={to} className="block no-underline">
+          {body}
+        </Link>
+      ) : (
+        body
+      )}
+      {actions && (
+        <div className="flex flex-wrap items-center gap-3 px-6 pb-4">
+          {actions}
+        </div>
+      )}
+    </Card>
+  );
 }
 
 /** One count of the summary panel: a name and its number, at the same size, one per line. */
@@ -193,6 +214,28 @@ export function DashboardPage() {
           // La tarjeta abre la tarjeta de compartir del último reporte, que es lo que se hace con él; sin
           // reporte, la lista. El detalle completo sigue a un clic adentro de esa vista.
           to={summary?.latestReportId ? `/reports/${summary.latestReportId}?share=1` : '/reports'}
+          actions={
+            summary?.latestReportId ? (
+              <>
+                <Link
+                  to={`/reports/${summary.latestReportId}?share=1`}
+                  className="text-xs text-green-700 hover:underline"
+                  data-testid="dashboard-report-share"
+                >
+                  {t('reports.shareWhatsApp')}
+                </Link>
+                {summary.latestReportCanEdit && (
+                  <Link
+                    to={`/reports/${summary.latestReportId}/edit`}
+                    className="text-xs text-blue-600 hover:underline"
+                    data-testid="dashboard-report-edit"
+                  >
+                    {t('reports.editTitle')}
+                  </Link>
+                )}
+              </>
+            ) : null
+          }
         />
         <SummaryCard
           title={t('dashboard.activeSchedule')}

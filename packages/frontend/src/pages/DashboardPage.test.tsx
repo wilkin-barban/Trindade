@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import i18n from '../i18n/config';
@@ -50,6 +50,7 @@ const SUMMARY = {
   reportsTotal: 12,
   schedulesTotal: 9,
   latestReportId: 33,
+  latestReportCanEdit: true,
   higieneDone: 3,
   higieneTotal: 5,
   recepcionDone: 2,
@@ -81,11 +82,28 @@ describe('DashboardPage', () => {
     renderPage();
 
     await waitFor(() => expect(screen.getByTestId('dashboard-card-reports')).toBeInTheDocument());
-    const reportLink = screen.getByTestId('dashboard-card-reports').querySelector('a');
-    expect(reportLink?.getAttribute('href')).toBe('/reports/33?share=1');
+    const reportLink = screen.getByTestId('dashboard-report-share');
+    expect(reportLink.getAttribute('href')).toBe('/reports/33?share=1');
 
     const schedule = screen.getByTestId('view-active-schedule');
     expect(schedule.getAttribute('href')).toBe('/loading?share=1&date=2026-10-30');
+  });
+
+  it('offers Editar on the report card only when the server allows it', async () => {
+    renderPage();
+
+    await waitFor(() => expect(screen.getByTestId('dashboard-report-edit')).toBeInTheDocument());
+    expect(screen.getByTestId('dashboard-report-edit').getAttribute('href')).toBe('/reports/33/edit');
+
+    // Un trabajador ajeno al reporte recibe `latestReportCanEdit: false` y no ve la acción.
+    cleanup();
+    get.mockImplementation(async (url: string) => {
+      if (url.startsWith('/dashboard/summary')) return { ...SUMMARY, latestReportCanEdit: false };
+      return { text: 'horario' };
+    });
+    renderPage();
+    await waitFor(() => expect(screen.getByTestId('dashboard-report-share')).toBeInTheDocument());
+    expect(screen.queryByTestId('dashboard-report-edit')).toBeNull();
   });
 
   it('draws the seven cards in the phone order, and not the counting history', async () => {

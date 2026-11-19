@@ -31,6 +31,13 @@ export const DashboardSummarySchema = z
     reportsTotal: z.number().int(),
     schedulesTotal: z.number().int(),
     latestReportId: z.number().int().nullable(),
+    /**
+     * Si el actor puede editar el último reporte de hoy.
+     *
+     * Lo decide el servidor: dueño o administrador, y sólo mientras el día es hoy. La tarjeta del dashboard lo
+     * refleja y no lo calcula.
+     */
+    latestReportCanEdit: z.boolean(),
     higieneDone: z.number().int(),
     higieneTotal: z.number().int(),
     recepcionDone: z.number().int(),
