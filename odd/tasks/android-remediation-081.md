@@ -497,3 +497,13 @@ Test: `LoadingSchedulePage.test.tsx` (clic en la puerta -> `loading-export-modal
 
 **Pendiente de F4**: sticky del bloque de guardar en web (`ReportsPage` y `ReportEditPage`, patron
 `sticky bottom-0` de `SalidaSummaryBar`), con su E2E.
+
+### F5b — cerrada (web y Android)
+
+- Web: `2ce2676f` tarjetas al share; `117da90e` `latestReportCanEdit` + Compartir/Editar del reporte; `27cbe2fd`
+  `activeScheduleCanEdit` + Compartir/Editar del lote. Unit web **247/247**, backend **985/985**.
+- Android: `9e446745` + `88471c4d` contrato regenerado (artefacto + cliente Kotlin juntos), las dos tarjetas abren
+  ShareCard y ofrecen Editar segun el resumen. Tests nuevos en `DashboardScreenTest` (acciones y ausencia para
+  quien no puede). Suite completa Android **verde**.
+- Regenerar el cliente Kotlin necesita Docker (`ghcr.io/cirruslabs/android-sdk:35`); el primer intento fallo por red
+  y el reintento funciono. El fake `FakeSystemApi.summary` gano los dos campos con default false.
