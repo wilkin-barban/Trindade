@@ -162,8 +162,20 @@ class MainActivity : ComponentActivity() {
          * surface the row did not carry -- the stock history, before it became the counter's overlay -- was drawn
          * as a jump to the Dashboard while the screen under it was something else entirely.
          */
-        fun selectedTabIndex(tabs: List<Destination>, current: Tab): Int? =
-            tabs.indexOfFirst { it.target.tab == current }.takeIf { it >= 0 }
+        /**
+         * Qué entrada de la fila representa la visita actual.
+         *
+         * La pestaña sola no alcanza desde que Salida y su historial comparten `Tab.SALIDA`: con dos entradas y
+         * una comparación por pestaña, abrir el historial marcaba el lanzamiento. Se compara también el overlay,
+         * y una entrada sin overlay (el lanzamiento) no coincide con una visita que sí lleva uno.
+         */
+        fun selectedTabIndex(
+            tabs: List<Destination>,
+            current: Tab,
+            overlay: Overlay? = null,
+        ): Int? = tabs
+            .indexOfFirst { it.target.tab == current && it.target.overlay == overlay }
+            .takeIf { it >= 0 }
 
         /**
          * The tab row, in the order it shows them.
@@ -177,10 +189,16 @@ class MainActivity : ComponentActivity() {
             Destination(RolePolicy.EntryPoint.REPORTS, R.string.nav_reports, R.drawable.ic_reports, NavTarget(Tab.REPORTS)),
             Destination(RolePolicy.EntryPoint.LOADING, R.string.nav_loading, R.drawable.ic_truck, NavTarget(Tab.LOADING)),
             Destination(RolePolicy.EntryPoint.MASSAS_LAUNCH, R.string.massas_title, R.drawable.ic_layers, NavTarget(Tab.MASSAS_LAUNCH)),
-            // Salida vive en la barra: la web la tiene en el mismo orden, y una pantalla que sólo existe en el
-            // cajón es una pantalla que la mitad de la planta no encuentra. El historial queda en el cajón: dos
-            // entradas de la misma pestaña rompen la selección de la fila, que se resuelve por pestaña.
+            // Salida y su historial viven en la barra: la web los tiene en el mismo orden, y una pantalla que sólo
+            // existe en el cajón es una pantalla que la mitad de la planta no encuentra. Comparten pestaña, así que
+            // la fila se resuelve por pestaña **y** overlay.
             Destination(RolePolicy.EntryPoint.SALIDA, R.string.nav_salida, R.drawable.ic_package_minus, NavTarget(Tab.SALIDA)),
+            Destination(
+                RolePolicy.EntryPoint.SALIDA_HISTORY,
+                R.string.nav_salida_history,
+                R.drawable.ic_history,
+                NavTarget(Tab.SALIDA, Overlay.SALIDA_HISTORY),
+            ),
             Destination(RolePolicy.EntryPoint.ASSAI_ORDER, R.string.nav_assai, R.drawable.ic_calculator, NavTarget(Tab.ASSAI)),
             Destination(RolePolicy.EntryPoint.STOCK_COUNTER, R.string.nav_stock_counter, R.drawable.ic_boxes, NavTarget(Tab.STOCK_COUNTER)),
             Destination(RolePolicy.EntryPoint.ADMIN_PANEL, R.string.admin_panel_title, R.drawable.ic_admin, NavTarget(Tab.ADMIN)),
@@ -952,7 +970,7 @@ fun MainAppShell(
         }
         shown
     }
-    val selectedIndex = MainActivity.selectedTabIndex(visibleTabs, currentTab)
+    val selectedIndex = MainActivity.selectedTabIndex(visibleTabs, currentTab, currentOverlay)
     val activeTarget = MainActivity.NavTarget(currentTab, currentOverlay)
     val scope = rememberCoroutineScope()
 

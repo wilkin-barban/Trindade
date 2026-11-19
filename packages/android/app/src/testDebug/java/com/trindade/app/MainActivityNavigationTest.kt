@@ -45,6 +45,8 @@ import com.trindade.app.auth.RegisterViewModel
 import com.trindade.app.auth.RolePolicy
 import com.trindade.app.ui.components.NavigationActionButton
 import com.trindade.app.ui.theme.TrindadeTheme
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -662,7 +664,7 @@ class MainActivityNavigationTest {
     }
 
     @Test
-    fun `drawer entries follow the web order and keep the histories out of the tab row`() {
+    fun `drawer entries follow the web order and the row carries the modules and Salida's history`() {
         // La regla, sin pantalla: es la que dice qué es cada lista y en qué orden.
         val drawerLabels = MainActivity.DRAWER_ENTRIES
             .filterIsInstance<MainActivity.DrawerEntry.Link>()
@@ -696,6 +698,7 @@ class MainActivityNavigationTest {
                 MainActivity.Tab.LOADING,
                 MainActivity.Tab.MASSAS_LAUNCH,
                 MainActivity.Tab.SALIDA,
+                MainActivity.Tab.SALIDA,
                 MainActivity.Tab.ASSAI,
                 MainActivity.Tab.STOCK_COUNTER,
                 MainActivity.Tab.ADMIN,
@@ -703,9 +706,14 @@ class MainActivityNavigationTest {
             ),
             tabTabs,
         )
-        assertTrue(
-            "La fila no lleva superposiciones: un histórico no es una pestaña",
-            MainActivity.TAB_DESTINATIONS.all { it.target.overlay == null },
+        // La fila sí lleva una superposición desde esta pasada: el historial de Salida, que el dueño pidió en la
+        // barra. Lo que no puede repetirse es el par pestaña+overlay, que es lo que identifica una entrada.
+        val targets = MainActivity.TAB_DESTINATIONS.map { it.target.tab to it.target.overlay }
+        assertEquals("una entrada por destino", targets.distinct().size, targets.size)
+        assertEquals(
+            "el historial de Salida va en la fila, después del lanzamiento",
+            MainActivity.Overlay.SALIDA_HISTORY,
+            MainActivity.TAB_DESTINATIONS.first { it.target.overlay != null }.target.overlay,
         )
     }
 
@@ -920,9 +928,25 @@ class MainActivityNavigationTest {
         MainActivity.TAB_DESTINATIONS.forEachIndexed { index, destination ->
             assertEquals(
                 index,
-                MainActivity.selectedTabIndex(MainActivity.TAB_DESTINATIONS, destination.target.tab) ?: -1,
+                MainActivity.selectedTabIndex(
+                    MainActivity.TAB_DESTINATIONS,
+                    destination.target.tab,
+                    destination.target.overlay,
+                ) ?: -1,
             )
         }
+
+        // Salida y su historial comparten pestaña: el overlay es lo que las distingue, y abrir el historial no
+        // puede marcar el lanzamiento.
+        val launch = MainActivity.selectedTabIndex(MainActivity.TAB_DESTINATIONS, MainActivity.Tab.SALIDA, null)
+        val history = MainActivity.selectedTabIndex(
+            MainActivity.TAB_DESTINATIONS,
+            MainActivity.Tab.SALIDA,
+            MainActivity.Overlay.SALIDA_HISTORY,
+        )
+        assertNotNull(launch)
+        assertNotNull(history)
+        assertNotEquals(launch, history)
 
         // And when a row really does not carry the current tab, the answer is "none selected", not the first
         // item: the fallback to index 0 is what turned opening the stock history into a jump to the dashboard.
