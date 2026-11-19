@@ -413,8 +413,21 @@ class MainActivity : ComponentActivity() {
                     val onBackLoadingTab = { tab = Tab.DASHBOARD }
                     val onBackAssaiTab = { tab = Tab.DASHBOARD }
                     val onBackShareTab = { tab = Tab.DASHBOARD }
+                    // El Historial de Masas abre en HOY con todas sus operaciones, como la web; el archivo de
+                    // fechas (Hoy + cinco + todas) queda detrás del Volver. Entrar a una lista de días para
+                    // después buscar el de hoy era un rodeo.
+                    val openMassasHistory = {
+                        tab = Tab.MASSAS_LAUNCH
+                        massasHistoryOpen = false
+                        massasLaunchDay = com.trindade.app.massas.MassasLaunchViewModel.saopauloToday()
+                        massasDayFromList = true
+                        massasDayFromHistory = false
+                    }
                     val onBackMassasLaunchTab = {
-                        if (massasDayFromHistory) {
+                        // Cualquier día abierto desde el historial vuelve al historial —la lista de fechas—, no al
+                        // lanzamiento: hoy también, que era el caso que caía en el Dashboard.
+                        if (massasDayFromList) {
+                            massasDayFromList = false
                             massasDayFromHistory = false
                             massasLaunchDay = null
                             massasHistoryOpen = true
@@ -609,7 +622,7 @@ class MainActivity : ComponentActivity() {
                                     massasDayFromHistory = false
                                 }
                                 when (target.overlay) {
-                                    Overlay.MASSAS_HISTORY -> massasHistoryOpen = true
+                                    Overlay.MASSAS_HISTORY -> openMassasHistory()
                                     Overlay.REPORTS_HISTORY -> historyOpen = true
                                     Overlay.LOADING_HISTORY -> loadingHistoryOpen = true
                                     Overlay.STOCK_HISTORY -> stockHistoryOpen = true
@@ -659,7 +672,7 @@ class MainActivity : ComponentActivity() {
                                     }
                                     com.trindade.app.massas.MassasLaunchScreen(
                                         viewModel = massasViewModel,
-                                        onNavigateToHistory = { massasHistoryOpen = true },
+                                        onNavigateToHistory = { openMassasHistory() },
                                         onBackToHistory = if (massasDayFromList) onBackMassasLaunchTab else null,
                                         // Hoy abierto desde el histórico también muestra operaciones y share; el
                                         // pasado es exactamente lo mismo, en modo de solo lectura.
