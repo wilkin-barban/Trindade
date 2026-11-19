@@ -167,7 +167,7 @@ describe('el mensaje del reporte 80, abreviado', () => {
     assert.equal(printed, expected);
 
     assert.ok(text.includes('📤 *SAÍDAS / BAIXA*'));
-    assert.ok(text.includes('👤 Wilkin:'));
+    assert.ok(text.includes('👤 WILKIN:'));
     // Sin código en el mensaje y con la cantidad exacta.
     assert.ok(text.includes('- AÇÚCAR 5kg: 6 un'));
     // El peso viaja en la línea: el grupo distingue el de un kilo del de dos.

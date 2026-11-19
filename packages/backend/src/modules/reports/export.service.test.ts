@@ -380,14 +380,18 @@ describe('Export Service (Generador Inteligente)', () => {
     const text = generateWhatsAppText(db, reportId)!;
 
     assert.ok(text.includes('📤 *SAÍDAS / BAIXA*'));
-    assert.ok(text.includes('👤 Test User:'));
-    // El prefijo del bloque delante del nombre corto, y la cantidad exacta.
-    assert.ok(text.includes('- EMB. DISCO 400g: 6000 un'));
-    assert.ok(text.includes('- BOB. BOBINA ROLO: 13 un'));
-    // La tabla ya trae el prefijo en algunos nombres: no se repite.
+    // El formato aprobado: el operario en mayúsculas, su bloque, y los productos debajo sin prefijo.
+    assert.ok(text.includes('👤 TEST USER:'));
+    assert.ok(text.includes('*📦 Embalagens*'));
+    assert.ok(text.includes('- DISCO 400g: 6000 un'));
+    assert.ok(text.includes('*🧵 Bobinas*'));
+    assert.ok(text.includes('- BOBINA ROLO: 13 un'));
+    // La tabla aprobada manda sobre la línea: `BOB. DISCO` es su nombre corto, no un prefijo agregado acá.
     assert.ok(text.includes('- BOB. DISCO: 2 un'));
-    assert.ok(!text.includes('BOB. BOB.'), 'el prefijo se escribe una sola vez');
-    // La materia prima va sin prefijo.
+    assert.ok(!text.includes('EMB. '), 'la sección no agrega prefijos propios');
+    assert.ok(!text.includes('- BOB. BOBINA'), 'y no duplica el que la tabla ya trae');
+    // La materia prima tiene su propio bloque.
+    assert.ok(text.includes('*🧪 Matéria-Prima*'));
     assert.ok(text.includes('- GORDURA: 7 un'));
     // La sección cierra sin un total suelto: la planta suma por operario.
     assert.ok(!text.includes('📊 Total:'), 'la sección de salidas no lleva total');

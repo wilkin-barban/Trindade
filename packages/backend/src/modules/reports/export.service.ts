@@ -334,18 +334,16 @@ export function generateWhatsAppText(
   }
 
   /**
-   * El nombre de un producto de Salida con el bloque delante, como lo lee la planta.
+   * Los encabezados de bloque de la sección de salidas, en el orden en que la planta los lee.
    *
-   * `EMB.` para embalagens y `BOB.` para bobinas; la materia prima va sin prefijo, porque su nombre ya dice lo que
-   * es. La tabla aprobada ya trae nombres con su prefijo (`BOB. LASANHA`, `BOB. DISCO`), y repetirlo daría
-   * `BOB. BOB. LASANHA`: si la abreviatura ya empieza por el suyo, se deja como está.
+   * El formato aprobado agrupa los productos debajo de su bloque, con emoji y nombre, en lugar de prefijar cada
+   * línea: el grupo ve de qué familia salió cada cosa sin que el prefijo se repita en cada producto.
    */
-  const salidaProductLabel = (product: { name: string; code: string; block: string }): string => {
-    const name = abbreviateProduct(product.name, product.code);
-    const prefix = product.block === 'embalagens' ? 'EMB.' : product.block === 'bobinas' ? 'BOB.' : null;
-    if (!prefix) return name;
-    return name.startsWith(prefix) ? name : `${prefix} ${name}`;
-  };
+  const SALIDA_BLOCK_HEADINGS: Array<{ block: string; heading: string }> = [
+    { block: 'embalagens', heading: '*📦 Embalagens*' },
+    { block: 'bobinas', heading: '*🧵 Bobinas*' },
+    { block: 'materia-prima', heading: '*🧪 Matéria-Prima*' },
+  ];
 
   // --- Salidas / Baixa ---
   // Same idea as the massas block above: what left the plant belongs in the day's report, grouped by the operator
@@ -357,10 +355,14 @@ export function generateWhatsAppText(
     lines.push('');
 
     for (const operator of salidaView.operators) {
-      lines.push(`👤 ${operator.name}:`);
-      for (const product of operator.products) {
-        if (product.units > 0) {
-          lines.push(`- ${salidaProductLabel(product)}: ${product.units} un`);
+      // Mayúsculas y dos puntos, como lo firma el resto de los mensajes de la planta.
+      lines.push(`👤 ${operator.name.toUpperCase()}:`);
+      for (const { block, heading } of SALIDA_BLOCK_HEADINGS) {
+        const products = operator.products.filter((product) => product.block === block && product.units > 0);
+        if (products.length === 0) continue;
+        lines.push(heading);
+        for (const product of products) {
+          lines.push(`- ${abbreviateProduct(product.name, product.code)}: ${product.units} un`);
         }
       }
       lines.push('');
