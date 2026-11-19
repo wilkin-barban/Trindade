@@ -40,6 +40,8 @@ import kotlinx.serialization.Contextual
  * @param reportsTotal 
  * @param schedulesTotal 
  * @param latestReportId 
+ * @param latestReportCanEdit 
+ * @param activeScheduleCanEdit 
  * @param higieneDone 
  * @param higieneTotal 
  * @param recepcionDone 
@@ -75,6 +77,12 @@ data class DashboardSummary (
 
     @SerialName(value = "latestReportId")
     val latestReportId: kotlin.Int?,
+
+    @SerialName(value = "latestReportCanEdit")
+    val latestReportCanEdit: kotlin.Boolean,
+
+    @SerialName(value = "activeScheduleCanEdit")
+    val activeScheduleCanEdit: kotlin.Boolean,
 
     @SerialName(value = "higieneDone")
     val higieneDone: kotlin.Int,

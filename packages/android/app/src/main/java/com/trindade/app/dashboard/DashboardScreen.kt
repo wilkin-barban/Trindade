@@ -18,6 +18,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.platform.testTag
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -74,6 +75,14 @@ fun DashboardScreen(
     onOpenReports: () -> Unit,
     onOpenLoading: () -> Unit,
     onOpenLoadingDay: (String) -> Unit,
+    /** La tarjeta del reporte abre su tarjeta de compartir; el detalle completo queda adentro. */
+    onOpenReportShare: (Int) -> Unit = onOpenReport,
+    /** Editar el último reporte, sólo si el servidor dice que este usuario puede. */
+    onEditLatestReport: (Int) -> Unit = {},
+    /** El lote activo abre su tarjeta de compartir, no el editor. */
+    onOpenScheduleShare: (String) -> Unit = {},
+    /** Editar el lote activo, sólo si el servidor lo permite. */
+    onEditActiveSchedule: (String) -> Unit = {},
     onOpenMassas: () -> Unit = {},
     onOpenMassasHistory: () -> Unit = {},
     onOpenSalida: () -> Unit = {},
@@ -157,7 +166,7 @@ fun DashboardScreen(
                     label = stringResource(R.string.dashboard_reports_today),
                     onClick = {
                         val latestReportId = summary.latestReportId
-                        if (latestReportId != null) onOpenReport(latestReportId) else onOpenReports()
+                        if (latestReportId != null) onOpenReportShare(latestReportId) else onOpenReports()
                     },
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -171,6 +180,25 @@ fun DashboardScreen(
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurface,
                         )
+                    }
+                    // Compartir y, si el servidor lo permite, Editar: el permiso no se decide acá.
+                    summary.latestReportId?.let { reportId ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(
+                                onClick = { onOpenReportShare(reportId) },
+                                modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("dashboard-report-share"),
+                            ) {
+                                Text(stringResource(R.string.dashboard_share_schedule))
+                            }
+                            if (summary.latestReportCanEdit) {
+                                TextButton(
+                                    onClick = { onEditLatestReport(reportId) },
+                                    modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("dashboard-report-edit"),
+                                ) {
+                                    Text(stringResource(R.string.reports_edit_action))
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -210,12 +238,26 @@ fun DashboardScreen(
                     // La otra mitad de la paridad: la web ofrece mandar el cronograma por WhatsApp desde esta
                     // misma tarjeta. Sin fecha de lote no hay texto que mandar, así que el botón se apaga en
                     // vez de abrir un compartidor vacío.
-                    TextButton(
-                        onClick = onShareActiveSchedule,
-                        enabled = activeScheduleBatchDate != null,
-                        modifier = Modifier.defaultMinSize(minHeight = 48.dp),
-                    ) {
-                        Text(text = stringResource(R.string.dashboard_share_schedule))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(
+                            onClick = {
+                                if (activeScheduleBatchDate != null) {
+                                    onOpenScheduleShare(activeScheduleBatchDate)
+                                }
+                            },
+                            enabled = activeScheduleBatchDate != null,
+                            modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("dashboard-share-active-schedule"),
+                        ) {
+                            Text(text = stringResource(R.string.dashboard_share_schedule))
+                        }
+                        if (activeScheduleBatchDate != null && summary.activeScheduleCanEdit) {
+                            TextButton(
+                                onClick = { onEditActiveSchedule(activeScheduleBatchDate) },
+                                modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("dashboard-active-schedule-edit"),
+                            ) {
+                                Text(stringResource(R.string.reports_edit_action))
+                            }
+                        }
                     }
                 }
 
@@ -409,6 +451,10 @@ fun DashboardRoute(
     // new, and a new one starts at `loading = true`, so the first frame is the spinner.
     sessionKey: String,
     onOpenReport: (Int) -> Unit,
+    onOpenReportShare: (Int) -> Unit = onOpenReport,
+    onEditLatestReport: (Int) -> Unit = {},
+    onOpenScheduleShare: (String) -> Unit = {},
+    onEditActiveSchedule: (String) -> Unit = {},
     onOpenReports: () -> Unit,
     onOpenLoading: () -> Unit,
     onOpenLoadingDay: (String) -> Unit,
@@ -433,6 +479,10 @@ fun DashboardRoute(
         onOpenReports = onOpenReports,
         onOpenLoading = onOpenLoading,
         onOpenLoadingDay = onOpenLoadingDay,
+        onOpenReportShare = onOpenReportShare,
+        onEditLatestReport = onEditLatestReport,
+        onOpenScheduleShare = onOpenScheduleShare,
+        onEditActiveSchedule = onEditActiveSchedule,
         onOpenMassas = onOpenMassas,
         onOpenMassasHistory = onOpenMassasHistory,
         onOpenSalida = onOpenSalida,

@@ -1210,6 +1210,12 @@
               "null"
             ]
           },
+          "latestReportCanEdit": {
+            "type": "boolean"
+          },
+          "activeScheduleCanEdit": {
+            "type": "boolean"
+          },
           "higieneDone": {
             "type": "integer"
           },
@@ -1233,6 +1239,8 @@
           "reportsTotal",
           "schedulesTotal",
           "latestReportId",
+          "latestReportCanEdit",
+          "activeScheduleCanEdit",
           "higieneDone",
           "higieneTotal",
           "recepcionDone",

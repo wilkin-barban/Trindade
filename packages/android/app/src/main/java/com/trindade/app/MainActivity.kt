@@ -669,6 +669,23 @@ class MainActivity : ComponentActivity() {
                                 Tab.DASHBOARD -> DashboardRoute(
                                     sessionKey = sessionKey,
                                     onOpenReport = { openReportTarget = OpenReportTarget(it, mode = null) },
+                                    // La tarjeta abre la tarjeta de compartir del último reporte; Editar lleva al
+                                    // editor, y el permiso ya lo decidió el servidor en el resumen.
+                                    onOpenReportShare = {
+                                        openReportTarget = OpenReportTarget(it, mode = ShareCardMode.SAVED)
+                                    },
+                                    onEditLatestReport = { editingReportId = it },
+                                    // El lote activo abre su ShareCard en modo día, con Editar que vuelve a la grilla.
+                                    onOpenScheduleShare = { day ->
+                                        loadingShareSaved = true
+                                        loadingShareDay = day
+                                    },
+                                    onEditActiveSchedule = { day ->
+                                        loadingShareSaved = false
+                                        loadingShareDay = null
+                                        loadingDay = day
+                                        tab = Tab.LOADING
+                                    },
                                     onOpenReports = { tab = Tab.REPORTS },
                                     onOpenLoading = { tab = Tab.LOADING },
                                     // A day that is not today's is opened as the day it is, which is the
