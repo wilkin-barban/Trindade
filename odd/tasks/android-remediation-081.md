@@ -634,6 +634,19 @@ el historial: separar las responsabilidades.
 **Sección 8 cerrada**: 8.1, 8.1-b, 8.2, 8.3, 8.4 y 8.5 en PASS, con la APK `0.8.4 (8007)` instalada en
 `emulator-5554`. Sin release, tag ni asset; la 0.7.5 y `packages/backend/apk` intactos.
 
+## 13. Salida: sync del ERP (sólo hoy) y pasado sólo con el share
+
+- **Sync del espejo en el Histórico de Salida** (`0fd92282`): botón «Sincronizar com ERP» + bloque del Relatório
+  para el día de hoy. Android: `syncSalidaDay()` con `syncDay(..., includeExits = true)`, `reportsRepository.salidaDay`
+  y `SalidaErpBlock` (spinner, error de credenciales/red, `474b…`); web: `triggerAeroMovementsSync(includeExits)` y
+  `SalidaReportSection` con `refetchKey`. Sin escrituras a Trindade: sólo el espejo y su marca de sync.
+- **El pasado es sólo el bloque de compartir** (`0fd92282`), en Masas y Salidas y en los dos clientes: debajo del
+  encabezado y sus chips no quedan tarjetas, fotos, filtros, pendientes, nota de solo lectura ni sync. El día vacío
+  deja la prévia vacía y el envío deshabilitado.
+- **Fotos sólo del dueño** (`2a2d0ab1` + `0fd92282`): Android compara `movement.username` con la cuenta de la sesión
+  y no dibuja selector ni borrado ajenos; web hace lo mismo con `canManagePhotos`; el backend responde 403
+  `SALIDA_NOT_OWNER` al adjuntar o borrar en un movimiento que no es del llamador (tests de rutas con dos cuentas).
+
 ## 12. Remediaciones de la 0.8.5, cuarta pasada
 
 - **Histórico de Salidas, día pasado: el día se lee y el share va al final** (`d0df0fca`). La columna de movimientos

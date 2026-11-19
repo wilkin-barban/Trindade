@@ -458,6 +458,13 @@ texto del servidor, estado de carga/error y acciones de WhatsApp/PDF, con `Edita
 - **Android**: la vista de detalle de un histórico es una pantalla de solo lectura con el texto del servidor, acciones
   de compartir/PDF y un botón Volver; no es el formulario de edición ni una grilla editable. El botón Volver y los
   destinos deben coincidir con los de la web.
+- **Sync del ERP en el Histórico de Salida**: sólo en el día de hoy, con la misma lectura del Relatório
+  (`includeExits`), el bloque `SalidaReportSection`/`SalidaReportCard` y el error de credenciales o red debajo. Es
+  lectura del espejo: no escribe en Trindade. En el pasado no se muestra.
+- **El pasado es sólo el bloque de compartir**: en Masas y Salidas, debajo del encabezado y sus chips no queda
+  ninguna otra información ni control (ni tarjetas, ni fotos, ni filtros, ni pendientes, ni nota de solo lectura).
+- **Fotos de Salida: sólo el dueño**: los movimientos de otros operarios —y los que vienen del ERP— se leen y no se
+  tocan. El cliente esconde el selector y el borrado, y el servidor responde 403 `SALIDA_NOT_OWNER`.
 - **Fechas rápidas de los históricos**: la fila ofrece siempre **las cinco fechas de calendario inmediatamente
   anteriores a hoy** (`hoy-1 … hoy-5`, hoy aparte) y «Todas as datas» para el archivo completo. No son las cinco
   primeras del archivo: con un archivo de 18, 17, 16, 13 y 12/11 esas serían las ofrecidas y se saltarían el 15 y
