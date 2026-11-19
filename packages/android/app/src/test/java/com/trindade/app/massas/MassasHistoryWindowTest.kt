@@ -34,8 +34,13 @@ class MassasHistoryWindowTest {
     }
 
     @Test
-    fun `a day without launches shows no earlier dates but the chip is still drawn by the screen`() {
-        assertEquals(emptyList<String>(), massasHistoryShownDays(today, listOf(today), all = false))
+    fun `a day without launches still offers five earlier dates, filled by the calendar`() {
+        // El archivo vacío es un archivo joven, no un error: la fila completa con el calendario, y cada una de esas
+        // fechas abre su día vacío en vez de no existir.
+        assertEquals(
+            listOf("2026-11-17", "2026-11-16", "2026-11-15", "2026-11-14", "2026-11-13"),
+            massasHistoryShownDays(today, listOf(today), all = false),
+        )
     }
 
 }

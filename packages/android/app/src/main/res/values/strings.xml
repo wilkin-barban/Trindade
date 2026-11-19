@@ -1141,7 +1141,7 @@
     <string name="share_card_back">Voltar</string>
     <string name="dashboard_salida_hint">Registrar saída de produto</string>
     <string name="massas_share_empty">Sem lançamentos para compartilhar</string>
-    <string name="salida_report_block">Salidas / Baixas</string>
+    <string name="salida_report_block">Saídas / Baixas</string>
     <string name="report_photo_too_big">A foto passa de 5 MB.</string>
     <string name="reports_edit_action">Editar</string>
 </resources>

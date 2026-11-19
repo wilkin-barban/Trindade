@@ -43,6 +43,7 @@ class SpanishLocaleResolutionTest {
         // La calculadora es femenina y en español no lleva la palabra portuguesa.
         assertEquals("Calculadora de Stock", context.getString(R.string.nav_stock_counter))
         assertEquals("Historial de Conteo", context.getString(R.string.nav_stock_history))
+        assertEquals("Salidas / Bajas", context.getString(R.string.salida_report_block))
 
         // El mensaje de WhatsApp de Salida: las mismas etiquetas que pasa la web, y el bloque de compartir.
         assertEquals("Salidas del día", context.getString(R.string.salida_day_share_title))
@@ -90,6 +91,8 @@ class SpanishLocaleResolutionTest {
         assertEquals("Fotos (1/3)", context.getString(R.string.report_photos_pending_count, 1, 3))
 
         assertEquals("Calculadora de Estoque", context.getString(R.string.nav_stock_counter))
+        // El bloque del Relatório en la UI portuguesa dice portugués.
+        assertEquals("Saídas / Baixas", context.getString(R.string.salida_report_block))
 
         // El portugués de la planta, tal como lo publica la web en su tabla de bloques.
         assertEquals("Saídas do dia", context.getString(R.string.salida_day_share_title))

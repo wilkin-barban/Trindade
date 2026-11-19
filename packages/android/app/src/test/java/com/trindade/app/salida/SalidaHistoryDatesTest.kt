@@ -26,9 +26,14 @@ class SalidaHistoryDatesTest {
     }
 
     @Test
-    fun `today is offered even when the server did not return it`() {
+    fun `today plus five earlier days, filled by the calendar when the archive is short`() {
+        // Verificado en planta: con tres días de archivo sólo había tres chips. El requisito son cinco, y el
+        // calendario los completa sin repetir ninguno.
         val visible = salidaHistoryVisibleDates(today, listOf("2026-11-17", "2026-11-16"), all = false)
-        assertEquals(listOf(today, "2026-11-17", "2026-11-16"), visible)
+        assertEquals(
+            listOf(today, "2026-11-17", "2026-11-16", "2026-11-15", "2026-11-14", "2026-11-13"),
+            visible,
+        )
     }
 
     @Test

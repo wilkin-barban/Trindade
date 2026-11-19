@@ -78,9 +78,10 @@ class LoadingShareScreenTest {
             }
         }
 
-        // Title and subtitle: the day as the plant writes it, not the ISO the navigation carries.
+        // Title and subtitle: el día del cargamento, como lo escribe la planta y como lo fecha el texto del
+        // servidor -- no el ISO que lleva la navegación ni la fecha del lote.
         composeRule.onNodeWithText(copy(R.string.loading_title)).assertIsDisplayed()
-        composeRule.onNodeWithText("18/11/2026").assertIsDisplayed()
+        composeRule.onNodeWithText("19/11/2026", substring = true).assertIsDisplayed()
 
         // Verbatim text
         composeRule.onNodeWithText(verbatimText).assertIsDisplayed()
@@ -155,6 +156,43 @@ class LoadingShareScreenTest {
         }
 
         composeRule.onNodeWithText(errorSentence).assertIsDisplayed()
+    }
+
+    /**
+     * El subtítulo fecha el cargamento, no el lote: el mismo día que el texto que la tarjeta muestra.
+     *
+     * El export se pide por la fecha del lote y su primera línea fecha el cargamento (el día siguiente, o el lunes
+     * si el lote es viernes). Con la fecha del lote arriba, la tarjeta decía 18/11/2026 en el subtítulo y
+     * «Quinta-feira • 19/11/2026» en el texto, a dos centímetros de distancia.
+     */
+    @Test
+    fun `the card dates the loading day the exported text announces`() {
+        val state = LoadingShareViewModel.UiState(
+            date = "2026-11-18",
+            loading = false,
+            exportText = "🚛 *HORÁRIO DE CARREGAMENTO*\n\n📅 Quinta-feira • 19/11/2026",
+            message = null,
+        )
+
+        composeRule.setContent {
+            TrindadeTheme {
+                LoadingShareScreen(
+                    date = "2026-11-18",
+                    state = state,
+                    onShare = {},
+                    onPdf = {},
+                    onBack = {},
+                )
+            }
+        }
+
+        // Dos veces: el subtítulo de la tarjeta y la línea de fecha del propio texto, que ahora coinciden.
+        assertEquals(
+            2,
+            composeRule.onAllNodesWithText("19/11/2026", substring = true).fetchSemanticsNodes().size,
+        )
+        // Y la fecha del lote no queda como fecha de la tarjeta.
+        composeRule.onNodeWithText("18/11/2026").assertDoesNotExist()
     }
 
     /**

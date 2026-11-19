@@ -138,17 +138,23 @@ class MassasHistoryDayHeaderTest {
     }
 
     /**
-     * La fuente es el archivo del servidor: un día que la planta no produjo no tiene chip, y uno que el archivo
-     * trajo sin ser de la última semana sí -- las dos cosas que un calendario local contestaría al revés.
+     * El archivo manda sobre qué fechas se ofrecen, y el calendario solo completa hasta cinco.
+     *
+     * Un día que el archivo trajo aunque sea viejo tiene su chip -- un calendario local lo habría dejado afuera --,
+     * y con dos días de archivo la fila igual llega a cinco: los rellenos son los días inmediatamente anteriores,
+     * que abren su estado vacío en vez de no existir.
      */
     @Test
-    fun `the quick dates are the archive's, not the calendar's`() {
+    fun `the archive dates are offered first and the calendar fills the five`() {
         render(historyDates = listOf(today, "2026-11-17", "2026-10-02"))
 
         composeRule.onNodeWithTag(massasHistoryDayChipTag("2026-11-17")).assertExists()
+        // El día viejo del archivo no se cae por antigüedad: tiene datos y tiene chip.
         composeRule.onNodeWithTag(massasHistoryDayChipTag("2026-10-02")).assertExists()
-        // El 15 de noviembre está entre medio del calendario y no lo produjo nadie: no hay chip.
-        composeRule.onNodeWithTag(massasHistoryDayChipTag("2026-11-15")).assertDoesNotExist()
+        // Y la fila completa hasta cinco con el calendario, que era el defecto visto en planta.
+        composeRule.onNodeWithTag(massasHistoryDayChipTag("2026-11-16")).assertExists()
+        composeRule.onNodeWithTag(massasHistoryDayChipTag("2026-11-15")).assertExists()
+        composeRule.onNodeWithTag(massasHistoryDayChipTag("2026-11-14")).assertExists()
     }
 
     /** Hoy se dibuja siempre, aunque el archivo todavía no lo haya devuelto. */

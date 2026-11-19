@@ -30,6 +30,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.res.stringResource
 import com.trindade.app.R
+import com.trindade.app.ui.historyQuickDays
 import com.trindade.app.ui.components.HelpSection
 import com.trindade.app.ui.components.ModuleHelpDialog
 import androidx.compose.runtime.setValue
@@ -334,11 +335,8 @@ fun SalidaHistoryScreen(
  * una pantalla que abre sin él lo hace dudar de si lanzó algo. Con [all] la lista entera pasa a estar disponible
  * desde el chip, que es lo que el botón «Todas las fechas» hace.
  */
-fun salidaHistoryVisibleDates(today: String, dates: List<String>, all: Boolean): List<String> {
-    val earlier = dates.filter { it != today }
-    val shown = if (all) earlier else earlier.take(5)
-    return (listOf(today) + shown).distinct()
-}
+fun salidaHistoryVisibleDates(today: String, dates: List<String>, all: Boolean): List<String> =
+    (listOf(today) + historyQuickDays(today, dates, all)).distinct()
 
 /**
  * Las fechas del histórico: hoy, las cinco anteriores y la puerta a todas.

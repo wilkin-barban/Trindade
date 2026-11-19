@@ -237,8 +237,9 @@ fun LoadingShareScreen(
         }
         ShareCard(
             title = stringResource(R.string.loading_title),
-            // El día tal como lo escribe la planta, no el ISO del parámetro de navegación.
-            subtitle = com.trindade.app.massas.brazilianDate(date),
+            // El día que anuncia el texto, no el del lote: el export se pide por la fecha del lote y su primera
+            // línea fecha el cargamento. Sin esto la tarjeta decía 18/11 arriba y 19/11 en el texto que muestra.
+            subtitle = com.trindade.app.massas.brazilianDate(exportLoadingDay(date)),
             text = state.exportText,
             loading = state.loading,
             error = state.message,

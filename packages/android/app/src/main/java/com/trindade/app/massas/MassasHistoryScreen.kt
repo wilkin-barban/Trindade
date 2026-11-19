@@ -27,6 +27,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.trindade.app.R
+import com.trindade.app.ui.historyQuickDays
 import com.trindade.app.ui.components.HelpSection
 import com.trindade.app.ui.components.HistoryEmptyState
 import com.trindade.app.ui.components.HistoryErrorBanner
@@ -46,15 +47,18 @@ import com.trindade.app.ui.resolve
  * reference and the copies cannot drift.
  */
 /**
- * Las fechas que el histórico ofrece debajo de «Hoje»: las cinco anteriores más recientes, o todas.
+ * Las fechas que el histórico ofrece debajo de «Hoje»: cinco anteriores, o todas.
  *
- * Hoy tiene su propio chip y no se repite en la lista. La regla vive acá y no dentro de la pantalla porque es lo
- * que el operario ve: cinco fechas por defecto, todas cuando lo pide, y nunca dos veces la misma.
+ * Hoy tiene su propio chip y no se repite en la lista. Las que el servidor reportó van primero, en su orden; si el
+ * archivo tiene menos de cinco -- y un archivo con dos días es un archivo joven, no un error -- las que faltan se
+ * completan con el calendario, de la más reciente hacia atrás. El requisito es que el operario tenga siempre cinco
+ * fechas a mano: una fecha sin lanzamientos abre su día vacío, que es una respuesta; una fecha que no está no se
+ * puede ni pedir.
+ *
+ * Con «Todas as datas» no se completa: ahí se muestra lo que el archivo tiene, sin inventar días.
  */
-fun massasHistoryShownDays(today: String, dates: List<String>, all: Boolean): List<String> {
-    val earlier = dates.filter { it != today }
-    return if (all) earlier else earlier.take(5)
-}
+fun massasHistoryShownDays(today: String, dates: List<String>, all: Boolean): List<String> =
+    historyQuickDays(today, dates, all)
 
 @Composable
 fun MassasHistoryScreen(
