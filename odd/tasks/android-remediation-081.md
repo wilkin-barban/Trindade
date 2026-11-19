@@ -626,3 +626,32 @@ el historial: separar las responsabilidades.
 
 **Sección 8 cerrada**: 8.1, 8.1-b, 8.2, 8.3, 8.4 y 8.5 en PASS, con la APK `0.8.4 (8007)` instalada en
 `emulator-5554`. Sin release, tag ni asset; la 0.7.5 y `packages/backend/apk` intactos.
+
+## 9. Auditoría sobre 0.8.4 (8007) — siete defectos
+
+La web es la referencia. Registro de la auditoría del dueño, con lo que hay que tocar.
+
+### P0
+
+- **9.1 Loading** — `LoadingScreen` conserva el flujo viejo (`Gerar texto do WhatsApp`, Copiar, Compartilhar, PDF y
+  la lista de fleteros) además de `Salvar Horário`. La web tiene **sólo Salvar** como acción y los fleteros viven
+  en la ShareCard. Quitar el bloque viejo; mover los fleteros con teléfono a `LoadingShareScreen`/ShareCard.
+- **9.2 Historial de Masas** — la vista de Hoy ya trae producción/filtros/ERP/share, pero **no tiene Volver visible
+  ni chips Hoy+5+Todas**; la lista sólo se alcanza con el botón físico. Header "Histórico de Massas" con Volver y
+  las fechas rápidas, sin grilla.
+
+### P1
+
+- **9.3 Editar en la ShareCard de hoy** — Historial de Reportes y de Cargamento: falta Editar para dueño/admin en
+  la fecha de hoy; el pasado sigue read-only.
+- **9.4 Ayudas** — faltan los botones en `ReportsHistoryScreen`, `LoadingHistoryScreen` y `StockHistoryScreen`.
+- **9.5 i18n de Salida** — `SalidaLaunchScreen`, `SalidaHistoryScreen` y `ReportPhotosSection` tienen textos en
+  español dentro de una app en portugués ("Salida / Baixa", "productos", "Lanzar salida", "Histórico de
+  Salidas", "Agregar fotos"). Pasar a recursos PT/ES; el botón de lanzamiento muestra la **cantidad de productos
+  distintos** como la web (`Lançar saída (N)`).
+- **9.6 Dashboard** — eliminar el aviso `dashboard_deferred_notice` ("Novos módulos..."), que la web ya no tiene;
+  revisar rótulos como "Calculador de Estoque" contra la web.
+- **9.7 Cierre** — tests/Compose por punto, capturas en `/tmp/trindade-085/`, bump **0.8.5 (8008)**, build e
+  instalación en `emulator-5554`, PASS/FAIL módulo por módulo.
+
+Todo pendiente al abrir esta sección; se cierra por slices con su commit.
