@@ -56,6 +56,8 @@ export async function reportPhotoFiles(photos: readonly ReportSharePhoto[]): Pro
 export async function shareReportMessage(args: {
   text: string;
   photos?: readonly File[];
+  /** Seam para las pruebas: abrir el enlace de WhatsApp cuando no hay hoja ni portapapeles. */
+  open?: (url: string) => unknown;
 }): Promise<ShareOutcome> {
   const photos = args.photos ?? [];
   const navigatorLike = (globalThis as { navigator?: Navigator }).navigator;
@@ -73,7 +75,7 @@ export async function shareReportMessage(args: {
     }
   }
 
-  return shareOrCopy(args.text);
+  return shareOrCopy(args.text, args.open);
 }
 
 /**

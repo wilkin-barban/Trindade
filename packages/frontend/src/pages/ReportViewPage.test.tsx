@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 /**
@@ -97,6 +97,42 @@ describe('ReportViewPage after a save', () => {
     expect(screen.queryByTestId('report-share-copy')).toBeNull();
     // The reading view is behind Editar, not underneath the card.
     expect(screen.queryByTestId('export-pdf-btn')).toBeNull();
+  });
+
+  /**
+   * El botón de compartir nunca se queda sin hacer nada.
+   *
+   * El dueño reportó que el botón no funcionaba: sin hoja nativa y sin portapapeles disponible el ayudante
+   * devolvía `failed` y no abría nada. Ahora abre WhatsApp con el texto en el enlace y lo dice en la nota.
+   */
+  it('opens WhatsApp with the text when neither the share sheet nor the clipboard is available', async () => {
+    const originalShare = navigator.share;
+    const originalClipboard = navigator.clipboard;
+    Object.defineProperty(navigator, 'share', { value: undefined, configurable: true });
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: async () => Promise.reject(new Error('denied')) },
+      configurable: true,
+    });
+    const open = vi.fn((url: string) => ({ url }));
+    const originalOpen = window.open;
+    Object.defineProperty(window, 'open', { value: open, configurable: true, writable: true });
+
+    try {
+      renderAt('/reports/5?saved=1');
+      await waitFor(() => expect(screen.getByTestId('report-share-card')).toBeTruthy());
+
+      fireEvent.click(screen.getByTestId('report-share-whatsapp'));
+
+      await waitFor(() => expect(open).toHaveBeenCalledTimes(1));
+      expect(open.mock.calls[0]?.[0]).toContain('https://api.whatsapp.com/send?text=');
+      await waitFor(() =>
+        expect(screen.getByText('reports.shareWhatsAppOpened')).toBeTruthy(),
+      );
+    } finally {
+      Object.defineProperty(navigator, 'share', { value: originalShare, configurable: true });
+      Object.defineProperty(navigator, 'clipboard', { value: originalClipboard, configurable: true });
+      Object.defineProperty(window, 'open', { value: originalOpen, configurable: true, writable: true });
+    }
   });
 
   it('opens the share card, read-only, for whoever comes from the history on a past day', async () => {

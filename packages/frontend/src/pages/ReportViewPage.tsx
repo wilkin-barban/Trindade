@@ -220,8 +220,14 @@ export function ReportViewPage() {
     try {
       const files = await reportPhotoFiles(photos);
       const outcome = await shareReportMessage({ text: shareText, photos: files });
+      // Cada salida dice lo que pasó: la hoja nativa no avisa nada, pero la copia y el enlace sí, y un botón sin
+      // efecto -- el defecto que el dueño reportó -- es peor que uno que cuenta por dónde salió el mensaje.
       if (outcome === 'copied') setShareNote(t('reports.shareCopied'));
+      else if (outcome === 'whatsapp') setShareNote(t('reports.shareWhatsAppOpened'));
       else if (outcome === 'failed') setShareNote(t('salida.shareFailed'));
+    } catch (error) {
+      // Una foto que no se pudo leer, una promesa rechazada: se dice, no se traga.
+      setShareNote(error instanceof Error ? error.message : t('reports.exportError'));
     } finally {
       setSharing(false);
     }

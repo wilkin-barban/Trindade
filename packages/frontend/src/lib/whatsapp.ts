@@ -32,7 +32,31 @@ export function waMeLink(phone: string, text: string): string | null {
   return `https://api.whatsapp.com/send?phone=${number}&text=${encodeURIComponent(text)}`;
 }
 
-export type ShareOutcome = 'shared' | 'copied' | 'cancelled' | 'failed';
+export type ShareOutcome = 'shared' | 'copied' | 'whatsapp' | 'cancelled' | 'failed';
+
+/** El enlace que abre WhatsApp con el texto ya cargado, sin depender de la hoja nativa ni del portapapeles. */
+export function whatsappTextLink(text: string): string {
+  return `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+}
+
+/**
+ * Abre [url] en otra pestaña y dice si el navegador la dejó abrir.
+ *
+ * `window.open` devuelve null cuando el navegador bloquea la ventana, y eso no es lo mismo que haberla abierto:
+ * quien llama lo necesita para decir la verdad al operario. La función se recibe por parámetro para poder probar
+ * los dos casos sin un navegador de verdad.
+ */
+export function openWhatsAppText(
+  text: string,
+  open: (url: string) => unknown = (url) => globalThis.open?.(url, '_blank', 'noopener'),
+): boolean {
+  try {
+    const opened = open(whatsappTextLink(text));
+    return opened !== null && opened !== undefined && opened !== false;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Hands [text] to the platform's own share sheet, and copies it when there is no sheet to hand it to.
@@ -42,7 +66,10 @@ export type ShareOutcome = 'shared' | 'copied' | 'cancelled' | 'failed';
  * falls back to the clipboard, because a browser that cannot share can still copy, and only when neither
  * is available does this answer `failed`.
  */
-export async function shareOrCopy(text: string): Promise<ShareOutcome> {
+export async function shareOrCopy(
+  text: string,
+  open: (url: string) => unknown = (url) => globalThis.open?.(url, '_blank', 'noopener'),
+): Promise<ShareOutcome> {
   const navigatorLike = (globalThis as { navigator?: Navigator }).navigator;
 
   if (typeof navigatorLike?.share === 'function') {
@@ -55,11 +82,17 @@ export async function shareOrCopy(text: string): Promise<ShareOutcome> {
   }
 
   const clipboard = navigatorLike?.clipboard;
-  if (!clipboard) return 'failed';
-  try {
-    await clipboard.writeText(text);
-    return 'copied';
-  } catch {
-    return 'failed';
+  if (clipboard) {
+    try {
+      await clipboard.writeText(text);
+      return 'copied';
+    } catch {
+      // El portapapeles también puede negarse -- un navegador sin permiso, una pestaña que perdió el foco --
+      // y entonces queda el enlace, que no necesita ninguno de los dos.
+    }
   }
+
+  // Sin hoja nativa y sin portapapeles, el texto igual llega: el enlace de WhatsApp lo lleva en la URL. Es lo que
+  // el operario espera de un botón que dice «Compartilhar no WhatsApp», y antes no pasaba nada en absoluto.
+  return openWhatsAppText(text, open) ? 'whatsapp' : 'failed';
 }
