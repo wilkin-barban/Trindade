@@ -72,6 +72,76 @@ import com.trindade.app.ui.resolve
 import com.trindade.app.ui.filterPhoneDigits
 import androidx.compose.ui.platform.testTag
 
+/**
+ * La barra de lanzamiento: el resumen y las dos acciones, siempre al pie.
+ *
+ * Vive fuera del scroll a propósito. El botón que confirma el día no puede depender de cuántos productos haya:
+ * con diez bloques abiertos el operario tenía que bajar hasta el final para lanzar, y en una tablet de planta eso
+ * es un viaje de ida y vuelta por cada día.
+ */
+@Composable
+internal fun MassasLaunchBar(
+    hasAnyQuantity: Boolean,
+    isSubmitting: Boolean,
+    onClear: () -> Unit,
+    onLaunch: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag(MASSAS_LAUNCH_BAR_TAG),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shadowElevation = 8.dp,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            OutlinedButton(
+                onClick = onClear,
+                enabled = hasAnyQuantity && !isSubmitting,
+                modifier = Modifier
+                    .weight(1f)
+                    .defaultMinSize(minHeight = 48.dp),
+            ) {
+                Text(stringResource(R.string.massas_clear), style = MaterialTheme.typography.labelLarge)
+            }
+
+            Button(
+                onClick = onLaunch,
+                enabled = hasAnyQuantity && !isSubmitting,
+                modifier = Modifier
+                    .weight(2f)
+                    .defaultMinSize(minHeight = 48.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+            ) {
+                if (isSubmitting) {
+                    CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.massas_submitting))
+                } else {
+                    Text(
+                        text = stringResource(R.string.massas_submit),
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** El tag con el que un test encuentra la barra fija y comprueba que no se mueve. */
+const val MASSAS_LAUNCH_BAR_TAG: String = "massas-launch-bar"
+
 @Composable
 fun MassasLaunchScreen(
     viewModel: MassasLaunchViewModel,
@@ -114,9 +184,13 @@ fun MassasLaunchScreen(
         ),
     )
 
+    // La pantalla son dos piezas: el cuerpo que scrollea y la barra de lanzamiento, que no se mueve. Con diez
+    // productos y todos los pasos abiertos, Limpar/Lançar tienen que seguir donde el pulgar los dejó -- es lo
+    // que Salida ya hacía y lo que este módulo decía en sus comentarios sin serlo.
+    Column(modifier = modifier.fillMaxSize()) {
     Column(
-        modifier = modifier
-            .fillMaxSize()
+        modifier = Modifier
+            .weight(1f)
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -303,47 +377,6 @@ fun MassasLaunchScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    val hasAnyQuantity = state.quantities.values.any { (it.toIntOrNull() ?: 0) > 0 }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        OutlinedButton(
-                            onClick = { viewModel.clearQuantities() },
-                            enabled = hasAnyQuantity && !state.isSubmitting,
-                            modifier = Modifier
-                                .weight(1f)
-                                .defaultMinSize(minHeight = 48.dp),
-                        ) {
-                            Text(stringResource(R.string.massas_clear), style = MaterialTheme.typography.labelLarge)
-                        }
-
-                        Button(
-                            onClick = { viewModel.requestLaunchConfirmation() },
-                            enabled = hasAnyQuantity && !state.isSubmitting,
-                            modifier = Modifier
-                                .weight(2f)
-                                .defaultMinSize(minHeight = 48.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                        ) {
-                            if (state.isSubmitting) {
-                                CircularProgressIndicator(
-                                    color = MaterialTheme.colorScheme.onPrimary,
-                                    modifier = Modifier.size(18.dp),
-                                    strokeWidth = 2.dp,
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(stringResource(R.string.massas_submitting))
-                            } else {
-                                Text(
-                                    text = stringResource(R.string.massas_submit),
-                                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                                )
-                            }
-                        }
-                    }
                 }
             }
         }
@@ -660,6 +693,14 @@ fun MassasLaunchScreen(
             whatsappLink = viewModel.getWhatsAppLink(),
         )
         }
+    }
+
+    MassasLaunchBar(
+        hasAnyQuantity = state.quantities.values.any { (it.toIntOrNull() ?: 0) > 0 },
+        isSubmitting = state.isSubmitting,
+        onClear = viewModel::clearQuantities,
+        onLaunch = viewModel::requestLaunchConfirmation,
+    )
     }
 
     // Modal de Ayuda Contextual
