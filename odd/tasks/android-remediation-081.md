@@ -665,7 +665,18 @@ Todo pendiente al abrir esta sección; se cierra por slices con su commit.
   el texto. `LoadingViewModel` perdió el flujo de export y los dos renderers que inyectaba. La norma quedó en
   `docs/paridad-android-web.md` (Horario de Cargamento). Evidencia: `:app:testDebugUnitTest` verde, 159+ pruebas
   del paquete `loading` incluidas las nuevas de la grilla y de la pantalla de compartir.
-- **Pendiente**: P0-2, P1-3, P1-4, P1-5, P1-7.
+- **Corrección de P0-2 · hecha (`63d2a2b2`)** — los chips no salen del calendario sino del archivo del servidor
+  (`/massas-launch/history`), como la web: **Hoje** se dibuja siempre, las cinco anteriores son las que el
+  servidor reportó con el mismo recorte que la lista, y **Todas as datas** abre el archivo. La vista de día
+  comparte el ViewModel del historial, así que abrir el día y volver a la lista cuesta una sola lectura.
+- **P1-3 · hecho (`31c8477c`)** — `ShareCard` dibuja **Editar** siempre que quien la abre lo ofrezca, en cualquier
+  modo; el modo decide la salida (`Cerrar` el día recién guardado, `Volver` la puerta que la abrió). Quién lo
+  ofrece es la regla de la web: el informe, `report.canEdit && report_date == hoy` (más siempre el recién
+  guardado); el cargamento, hoy con el lote activo, la misma regla que usa su grilla. `Editar` abre el editor del
+  día -- en cargamento ya no se limita a cerrar la tarjeta -- y el pasado sigue read-only. Norma en
+  `docs/paridad-android-web.md` (§ Históricos). Evidencia: lane `loading`/`reports`/`ShareCard` y suite Android
+  completa verdes (`ReportShareEditTest`, `MassasHistory…`, `LoadingShareViewModelTest.canEdit`, `ShareCardTest`).
+- **Pendiente**: P1-4, P1-5, P1-7.
 
 - **P0-2 · hecho (`6a0a5927`)** — el día que abre el Historial de Massas dejó la barra de la pestaña y trae la
   suya: **Histórico de Massas**, **Voltar** siempre visible (hoy incluido; antes sólo en el pasado) y las fechas
