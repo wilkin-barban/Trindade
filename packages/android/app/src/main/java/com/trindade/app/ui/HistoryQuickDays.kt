@@ -3,32 +3,22 @@ package com.trindade.app.ui
 import java.time.LocalDate
 
 /**
- * Las cinco fechas anteriores que ofrece un histórico, o todas las que el archivo reportó.
+ * Las fechas rápidas de un histórico, y el archivo completo cuando se piden todas.
  *
- * El archivo del servidor manda: sus fechas salen primero y en el orden en que llegan. Cuando tiene menos de cinco
- * -- tres días de producción son tres chips, y el requisito pide cinco -- las que faltan se completan con el
- * calendario, de la más reciente hacia atrás, sin repetir ninguna. Un día sin datos abre su estado vacío, que es
- * una respuesta; un día que no está en la fila no se puede ni consultar.
+ * Los cinco chips son **siempre las cinco fechas de calendario inmediatamente anteriores a hoy** (hoy-1 … hoy-5,
+ * hoy aparte), no las cinco primeras del archivo. La verificación en planta lo dejó claro: con un archivo de
+ * 18, 17, 16, 13 y 12/11, tomar las cinco del archivo se saltaba el 15 y el 14 -- las dos fechas pasadas más
+ * recientes que faltaban -- y ofrecía en su lugar días más viejos, que es lo contrario de lo que el operario
+ * espera de una fila que dice «fechas anteriores». Un día del calendario sin producción abre su estado vacío, que
+ * es una respuesta; un día ausente no se puede ni pedir.
  *
- * Con [all] no se completa: «Todas as datas» es el archivo, y rellenarlo con días que no existen sería inventar
- * historia.
+ * «Todas as datas» es el archivo: lo que el servidor reportó, de la más reciente a la más vieja, sin hoy y sin
+ * relleno. Ahí viven los días que quedan fuera de la ventana.
  */
 fun historyQuickDays(today: String, dates: List<String>, all: Boolean, count: Int = 5): List<String> {
     val earlier = dates.distinct().filter { it != today }.sortedDescending()
-    if (all) return earlier.sortedDescending()
+    if (all) return earlier
 
-    val shown = earlier.take(count).toMutableList()
-    if (shown.size >= count) return shown
-
-    // El día de planta es el techo del calendario: una fecha futura no es archivo.
-    val anchor = runCatching { LocalDate.parse(today) }.getOrNull() ?: return shown.sortedDescending()
-    var candidate = anchor.minusDays(1)
-    while (shown.size < count) {
-        val iso = candidate.toString()
-        if (iso !in shown && iso != today) shown += iso
-        candidate = candidate.minusDays(1)
-    }
-    // La fila se lee de la más reciente a la más vieja, aunque un día del archivo sea más viejo que los rellenos:
-    // el archivo manda sobre qué se ofrece, el calendario sobre qué se completa, y el orden es siempre el mismo.
-    return shown.sortedDescending()
+    val anchor = runCatching { LocalDate.parse(today) }.getOrNull() ?: return emptyList()
+    return (1..count).map { offset -> anchor.minusDays(offset.toLong()).toString() }
 }

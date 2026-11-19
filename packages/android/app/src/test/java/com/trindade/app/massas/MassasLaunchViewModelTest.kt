@@ -742,6 +742,29 @@ class MassasLaunchViewModelTest {
         assertEquals(0, erpPort.readDates.size)
     }
 
+    /**
+     * Una fecha rápida sin producción abre su día vacío, y ese día es de solo lectura.
+     *
+     * Los cinco chips son de calendario, así que muchos caen en días que la planta no produjo: el operario tiene
+     * que poder entrar y ver que no hay nada, no un error ni una pantalla que no responde -- y sin poder escribir
+     * en un día que ya pasó.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `a quick date with nothing produced opens an empty past day and refuses writes`() = runTest {
+        val fakeRepo = FakeMassasRepository(massasApi)
+        val testVm = newViewModel(fakeRepo)
+        testScheduler.runCurrent()
+
+        testVm.loadDay("2020-01-02")
+        testScheduler.runCurrent()
+
+        assertEquals("2020-01-02", testVm.state.value.date)
+        assertTrue(testVm.state.value.isReadOnly)
+        assertEquals(emptyList<MassasUnifiedRow>(), testVm.state.value.unifiedRows)
+        assertNull("un día vacío no es un error", testVm.state.value.resultDialogMessage)
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun `switching to a day with no snapshot does not keep the previous day's erp seats`() = runTest {

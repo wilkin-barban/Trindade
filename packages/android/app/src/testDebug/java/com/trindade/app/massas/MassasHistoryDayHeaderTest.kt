@@ -58,8 +58,8 @@ class MassasHistoryDayHeaderTest {
         "2026-11-12", "2026-11-11", "2026-11-10", "2026-11-09",
     )
 
-    /** Las cinco anteriores del archivo, que son las que el recorte deja pasar. */
-    private val earlier = listOf("2026-11-17", "2026-11-16", "2026-11-13", "2026-11-12", "2026-11-11")
+    /** Las cinco fechas anteriores de calendario, que son siempre las que la fila ofrece. */
+    private val earlier = listOf("2026-11-17", "2026-11-16", "2026-11-15", "2026-11-14", "2026-11-13")
 
     private fun render(
         selectedDate: String = today,
@@ -138,23 +138,21 @@ class MassasHistoryDayHeaderTest {
     }
 
     /**
-     * El archivo manda sobre qué fechas se ofrecen, y el calendario solo completa hasta cinco.
+     * Las cinco de la fila son las de calendario, aunque el archivo tenga huecos o días viejos.
      *
-     * Un día que el archivo trajo aunque sea viejo tiene su chip -- un calendario local lo habría dejado afuera --,
-     * y con dos días de archivo la fila igual llega a cinco: los rellenos son los días inmediatamente anteriores,
-     * que abren su estado vacío en vez de no existir.
+     * Con un archivo de 18, 17 y 02/10, la fila ofrece 17…13: el 15 y el 14 son las dos fechas pasadas más
+     * recientes que faltan, y son las que el operario necesita para caminar hacia atrás desde hoy. El día viejo del
+     * archivo no desaparece: vive en «Todas as datas», que es el archivo entero.
      */
     @Test
-    fun `the archive dates are offered first and the calendar fills the five`() {
+    fun `the five dates are the calendar's, and an old archive day stays behind Todas`() {
         render(historyDates = listOf(today, "2026-11-17", "2026-10-02"))
 
-        composeRule.onNodeWithTag(massasHistoryDayChipTag("2026-11-17")).assertExists()
-        // El día viejo del archivo no se cae por antigüedad: tiene datos y tiene chip.
-        composeRule.onNodeWithTag(massasHistoryDayChipTag("2026-10-02")).assertExists()
-        // Y la fila completa hasta cinco con el calendario, que era el defecto visto en planta.
-        composeRule.onNodeWithTag(massasHistoryDayChipTag("2026-11-16")).assertExists()
-        composeRule.onNodeWithTag(massasHistoryDayChipTag("2026-11-15")).assertExists()
-        composeRule.onNodeWithTag(massasHistoryDayChipTag("2026-11-14")).assertExists()
+        for (date in earlier) {
+            composeRule.onNodeWithTag(massasHistoryDayChipTag(date)).assertExists()
+        }
+        composeRule.onNodeWithTag(massasHistoryDayChipTag("2026-10-02")).assertDoesNotExist()
+        composeRule.onNodeWithTag(MASSAS_HISTORY_DAY_ALL_TAG).assertExists()
     }
 
     /** Hoy se dibuja siempre, aunque el archivo todavía no lo haya devuelto. */

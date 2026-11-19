@@ -18,9 +18,11 @@ class MassasHistoryWindowTest {
     )
 
     @Test
-    fun `five earlier days, without today`() {
+    fun `the five earlier days are the calendar's, not the archive's first five`() {
+        // El archivo trae 17, 16, 13, 12, 11...: los cinco chips son igualmente 17…13 de calendario, porque el
+        // 15 y el 14 son las dos fechas pasadas más recientes que faltan.
         assertEquals(
-            listOf("2026-11-17", "2026-11-16", "2026-11-13", "2026-11-12", "2026-11-11"),
+            listOf("2026-11-17", "2026-11-16", "2026-11-15", "2026-11-14", "2026-11-13"),
             massasHistoryShownDays(today, days, all = false),
         )
     }

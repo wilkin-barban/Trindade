@@ -18,11 +18,14 @@ class SalidaHistoryDatesTest {
     )
 
     @Test
-    fun `today comes first and only five earlier days are offered`() {
+    fun `today comes first and the five earlier days are the calendar's five`() {
         val visible = salidaHistoryVisibleDates(today, days, all = false)
         assertEquals(today, visible.first())
         assertEquals(6, visible.size)
-        assertEquals(listOf("2026-11-18", "2026-11-17", "2026-11-16", "2026-11-13", "2026-11-12", "2026-11-11"), visible)
+        assertEquals(
+            listOf(today, "2026-11-17", "2026-11-16", "2026-11-15", "2026-11-14", "2026-11-13"),
+            visible,
+        )
     }
 
     @Test
