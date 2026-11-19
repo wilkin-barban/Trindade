@@ -37,12 +37,25 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class ReportEditViewModel @Inject constructor(
     private val repository: ReportsRepository,
+    // Las mismas lecturas del ERP que la pantalla de creación: la edición declara el día entero, así que muestra
+    // las tarjetas de Massas, Insumos y Salidas y ofrece la misma sincronización.
+    private val massasDaySource: com.trindade.app.massas.MassasDaySource? = null,
+    private val aeroDispatcher: com.trindade.app.aero.AeroDispatcher? = null,
+    private val aeroSettingsStore: com.trindade.app.aero.AeroSettingsPort? = null,
 ) : ViewModel() {
 
     data class UiState(
         val loading: Boolean = true,
         /** Las salidas del día del reporte, que se declaran al editarlo igual que al crearlo. */
         val salidaDay: com.trindade.app.contract.models.SalidaReportDayView? = null,
+        /** La producción del día tal como la registró el ERP, con las mismas tarjetas que la creación. */
+        val massasDay: com.trindade.app.contract.models.MassasReportDayView? = null,
+        /** Los insumos recibidos en el día. */
+        val receipts: com.trindade.app.contract.models.ReportReceipts? = null,
+        /** Una sincronización del ERP en vuelo. */
+        val isSyncingErp: Boolean = false,
+        /** Lo que dijo el ERP -- o la falta de credenciales -- debajo de las tarjetas. */
+        val erpError: com.trindade.app.ui.UiText? = null,
         /** Las fotos elegidas y todavía sin subir al reporte. */
         val pendingPhotos: List<PendingPhoto> = emptyList(),
         val report: ReportResponseReport? = null,
@@ -500,12 +513,63 @@ class ReportEditViewModel @Inject constructor(
         const val GENERIC = "Não foi possível salvar o relatório. Tente de novo."
     }
 
+    /**
+     * Trae del ERP el día completo del reporte: producción, insumos y salidas en una sola lectura.
+     *
+     * Es el mismo viaje de la creación (`syncDay(..., includeExits = true)`) y no escribe en Trindade: refresca el
+     * espejo y vuelve a leer las tres tarjetas. La edición se sigue guardando con el update de siempre.
+     */
+    fun syncErp() {
+        if (state.value.isSyncingErp) return
+        val date = state.value.report?.reportDate?.takeIf { it.isNotBlank() } ?: return
+        val dispatcher = aeroDispatcher
+        val store = aeroSettingsStore
+        if (dispatcher == null || store == null) {
+            _state.update { it.copy(erpError = com.trindade.app.ui.UiText.of(R.string.report_erp_not_configured)) }
+            return
+        }
+        viewModelScope.launch {
+            val settings = store.load()
+            if (!settings.ready) {
+                _state.update { it.copy(erpError = com.trindade.app.ui.UiText.of(R.string.report_erp_not_configured)) }
+                return@launch
+            }
+            _state.update { it.copy(isSyncingErp = true, erpError = null) }
+            when (val outcome = dispatcher.syncDay(settings, date, includeExits = true)) {
+                is com.trindade.app.aero.AeroSyncOutcome.Synced -> {
+                    store.markSynced(date, com.trindade.app.massas.MassasLaunchViewModel.nowLabel())
+                    val massas = massasDaySource?.reportDay(date)
+                    val receipts = repository.receipts(date)
+                    val salida = runCatching { repository.salidaDay(date) }.getOrNull()
+                    _state.update {
+                        it.copy(
+                            isSyncingErp = false,
+                            massasDay = massas ?: it.massasDay,
+                            receipts = receipts ?: it.receipts,
+                            salidaDay = salida ?: it.salidaDay,
+                        )
+                    }
+                }
+                is com.trindade.app.aero.AeroSyncOutcome.Failed ->
+                    _state.update { it.copy(isSyncingErp = false, erpError = outcome.failure.describe()) }
+            }
+        }
+    }
+
     /** Lee las salidas del día del reporte; una lectura fallida no borra lo que ya se ve. */
     fun refreshSalidaDay(date: String) {
         if (date.isBlank()) return
         viewModelScope.launch {
             val day = runCatching { repository.salidaDay(date) }.getOrNull()
-            if (day != null) _state.update { it.copy(salidaDay = day) }
+            val massas = massasDaySource?.reportDay(date)
+            val receipts = repository.receipts(date)
+            _state.update {
+                it.copy(
+                    salidaDay = day ?: it.salidaDay,
+                    massasDay = massas ?: it.massasDay,
+                    receipts = receipts ?: it.receipts,
+                )
+            }
         }
     }
 

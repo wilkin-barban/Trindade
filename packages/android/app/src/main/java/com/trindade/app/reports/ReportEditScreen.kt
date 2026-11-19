@@ -61,6 +61,8 @@ fun ReportEditScreen(
     onTemperatureChange: (Int, Int, String) -> Unit,
     onBoxTypeChange: (Int, Boolean) -> Unit,
     onSubmit: () -> Unit,
+    /** La lectura del ERP del día, la misma del alta: una sola acción para las tres tarjetas. */
+    onSyncErp: () -> Unit = {},
     onAddPhotos: () -> Unit = {},
     onRemovePendingPhoto: (Int) -> Unit = {},
     onBack: () -> Unit,
@@ -134,6 +136,22 @@ fun ReportEditScreen(
                 pendingCount = state.pendingPhotos.size,
                 onAddPhotos = onAddPhotos,
                 onRemovePhoto = onRemovePendingPhoto,
+            )
+        }
+
+        // Las tres lecturas del ERP, con las mismas tarjetas y la misma acción que la creación: el día se declara
+        // entero al editar también, y esta pantalla era la única que no dejaba consultarlo ni refrescarlo.
+        ErpMovementsCard(
+            massasDay = state.massasDay,
+            receipts = state.receipts,
+            isSyncing = state.isSyncingErp,
+            onSync = onSyncErp,
+        )
+        state.erpError?.let { error ->
+            Text(
+                text = error.resolve(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
             )
         }
 
@@ -254,6 +272,7 @@ fun ReportEditRoute(
         onTemperatureChange = viewModel::onTemperatureChange,
         onBoxTypeChange = viewModel::onBoxTypeChange,
         onSubmit = viewModel::submit,
+        onSyncErp = viewModel::syncErp,
         onDismissResult = viewModel::dismissMessage,
         onAddPhotos = {
             pickPhotos.launch(

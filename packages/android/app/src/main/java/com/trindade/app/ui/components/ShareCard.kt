@@ -3,6 +3,7 @@ package com.trindade.app.ui.components
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -16,6 +17,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.trindade.app.ui.components.NavigationActionButton
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -77,19 +80,34 @@ fun ShareCard(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                if (subtitle != null) {
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                // La vuelta va arriba a la izquierda, como en todos los módulos. Abajo quedaba al lado de
+                // Compartir y del PDF, donde se lee como una cuarta acción del mensaje y no como la salida.
+                if (mode != ShareCardMode.SAVED) {
+                    NavigationActionButton(
+                        onClick = onClose,
+                        text = stringResource(R.string.share_card_back),
+                        modifier = Modifier.testTag("share-card-back"),
                     )
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    if (subtitle != null) {
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
 
@@ -157,16 +175,13 @@ fun ShareCard(
                     )
                 }
 
-                AdminSecondaryButton(
-                    onClick = onClose,
-                    text = stringResource(
-                        when (mode) {
-                            ShareCardMode.SAVED -> R.string.share_card_close
-                            ShareCardMode.SHARE, ShareCardMode.FROM_HISTORY -> R.string.share_card_back
-                        },
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                if (mode == ShareCardMode.SAVED) {
+                    AdminSecondaryButton(
+                        onClick = onClose,
+                        text = stringResource(R.string.share_card_close),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
         }
     }

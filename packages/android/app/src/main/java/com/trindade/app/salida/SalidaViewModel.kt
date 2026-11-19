@@ -242,12 +242,16 @@ class SalidaViewModel @Inject constructor(
      */
     fun dayShareText(labels: SalidaSummaryLabels = SalidaSummaryLabels()): String {
         val chosen = _state.value.historyDate ?: _state.value.date
-        val day = _state.value.history.firstOrNull { it.date == chosen } ?: return ""
+        val day = _state.value.history.firstOrNull { it.date == chosen }
+        // El día del archivo puede faltar y el ERP tener asientos igual: se arma el texto con lo que haya.
+        val erp = _state.value.salidaDay?.takeIf { _state.value.salidaDay?.date == chosen }?.operators.orEmpty()
+        if (day == null && erp.none { operator -> operator.products.any { it.units > 0 } }) return ""
         return salidaDaySummaryText(
-            date = day.date,
-            movements = day.movements,
+            date = day?.date ?: chosen,
+            movements = day?.movements.orEmpty(),
             abbreviations = abbreviationsSource?.table ?: com.trindade.app.massas.WhatsappAbbreviations.EMPTY,
             labels = labels,
+            erpOperators = erp,
         )
     }
 

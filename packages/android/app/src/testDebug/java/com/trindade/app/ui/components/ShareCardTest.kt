@@ -249,6 +249,59 @@ class ShareCardTest {
      * La tarjeta comparte; borrar o agregar fotos es de la pantalla del reporte. La miniatura no es un botón y no
      * cambia el texto ni la acción de enviar.
      */
+    /**
+     * La vuelta de un histórico va arriba a la izquierda, y una sola vez.
+     *
+     * Abajo quedaba junto a Compartir y al PDF, donde se lee como una cuarta acción del mensaje. El día que se
+     * acaba de guardar conserva su «Cerrar» abajo: ahí el cierre es parte del flujo, no una salida de pantalla.
+     */
+    @Test
+    fun `FROM_HISTORY puts the way back in the header and not at the bottom`() {
+        composeRule.setContent {
+            TrindadeTheme {
+                ShareCard(
+                    title = "Relatório #10",
+                    subtitle = null,
+                    text = "Texto",
+                    loading = false,
+                    error = null,
+                    mode = ShareCardMode.FROM_HISTORY,
+                    onShare = {},
+                    onPdf = {},
+                    onEdit = null,
+                    onClose = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("share-card-back").assertIsDisplayed()
+        // Una sola vez: el botón inferior ya no está.
+        assertEquals(1, composeRule.onAllNodesWithText("Volver").fetchSemanticsNodes().size)
+    }
+
+    @Test
+    fun `the day just saved keeps its Cerrar at the bottom and draws no header back`() {
+        composeRule.setContent {
+            TrindadeTheme {
+                ShareCard(
+                    title = "Relatório #10",
+                    subtitle = null,
+                    text = "Texto",
+                    loading = false,
+                    error = null,
+                    mode = ShareCardMode.SAVED,
+                    onShare = {},
+                    onPdf = {},
+                    onEdit = null,
+                    onClose = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("share-card-back").assertDoesNotExist()
+        composeRule.onNodeWithText("Cerrar").assertIsDisplayed()
+    }
+
     @Test
     fun `photos ride above the text as thumbnails and are not buttons`() {
         composeRule.setContent {

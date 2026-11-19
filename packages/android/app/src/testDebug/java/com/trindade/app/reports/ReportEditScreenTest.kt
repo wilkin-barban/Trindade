@@ -178,6 +178,7 @@ class ReportEditScreenTest {
         temperatures: Map<Int, List<String>> = mapOf(TEMPERATURE_TASK_ID to listOf("4.5", "-18")),
         message: String? = null,
         validation: UiText? = null,
+        salidaDay: com.trindade.app.contract.models.SalidaReportDayView? = null,
     ) = ReportEditViewModel.UiState(
         loading = false,
         report = report,
@@ -189,6 +190,7 @@ class ReportEditScreenTest {
         temperatures = temperatures,
         message = message,
         validation = validation,
+        salidaDay = salidaDay,
     )
 
     // ---- Rendering ----
@@ -365,6 +367,50 @@ class ReportEditScreenTest {
 
         // Sin scroll: el diálogo flota sobre la pantalla, no vive dentro de la lista.
         composeRule.onNodeWithText(MESSAGE).assertIsDisplayed()
+    }
+
+    /**
+     * La edición consulta el ERP igual que la creación: las tres tarjetas y una sola sincronización.
+     *
+     * Antes sólo montaba la tarjeta de Salidas y sin ninguna acción, así que el día no se podía refrescar al
+     * corregir el reporte. El botón es el mismo de la creación, y no toca el formulario ni el guardado.
+     */
+    @Test
+    fun `the edit screen shows the three ERP cards and one sync action`() {
+        var synced = 0
+        composeRule.setContent {
+            TrindadeTheme {
+                ReportEditScreen(
+                    state = state(
+                        salidaDay = com.trindade.app.contract.models.SalidaReportDayView(
+                            date = "2026-11-13",
+                            operators = emptyList(),
+                            totalUnits = 0,
+                            movementCount = 0,
+                        ),
+                    ),
+                    onTurnoChange = {},
+                    onNotesChange = {},
+                    onCheckChange = { _, _ -> },
+                    onProductToggle = { _, _, _ -> },
+                    onTemperatureChange = { _, _, _ -> },
+                    onBoxTypeChange = { _, _ -> },
+                    onSubmit = {},
+                    onSyncErp = { synced++ },
+                    onBack = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(copy(R.string.report_massas_day_title)).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(copy(R.string.report_receipts_title)).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(copy(R.string.salida_report_block)).performScrollTo().assertIsDisplayed()
+
+        val sync = composeRule.onAllNodesWithText(copy(R.string.report_erp_sync))
+        assertEquals("una sola acción para las tres tarjetas", 1, sync.fetchSemanticsNodes().size)
+        sync[0].performScrollTo().performClick()
+        composeRule.waitForIdle()
+        assertEquals(1, synced)
     }
 
     @Test

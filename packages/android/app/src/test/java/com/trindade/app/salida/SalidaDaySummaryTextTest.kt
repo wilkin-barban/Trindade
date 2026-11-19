@@ -25,7 +25,7 @@ class SalidaDaySummaryTextTest {
     private val table = WhatsappAbbreviations.parse(
         """
         {
-          "catalogueByCode": { "1356": "DISCO 400g", "1900": "BOBINA ROLO" },
+          "catalogueByCode": { "1356": "DISCO 400g", "1357": "DISCO 200g", "1900": "BOBINA ROLO" },
           "catalogueByName": {},
           "erpByName": {}
         }
@@ -67,6 +67,25 @@ class SalidaDaySummaryTextTest {
             matchedItemIds = emptyList(),
         ),
         erp = null as SalidaMovementErp?,
+    )
+
+    private fun erpProduct(code: String, name: String, block: String, units: Int) =
+        com.trindade.app.contract.models.SalidaReportOperatorProductsInner(
+            code = code,
+            name = name,
+            block = com.trindade.app.contract.models.SalidaReportOperatorProductsInner.Block.valueOf(block),
+            units = units,
+        )
+
+    private fun erpOperator(
+        username: String,
+        products: List<com.trindade.app.contract.models.SalidaReportOperatorProductsInner>,
+    ) = com.trindade.app.contract.models.SalidaReportDayViewOperatorsInner(
+        name = username.replaceFirstChar { it.uppercase() },
+        username = username,
+        units = products.sumOf { it.units },
+        products = products,
+        erpOnly = true,
     )
 
     @Test
@@ -214,6 +233,74 @@ class SalidaDaySummaryTextTest {
         // El nombre del catálogo que la tabla no conoce y el código no salen nunca.
         assertFalse(text.contains("EMBALAG."))
         assertFalse(text.contains("1356"))
+    }
+
+    /**
+     * Lo que el ERP registró de otros operarios también va en el mensaje.
+     *
+     * El histórico arma el texto con los movimientos de Trindade; los asientos que sólo existen en el ERP -- o un
+     * producto de un operario del día que no salió acá -- se suman con el mismo formato y la misma tabla, sin
+     * repetir a nadie. Sin ERP, el texto es exactamente el de antes.
+     */
+    @Test
+    fun `erp-only operators join the message, merged without repeating`() {
+        val erpOperators = listOf(
+            erpOperator(
+                username = "ana",
+                products = listOf(
+                    erpProduct("1357", "EMBALAG. DISCO 200g", "embalagens", 4),
+                    erpProduct("1900", "BOBINA ROLO", "bobinas", 2),
+                ),
+            ),
+        )
+
+        val text = salidaDaySummaryText(
+            date = "2026-11-18",
+            movements = listOf(movement(1, "wilkin", "Wilkin", listOf(item("1356", "EMBALAG. DISCO 400g", "embalagens", 6000)))),
+            abbreviations = table,
+            erpOperators = erpOperators,
+        )
+
+        assertEquals(
+            """
+            🚛 *Saídas do dia — 18/11/2026*
+            Movimentos: 1
+
+            👤 WILKIN:
+            *📦 Embalagens*
+            - DISCO 400g: 6000 un
+
+            👤 ANA:
+            *📦 Embalagens*
+            - DISCO 200g: 4 un
+            *🧵 Bobinas*
+            - BOBINA ROLO: 2 un
+            """.trimIndent(),
+            text,
+        )
+    }
+
+    @Test
+    fun `a product the archive already carries is not repeated from the erp`() {
+        val text = salidaDaySummaryText(
+            date = "2026-11-18",
+            movements = listOf(movement(1, "wilkin", "Wilkin", listOf(item("1356", "EMBALAG. DISCO 400g", "embalagens", 6000)))),
+            abbreviations = table,
+            erpOperators = listOf(
+                erpOperator(
+                    username = "WILKIN",
+                    products = listOf(
+                        erpProduct("1356", "EMBALAG. DISCO 400g", "embalagens", 6000),
+                        erpProduct("1900", "BOBINA ROLO", "bobinas", 1),
+                    ),
+                ),
+            ),
+        )
+
+        // El operario se dibuja una vez; el producto ya presente no se repite y el nuevo entra en su bloque.
+        assertEquals(text, 1, Regex("👤 WILKIN:").findAll(text).count())
+        assertEquals(text, 1, Regex("DISCO 400g").findAll(text).count())
+        assertTrue(text.contains("- BOBINA ROLO: 1 un"))
     }
 
     @Test

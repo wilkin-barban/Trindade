@@ -73,24 +73,58 @@ fun salidaDaySummaryText(
     movements: List<SalidaCreateResponseMovement>,
     abbreviations: WhatsappAbbreviations = WhatsappAbbreviations.EMPTY,
     labels: SalidaSummaryLabels = SalidaSummaryLabels(),
+    /**
+     * Los operarios del día tal como los devuelve el bloque de Salidas del Relatório.
+     *
+     * El histórico arma su mensaje con los movimientos que hay en Trindade; el ERP puede tener asientos de otros
+     * operarios -- o productos de un operario que sí está -- que el grupo también espera leer. Se suman acá con el
+     * mismo formato y la misma tabla, sin repetir a nadie: un operario con asientos en los dos lados se dibuja una
+     * vez, y un producto que ya salió en su bloque no vuelve a entrar.
+     */
+    erpOperators: List<com.trindade.app.contract.models.SalidaReportDayViewOperatorsInner> = emptyList(),
 ): String {
-    if (movements.isEmpty()) return ""
+    // Una línea del mensaje, venga de Trindade o del ERP: el nombre que se imprime se resuelve igual en los dos.
+    data class Line(val code: String, val name: String, val block: String, val units: Int)
+
+    // El orden de los operarios y de sus productos es el del archivo local; el ERP sólo agrega lo que falta.
+    val localOperators = LinkedHashMap<String, MutableList<Line>>()
+    for (movement in movements) {
+        val key = movement.username.uppercase()
+        val lines = localOperators.getOrPut(key) { mutableListOf() }
+        for (item in movement.items) {
+            lines += Line(item.productCode, item.productName, item.block.value, item.quantity)
+        }
+    }
+
+    val merged = LinkedHashMap(localOperators.mapValues { (_, lines) -> lines.toMutableList() })
+    for (operator in erpOperators) {
+        val key = operator.username.uppercase()
+        val known = merged[key]?.map { it.code }?.toSet().orEmpty()
+        val extra = operator.products
+            .filter { it.units > 0 && it.code !in known }
+            .map { Line(it.code, it.name, it.block.value, it.units) }
+        if (extra.isEmpty()) continue
+        merged.getOrPut(key) { mutableListOf() } += extra
+    }
+
+    if (merged.isEmpty()) return ""
 
     val lines = mutableListOf<String>()
     lines.add("🚛 *${labels.title} — ${brazilianDate(date)}*")
     lines.add("${labels.movements}: ${movements.size}")
     lines.add("")
 
-    movements.forEachIndexed { index, movement ->
+    merged.entries.forEachIndexed { index, (operator, entries) ->
         if (index > 0) lines.add("")
-        lines.add("👤 ${movement.username.uppercase()}:")
+        lines.add("👤 $operator:")
         for (block in SalidaCatalog.blocks) {
-            val items = movement.items.filter { it.block.value == block }
+            val items = entries.filter { it.block == block }
             if (items.isEmpty()) continue
             lines.add("*${salidaBlockEmojis[block]} ${labels.blocks[block]}*")
             for (item in items) {
-                val name = abbreviations.shortName(item.productCode, item.productName)
-                lines.add("- $name: ${item.quantity} un")
+                // El nombre corto sale de la tabla aprobada; para el asiento del ERP, la tabla o el nombre del ERP.
+                val name = abbreviations.shortName(item.code, item.name)
+                lines.add("- $name: ${item.units} un")
             }
         }
     }
