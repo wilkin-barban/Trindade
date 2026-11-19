@@ -381,3 +381,47 @@ No cambiar el alcance de release: **sin release/tag/asset**.
   alcance: menú/Historial de Salidas, botón canónico y ayudas siguen siendo suyos.
 - El punto 5 de R5 («como mínimo conservar el comportamiento actual») queda **superado** por C: fotos por movimiento, compartir con
   fotos, reenviar pendientes y ShareCard del día son obligatorios, no opcionales.
+
+
+---
+
+## 7. Avance de implementación
+
+### F0 — cerrada
+ODD en el repo y versión por defecto del módulo en **0.8.1 (8004)** (`080d8e6a`). Baseline previa: Android 1433,
+backend 983, web node 754 + unit 243. El fix de `GUSTAVO H → Gustavo` ya estaba desplegado y no se tocó.
+
+### F5 (mitad del addendum A+B+backend) — cerrada
+- `fd99fac8` — `canEdit` = dueño-en-ventana **o** admin-hoy, con `!isClosedDay`; el calendario manda sobre el reloj.
+  Tests de proyección (21 casos) y de rutas: admin edita el día, trabajador ajeno 403, pasado inmutable.
+- `af80fe42` — todos los días del Historial de Cargamento abren la ShareCard; `Editar` sólo hoy para dueño/admin
+  (→ `/loading/edit?date=`); igual en la tarjeta del Historial de Reportes y en `ReportViewPage` rama `fromHistory`.
+- Suites del worker: backend **983**, web node **754**, unit **243**.
+
+### F1 — cerrada (Android)
+| Commit | Requisito | Test que lo prueba |
+| --- | --- | --- |
+| `e4715ec1` | R1/R6 Historial de Salidas en el cajón, overlay, resets, `stockHistoryOpen` | `MainActivityNavigationTest` |
+| `1ff84a8c` | R2 píldora `ModuleHistoryButton` + `HistoryHeader` | `SalidaHeaderTest`, `ModuleHeaderActionsTest` |
+| `a9069aea` | R3 barra fija de Masas (`massas-launch-bar`) | `MassasLaunchBarTest` |
+| `3059695a` | R9 Salvar fijo en Reporte y edición (`report-save-bar`) | `ReportSaveBarTest`, `ReportGeneratorScreenTest`, `ReportEditScreenTest` |
+| `ccd0c89f` | R10 Salvar Horario + ShareCard del día con Editar (`loading-save-btn`) | `LoadingSaveBarTest`, `loading.*` |
+| `c2446b74` | R14 ayudas de Salida e historial (es/pt) | `LocaleStringsParityTest`, `salida.*` |
+
+Suite completa de Android **verde** al cerrar la fase. Sin build de APK todavía: eso es F7.
+
+**Pendiente de F1**: nada de código. La verificación en emulador de R1/R2/R3/R9/R10/R14 va en F7 con el resto.
+
+### F2 — siguiente, no empezada
+Alcance confirmado por §6 C. Punto de partida exacto:
+- `SalidaRepository.history()` devuelve hoy una lista plana de movimientos; debe devolver días (`date`, `total_units`,
+  `movements`), que el contrato ya trae.
+- `SalidaHistoryScreen` es la lista plana a reescribir: `HistoryHeader` (ya tiene ayuda), chip Hoy, 5 fechas,
+  “Todas las fechas”, filtro por bloque, filas por movimiento con estados, fotos por movimiento
+  (`SalidaApi.photos`/`uploadPhoto`/`deletePhoto`), ShareCard/WhatsApp del día con la tabla de abreviaturas y
+  `Reenviar ao ERP` con `retryPending`.
+- TestIDs exigidos: `salida-history-date`, `salida-history-day-<date>`, `salida-history-readonly-note`,
+  `salida-whatsapp-share-card`, `salida-share-day`, `salida-preview-message`, `salida-photo-picker`,
+  `salida-share-<id>`, `salida-resend-<id>`, `salida-pending-count`.
+- Después: F3 (salidas en creación/edición + fotos), F4 (fleteros web + sticky), F5b (tarjetas del dashboard),
+  F6 (abreviaturas en Stock/Assaí) y F7 (build 8004, instalación, capturas, PASS/FAIL).
