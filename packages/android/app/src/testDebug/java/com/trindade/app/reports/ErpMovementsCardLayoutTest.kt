@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -19,7 +20,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * Where the header's two pieces sit, at the widths the crew's phones and the plant's tablets really have.
+ * Where each card's header sits, at the widths the crew's phones and the plant's tablets really have.
  *
  * The complaint this pins is a measurement, not a style preference: on an iPhone the title was drawn beside
  * the sync button with four words to a line, and the button itself was pushed out of the card's padding. So
@@ -55,37 +56,45 @@ class ErpMovementsCardLayoutTest {
         }
     }
 
+    /** El encabezado de cada tarjeta, medido: en el teléfono la acción va debajo del título. */
     @Test
-    fun `on a phone the sync action sits below the title rather than beside it`() {
-        // 360dp: the width of the handset the complaint came from, minus nothing -- the card is already the
-        // full content width there.
+    fun `on a phone each card's sync action sits below its title rather than beside it`() {
         drawCardIn(360)
 
-        val title = composeRule
-            .onNodeWithText(context.getString(R.string.report_erp_movements_title))
-            .getUnclippedBoundsInRoot()
-        val button = composeRule
-            .onNodeWithText(context.getString(R.string.report_erp_sync), substring = true)
-            .getUnclippedBoundsInRoot()
-
-        assertTrue(
-            "the action must start below the title, not beside it; title=$title button=$button",
-            button.top >= title.bottom,
-        )
+        assertHeaderStacked(R.string.report_massas_day_title, index = 0)
+        assertHeaderStacked(R.string.report_receipts_title, index = 1)
     }
 
     @Test
     fun `on a tablet the sync action returns beside the title`() {
         drawCardIn(720)
 
+        assertHeaderBeside(R.string.report_massas_day_title, index = 0)
+        assertHeaderBeside(R.string.report_receipts_title, index = 1)
+    }
+
+    private fun assertHeaderStacked(titleRes: Int, index: Int) {
+        // El título de cada tarjeta es único; lo que se repite es la acción, una por tarjeta.
         val title = composeRule
-            .onNodeWithText(context.getString(R.string.report_erp_movements_title))
+            .onNodeWithText(context.getString(titleRes))
             .getUnclippedBoundsInRoot()
         val button = composeRule
-            .onNodeWithText(context.getString(R.string.report_erp_sync), substring = true)
+            .onAllNodesWithText(context.getString(R.string.report_erp_sync), substring = true)[index]
             .getUnclippedBoundsInRoot()
+        assertTrue(
+            "the action must start below the title, not beside it; title=$title button=$button",
+            button.top >= title.bottom,
+        )
+    }
 
-        // The same row: the action begins to the right of the title and is not pushed below it.
+    private fun assertHeaderBeside(titleRes: Int, index: Int) {
+        // El título de cada tarjeta es único; lo que se repite es la acción, una por tarjeta.
+        val title = composeRule
+            .onNodeWithText(context.getString(titleRes))
+            .getUnclippedBoundsInRoot()
+        val button = composeRule
+            .onAllNodesWithText(context.getString(R.string.report_erp_sync), substring = true)[index]
+            .getUnclippedBoundsInRoot()
         assertTrue(
             "the action must sit to the right of the title; title=$title button=$button",
             button.left > title.left && button.top < title.bottom,

@@ -194,7 +194,8 @@ class ReportGeneratorScreenTest {
     fun `the day's ERP movements are drawn under the temperatures`() {
         render(state(listOf(category(1, "Cozinha"))))
 
-        displayed(context.getString(R.string.report_erp_movements_title))
+        // Dos tarjetas, dos títulos: la de la producción del día y la de los insumos.
+        displayed(context.getString(R.string.report_massas_day_title))
         displayed(context.getString(R.string.report_receipts_title))
     }
 
@@ -596,11 +597,26 @@ class ReportGeneratorScreenTest {
         composeRule.onNodeWithText(copy(R.string.report_temperatures_required)).assertDoesNotExist()
     }
 
+    /**
+     * La falta de lecturas se responde en la ventana, no en una línea dentro del formulario.
+     *
+     * El ViewModel es quien decide: al guardar con lecturas faltantes deja el mensaje de error en el estado, y la
+     * pantalla lo dice en el mismo diálogo que usa para todo lo demás. Las casillas siguen marcadas por su lado
+     * (`showValidation`), que es lo que hace accionable la frase en un formulario más alto que la pantalla.
+     */
     @Test
-    fun `a form that owes a reading shows temperature warning when validation is triggered`() {
-        render(temperatureState(listOf("", "")).copy(showValidation = true))
+    fun `a form that owes a reading answers in the dialog, not inside the form`() {
+        render(
+            temperatureState(listOf("", "")).copy(
+                showValidation = true,
+                message = UiText.of(R.string.report_temperatures_required),
+                messageIsError = true,
+            ),
+        )
 
-        displayed(copy(R.string.report_temperatures_required))
+        composeRule.onNodeWithText(copy(R.string.report_temperatures_required)).assertIsDisplayed()
+        // Y no queda dibujada dos veces: la frase no vive también en la lista.
+        composeRule.onAllNodesWithText(copy(R.string.report_temperatures_required)).assertCountEquals(1)
     }
 
     @Test

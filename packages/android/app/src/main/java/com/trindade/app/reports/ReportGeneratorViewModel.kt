@@ -493,7 +493,16 @@ class ReportGeneratorViewModel @Inject constructor(
         val current = state.value
         if (!current.ready || current.submitting) return
         if (current.missingReadings.isNotEmpty()) {
-            _state.update { it.copy(showValidation = true) }
+            // La razón por la que no se guarda se dice en la ventana que esta pantalla ya usa para responder,
+            // y las casillas que faltan quedan marcadas: una frase suelta dentro de una lista de treinta
+            // casillas se pierde entre los controles, que es justo lo que el operario está mirando.
+            _state.update {
+                it.copy(
+                    showValidation = true,
+                    message = UiText.of(R.string.report_temperatures_required),
+                    messageIsError = true,
+                )
+            }
             return
         }
         _state.update { it.copy(submitting = true, message = null) }

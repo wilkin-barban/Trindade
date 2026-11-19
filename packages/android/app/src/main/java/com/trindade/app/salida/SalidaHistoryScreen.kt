@@ -29,6 +29,7 @@ import com.trindade.app.contract.models.SalidaCreateResponseMovement
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import com.trindade.app.R
 import com.trindade.app.ui.historyQuickDays
 import com.trindade.app.ui.components.HelpSection
@@ -152,7 +153,8 @@ fun SalidaHistoryScreen(
         // El mismo header que Masas, Cargamento, Reportes y Contagem: título, contador y Volver de 48 dp.
         HistoryHeader(
             title = stringResource(R.string.salida_history_title),
-            subtitle = state.history.size.toString(),
+            // Días, no un número suelto: «3» sobre un historial no decía tres qué.
+            subtitle = pluralStringResource(R.plurals.salida_history_days, state.history.size, state.history.size),
             onBack = onBack,
             onHelp = { showHelpDialog = true },
         )

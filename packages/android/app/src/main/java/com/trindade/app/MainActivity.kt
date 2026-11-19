@@ -170,6 +170,16 @@ class MainActivity : ComponentActivity() {
          * una comparación por pestaña, abrir el historial marcaba el lanzamiento. Se compara también el overlay,
          * y una entrada sin overlay (el lanzamiento) no coincide con una visita que sí lleva uno.
          */
+        /**
+         * La superposición que la visita actual a Masas representa, o null cuando no es una visita al archivo.
+         *
+         * El archivo abre en el día de planta, así que al entrar `massasHistoryOpen` queda en false y es
+         * `massasDayFromList` el que dice que la pantalla es el histórico: una regla sola para las dos formas de
+         * estar en el archivo, y la fila de arriba apunta a la entrada correcta en ambas.
+         */
+        fun massasVisitOverlay(historyOpen: Boolean, dayFromList: Boolean): Overlay? =
+            if (historyOpen || dayFromList) Overlay.MASSAS_HISTORY else null
+
         fun selectedTabIndex(
             tabs: List<Destination>,
             current: Tab,
@@ -465,6 +475,13 @@ class MainActivity : ComponentActivity() {
                             massasLaunchDay = null
                             massasDayFromHistory = false
                         }
+                        // La entrada de Lanzamiento y la del archivo comparten pestaña: lo que las separa es
+                        // `massasDayFromList`, y una visita al lanzamiento tiene que soltarlo. Si no, tocar
+                        // «Lançamento de Massas» desde un día del archivo volvía a dibujar ese mismo día.
+                        if (target.overlay != Overlay.MASSAS_HISTORY) {
+                            massasDayFromList = false
+                            if (target.tab == Tab.MASSAS_LAUNCH) massasLaunchDay = null
+                        }
                         when (target.overlay) {
                             Overlay.MASSAS_HISTORY -> openMassasHistory()
                             Overlay.REPORTS_HISTORY -> historyOpen = true
@@ -637,7 +654,11 @@ class MainActivity : ComponentActivity() {
                             role = role,
                             currentTab = tab,
                             currentOverlay = when {
-                                massasHistoryOpen -> Overlay.MASSAS_HISTORY
+                                // El archivo se abre en el día de planta, así que `massasHistoryOpen` queda en
+                                // false mientras se lee un día del archivo: sin `massasDayFromList` la fila
+                                // seguía marcando Lanzamiento sobre una pantalla que ya era el histórico.
+                                massasVisitOverlay(massasHistoryOpen, massasDayFromList) != null ->
+                                    Overlay.MASSAS_HISTORY
                                 historyOpen -> Overlay.REPORTS_HISTORY
                                 loadingHistoryOpen -> Overlay.LOADING_HISTORY
                                 stockHistoryOpen -> Overlay.STOCK_HISTORY

@@ -519,6 +519,11 @@ class ReportGeneratorViewModelTest {
         // The write is not attempted at all: no body, and no request the server would refuse.
         model.submit()
         assertNull(api.createdBody)
+
+        // Y la pantalla recibe la frase para su ventana, con las casillas marcadas por su lado.
+        assertEquals(com.trindade.app.R.string.report_temperatures_required, model.state.value.message?.resId)
+        assertEquals(true, model.state.value.messageIsError)
+        assertEquals(true, model.state.value.showValidation)
     }
 
     @Test

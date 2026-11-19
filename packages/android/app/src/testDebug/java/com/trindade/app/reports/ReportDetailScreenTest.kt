@@ -239,9 +239,9 @@ class ReportDetailScreenTest {
             ),
         )
 
-        // The card is permanent and by date, so a day with nothing recorded still says so rather than
-        // leaving a blank space where the operator expects the production of that day.
-        composeRule.onNodeWithText(copy(R.string.report_erp_movements_title)).assertIsDisplayed()
+        // The cards are permanent and by date, so a day with nothing recorded still says so rather than
+        // leaving a blank space where the operator expects the production of that day. Cada bloque tiene su
+        // tarjeta desde la separación de la tarjeta única.
         composeRule.onNodeWithText(copy(R.string.report_massas_day_title)).assertIsDisplayed()
         composeRule.onNodeWithText(copy(R.string.report_massas_day_empty)).assertIsDisplayed()
         composeRule.onNodeWithText(copy(R.string.report_receipts_title)).assertIsDisplayed()

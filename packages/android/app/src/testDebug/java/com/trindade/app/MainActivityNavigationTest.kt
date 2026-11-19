@@ -313,6 +313,25 @@ class MainActivityNavigationTest {
         assertEquals(1, composeRule.onAllNodes(isSelected()).fetchSemanticsNodes().size)
     }
 
+    /**
+     * Una visita al archivo de Masas selecciona la entrada del archivo, también cuando abre en el día de planta.
+     *
+     * `openMassasHistory` apunta al día de hoy y deja `massasHistoryOpen` en false; si la superposición mirara
+     * sólo ese flag, la barra seguiría marcando Lanzamiento sobre una pantalla que ya es el histórico.
+     */
+    @Test
+    fun `a visit to the archive selects the archive entry, even when it opened on today`() {
+        assertEquals(
+            MainActivity.Overlay.MASSAS_HISTORY,
+            MainActivity.massasVisitOverlay(historyOpen = false, dayFromList = true),
+        )
+        assertEquals(
+            MainActivity.Overlay.MASSAS_HISTORY,
+            MainActivity.massasVisitOverlay(historyOpen = true, dayFromList = false),
+        )
+        assertEquals(null, MainActivity.massasVisitOverlay(historyOpen = false, dayFromList = false))
+    }
+
     @Test
     fun `the Salida history in the row reports its overlay too`() {
         var selected: MainActivity.Destination? = null

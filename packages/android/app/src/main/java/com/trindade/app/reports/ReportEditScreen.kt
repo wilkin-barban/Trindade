@@ -26,6 +26,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trindade.app.R
+import com.trindade.app.ui.components.ActionResultDialog
+import com.trindade.app.ui.resolve
 import com.trindade.app.contract.models.UpdateReportRequest
 import com.trindade.app.ui.components.AdminPrimaryButton
 import com.trindade.app.ui.components.NavigationActionButton
@@ -62,6 +64,7 @@ fun ReportEditScreen(
     onAddPhotos: () -> Unit = {},
     onRemovePendingPhoto: (Int) -> Unit = {},
     onBack: () -> Unit,
+    onDismissResult: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     // Built once, outside the category loop, for the reason the generator's own copy gives: the form
@@ -163,13 +166,6 @@ fun ReportEditScreen(
             )
         }
 
-        state.message?.let { message ->
-            Text(
-                text = message,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
 
         // D6, rendered: when the server says this report cannot be edited, the save is not drawn at all
         // -- not drawn disabled. A disabled action is still an offer, and it reads as one with a reason
@@ -180,30 +176,30 @@ fun ReportEditScreen(
         // The controls above are drawn disabled rather than left live, as the web draws its own
         // (`readOnly` reaches every input there too): a live field would collect an edit this screen has
         // no action to send.
-        if (!state.readOnly) {
-            // The reason the save below is withheld, said only where there is a save to explain: a
-            // read-only report owes nobody a reading, and a sentence about one would be advice with no
-            // action behind it. It is the same sentence, from the same resource, that the generator
-            // draws in the same place.
-            if (state.missingReadings.isNotEmpty()) {
-                Text(
-                    text = stringResource(R.string.report_temperatures_required),
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-
-        }
+        // Lo que falta para guardar no se escribe acá: se responde en la ventana de abajo, con las casillas
+        // marcadas por su lado. Una frase dentro del formulario se pierde entre treinta controles.
     }
 
     if (!state.readOnly) {
         ReportSaveBar(
-            enabled = state.canSubmit,
+            // Se puede tocar con una lectura faltante: la pantalla contesta con su ventana qué falta, en vez de
+            // dejar un botón apagado sobre un formulario incompleto.
+            enabled = state.ready && !state.readOnly && !state.submitting && !state.saved,
             loading = state.submitting,
             label = stringResource(R.string.report_update),
             onSubmit = onSubmit,
         )
     }
+
+        // La misma ventana que usa el Relatório nuevo: lo que el servidor responde y lo que esta pantalla ya sabe.
+        val answer = state.message ?: state.validation?.resolve()
+        if (answer != null) {
+            ActionResultDialog(
+                message = answer,
+                isSuccess = false,
+                onDismiss = onDismissResult,
+            )
+        }
     }
 }
 
@@ -258,6 +254,7 @@ fun ReportEditRoute(
         onTemperatureChange = viewModel::onTemperatureChange,
         onBoxTypeChange = viewModel::onBoxTypeChange,
         onSubmit = viewModel::submit,
+        onDismissResult = viewModel::dismissMessage,
         onAddPhotos = {
             pickPhotos.launch(
                 androidx.activity.result.PickVisualMediaRequest(

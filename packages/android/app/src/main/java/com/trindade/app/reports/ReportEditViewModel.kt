@@ -6,6 +6,7 @@ import com.trindade.app.contract.models.CategoriesResponseCategoriesInner
 import com.trindade.app.contract.models.ProductsResponse
 import com.trindade.app.contract.models.ReportCategoryTasksInner
 import com.trindade.app.contract.models.ReportResponseReport
+import com.trindade.app.R
 import com.trindade.app.contract.models.UpdateReportRequest
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -66,6 +67,13 @@ class ReportEditViewModel @Inject constructor(
         /** Set once the server accepted the update, which is what the screen leaves on. */
         val saved: Boolean = false,
         val message: String? = null,
+        /**
+         * La razón por la que no se guardó, en el idioma de la app.
+         *
+         * [message] es el texto que manda el servidor; esto es lo que esta pantalla sabe antes de preguntarle
+         * -- hoy, que faltan lecturas de temperatura -- y se dice en la misma ventana, no dentro del formulario.
+         */
+        val validation: com.trindade.app.ui.UiText? = null,
     ) {
         /**
          * Whether the form is drawn read-only, read off the report rather than decided here.
@@ -295,16 +303,28 @@ class ReportEditViewModel @Inject constructor(
      * for is waste -- no screen is left to draw it -- while a write nobody is waiting for is still an edit
      * the operator made and expects to have landed.
      */
+    /** Cierra la ventana de respuesta: el servidor y la validación comparten salida. */
+    fun dismissMessage() {
+        _state.update { it.copy(message = null, validation = null) }
+    }
+
     fun submit() {
         val current = state.value
-        if (!current.canSubmit) return
+        // La guarda es la del formulario listo, no la de `canSubmit`: con una lectura faltante el botón se puede
+        // tocar y la pantalla explica qué falta en su ventana. Un botón apagado sobre un formulario incompleto es
+        // un botón que no dice por qué.
+        if (!current.ready || current.readOnly || current.submitting || current.saved) return
         val report = current.report ?: return
+        if (current.missingReadings.isNotEmpty()) {
+            _state.update { it.copy(validation = com.trindade.app.ui.UiText.of(R.string.report_temperatures_required)) }
+            return
+        }
 
         // The arrival this save belongs to, read before the request is launched: a load that starts while
         // the write is in the air takes a newer token, and this save then belongs to a screen that is gone.
         val load = newestLoad
 
-        _state.update { it.copy(submitting = true, message = null) }
+        _state.update { it.copy(submitting = true, message = null, validation = null) }
 
         // `submitting` is set here as the write starts and cleared on every path that runs when it
         // finishes, and the token is what keeps a later arrival from being handed any of it: a save whose

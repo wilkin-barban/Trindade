@@ -10,6 +10,7 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -41,6 +42,8 @@ class ErpMovementsCardSyncButtonTest {
     private val context: android.content.Context
         get() = ApplicationProvider.getApplicationContext()
 
+    private var syncs = 0
+
     private fun drawCard(isSyncing: Boolean = false) {
         composeRule.setContent {
             TrindadeTheme {
@@ -49,39 +52,52 @@ class ErpMovementsCardSyncButtonTest {
                         massasDay = null,
                         receipts = null,
                         isSyncing = isSyncing,
-                        onSync = {},
+                        onSync = { syncs++ },
                     )
                 }
             }
         }
     }
 
+    /**
+     * Las dos tarjetas ofrecen la sincronización, porque es una sola lectura del ERP para las dos.
+     *
+     * La lógica es una -- el mismo `onSync`, el mismo estado -- y por eso el test aprieta la de Insumos y cuenta
+     * una sola llamada: dos botones no son dos sincronizaciones.
+     */
     @Test
-    fun `the action is the label and nothing else`() {
+    fun `each card carries the action, and pressing either is one sync`() {
         drawCard()
 
         val label = context.getString(R.string.report_erp_sync)
-        composeRule.onNodeWithText(label).assertIsEnabled()
+        composeRule.onAllNodesWithText(label).assertCountEquals(2)
+        composeRule.onAllNodesWithText(label)[1].assertIsEnabled().performClick()
+        composeRule.waitForIdle()
+
+        org.junit.Assert.assertEquals(1, syncs)
         // No decorated variant of the same label exists beside it.
         composeRule.onAllNodesWithText("🔄", substring = true).assertCountEquals(0)
     }
 
     @Test
-    fun `the touch target is at least 48dp tall`() {
+    fun `both actions keep the 48dp target`() {
         drawCard()
 
-        val bounds = composeRule
-            .onNodeWithText(context.getString(R.string.report_erp_sync))
-            .getUnclippedBoundsInRoot()
-
-        val height = bounds.bottom - bounds.top
-        assertTrue("the action must be at least 48dp tall; height=$height bounds=$bounds", height >= 48.dp)
+        composeRule.onAllNodesWithText(context.getString(R.string.report_erp_sync)).fetchSemanticsNodes().forEachIndexed { index, _ ->
+            val bounds = composeRule
+                .onAllNodesWithText(context.getString(R.string.report_erp_sync))[index]
+                .getUnclippedBoundsInRoot()
+            val height = bounds.bottom - bounds.top
+            assertTrue("the action must be at least 48dp tall; height=$height bounds=$bounds", height >= 48.dp)
+        }
     }
 
     @Test
     fun `a sync in flight cannot be fired twice`() {
         drawCard(isSyncing = true)
 
-        composeRule.onNodeWithText(context.getString(R.string.report_erp_sync)).assertIsNotEnabled()
+        composeRule.onAllNodesWithText(context.getString(R.string.report_erp_sync)).fetchSemanticsNodes().forEachIndexed { index, _ ->
+            composeRule.onAllNodesWithText(context.getString(R.string.report_erp_sync))[index].assertIsNotEnabled()
+        }
     }
 }

@@ -13,6 +13,7 @@ import androidx.compose.ui.test.hasAnySibling
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -24,6 +25,7 @@ import com.trindade.app.contract.models.CategoriesResponseCategoriesInner
 import com.trindade.app.contract.models.ProductsResponse
 import com.trindade.app.contract.models.ReportCategoryTasksInner
 import com.trindade.app.contract.models.ReportResponseReport
+import com.trindade.app.ui.UiText
 import com.trindade.app.ui.theme.TrindadeTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -175,6 +177,7 @@ class ReportEditScreenTest {
         // every reading, and the save is withheld until the form owes none (see the tests below).
         temperatures: Map<Int, List<String>> = mapOf(TEMPERATURE_TASK_ID to listOf("4.5", "-18")),
         message: String? = null,
+        validation: UiText? = null,
     ) = ReportEditViewModel.UiState(
         loading = false,
         report = report,
@@ -185,6 +188,7 @@ class ReportEditScreenTest {
         checks = checks,
         temperatures = temperatures,
         message = message,
+        validation = validation,
     )
 
     // ---- Rendering ----
@@ -318,12 +322,32 @@ class ReportEditScreenTest {
      * shows before sending -- and it sits above the action, because that is where the operator looks for the
      * reason a button will not press.
      */
+    /**
+     * La falta de lecturas se responde en la ventana, y el guardado se puede tocar para escucharla.
+     *
+     * Antes la frase vivía dentro del formulario y el botón estaba apagado: el operario veía un botón muerto y una
+     * oración perdida entre treinta controles. Ahora el estado lleva la validación (`validation`) y la pantalla la
+     * dice en la misma ventana que usa para el servidor, con las casillas marcadas por su lado.
+     */
     @Test
-    fun `a report that owes a reading says so and withholds the save`() {
+    fun `a report that owes a reading answers in the dialog and the save can be pressed`() {
+        render(
+            state(
+                temperatures = mapOf(TEMPERATURE_TASK_ID to listOf("4.5", "")),
+                validation = UiText.of(R.string.report_temperatures_required),
+            ),
+        )
+
+        composeRule.onNodeWithText(copy(R.string.report_temperatures_required)).assertIsDisplayed()
+        composeRule.onAllNodesWithText(copy(R.string.report_temperatures_required)).assertCountEquals(1)
+        composeRule.onNodeWithText(copy(R.string.report_update)).assertIsEnabled()
+    }
+
+    @Test
+    fun `a report that owes a reading says nothing until the save asks`() {
         render(state(temperatures = mapOf(TEMPERATURE_TASK_ID to listOf("4.5", ""))))
 
-        displayed(copy(R.string.report_temperatures_required))
-        composeRule.onNodeWithText(copy(R.string.report_update)).assertIsNotEnabled()
+        composeRule.onNodeWithText(copy(R.string.report_temperatures_required)).assertDoesNotExist()
     }
 
     /**
@@ -336,10 +360,11 @@ class ReportEditScreenTest {
      * has a form on screen to explain.
      */
     @Test
-    fun `the message the state carries is drawn`() {
+    fun `the message the state carries is drawn, in the dialog`() {
         render(state(message = MESSAGE))
 
-        displayed(MESSAGE)
+        // Sin scroll: el diálogo flota sobre la pantalla, no vive dentro de la lista.
+        composeRule.onNodeWithText(MESSAGE).assertIsDisplayed()
     }
 
     @Test

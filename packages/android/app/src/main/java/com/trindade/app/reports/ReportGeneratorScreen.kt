@@ -325,22 +325,6 @@ fun ReportGeneratorScreen(
                     )
                 }
 
-                // The reason the save below is withheld, said where the operator is looking for the
-                // action: without it a form that owes a reading is a form whose button does nothing, and
-                // the sentence the server would answer 400 with only ever arrives for a body the client
-                // no longer has any reason to send. The fields themselves carry the same information one
-                // reading at a time (see `TemperatureBlock`), which is what makes the sentence actionable
-                // on a form taller than the screen.
-                if (state.showValidation && form.missingReadings.isNotEmpty()) {
-                    item {
-                        Text(
-                            text = stringResource(R.string.report_temperatures_required),
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
-                }
-
             }
 
             ReportGeneratorViewModel.Stage.FAILED -> Unit

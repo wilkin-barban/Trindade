@@ -1043,7 +1043,6 @@
     <string name="report_massas_day_balance">Balanço: %1$s</string>
     <string name="report_massas_summary">Resumo coletivo</string>
     <!-- Reports: unified ERP movements card (massas and receipts). -->
-    <string name="report_erp_movements_title">Movimentações do ERP</string>
     <string name="report_erp_sync">Sincronizar com ERP</string>
     <string name="report_receipts_title">Insumos</string>
     <string name="report_receipts_subtitle">Produtos que não são massa, incluindo os terceirizados.</string>
@@ -1115,6 +1114,10 @@
     <plurals name="massas_history_days_count">
         <item quantity="one">%1$d dia registrado</item>
         <item quantity="other">%1$d dias registrados</item>
+    </plurals>
+    <plurals name="salida_history_days">
+        <item quantity="one">%1$d dia</item>
+        <item quantity="other">%1$d dias</item>
     </plurals>
     <plurals name="massas_history_boxes">
         <item quantity="one">%1$d caixa</item>

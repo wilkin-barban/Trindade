@@ -242,10 +242,16 @@ class ReportEditViewModelTest {
         assertEquals(setOf(TemperatureSlot(TEMPERATURE_TASK_ID, 1)), model.state.value.missingReadings)
         assertEquals(false, model.state.value.canSubmit)
 
-        // No request at all: the body the server would refuse is never built.
+        // No request at all: the body the server would refuse is never built, y la pantalla recibe la frase
+        // para su ventana.
         model.submit()
         assertNull(recording.updatedBody)
         assertEquals(false, model.state.value.submitting)
+        assertEquals(com.trindade.app.R.string.report_temperatures_required, model.state.value.validation?.resId)
+
+        // Cerrar la ventana limpia la validación, que es lo que hace que se pueda volver a pedir.
+        model.dismissMessage()
+        assertNull(model.state.value.validation)
 
         // Filling the slot is the whole of what the form was waiting for, and the save is offered again.
         model.onTemperatureChange(TEMPERATURE_TASK_ID, index = 1, value = "-18")
