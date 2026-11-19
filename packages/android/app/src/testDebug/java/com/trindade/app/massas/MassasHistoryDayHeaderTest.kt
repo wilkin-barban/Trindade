@@ -160,6 +160,36 @@ class MassasHistoryDayHeaderTest {
         composeRule.onNodeWithTag(MASSAS_HISTORY_DAY_ALL_TAG).assertExists()
     }
 
+    /**
+     * El ancho de la planta: 390 dp con las cinco fechas y el archivo, todas alcanzables.
+     *
+     * La fila scrollea, y eso es parte del requisito: en un teléfono no entran seis fechas, así que lo que se
+     * afirma es que cada una existe, que se trae a la vista al tocarla y que abre el día que dice -- el día
+     * pasado incluido, que es el uso real del archivo.
+     */
+    @Test
+    @Config(qualifiers = "w390dp-h800dp-xhdpi")
+    fun `at the plant's width the five past dates and the whole archive are all reachable`() {
+        val picked = mutableListOf<String>()
+        render(selectedDate = today, onSelectDate = { picked += it })
+
+        for (date in earlier) {
+            val chip = composeRule.onNodeWithTag(massasHistoryDayChipTag(date)).performScrollTo()
+            chip.assertIsDisplayed()
+            val bounds = chip.getUnclippedBoundsInRoot()
+            assertTrue(
+                "chip $date must keep 44dp at 390dp but was ${bounds.bottom - bounds.top}",
+                bounds.bottom - bounds.top >= 44.dp,
+            )
+        }
+
+        composeRule.onNodeWithTag(MASSAS_HISTORY_DAY_ALL_TAG).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag(massasHistoryDayChipTag("2026-11-16")).performScrollTo().performClick()
+        composeRule.waitForIdle()
+
+        assertEquals(listOf("2026-11-16"), picked)
+    }
+
     @Test
     fun `the quick dates keep the 44dp a finger needs`() {
         render()

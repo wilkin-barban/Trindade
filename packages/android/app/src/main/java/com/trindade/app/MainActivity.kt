@@ -190,6 +190,15 @@ class MainActivity : ComponentActivity() {
             Destination(RolePolicy.EntryPoint.REPORTS, R.string.nav_reports, R.drawable.ic_reports, NavTarget(Tab.REPORTS)),
             Destination(RolePolicy.EntryPoint.LOADING, R.string.nav_loading, R.drawable.ic_truck, NavTarget(Tab.LOADING)),
             Destination(RolePolicy.EntryPoint.MASSAS_LAUNCH, R.string.massas_title, R.drawable.ic_layers, NavTarget(Tab.MASSAS_LAUNCH)),
+            // El archivo de Masas, junto al lanzamiento: la web los tiene en ese orden y el histórico es una
+            // pantalla de uso diario, no una entrada escondida en el cajón. Comparte pestaña con el lanzamiento,
+            // así que la fila se resuelve por pestaña **y** overlay, como Salida y su historial.
+            Destination(
+                RolePolicy.EntryPoint.MASSAS_HISTORY,
+                R.string.massas_history_title,
+                R.drawable.ic_history,
+                NavTarget(Tab.MASSAS_LAUNCH, Overlay.MASSAS_HISTORY),
+            ),
             // Salida y su historial viven en la barra: la web los tiene en el mismo orden, y una pantalla que sólo
             // existe en el cajón es una pantalla que la mitad de la planta no encuentra. Comparten pestaña, así que
             // la fila se resuelve por pestaña **y** overlay.
@@ -436,6 +445,38 @@ class MainActivity : ComponentActivity() {
                             tab = Tab.DASHBOARD
                         }
                     }
+                    // Una entrada de la navegación es su destino entero, y la fila de arriba y el cajón abren por
+                    // el mismo camino: un histórico no puede quedar tapado por su módulo, ni abrirse el
+                    // lanzamiento en su lugar. Salir de toda superposición antes de pintar el destino nuevo es
+                    // parte de lo mismo: una que sobreviviera a su visita taparía la pantalla que se pidió.
+                    val openDestination: (Destination) -> Unit = { entry ->
+                        val target = entry.target
+                        massasHistoryOpen = false
+                        historyOpen = false
+                        loadingHistoryOpen = false
+                        stockHistoryOpen = false
+                        salidaHistoryOpen = false
+                        adminRequestedSection = null
+                        if (target.tab != Tab.LOADING) {
+                            loadingDay = null
+                            loadingDayFromHistory = false
+                        }
+                        if (target.tab != Tab.MASSAS_LAUNCH) {
+                            massasLaunchDay = null
+                            massasDayFromHistory = false
+                        }
+                        when (target.overlay) {
+                            Overlay.MASSAS_HISTORY -> openMassasHistory()
+                            Overlay.REPORTS_HISTORY -> historyOpen = true
+                            Overlay.LOADING_HISTORY -> loadingHistoryOpen = true
+                            Overlay.STOCK_HISTORY -> stockHistoryOpen = true
+                            Overlay.SALIDA_HISTORY -> salidaHistoryOpen = true
+                            Overlay.ADMIN_AUDIT -> adminRequestedSection =
+                                com.trindade.app.admin.AdminSection.AUDIT
+                            null -> Unit
+                        }
+                        tab = target.tab
+                    }
                     val onBackReportsTab = { tab = Tab.DASHBOARD }
                     val onBackAdminTab = { tab = Tab.DASHBOARD }
                     val onBackRegister = { registerOpen = false }
@@ -615,36 +656,8 @@ class MainActivity : ComponentActivity() {
                             updateAvailable = updateAvailable,
                             tabDestinations = TAB_DESTINATIONS,
                             drawerEntries = DRAWER_ENTRIES,
-                            onSelectDrawerEntry = { entry ->
-                                val target = entry.target
-                                // Salir de toda superposición antes de pintar el destino nuevo: un histórico
-                                // que sobreviviera a su visita taparía la pantalla que se acaba de pedir.
-                                massasHistoryOpen = false
-                                historyOpen = false
-                                loadingHistoryOpen = false
-                                stockHistoryOpen = false
-                                salidaHistoryOpen = false
-                                adminRequestedSection = null
-                                if (target.tab != Tab.LOADING) {
-                                    loadingDay = null
-                                    loadingDayFromHistory = false
-                                }
-                                if (target.tab != Tab.MASSAS_LAUNCH) {
-                                    massasLaunchDay = null
-                                    massasDayFromHistory = false
-                                }
-                                when (target.overlay) {
-                                    Overlay.MASSAS_HISTORY -> openMassasHistory()
-                                    Overlay.REPORTS_HISTORY -> historyOpen = true
-                                    Overlay.LOADING_HISTORY -> loadingHistoryOpen = true
-                                    Overlay.STOCK_HISTORY -> stockHistoryOpen = true
-                                    Overlay.SALIDA_HISTORY -> salidaHistoryOpen = true
-                                    Overlay.ADMIN_AUDIT -> adminRequestedSection =
-                                        com.trindade.app.admin.AdminSection.AUDIT
-                                    null -> Unit
-                                }
-                                tab = target.tab
-                            },
+                            onSelectDestination = openDestination,
+                            onSelectDrawerEntry = openDestination,
                             drawerState = drawerState,
                         ) {
                             when (tab) {
@@ -904,6 +917,14 @@ fun MainAppShell(
     role: String?,
     currentTab: MainActivity.Tab,
     onSelectTab: (MainActivity.Tab) -> Unit,
+    /**
+     * A dónde lleva una entrada de la fila, entera.
+     *
+     * La pestaña sola no identifica una entrada: Masas y su histórico comparten `Tab.MASSAS_LAUNCH`, y Salida y
+     * el suyo comparten `Tab.SALIDA`. Con el callback viejo -- la pestaña -- tocar el histórico abría el
+     * lanzamiento y dejaba dos entradas encendidas. El default conserva a las pruebas que sólo miran la fila.
+     */
+    onSelectDestination: (MainActivity.Destination) -> Unit = { onSelectTab(it.target.tab) },
     onOpenProfile: () -> Unit,
     // El aviso del invitado ofrece ir al login, y el login vive en MainActivity, no acá: el callback
     // entra por parámetro. Con default para que las pruebas del armazón no tengan que saber de sesiones.
@@ -1159,20 +1180,21 @@ fun MainAppShell(
                             contentColor = MaterialTheme.colorScheme.primary,
                         ) {
                             visibleTabs.forEach { destination ->
+                                val isActive = destination.target == activeTarget
                                 Tab(
-                                    selected = currentTab == destination.target.tab,
-                                    onClick = { onSelectTab(destination.target.tab) },
+                                    selected = isActive,
+                                    onClick = { onSelectDestination(destination) },
                                     modifier = Modifier.defaultMinSize(minHeight = 48.dp),
                                     text = {
                                         Text(
                                             text = stringResource(destination.label),
                                             maxLines = 1,
-                                            style = if (currentTab == destination.target.tab) {
+                                            style = if (isActive) {
                                                 MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
                                             } else {
                                                 MaterialTheme.typography.labelLarge
                                             },
-                                            color = if (currentTab == destination.target.tab) {
+                                            color = if (isActive) {
                                                 MaterialTheme.colorScheme.primary
                                             } else {
                                                 MaterialTheme.colorScheme.onSurfaceVariant

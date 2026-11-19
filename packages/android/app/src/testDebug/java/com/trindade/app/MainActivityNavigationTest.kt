@@ -23,6 +23,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.isSelected
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.hasAnyAncestor
@@ -81,8 +82,10 @@ class MainActivityNavigationTest {
         role: String? = RolePolicy.WORKER,
         currentTab: MainActivity.Tab = MainActivity.Tab.DASHBOARD,
         onSelectTab: (MainActivity.Tab) -> Unit = {},
+        onSelectDestination: (MainActivity.Destination) -> Unit = { onSelectTab(it.target.tab) },
         onOpenProfile: () -> Unit = {},
         tabDestinations: List<MainActivity.Destination> = MainActivity.TAB_DESTINATIONS,
+        currentOverlay: MainActivity.Overlay? = null,
         content: @Composable () -> Unit = { Text("Destination Content") },
     ) {
         composeRule.setContent {
@@ -90,7 +93,9 @@ class MainActivityNavigationTest {
                 MainAppShell(
                     role = role,
                     currentTab = currentTab,
+                    currentOverlay = currentOverlay,
                     onSelectTab = onSelectTab,
+                    onSelectDestination = onSelectDestination,
                     onOpenProfile = onOpenProfile,
                     tabDestinations = tabDestinations,
                     content = content,
@@ -107,7 +112,12 @@ class MainActivityNavigationTest {
         composeRule.setContent {
             TrindadeTheme {
                 Box(Modifier.width(411.dp)) {
-                    MainAppShell(role, currentTab(), onSelectTab, {}) { Text("Body") }
+                    MainAppShell(
+                        role = role,
+                        currentTab = currentTab(),
+                        onSelectTab = onSelectTab,
+                        onOpenProfile = {},
+                    ) { Text("Body") }
                 }
             }
         }
@@ -175,7 +185,9 @@ class MainActivityNavigationTest {
         // Tarefas y Motoristas salieron de la fila: se llega a ellas desde el panel administrativo.
         composeRule.onAllNodesWithText(copy(R.string.tasks_title)).assertCountEquals(0)
         composeRule.onAllNodesWithText(copy(R.string.drivers_title)).assertCountEquals(0)
-        composeRule.onAllNodesWithText(copy(R.string.massas_history_title)).assertCountEquals(0)
+        // Los históricos de Masas y de Salida están en la fila desde esta pasada; el de Contagem sigue adentro.
+        composeRule.onAllNodesWithText(copy(R.string.massas_history_title)).assertCountEquals(1)
+        composeRule.onAllNodesWithText(copy(R.string.nav_salida_history)).assertCountEquals(1)
         composeRule.onAllNodesWithText(copy(R.string.nav_stock_history)).assertCountEquals(0)
     }
     @Test
@@ -241,6 +253,78 @@ class MainActivityNavigationTest {
 
         composeRule.onNodeWithText(copy(R.string.nav_dashboard)).assertIsDisplayed()
         composeRule.onNodeWithText(copy(R.string.tasks_title)).assertIsDisplayed()
+    }
+
+    /**
+     * El archivo de Masas vive en la fila, al lado de su lanzamiento.
+     *
+     * Es una pantalla de uso diario -- la planta la abre para ver qué se produjo -- y una entrada que sólo existe
+     * en el cajón es una entrada que la mitad de los operarios no encuentra. Las dos comparten pestaña, así que la
+     * fila tiene que distinguirlas por overlay; si no, el toque abre el lanzamiento y quedan dos encendidas.
+     */
+    @Test
+    fun `the row carries the Massas history next to its launch`() {
+        render(role = RolePolicy.WORKER)
+
+        val launch = composeRule.onNodeWithText(copy(R.string.massas_title))
+        val history = composeRule.onNodeWithText(copy(R.string.massas_history_title))
+        launch.performScrollTo().assertIsDisplayed()
+        history.performScrollTo().assertIsDisplayed()
+
+        val launchIndex = MainActivity.TAB_DESTINATIONS.indexOfFirst {
+            it.target == MainActivity.NavTarget(MainActivity.Tab.MASSAS_LAUNCH)
+        }
+        val historyIndex = MainActivity.TAB_DESTINATIONS.indexOfFirst {
+            it.target == MainActivity.NavTarget(
+                MainActivity.Tab.MASSAS_LAUNCH,
+                MainActivity.Overlay.MASSAS_HISTORY,
+            )
+        }
+        assertTrue("history must sit next to its launch", historyIndex == launchIndex + 1)
+    }
+
+    @Test
+    fun `tapping the Massas history reports the history, not the launch`() {
+        var selected: MainActivity.Destination? = null
+        render(role = RolePolicy.WORKER, onSelectDestination = { selected = it })
+
+        composeRule.onNodeWithText(copy(R.string.massas_history_title)).performScrollTo().performClick()
+        composeRule.waitForIdle()
+
+        assertEquals(
+            MainActivity.NavTarget(MainActivity.Tab.MASSAS_LAUNCH, MainActivity.Overlay.MASSAS_HISTORY),
+            selected?.target,
+        )
+    }
+
+    @Test
+    fun `only the entry being visited is selected, never both neighbours of a shared tab`() {
+        render(
+            role = RolePolicy.WORKER,
+            currentTab = MainActivity.Tab.MASSAS_LAUNCH,
+            currentOverlay = MainActivity.Overlay.MASSAS_HISTORY,
+        )
+
+        composeRule.onNodeWithText(copy(R.string.massas_history_title)).performScrollTo().assertIsSelected()
+        composeRule.onNodeWithText(copy(R.string.massas_title)).assertIsNotSelected()
+
+        // Una sola entrada encendida en toda la fila: el indicador y el estado de cada pestaña salen del mismo
+        // destino, así que dos entradas de la misma pestaña no pueden encenderse juntas.
+        assertEquals(1, composeRule.onAllNodes(isSelected()).fetchSemanticsNodes().size)
+    }
+
+    @Test
+    fun `the Salida history in the row reports its overlay too`() {
+        var selected: MainActivity.Destination? = null
+        render(role = RolePolicy.WORKER, onSelectDestination = { selected = it })
+
+        composeRule.onNodeWithText(copy(R.string.nav_salida_history)).performScrollTo().performClick()
+        composeRule.waitForIdle()
+
+        assertEquals(
+            MainActivity.NavTarget(MainActivity.Tab.SALIDA, MainActivity.Overlay.SALIDA_HISTORY),
+            selected?.target,
+        )
     }
 
     @Test
@@ -697,6 +781,7 @@ class MainActivityNavigationTest {
                 MainActivity.Tab.REPORTS,
                 MainActivity.Tab.LOADING,
                 MainActivity.Tab.MASSAS_LAUNCH,
+                MainActivity.Tab.MASSAS_LAUNCH,
                 MainActivity.Tab.SALIDA,
                 MainActivity.Tab.SALIDA,
                 MainActivity.Tab.ASSAI,
@@ -711,9 +796,14 @@ class MainActivityNavigationTest {
         val targets = MainActivity.TAB_DESTINATIONS.map { it.target.tab to it.target.overlay }
         assertEquals("una entrada por destino", targets.distinct().size, targets.size)
         assertEquals(
-            "el historial de Salida va en la fila, después del lanzamiento",
-            MainActivity.Overlay.SALIDA_HISTORY,
+            "el archivo de Masas va en la fila, justo después de su lanzamiento",
+            MainActivity.Overlay.MASSAS_HISTORY,
             MainActivity.TAB_DESTINATIONS.first { it.target.overlay != null }.target.overlay,
+        )
+        assertEquals(
+            "y el de Salida, después del suyo",
+            MainActivity.Overlay.SALIDA_HISTORY,
+            MainActivity.TAB_DESTINATIONS.last { it.target.overlay != null }.target.overlay,
         )
     }
 
