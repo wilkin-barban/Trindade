@@ -64,6 +64,7 @@ import com.trindade.app.ui.BrazilianPhoneVisualTransformation
 import com.trindade.app.ui.components.AdminSecondaryButton
 import com.trindade.app.ui.components.HelpSection
 import com.trindade.app.ui.components.ModuleHelpButton
+import com.trindade.app.ui.UiText
 import com.trindade.app.ui.components.ActionResultDialog
 import com.trindade.app.ui.components.ModuleHelpDialog
 import com.trindade.app.ui.components.ModuleHistoryButton
@@ -264,37 +265,13 @@ fun MassasLaunchScreen(
             }
         }
 
-        // Banners de Notificación / Error
-        if (state.noticeMessage != null) {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = "✓ " + (state.noticeMessage?.resolve() ?: ""),
-                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.weight(1f),
-                    )
-                    TextButton(
-                        onClick = { viewModel.clearNotice() },
-                        modifier = Modifier.defaultMinSize(minHeight = 48.dp),
-                    ) {
-                        Text(
-                            text = stringResource(R.string.massas_close),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        )
-                    }
-                }
-            }
-        }
+        MassasActionResults(
+            notice = state.noticeMessage,
+            dialog = state.resultDialogMessage,
+            dialogIsSuccess = state.resultDialogIsSuccess,
+            onClearNotice = { viewModel.clearNotice() },
+            onDismissDialog = { viewModel.dismissResultDialog() },
+        )
 
         if (state.errorMessage != null) {
             Card(
@@ -924,13 +901,62 @@ fun MassasLaunchScreen(
         )
     }
 
-    // Lo que respondió la última acción, en una ventana que el operario cierra: la misma frase, el mismo
-    // tono y la misma salida que el relatório y el panel, para que la respuesta se reconozca antes de leerse.
-    if (state.resultDialogMessage != null) {
+}
+
+/**
+ * Lo que una acción de la pantalla responde, en sus dos formas.
+ *
+ * El aviso en línea es para lo que acompaña a la pantalla -- una copia, un cierre --; lo que una acción de datos
+ * devuelve -- importar un asiento, lanzar, sincronizar -- se dice en una ventana que el operario cierra, porque la
+ * tabla debajo ya cambió y un cartel dentro de ella se lee como parte del estado que se está mirando. Tener las dos
+ * formas en una pieza es lo que permite probar que una importación no deja aviso en línea: mientras vivían sueltas
+ * en la pantalla, el test sólo podía mirar el ViewModel.
+ */
+@Composable
+internal fun MassasActionResults(
+    notice: UiText?,
+    dialog: UiText?,
+    dialogIsSuccess: Boolean,
+    onClearNotice: () -> Unit,
+    onDismissDialog: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (notice != null) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+            modifier = modifier.fillMaxWidth(),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "✓ " + notice.resolve(),
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(
+                    onClick = onClearNotice,
+                    modifier = Modifier.defaultMinSize(minHeight = 48.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.massas_close),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                }
+            }
+        }
+    }
+
+    if (dialog != null) {
         ActionResultDialog(
-            message = state.resultDialogMessage?.resolve() ?: "",
-            isSuccess = state.resultDialogIsSuccess,
-            onDismiss = { viewModel.dismissResultDialog() },
+            message = dialog.resolve(),
+            isSuccess = dialogIsSuccess,
+            onDismiss = onDismissDialog,
         )
     }
 }

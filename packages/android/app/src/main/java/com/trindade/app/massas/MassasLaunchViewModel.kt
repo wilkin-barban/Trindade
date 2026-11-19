@@ -979,12 +979,18 @@ class MassasLaunchViewModel @Inject constructor(
                     error = error,
                 )
             }
+            // Lo que la importación responde se dice en una ventana, no en un cartel dentro de la tabla: la fila
+            // de la que salió el toque ya cambió de estado debajo, y un aviso en línea se lee como parte de la
+            // tabla que se está mirando. Es el mismo patrón del lanzamiento y del panel.
             when (result) {
                 is MassasWriteResult.Saved -> {
                     _state.value = _state.value.copy(
                         isSubmitting = false,
                         dayView = result.view,
-                        noticeMessage = UiText.of(R.string.massas_aero_imported),
+                        noticeMessage = null,
+                        errorMessage = null,
+                        resultDialogMessage = UiText.of(R.string.massas_aero_imported),
+                        resultDialogIsSuccess = true,
                     )
                     audit(null)
                 }
@@ -992,7 +998,9 @@ class MassasLaunchViewModel @Inject constructor(
                     val isInactive = result.errorCode == "MASSAS_OPERATOR_INACTIVE"
                     _state.value = _state.value.copy(
                         isSubmitting = false,
-                        errorMessage = refusalMessage(result, R.string.massas_error_create_refused),
+                        errorMessage = null,
+                        resultDialogMessage = refusalMessage(result, R.string.massas_error_create_refused),
+                        resultDialogIsSuccess = false,
                         inactiveOperators = if (isInactive) _state.value.inactiveOperators + row.operatorName else _state.value.inactiveOperators,
                     )
                     audit(result.errorCode ?: "AERO_IMPORT_REFUSED")
@@ -1000,7 +1008,9 @@ class MassasLaunchViewModel @Inject constructor(
                 is MassasWriteResult.Unreachable -> {
                     _state.value = _state.value.copy(
                         isSubmitting = false,
-                        errorMessage = UiText.of(R.string.massas_error_offline),
+                        errorMessage = null,
+                        resultDialogMessage = UiText.of(R.string.massas_error_offline),
+                        resultDialogIsSuccess = false,
                     )
                     audit("AERO_IMPORT_UNREACHABLE")
                 }

@@ -1747,7 +1747,52 @@ class MassasLaunchViewModelTest {
         advanceUntilIdle()
 
         assertTrue(testVm.state.value.inactiveOperators.contains("INATIVO"))
-        assertEquals(R.string.massas_error_operator_inactive, testVm.state.value.errorMessage?.resId)
+        // El rechazo de la importación se dice en la ventana, no en un cartel sobre la tabla.
+        assertEquals(
+            R.string.massas_error_operator_inactive,
+            testVm.state.value.resultDialogMessage?.resId,
+        )
+        assertEquals(false, testVm.state.value.resultDialogIsSuccess)
+        assertEquals(null, testVm.state.value.errorMessage)
+        assertEquals(null, testVm.state.value.noticeMessage)
+    }
+
+    /**
+     * Una importación exitosa responde en la ventana, y no deja aviso en línea.
+     *
+     * La fila de la que salió el toque cambia de estado debajo -- deja de ofrecer Importar --, así que un cartel
+     * dentro de la tabla se lee como parte de ella y no como la respuesta de la acción. La frase es la misma que
+     * antes: lo que cambia es dónde se dice.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `importing a seat answers in the result dialog and leaves no inline notice`() = runTest {
+        val stored = com.trindade.app.network.AeroMovementsStoredDay(
+            date = MassasLaunchViewModel.saopauloToday(),
+            movements = listOf(
+                com.trindade.app.network.AeroStoredMovement(
+                    entLan = 35937,
+                    productCode = "1045",
+                    productDesc = "MASSA CASEIRA",
+                    quantity = 30.0,
+                    entryDate = MassasLaunchViewModel.saopauloToday(),
+                    operatorName = "VICTOR",
+                    movementType = "E",
+                ),
+            ),
+        )
+        val repo = DayRepository(massasApi, dayWith(), stored)
+        val testVm = newViewModel(repo)
+        testVm.refresh()
+        advanceUntilIdle()
+
+        testVm.importErpSeat(testVm.state.value.unifiedRows.single())
+        advanceUntilIdle()
+
+        assertEquals(R.string.massas_aero_imported, testVm.state.value.resultDialogMessage?.resId)
+        assertEquals(true, testVm.state.value.resultDialogIsSuccess)
+        assertEquals("un aviso en línea sobre la tabla no es la respuesta", null, testVm.state.value.noticeMessage)
+        assertEquals(null, testVm.state.value.errorMessage)
     }
 
     // ---- La lectura del día después de lanzar (auto-conciliación) ----
