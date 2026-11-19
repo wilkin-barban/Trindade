@@ -142,12 +142,25 @@ internal fun MassasLaunchBar(
 /** El tag con el que un test encuentra la barra fija y comprueba que no se mueve. */
 const val MASSAS_LAUNCH_BAR_TAG: String = "massas-launch-bar"
 
+enum class MassasOrigin {
+    /** Se entró por la pestaña de lanzamiento: grilla, confirmación y barra. */
+    LAUNCH,
+
+    /** Se entró desde el histórico: producción, lanzamientos, resumen y el share del día. */
+    HISTORY,
+}
+
 @Composable
 fun MassasLaunchScreen(
     viewModel: MassasLaunchViewModel,
     onNavigateToHistory: () -> Unit,
     onBackToHistory: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    /**
+     * De dónde se entró. No se deduce de [onBackToHistory]: hoy abierto desde el histórico también vuelve al
+     * histórico y, aun así, tiene que mostrar las operaciones del día y su share.
+     */
+    origin: MassasOrigin = if (onBackToHistory != null) MassasOrigin.HISTORY else MassasOrigin.LAUNCH,
 ) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
@@ -300,7 +313,7 @@ fun MassasLaunchScreen(
             syncedAt = state.aeroSyncedAt,
             isSyncing = state.isSyncingAero,
             // El sync del espejo es del histórico: el lanzamiento lanza y el día se consulta donde se lee.
-            onSync = if (onBackToHistory != null) viewModel::syncAeroDay else null,
+            onSync = if (origin == MassasOrigin.HISTORY) viewModel::syncAeroDay else null,
             readOnly = state.isReadOnly,
         )
 
@@ -383,7 +396,7 @@ fun MassasLaunchScreen(
 
         // Del PASO 3 al PASO 6 la pantalla es el histórico del día: producción, lanzamientos, resumen y el
         // mensaje que se comparte. El lanzamiento se queda con la grilla, la confirmación y la barra sticky.
-        if (onBackToHistory != null) {
+        if (origin == MassasOrigin.HISTORY) {
         // PASO 3: Produção do Dia (tabela unificada: lançado aqui, no ERP e só no ERP).
         MassasUnifiedTable(
             state = state,

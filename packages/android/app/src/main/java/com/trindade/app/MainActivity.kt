@@ -286,6 +286,9 @@ class MainActivity : ComponentActivity() {
                     var stockHistoryOpen by remember { mutableStateOf(false) }
                     var massasLaunchDay by remember { mutableStateOf<String?>(null) }
                     var massasDayFromHistory by remember { mutableStateOf(false) }
+                    // El día se abrió desde la lista del histórico (hoy o pasado). Es lo que decide si la pantalla
+                    // muestra las operaciones y el share; `massasDayFromHistory` sólo dice si es de solo lectura.
+                    var massasDayFromList by remember { mutableStateOf(false) }
                     var loadingDay by remember { mutableStateOf<String?>(null) }
                     var loadingDayFromHistory by remember { mutableStateOf(false) }
                     var tab by remember { mutableStateOf(Tab.DASHBOARD) }
@@ -357,6 +360,7 @@ class MainActivity : ComponentActivity() {
                         stockHistoryOpen = false
                         massasLaunchDay = null
                         massasDayFromHistory = false
+                        massasDayFromList = false
                         loadingDay = null
                         loadingDayFromHistory = false
                         adminRequestedSection = null
@@ -513,6 +517,7 @@ class MainActivity : ComponentActivity() {
                                     massasLaunchDay = date
                                     val isToday = date == com.trindade.app.massas.MassasLaunchViewModel.saopauloToday()
                                     massasDayFromHistory = !isToday
+                                    massasDayFromList = true
                                     tab = Tab.MASSAS_LAUNCH
                                 },
                             )
@@ -633,7 +638,14 @@ class MainActivity : ComponentActivity() {
                                     com.trindade.app.massas.MassasLaunchScreen(
                                         viewModel = massasViewModel,
                                         onNavigateToHistory = { massasHistoryOpen = true },
-                                        onBackToHistory = if (massasDayFromHistory) onBackMassasLaunchTab else null,
+                                        onBackToHistory = if (massasDayFromList) onBackMassasLaunchTab else null,
+                                        // Hoy abierto desde el histórico también muestra operaciones y share; el
+                                        // pasado es exactamente lo mismo, en modo de solo lectura.
+                                        origin = if (massasDayFromList) {
+                                            com.trindade.app.massas.MassasOrigin.HISTORY
+                                        } else {
+                                            com.trindade.app.massas.MassasOrigin.LAUNCH
+                                        },
                                     )
                                 }
                                 // O histórico mostra o que o dia produziu; a correção acontece na
@@ -676,12 +688,14 @@ class MainActivity : ComponentActivity() {
                                         massasHistoryOpen = false
                                         massasLaunchDay = null
                                         massasDayFromHistory = false
+                                        massasDayFromList = false
                                     },
                                     onOpenMassasHistory = {
                                         tab = Tab.MASSAS_LAUNCH
                                         massasHistoryOpen = true
                                         massasLaunchDay = null
                                         massasDayFromHistory = false
+                                        massasDayFromList = false
                                     },
                                     // La séptima tarjeta entra por el mismo camino que el cajón: la pestaña
                                     // ya existe y la tarjeta solo decide si abre el lanzamiento o el

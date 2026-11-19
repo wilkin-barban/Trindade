@@ -7,6 +7,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.material3.FilterChip
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.testTag
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -35,14 +45,28 @@ import com.trindade.app.ui.resolve
  * to live only in this file; it lives in `ui/components` now, and this screen draws itself from there so the
  * reference and the copies cannot drift.
  */
+/**
+ * Las fechas que el histórico ofrece debajo de «Hoje»: las cinco anteriores más recientes, o todas.
+ *
+ * Hoy tiene su propio chip y no se repite en la lista. La regla vive acá y no dentro de la pantalla porque es lo
+ * que el operario ve: cinco fechas por defecto, todas cuando lo pide, y nunca dos veces la misma.
+ */
+fun massasHistoryShownDays(today: String, dates: List<String>, all: Boolean): List<String> {
+    val earlier = dates.filter { it != today }
+    return if (all) earlier else earlier.take(5)
+}
+
 @Composable
 fun MassasHistoryScreen(
     viewModel: MassasHistoryViewModel,
     onBack: () -> Unit,
     onSelectDate: (String) -> Unit,
     modifier: Modifier = Modifier,
+    /** El día de planta: es el que el chip «Hoje» ofrece aunque el servidor todavía no lo haya devuelto. */
+    today: String = com.trindade.app.massas.MassasLaunchViewModel.saopauloToday(),
 ) {
     val state by viewModel.state.collectAsState()
+    var showAll by remember { mutableStateOf(false) }
 
     val helpSections = listOf(
         HelpSection(
@@ -78,6 +102,39 @@ fun MassasHistoryScreen(
             )
         }
 
+        // Hoy primero, después las cinco anteriores: lo demás está detrás de «Todas as datas», que es el mismo
+        // listado sin recorte y no una pantalla distinta.
+        val shown = massasHistoryShownDays(today, state.days.map { it.date }, showAll)
+            .mapNotNull { date -> state.days.firstOrNull { it.date == date } }
+
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            FilterChip(
+                selected = false,
+                onClick = { onSelectDate(today) },
+                label = { Text("Hoje") },
+                modifier = Modifier.defaultMinSize(minHeight = 44.dp).testTag("massas-history-today"),
+            )
+            shown.forEach { day ->
+                FilterChip(
+                    selected = false,
+                    onClick = { onSelectDate(day.date) },
+                    label = { Text(brazilianDate(day.date)) },
+                    modifier = Modifier
+                        .defaultMinSize(minHeight = 44.dp)
+                        .testTag("massas-history-chip-${day.date}"),
+                )
+            }
+            FilterChip(
+                selected = showAll,
+                onClick = { showAll = !showAll },
+                label = { Text(if (showAll) "Últimas datas" else "Todas as datas") },
+                modifier = Modifier.defaultMinSize(minHeight = 44.dp).testTag("massas-history-all"),
+            )
+        }
+
         when {
             state.isLoading -> HistoryLoading(modifier = Modifier.weight(1f))
             state.days.isEmpty() -> HistoryEmptyState(
@@ -88,7 +145,7 @@ fun MassasHistoryScreen(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                items(state.days, key = { it.date }) { day ->
+                items(shown, key = { it.date }) { day ->
                     HistoryRecordCard(
                         onClick = { onSelectDate(day.date) },
                         action = "Abrir ›",
