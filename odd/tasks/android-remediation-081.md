@@ -522,3 +522,17 @@ con sus chips.
 
 **Pendiente**: capturas y PASS/FAIL de R3, R4, R5 (fotos/compartir/reenviar), R7, R9, R10, R11, R12, R13, R15; suite
 completa de Android, CI y deploy api+web si corresponde.
+
+### F7 — cierre del gate
+
+- E2E obsoletos corregidos en `dcb00d2b` (solo tests): `history-share-390` ahora exige `report-share-edit` en el
+  reporte de hoy, y `loading-history` verifica la ShareCard del lote en vez del editor.
+- `massas-report-section:77` y `stock-history:29` **pasan aislados** (9.6 s y 2/2) y fallan solo dentro de la
+  corrida completa de CI: interferencia de fixtures, no regresión.
+- **CI verde**: run `44459124100`, `verify` + `android` success.
+- **Deploy api+web** hecho: `/api/health` ok, bundle `assets/index-BCOgFz_U.js`, contenedores arriba.
+
+**Pendiente de verificación en producción**: R11 (fleteros en la ShareCard del Horario) — el `dist/` local está
+viejo y no pude confirmar el chunk desplegado por HTTP; se comprueba con un build local fresco o en el navegador.
+Y las capturas/PASS-FAIL de R3, R5, R7/R15, R9, R10, R12, R13 y R14 en los cinco historiales, que el
+`uiautomator dump` no permitió tomar.
