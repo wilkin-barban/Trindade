@@ -1078,4 +1078,5 @@
     <string name="dashboard_salida_hint">Registrar salida de producto</string>
     <string name="massas_share_empty">Sin lanzamientos para compartir</string>
     <string name="salida_report_block">Salidas / Bajas</string>
+    <string name="report_photo_too_big">La foto supera los 5 MB.</string>
 </resources>

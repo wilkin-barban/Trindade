@@ -42,6 +42,8 @@ class ReportEditViewModel @Inject constructor(
         val loading: Boolean = true,
         /** Las salidas del día del reporte, que se declaran al editarlo igual que al crearlo. */
         val salidaDay: com.trindade.app.contract.models.SalidaReportDayView? = null,
+        /** Las fotos elegidas y todavía sin subir al reporte. */
+        val pendingPhotos: List<PendingPhoto> = emptyList(),
         val report: ReportResponseReport? = null,
         val categories: List<CategoriesResponseCategoriesInner> = emptyList(),
         val offers: ProductsResponse? = null,
@@ -351,7 +353,11 @@ class ReportEditViewModel @Inject constructor(
                 when (result) {
                     // Saved only means the server took the body: the screen leaves on it, and there is
                     // nothing left for this state to hold.
-                    is ReportWriteResult.Saved -> previous.copy(submitting = false, saved = true)
+                    is ReportWriteResult.Saved -> {
+                        // El reporte ya existe: recién ahora las fotos tienen a quién subirse.
+                        uploadPendingPhotos()
+                        previous.copy(submitting = false, saved = true)
+                    }
                     is ReportWriteResult.Refused ->
                         previous.copy(submitting = false, message = refusalMessage(result.statusCode, result.serverMessage))
                     ReportWriteResult.Unreachable -> previous.copy(submitting = false, message = UNREACHABLE)
@@ -480,6 +486,33 @@ class ReportEditViewModel @Inject constructor(
         viewModelScope.launch {
             val day = runCatching { repository.salidaDay(date) }.getOrNull()
             if (day != null) _state.update { it.copy(salidaDay = day) }
+        }
+    }
+
+    /** Guarda una foto comprimida para subirla cuando el reporte actualizado exista. */
+    fun addPendingPhoto(jpeg: ByteArray) {
+        _state.update { current ->
+            if (current.pendingPhotos.size >= MAX_PENDING_PHOTOS) current
+            else current.copy(pendingPhotos = current.pendingPhotos + PendingPhoto(jpeg))
+        }
+    }
+
+    /** Quita una foto pendiente. */
+    fun removePendingPhoto(index: Int) {
+        _state.update { current ->
+            if (index !in current.pendingPhotos.indices) current
+            else current.copy(pendingPhotos = current.pendingPhotos.filterIndexed { at, _ -> at != index })
+        }
+    }
+
+    /** Sube las fotos elegidas al reporte recién actualizado. */
+    fun uploadPendingPhotos() {
+        val reportId = _state.value.report?.id ?: return
+        val photos = _state.value.pendingPhotos
+        if (photos.isEmpty()) return
+        viewModelScope.launch {
+            for (photo in photos) repository.attachPhoto(reportId, photo.jpeg)
+            _state.update { it.copy(pendingPhotos = emptyList()) }
         }
     }
 }

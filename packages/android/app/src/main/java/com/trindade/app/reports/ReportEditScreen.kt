@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -58,6 +59,8 @@ fun ReportEditScreen(
     onTemperatureChange: (Int, Int, String) -> Unit,
     onBoxTypeChange: (Int, Boolean) -> Unit,
     onSubmit: () -> Unit,
+    onAddPhotos: () -> Unit = {},
+    onRemovePendingPhoto: (Int) -> Unit = {},
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -121,6 +124,15 @@ fun ReportEditScreen(
             enabled = !state.readOnly,
             modifier = Modifier.fillMaxWidth(),
         )
+
+        // Las fotos que el reporte va a llevar: la edición las pide igual que la creación.
+        if (!state.readOnly) {
+            ReportPhotosSection(
+                pendingCount = state.pendingPhotos.size,
+                onAddPhotos = onAddPhotos,
+                onRemovePhoto = onRemovePendingPhoto,
+            )
+        }
 
         // Las salidas del día del reporte, con la misma tarjeta que el alta y el detalle.
         if (state.salidaDay != null) Column(modifier = Modifier.fillMaxWidth()) {
@@ -216,6 +228,20 @@ fun ReportEditRoute(
     viewModel: ReportEditViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val compressor = androidx.compose.runtime.remember { AndroidPhotoCompressor() }
+    val pickPhotos = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia(MAX_PENDING_PHOTOS),
+    ) { uris ->
+        uris.take(MAX_PENDING_PHOTOS).forEach { uri ->
+            scope.launch {
+                val staged = stagePickedPhoto(context, uri)
+                val jpeg = staged?.let { compressor.compressToJpeg(it) }
+                if (jpeg != null) viewModel.addPendingPhoto(jpeg)
+            }
+        }
+    }
 
     LaunchedEffect(reportId) {
         viewModel.load(reportId)
@@ -232,6 +258,14 @@ fun ReportEditRoute(
         onTemperatureChange = viewModel::onTemperatureChange,
         onBoxTypeChange = viewModel::onBoxTypeChange,
         onSubmit = viewModel::submit,
+        onAddPhotos = {
+            pickPhotos.launch(
+                androidx.activity.result.PickVisualMediaRequest(
+                    androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly,
+                ),
+            )
+        },
+        onRemovePendingPhoto = viewModel::removePendingPhoto,
         onBack = onBack,
     )
 }

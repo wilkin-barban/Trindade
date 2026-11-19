@@ -24,6 +24,19 @@ import com.trindade.app.massas.MassasLaunchViewModel
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/** Una foto ya comprimida, esperando el reporte al que pertenece. */
+data class PendingPhoto(val jpeg: ByteArray) {
+    // ByteArray no tiene equals estructural: dos fotos con los mismos bytes son la misma foto para una lista.
+    override fun equals(other: Any?): Boolean = other is PendingPhoto && other.jpeg.contentEquals(jpeg)
+    override fun hashCode(): Int = jpeg.contentHashCode()
+}
+
+/** El tope del servidor: cinco fotos por reporte. */
+const val MAX_PENDING_PHOTOS = 5
+
+/** El tamaño máximo que acepta el servidor por archivo. */
+const val MAX_PHOTO_BYTES = 5 * 1024 * 1024
+
 /**
  * The report generator's form.
  *
@@ -96,6 +109,13 @@ class ReportGeneratorViewModel @Inject constructor(
         val submitting: Boolean = false,
         /** The report the server created, which is what the next screen needs. */
         val createdReportId: Int? = null,
+        /**
+         * Las fotos elegidas y todavía sin subir.
+         *
+         * Se guardan comprimidas y no como URI: la pantalla puede desaparecer -- una rotación, el operario
+         * cambiando de app -- y el archivo temporal de la cámara no tiene por qué seguir ahí.
+         */
+        val pendingPhotos: List<PendingPhoto> = emptyList(),
         /** What the last action answered, shown in a dialog; null when nothing has been answered yet. */
         val message: UiText? = null,
         /** Whether that answer is a refusal, which is what the dialog's tone is drawn from. */
@@ -291,6 +311,45 @@ class ReportGeneratorViewModel @Inject constructor(
      * the day the report will be filed against rather than about a date the operator picked.
      */
     /**
+     * Guarda una foto elegida, ya comprimida, en la lista de pendientes.
+     *
+     * El tope es el mismo del servidor (cinco fotos) y el mismo tamaño máximo (5 MB): rechazarlas acá evita un
+     * viaje que la pantalla ya sabe que va a fallar.
+     */
+    fun addPendingPhoto(jpeg: ByteArray) {
+        _state.update { current ->
+            when {
+                current.pendingPhotos.size >= MAX_PENDING_PHOTOS -> current
+                jpeg.size > MAX_PHOTO_BYTES -> current.copy(
+                    message = com.trindade.app.ui.UiText.of(com.trindade.app.R.string.report_photo_too_big),
+                    messageIsError = true,
+                )
+                else -> current.copy(pendingPhotos = current.pendingPhotos + PendingPhoto(jpeg))
+            }
+        }
+    }
+
+    /** Quita una foto pendiente antes de subirla. */
+    fun removePendingPhoto(index: Int) {
+        _state.update { current ->
+            if (index !in current.pendingPhotos.indices) current
+            else current.copy(pendingPhotos = current.pendingPhotos.filterIndexed { at, _ -> at != index })
+        }
+    }
+
+    /** Sube las fotos elegidas al reporte recién creado; una que falle no borra el reporte ni las demás. */
+    private fun uploadPendingPhotos(reportId: Int) {
+        val photos = _state.value.pendingPhotos
+        if (photos.isEmpty()) return
+        viewModelScope.launch {
+            for (photo in photos) {
+                repository.attachPhoto(reportId, photo.jpeg)
+            }
+            _state.update { it.copy(pendingPhotos = emptyList()) }
+        }
+    }
+
+    /**
      * Lee las salidas del día para el bloque del formulario.
      *
      * Un día sin salidas llega como un objeto vacío y el bloque lo dice; una lectura fallida deja el bloque en
@@ -459,7 +518,10 @@ class ReportGeneratorViewModel @Inject constructor(
 
             _state.update { previous ->
                 when (result) {
-                    is ReportWriteResult.Saved -> previous.copy(submitting = false, createdReportId = result.report.id)
+                    is ReportWriteResult.Saved -> {
+                        uploadPendingPhotos(result.report.id)
+                        previous.copy(submitting = false, createdReportId = result.report.id)
+                    }
                     is ReportWriteResult.Refused -> previous.copy(
                         submitting = false,
                         message = refusalMessage(result.statusCode, result.serverMessage),
