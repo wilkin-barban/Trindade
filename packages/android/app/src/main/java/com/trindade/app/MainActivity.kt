@@ -576,7 +576,9 @@ class MainActivity : ComponentActivity() {
                                     loadingDayFromHistory = false
                                     loadingHistoryOpen = true
                                 },
-                                // Salvar Horario abre la vista de compartir del día, que es donde vive el PDF.
+                                // Salvar Horario abre la vista de compartir del día, que es donde viven Compartir,
+                                // el PDF, Editar y los fleteros. El día ya está guardado fila por fila: esta acción
+                                // no escribe, y por eso no hay aquí una llamada de escritura que pueda fallar.
                                 onSaveDay = { day ->
                                     loadingShareSaved = true
                                     loadingShareDay = day

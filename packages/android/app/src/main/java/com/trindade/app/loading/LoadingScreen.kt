@@ -137,7 +137,13 @@ fun LoadingScreen(
     onConfirmAdd: () -> Unit,
     onDelete: (Int) -> Unit,
     onEditEntry: (Int, String) -> Unit,
-    /** Cierra el día: abre su vista de compartir, donde vive el PDF y el botón de WhatsApp. */
+    /**
+     * Cierra el día: abre su vista de compartir, donde viven Compartir, el PDF, Editar y los fleteros.
+     *
+     * No escribe nada, y no le falta nada: cada asignación se guarda cuando se confirma en el selector -- alta por
+     * fila, edición por fila, borrado por fila -- así que cuando esta acción está habilitada el día ya está en el
+     * servidor. Salvar es la puerta a la tarjeta, no un segundo camino de escritura.
+     */
     onSaveDay: (String) -> Unit = {},
     modifier: Modifier = Modifier,
     onQuickAdd: (String, String?, String?) -> Unit = { _, _, _ -> },
