@@ -41,6 +41,36 @@ import com.trindade.app.ui.components.HistoryHeader
  * Muestra lo que hay en Trindade y su estado contra el ERP. No lee el espejo ni ofrece conciliar: ese trabajo es
  * del Relatório, que es donde el día se sincroniza. Cada tarjeta dice el estado en una palabra.
  */
+/**
+ * El día sin movimientos: una frase y, sólo si es hoy, la puerta al lanzamiento.
+ *
+ * En el pasado no se lanza nada, así que ahí la frase va sola. Está aparte de la pantalla porque es lo único
+ * que se puede probar sin levantar el ViewModel, y es justo la regla que se quiere fijar.
+ */
+@Composable
+internal fun SalidaHistoryEmpty(
+    isToday: Boolean,
+    onLaunch: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier) {
+        Text(
+            if (isToday) "Nenhuma saída registrada hoje." else "Nenhuma saída registrada.",
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(top = 24.dp).testTag("salida-history-empty"),
+        )
+        if (isToday) {
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = onLaunch,
+                modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("salida-empty-cta"),
+            ) {
+                Text("Lanzar salida")
+            }
+        }
+    }
+}
+
 @Composable
 fun SalidaHistoryScreen(
     viewModel: SalidaViewModel,
@@ -148,24 +178,7 @@ fun SalidaHistoryScreen(
 
         val day = days.firstOrNull { it.date == selected }
         if (day == null || day.movements.isEmpty()) {
-            Text(
-                if (selected == today) "Nenhuma saída registrada hoje." else "Nenhuma saída registrada.",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(top = 24.dp).testTag("salida-history-empty"),
-            )
-            // Un día de hoy vacío tiene una salida: lanzar la primera baja. El pasado no la ofrece porque no se
-            // lanza en el pasado -- ahí sólo se lee lo que hubo.
-            if (selected == today) {
-                Spacer(Modifier.height(12.dp))
-                OutlinedButton(
-                    onClick = onLaunch,
-                    modifier = Modifier
-                        .defaultMinSize(minHeight = 48.dp)
-                        .testTag("salida-empty-cta"),
-                ) {
-                    Text("Lanzar salida")
-                }
-            }
+            SalidaHistoryEmpty(isToday = selected == today, onLaunch = onLaunch)
             return@Column
         }
 
