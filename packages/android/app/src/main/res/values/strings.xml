@@ -505,7 +505,7 @@
     <string name="audit_details_collapse">Ocultar detalhes</string>
     <string name="audit_error_fetch">Erro ao carregar logs de auditoria</string>
     <string name="nav_assai">Calculadora de Assaí</string>
-    <string name="nav_stock_counter">Calculador de Estoque</string>
+    <string name="nav_stock_counter">Calculadora de Estoque</string>
     <string name="nav_stock_history">Histórico de Contagem</string>
     <string name="nav_share">Compartilhar App</string>
     <string name="nav_salida">Saída / Baixa</string>
@@ -632,7 +632,7 @@
     <string name="help_dashboard_title">Visão Geral do Painel</string>
     <string name="help_dashboard_desc">Acesso rápido a todos os módulos operacionais da fábrica Trindade. Navegue pelos cards para lançamentos, cronogramas, estoque e relatórios.</string>
 
-    <string name="help_stock_title">Calculador de Estoque</string>
+    <string name="help_stock_title">Calculadora de Estoque</string>
     <string name="help_stock_desc">Controle de estoque e sobras diárias por produto terceirizado e massas. Consulta por operadores e fechamento por administradores.</string>
     <string name="help_stock_counting_title">Contagem por Caixas</string>
     <string name="help_stock_counting_desc">Insira as caixas contadas em cada produto. As unidades são calculadas automaticamente conforme o padrão de embalagem.</string>
@@ -684,6 +684,39 @@
     <string name="help_share_title">Compartilhar Aplicativo</string>
     <string name="help_share_desc">Compartilhe o link do aplicativo com operadores e motoristas por WhatsApp, cópia de link ou código QR na tela.</string>
 
+    <string name="salida_title">Saída / Baixa</string>
+    <string name="salida_block_embalagens">Embalagens</string>
+    <string name="salida_block_bobinas">Bobinas</string>
+    <string name="salida_block_materia_prima">Matéria-prima</string>
+    <string name="salida_products_count">%1$d produtos</string>
+    <string name="salida_units_format">%1$d un</string>
+    <string name="salida_launch">Lançar saída</string>
+    <string name="salida_launch_with_count">Lançar saída (%1$d)</string>
+    <string name="salida_launching">Lançando…</string>
+    <string name="salida_confirm_title">Confirmar saída</string>
+    <string name="salida_confirm_hint">Confira os produtos e as quantidades antes de confirmar:</string>
+    <string name="salida_total">Total</string>
+    <string name="salida_confirm">Confirmar</string>
+    <string name="salida_cancel">Cancelar</string>
+    <string name="salida_history_title">Histórico de Saídas</string>
+    <string name="salida_history_empty_today">Nenhuma saída registrada hoje.</string>
+    <string name="salida_history_empty_past">Nenhuma saída registrada.</string>
+    <string name="salida_history_launch">Lançar saída</string>
+    <string name="salida_history_pending">%1$d pendentes</string>
+    <string name="salida_history_resend_pending">Reenviar pendentes</string>
+    <string name="salida_history_past_readonly">Data passada: somente leitura.</string>
+    <string name="salida_status_sent">Enviado</string>
+    <string name="salida_status_reconciled">Conciliado</string>
+    <string name="salida_status_partial">Parcial</string>
+    <string name="salida_status_pending">Pendente</string>
+    <string name="salida_photos_count">Fotos (%1$d)</string>
+    <string name="salida_photo_delete">Excluir foto</string>
+    <string name="salida_photo_add">Adicionar foto</string>
+    <string name="salida_share">Compartilhar</string>
+    <string name="salida_resend">Reenviar ao ERP</string>
+    <string name="report_photos_pending_count">Fotos (%1$d/%2$d)</string>
+    <string name="report_photos_add">Adicionar fotos</string>
+    <string name="report_photo_number">Foto %1$d</string>
     <string name="help_salida_title">Como Funciona a Saída / Baixa</string>
     <string name="help_salida_desc">Registre a saída de produtos acabados, embalagens e matérias-primas com contagem de caixas e controle de estoque.</string>
     <string name="help_salida_section1_title">Seleção de Produtos e Blocos</string>

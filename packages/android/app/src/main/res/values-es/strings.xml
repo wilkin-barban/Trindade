@@ -505,7 +505,7 @@
     <string name="nav_salida">Salida / Baja</string>
     <string name="nav_salida_history">Historial de Salidas</string>
     <string name="nav_assai">Calculadora de Assaí</string>
-    <string name="nav_stock_counter">Calculador de Estoque</string>
+    <string name="nav_stock_counter">Calculadora de Stock</string>
     <string name="nav_stock_history">Historial de Conteo</string>
     <string name="nav_share">Compartir App</string>
     <string name="dashboard_stock_counter">Cuente y sume las cajas del día</string>
@@ -630,14 +630,14 @@
     <string name="help_dashboard_title">Visión General del Panel</string>
     <string name="help_dashboard_desc">Acceso rápido a todos los módulos operativos de la fábrica Trindade. Navegue por las tarjetas para lanzamientos, cronogramas, stock y reportes.</string>
 
-    <string name="help_stock_title">Calculador de Estoque</string>
+    <string name="help_stock_title">Calculadora de Stock</string>
     <string name="help_stock_desc">Control de stock y sobrantes diarios por producto tercerizado y masas. Consulta por operarios y cierre por administradores.</string>
     <string name="help_stock_counting_title">Conteo por Cajas</string>
     <string name="help_stock_counting_desc">Ingrese las cajas contadas en cada producto. Las unidades se calculan automáticamente según el estándar de embalaje.</string>
     <string name="help_stock_permissions_title">Cierre y Permisos</string>
     <string name="help_stock_permissions_desc">Los operarios pueden consultar el stock y compartir el resumen por WhatsApp o correo electrónico. Solo los administradores pueden registrar conteos y realizar el cierre oficial.</string>
 
-    <string name="help_stock_history_title">Historial de Stock</string>
+    <string name="help_stock_history_title">Historial de Conteo</string>
     <string name="help_stock_history_desc">Consulte los conteos de stock registrados en fechas anteriores para cierre de fábrica y control de sobrantes.</string>
 
     <string name="help_assai_title">Calculador de Pedidos Assaí</string>
@@ -682,6 +682,39 @@
     <string name="help_share_title">Compartir Aplicación</string>
     <string name="help_share_desc">Comparta el enlace de la aplicación con operarios y choferes por WhatsApp, copia de enlace o código QR en pantalla.</string>
 
+    <string name="salida_title">Salida / Baja</string>
+    <string name="salida_block_embalagens">Envases</string>
+    <string name="salida_block_bobinas">Bobinas</string>
+    <string name="salida_block_materia_prima">Materia prima</string>
+    <string name="salida_products_count">%1$d productos</string>
+    <string name="salida_units_format">%1$d un</string>
+    <string name="salida_launch">Lanzar salida</string>
+    <string name="salida_launch_with_count">Lanzar salida (%1$d)</string>
+    <string name="salida_launching">Lanzando…</string>
+    <string name="salida_confirm_title">Confirmar salida</string>
+    <string name="salida_confirm_hint">Revisá los productos y las cantidades antes de confirmar:</string>
+    <string name="salida_total">Total</string>
+    <string name="salida_confirm">Confirmar</string>
+    <string name="salida_cancel">Cancelar</string>
+    <string name="salida_history_title">Historial de Salidas</string>
+    <string name="salida_history_empty_today">Ninguna salida registrada hoy.</string>
+    <string name="salida_history_empty_past">Ninguna salida registrada.</string>
+    <string name="salida_history_launch">Lanzar salida</string>
+    <string name="salida_history_pending">%1$d pendientes</string>
+    <string name="salida_history_resend_pending">Reenviar pendientes</string>
+    <string name="salida_history_past_readonly">Fecha pasada: solo lectura.</string>
+    <string name="salida_status_sent">Enviado</string>
+    <string name="salida_status_reconciled">Conciliado</string>
+    <string name="salida_status_partial">Parcial</string>
+    <string name="salida_status_pending">Pendiente</string>
+    <string name="salida_photos_count">Fotos (%1$d)</string>
+    <string name="salida_photo_delete">Borrar foto</string>
+    <string name="salida_photo_add">Agregar foto</string>
+    <string name="salida_share">Compartir</string>
+    <string name="salida_resend">Reenviar al ERP</string>
+    <string name="report_photos_pending_count">Fotos (%1$d/%2$d)</string>
+    <string name="report_photos_add">Agregar fotos</string>
+    <string name="report_photo_number">Foto %1$d</string>
     <string name="help_salida_title">Cómo Funciona la Salida / Baja</string>
     <string name="help_salida_desc">Registre la salida de productos terminados, envases y materias primas con conteo de cajas y control de stock.</string>
     <string name="help_salida_section1_title">Selección de Productos y Bloques</string>

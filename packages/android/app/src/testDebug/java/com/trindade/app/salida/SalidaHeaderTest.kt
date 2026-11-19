@@ -31,6 +31,9 @@ class SalidaHeaderTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    private val context: android.content.Context
+        get() = androidx.test.core.app.ApplicationProvider.getApplicationContext()
+
     @Test
     fun `the history action is the shared pill, with its label and its touch target`() {
         var opened = 0
@@ -40,7 +43,7 @@ class SalidaHeaderTest {
             }
         }
 
-        composeRule.onNodeWithText("Salida / Baixa").assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(com.trindade.app.R.string.salida_title)).assertIsDisplayed()
         composeRule.onNodeWithText("2026-11-18").assertIsDisplayed()
 
         // La píldora es la compartida: el nodo con el texto es el target, y mide lo que mide en Masas,

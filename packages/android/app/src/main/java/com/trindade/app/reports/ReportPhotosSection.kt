@@ -14,6 +14,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.trindade.app.R
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 
@@ -41,7 +43,7 @@ fun ReportPhotosSection(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                text = "Fotos ($pendingCount/$maxPhotos)",
+                text = stringResource(R.string.report_photos_pending_count, pendingCount, maxPhotos),
                 style = MaterialTheme.typography.titleMedium,
             )
             OutlinedButton(
@@ -52,21 +54,21 @@ fun ReportPhotosSection(
                     .defaultMinSize(minHeight = 48.dp)
                     .testTag("report-photo-input"),
             ) {
-                Text("Agregar fotos", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.report_photos_add), style = MaterialTheme.typography.labelLarge)
             }
             for (index in 0 until pendingCount) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text("Foto ${index + 1}", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.report_photo_number, index + 1), style = MaterialTheme.typography.bodySmall)
                     TextButton(
                         onClick = { onRemovePhoto(index) },
                         modifier = Modifier
                             .defaultMinSize(minHeight = 48.dp)
                             .testTag("remove-pending-photo-btn"),
                     ) {
-                        Text("Quitar")
+                        Text(stringResource(R.string.report_photo_remove))
                     }
                 }
             }

@@ -37,17 +37,28 @@ import com.trindade.app.ui.components.ModuleHelpDialog
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.trindade.app.ui.components.ModuleHistoryButton
 
-/** Los nombres de los bloques, como los lee la planta. */
-private val blockLabels = mapOf(
-    SalidaCatalog.BLOCK_EMBALAGENS to "Embalagens",
-    SalidaCatalog.BLOCK_BOBINAS to "Bobinas",
-    SalidaCatalog.BLOCK_MATERIA_PRIMA to "Matéria-prima",
-)
+/**
+ * Los nombres de los bloques, como los lee la planta.
+ *
+ * Eran un mapa en español dentro de una app en portugués; ahora son recursos, así que el idioma de la app y el
+ * de la planta son el mismo en las dos lenguas que el módulo declara.
+ */
+@Composable
+private fun salidaBlockLabel(block: String): String {
+    val resource = when (block) {
+        SalidaCatalog.BLOCK_EMBALAGENS -> R.string.salida_block_embalagens
+        SalidaCatalog.BLOCK_BOBINAS -> R.string.salida_block_bobinas
+        SalidaCatalog.BLOCK_MATERIA_PRIMA -> R.string.salida_block_materia_prima
+        else -> null
+    }
+    return if (resource == null) block else stringResource(resource)
+}
 
 /**
  * La baja: el día de hoy, los productos con su cantidad y una barra que dice cuánto va a salir.
@@ -62,6 +73,64 @@ private val blockLabels = mapOf(
  * size, and a screen that can only be reached through a Hilt view model cannot be asked whether it still uses
  * it. Extracting the row makes that a test instead of a reading.
  */
+/** El tag con el que un test encuentra el botón de lanzamiento, el mismo que usa la web. */
+const val SALIDA_LAUNCH_BAR_TAG: String = "salida-launch"
+
+/**
+ * La barra pegada abajo: cuántos productos distintos van a salir, el total y el botón que abre la confirmación.
+ *
+ * El contador del botón es la cantidad de **productos distintos**, como en la web: lo que el operario confirma es
+ * una lista de renglones, y el total de unidades ya está al lado. Se dice en el botón y no sólo en la barra porque
+ * es el número que decide cuántas líneas va a repasar en el diálogo.
+ *
+ * Vive aparte de la pantalla por la misma razón que el encabezado: la regla del rótulo -- con cuántos productos se
+ * escribe "(N)" y con ninguno no -- tiene que poder probarse sin levantar el ViewModel.
+ */
+@Composable
+internal fun SalidaLaunchBar(
+    products: Int,
+    totalUnits: Int,
+    submitting: Boolean,
+    onLaunch: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column {
+                Text(
+                    text = stringResource(R.string.salida_products_count, products),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Text(
+                    text = stringResource(R.string.salida_units_format, totalUnits),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            Button(
+                onClick = onLaunch,
+                enabled = products > 0 && !submitting,
+                modifier = Modifier.defaultMinSize(minHeight = 44.dp).testTag(SALIDA_LAUNCH_BAR_TAG),
+            ) {
+                Text(
+                    when {
+                        submitting -> stringResource(R.string.salida_launching)
+                        products > 0 -> stringResource(R.string.salida_launch_with_count, products)
+                        else -> stringResource(R.string.salida_launch)
+                    },
+                )
+            }
+        }
+    }
+}
+
 @Composable
 internal fun SalidaHeader(
     date: String,
@@ -75,13 +144,13 @@ internal fun SalidaHeader(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column {
-            Text("Salida / Baixa", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.salida_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Text(date, style = MaterialTheme.typography.bodySmall)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             // La píldora canónica de los históricos: mismo alto, mismo target y mismo icono que Masas,
             // Cargamento, Reportes y Contagem. Un texto plano al lado del título no era el mismo botón.
-            ModuleHistoryButton(onClick = onOpenHistory, label = "Histórico")
+            ModuleHistoryButton(onClick = onOpenHistory, label = stringResource(R.string.report_history))
             ModuleHelpButton(onClick = onHelp)
         }
     }
@@ -128,7 +197,7 @@ fun SalidaLaunchScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(blockLabels[block] ?: block, fontWeight = FontWeight.SemiBold)
+                            Text(salidaBlockLabel(block), fontWeight = FontWeight.SemiBold)
                             Switch(checked = active, onCheckedChange = { viewModel.toggleBlock(block) })
                         }
                         if (active) {
@@ -158,60 +227,42 @@ fun SalidaLaunchScreen(
             }
         }
 
-        // La barra pegada abajo: el total que se confirma y el botón que abre la confirmación.
-        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column {
-                    Text("${state.selection.lines.size} productos", style = MaterialTheme.typography.bodySmall)
-                    Text(
-                        "${state.selection.totalUnits} un",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-                Button(
-                    onClick = { viewModel.requestLaunch() },
-                    enabled = !state.selection.isEmpty && !state.submitting,
-                    modifier = Modifier.defaultMinSize(minHeight = 44.dp),
-                ) {
-                    Text(if (state.submitting) "Enviando…" else "Lanzar salida")
-                }
-            }
-        }
+        SalidaLaunchBar(
+            products = state.selection.lines.size,
+            totalUnits = state.selection.totalUnits,
+            submitting = state.submitting,
+            onLaunch = viewModel::requestLaunch,
+        )
     }
 
     if (state.confirmOpen) {
         val selection = state.selection
         AlertDialog(
             onDismissRequest = { viewModel.dismissConfirmation() },
-            title = { Text("Confirmar salida") },
+            title = { Text(stringResource(R.string.salida_confirm_title)) },
             text = {
                 Column {
-                    Text("Revisá los productos y las cantidades antes de confirmar:", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.salida_confirm_hint), style = MaterialTheme.typography.bodySmall)
                     Spacer(Modifier.height(8.dp))
                     selection.lines.forEach { line ->
                         val product = SalidaCatalog.product(line.code)
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text(product?.name ?: line.code, style = MaterialTheme.typography.bodyMedium)
-                            Text("${line.quantity} un", fontWeight = FontWeight.SemiBold)
+                            Text(stringResource(R.string.salida_units_format, line.quantity), fontWeight = FontWeight.SemiBold)
                         }
                     }
                     Spacer(Modifier.height(8.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Total", fontWeight = FontWeight.SemiBold)
-                        Text("${selection.totalUnits} un", fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.salida_total), fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.salida_units_format, selection.totalUnits), fontWeight = FontWeight.Bold)
                     }
                 }
             },
             confirmButton = {
-                Button(onClick = { viewModel.confirmLaunch(username) }) { Text("Confirmar") }
+                Button(onClick = { viewModel.confirmLaunch(username) }) { Text(stringResource(R.string.salida_confirm)) }
             },
             dismissButton = {
-                OutlinedButton(onClick = { viewModel.dismissConfirmation() }) { Text("Cancelar") }
+                OutlinedButton(onClick = { viewModel.dismissConfirmation() }) { Text(stringResource(R.string.salida_cancel)) }
             },
         )
     }

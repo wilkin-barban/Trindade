@@ -99,7 +99,7 @@ class SalidaMovementCardTest {
         composeRule.onNodeWithTag("salida-photo-picker").performClick()
         assertEquals(1, added)
 
-        composeRule.onAllNodesWithText("Borrar foto")[1].performClick()
+        composeRule.onAllNodesWithText("Excluir foto")[1].performClick()
         assertEquals(92, deleted)
     }
 

@@ -55,7 +55,7 @@ internal fun SalidaHistoryEmpty(
 ) {
     Column(modifier = modifier) {
         Text(
-            if (isToday) "Nenhuma saída registrada hoje." else "Nenhuma saída registrada.",
+            if (isToday) stringResource(R.string.salida_history_empty_today) else stringResource(R.string.salida_history_empty_past),
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(top = 24.dp).testTag("salida-history-empty"),
         )
@@ -65,7 +65,7 @@ internal fun SalidaHistoryEmpty(
                 onClick = onLaunch,
                 modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("salida-empty-cta"),
             ) {
-                Text("Lanzar salida")
+                Text(stringResource(R.string.salida_history_launch))
             }
         }
     }
@@ -105,7 +105,7 @@ fun SalidaHistoryScreen(
     Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
         // El mismo header que Masas, Cargamento, Reportes y Contagem: título, contador y Volver de 48 dp.
         HistoryHeader(
-            title = "Histórico de Salidas",
+            title = stringResource(R.string.salida_history_title),
             subtitle = state.history.size.toString(),
             onBack = onBack,
             onHelp = { showHelpDialog = true },
@@ -148,7 +148,7 @@ fun SalidaHistoryScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "$pending pendentes",
+                    text = stringResource(R.string.salida_history_pending, pending),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.testTag("salida-pending-count"),
@@ -157,7 +157,7 @@ fun SalidaHistoryScreen(
                     onClick = viewModel::resendPending,
                     modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("salida-resend-pending"),
                 ) {
-                    Text("Reenviar pendentes")
+                    Text(stringResource(R.string.salida_history_resend_pending))
                 }
             }
         }
@@ -167,7 +167,7 @@ fun SalidaHistoryScreen(
         if (selected != today) {
             // El pasado no se toca: el histórico muestra lo que se lanzó y su estado, y nada de eso se edita.
             Text(
-                text = "Fecha pasada: solo lectura.",
+                text = stringResource(R.string.salida_history_past_readonly),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
@@ -211,7 +211,7 @@ fun SalidaHistoryScreen(
         }
 
         Text(
-            text = "${day.totalUnits} un",
+            text = stringResource(R.string.salida_units_format, day.totalUnits),
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(bottom = 8.dp).testTag("salida-history-total"),
@@ -315,12 +315,13 @@ internal fun SalidaHistoryChips(
     }
 }
 
+@Composable
 private fun statusLabel(status: com.trindade.app.contract.models.SalidaMovementErp.Status?): String = when (status?.value?.lowercase()) {
-    "sent" -> "Enviado"
-    "reconciled" -> "Conciliado"
-    "partial" -> "Parcial"
-    "failed" -> "Pendente"
-    else -> "Pendente"
+    "sent" -> stringResource(R.string.salida_status_sent)
+    "reconciled" -> stringResource(R.string.salida_status_reconciled)
+    "partial" -> stringResource(R.string.salida_status_partial)
+    "failed" -> stringResource(R.string.salida_status_pending)
+    else -> stringResource(R.string.salida_status_pending)
 }
 
 @Composable
@@ -355,20 +356,32 @@ internal fun SalidaMovementCard(
             movement.items.forEach { item ->
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(item.productName, style = MaterialTheme.typography.bodySmall)
-                    Text("${item.quantity} un", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        stringResource(R.string.salida_units_format, item.quantity),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
                 }
             }
             Spacer(Modifier.height(6.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Total", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-                Text("${movement.totalUnits} un", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                Text(
+                    stringResource(R.string.salida_total),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    stringResource(R.string.salida_units_format, movement.totalUnits),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                )
             }
 
             // Las fotos son la evidencia de la baja: viven en la tarjeta del movimiento, no en el día.
             if (movement.photos.isNotEmpty()) {
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    text = "Fotos (${movement.photos.size})",
+                    text = stringResource(R.string.salida_photos_count, movement.photos.size),
                     style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.testTag("salida-photos-${movement.id}"),
                 )
@@ -388,7 +401,7 @@ internal fun SalidaMovementCard(
                             onClick = { onDeletePhoto(photo.id) },
                             modifier = Modifier.defaultMinSize(minHeight = 48.dp),
                         ) {
-                            Text("Borrar foto")
+                            Text(stringResource(R.string.salida_photo_delete))
                         }
                     }
                 }
@@ -401,7 +414,7 @@ internal fun SalidaMovementCard(
                         onClick = onAddPhoto,
                         modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("salida-photo-picker"),
                     ) {
-                        Text("Agregar foto", style = MaterialTheme.typography.labelMedium)
+                        Text(stringResource(R.string.salida_photo_add), style = MaterialTheme.typography.labelMedium)
                     }
                 }
                 if (onShare != null) {
@@ -409,7 +422,7 @@ internal fun SalidaMovementCard(
                         onClick = onShare,
                         modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("salida-share-${movement.id}"),
                     ) {
-                        Text("Compartir", style = MaterialTheme.typography.labelMedium)
+                        Text(stringResource(R.string.salida_share), style = MaterialTheme.typography.labelMedium)
                     }
                 }
                 if (onResend != null) {
@@ -417,7 +430,7 @@ internal fun SalidaMovementCard(
                         onClick = onResend,
                         modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("salida-resend-${movement.id}"),
                     ) {
-                        Text("Reenviar ao ERP", style = MaterialTheme.typography.labelMedium)
+                        Text(stringResource(R.string.salida_resend), style = MaterialTheme.typography.labelMedium)
                     }
                 }
             }
