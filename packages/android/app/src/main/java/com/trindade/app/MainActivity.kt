@@ -745,13 +745,9 @@ class MainActivity : ComponentActivity() {
                                         massasDayFromHistory = false
                                         massasDayFromList = false
                                     },
-                                    onOpenMassasHistory = {
-                                        tab = Tab.MASSAS_LAUNCH
-                                        massasHistoryOpen = true
-                                        massasLaunchDay = null
-                                        massasDayFromHistory = false
-                                        massasDayFromList = false
-                                    },
+                                    // La tarjeta del dashboard entra por el mismo camino que el cajón: hoy con
+                                    // origen historial, sin grilla de lanzamiento.
+                                    onOpenMassasHistory = { openMassasHistory() },
                                     // La séptima tarjeta entra por el mismo camino que el cajón: la pestaña
                                     // ya existe y la tarjeta solo decide si abre el lanzamiento o el
                                     // histórico, que son las dos puertas de `Tab.SALIDA`.

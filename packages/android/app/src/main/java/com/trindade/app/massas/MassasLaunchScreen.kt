@@ -319,7 +319,8 @@ fun MassasLaunchScreen(
             readOnly = state.isReadOnly,
         )
 
-        if (!state.isReadOnly) {
+        // PASO 2 es del lanzamiento: la vista de día del historial no pide cantidades, sólo lee el día.
+        if (origin == MassasOrigin.LAUNCH && !state.isReadOnly) {
             // PASO 2: Lançar Produção por Caixas (cálculo e inputs)
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
