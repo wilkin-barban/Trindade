@@ -634,6 +634,20 @@ el historial: separar las responsabilidades.
 **Sección 8 cerrada**: 8.1, 8.1-b, 8.2, 8.3, 8.4 y 8.5 en PASS, con la APK `0.8.4 (8007)` instalada en
 `emulator-5554`. Sin release, tag ni asset; la 0.7.5 y `packages/backend/apk` intactos.
 
+## 11. Remediaciones de la 0.8.5, tercera pasada
+
+- **Una sola sincronización del ERP en el Relatório.** La acción vive en el encabezado del bloque
+  (`ErpMovementsCard`) y lee el día con `includeExits = true`: refresca massas, insumos y `salidaDay`. Las dos
+  tarjetas ya no tienen botón. `ReportDetailViewModel` también refresca `salidaDay` en su sync.
+- **Sin «Voltar» redundante.** `HistoryHeader` acepta `onBack` nulo; el día y la lista del Histórico de Masas y el
+  Histórico de Salidas ya no lo dibujan. La navegación es la barra superior, «Todas as datas» vuelve al archivo, y
+  el atrás físico cierra el archivo de Salidas antes de salir del módulo. Reportes, Cargamento y Contagem lo
+  conservan.
+- **Pasado verificado en los dos módulos.** Massas: sin grilla de lanzamiento (`origin`), filas sin importar ni
+  enviar (`readOnly` del día), producción/filtros/share y chips de cinco fechas. Salidas: tarjetas, nota de solo
+  lectura, share y reenvío pendiente, sin CTA en el día vacío; **corregido**: las fotos de un día cerrado se ven
+  pero no se agregan ni se borran (el selector y el borrado se pasan sólo para hoy).
+
 ## 10. Remediaciones de la 0.8.5 verificadas en dispositivo
 
 Cuatro defectos vistos con la 0.8.5 (8008) instalada en `emulator-5554`, cerrados en un solo slice (`3ef6bb5d`):

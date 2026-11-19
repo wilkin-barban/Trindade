@@ -482,8 +482,14 @@ texto del servidor, estado de carga/error y acciones de WhatsApp/PDF, con `Edita
   respuesta del servidor se dicen en un `ActionResultDialog`, nunca como una frase dentro del formulario. Las
   casillas que faltan se marcan en su lugar, y el guardado se puede tocar para escuchar la razón.
 - **Lecturas del ERP en el Relatório**: “Massa do dia” e “Insumos” son **dos tarjetas independientes**, con la forma
-  del bloque de Salidas. La sincronización del ERP es una sola lectura y cada tarjeta ofrece la misma acción sobre el
-  mismo callback; no se duplica la lógica.
+  del bloque de Salidas. La sincronización es **una sola acción, en el encabezado del bloque**, y lee el día con
+  `includeExits = true`: refresca las tres lecturas —masas, insumos y salidas— de una vez. Las tarjetas no llevan
+  botón, y no hay lógica duplicada.
+- **Históricos: sin «Voltar» redundante**: las pantallas que se alcanzan desde la barra superior (archivo de Masas y
+  su día, histórico de Salidas) no dibujan un Volver; la vuelta es la fila superior y, en Masas, el chip «Todas as
+  datas». Los históricos que no tienen entrada propia en la fila (Reportes, Cargamento, Contagem) lo conservan.
+- **Pasado de Salidas**: un día cerrado muestra sus fotos pero **no** deja agregarlas ni borrarlas; compartir y
+  reenviar pendientes siguen disponibles.
 - **Históricos en la barra superior**: la entrada del archivo (Masas, Salidas) se selecciona por **pestaña + overlay**;
   entrar al archivo desde su módulo o desde la fila deja seleccionada la entrada del archivo, y elegir el lanzamiento
   la suelta.
