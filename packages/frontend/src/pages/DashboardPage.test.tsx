@@ -75,6 +75,19 @@ beforeEach(async () => {
 });
 
 describe('DashboardPage', () => {
+  it('the report and schedule cards open the share view', async () => {
+    // Las dos tarjetas llevan a la tarjeta de compartir: es lo que se manda y lo que el dueño pidió ver desde
+    // el escritorio de la planta, sin pasar por el editor.
+    renderPage();
+
+    await waitFor(() => expect(screen.getByTestId('dashboard-card-reports')).toBeInTheDocument());
+    const reportLink = screen.getByTestId('dashboard-card-reports').querySelector('a');
+    expect(reportLink?.getAttribute('href')).toBe('/reports/33?share=1');
+
+    const schedule = screen.getByTestId('view-active-schedule');
+    expect(schedule.getAttribute('href')).toBe('/loading?share=1&date=2026-10-30');
+  });
+
   it('draws the seven cards in the phone order, and not the counting history', async () => {
     renderPage();
 

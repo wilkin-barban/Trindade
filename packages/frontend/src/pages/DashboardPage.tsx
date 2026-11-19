@@ -190,7 +190,9 @@ export function DashboardPage() {
             )
           }
           icon="📋"
-          to={summary?.latestReportId ? `/reports/${summary.latestReportId}` : '/reports'}
+          // La tarjeta abre la tarjeta de compartir del último reporte, que es lo que se hace con él; sin
+          // reporte, la lista. El detalle completo sigue a un clic adentro de esa vista.
+          to={summary?.latestReportId ? `/reports/${summary.latestReportId}?share=1` : '/reports'}
         />
         <SummaryCard
           title={t('dashboard.activeSchedule')}
@@ -207,7 +209,11 @@ export function DashboardPage() {
               */}
               <div className="flex flex-wrap items-center gap-3 pt-1">
                 <Link
-                  to={scheduleLink.to}
+                  to={
+                    summary?.activeScheduleBatchDate
+                      ? `/loading?share=1&date=${summary.activeScheduleBatchDate}`
+                      : scheduleLink.to
+                  }
                   className="text-xs text-blue-600 hover:underline"
                   data-testid="view-active-schedule"
                 >
