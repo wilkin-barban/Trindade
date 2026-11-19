@@ -634,6 +634,23 @@ el historial: separar las responsabilidades.
 **Sección 8 cerrada**: 8.1, 8.1-b, 8.2, 8.3, 8.4 y 8.5 en PASS, con la APK `0.8.4 (8007)` instalada en
 `emulator-5554`. Sin release, tag ni asset; la 0.7.5 y `packages/backend/apk` intactos.
 
+## 10. Remediaciones de la 0.8.5 verificadas en dispositivo
+
+Cuatro defectos vistos con la 0.8.5 (8008) instalada en `emulator-5554`, cerrados en un solo slice (`3ef6bb5d`):
+
+- **Relatório: la validación responde en ventana.** `ReportGeneratorViewModel.submit()` deja el mensaje de error en
+  el estado cuando faltan lecturas (y `showValidation` para marcar las casillas); la frase ya no se dibuja dentro
+  de la lista. `ReportEditViewModel` gana `validation: UiText?` y `dismissMessage()`, su guardado se puede tocar con
+  una lectura faltante, y `ReportEditScreen` también responde en `ActionResultDialog`.
+- **ERP: dos tarjetas.** `ErpMovementsCard` dibuja “Massa do dia” e “Insumos” como dos tarjetas independientes con
+  la forma de `SalidaReportCard`; la sincronización es una sola y cada encabezado la ofrece sobre el mismo
+  `onSync` (sin lógica duplicada). La cadena «Movimentações do ERP» quedó sin uso y se retiró.
+- **Histórico de Masas en la fila.** La visita al archivo selecciona `Overlay.MASSAS_HISTORY` aunque abra en el día
+  de planta (`massasVisitOverlay`), y elegir Lanzamiento suelta `massasDayFromList` para no volver a dibujar el día
+  del archivo.
+- **Histórico de Saídas: días, no un número.** El subtítulo usa el plural `salida_history_days` («3 dias» /
+  «3 días»).
+
 ## 9. Auditoría sobre 0.8.4 (8007) — siete defectos
 
 La web es la referencia. Registro de la auditoría del dueño, con lo que hay que tocar.

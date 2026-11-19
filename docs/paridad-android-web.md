@@ -476,6 +476,18 @@ texto del servidor, estado de carga/error y acciones de WhatsApp/PDF, con `Edita
   placeholders de funciones ya implementadas.
 - **Android**: el menú no debe mostrar secciones “Futuro” ni entradas deshabilitadas para funciones que ya existen.
 
+### 6-bis. Dónde responde una pantalla (normativa)
+
+- **Errores de guardado en ventana**: la validación propia de la pantalla (lecturas de temperatura faltantes) y la
+  respuesta del servidor se dicen en un `ActionResultDialog`, nunca como una frase dentro del formulario. Las
+  casillas que faltan se marcan en su lugar, y el guardado se puede tocar para escuchar la razón.
+- **Lecturas del ERP en el Relatório**: “Massa do dia” e “Insumos” son **dos tarjetas independientes**, con la forma
+  del bloque de Salidas. La sincronización del ERP es una sola lectura y cada tarjeta ofrece la misma acción sobre el
+  mismo callback; no se duplica la lógica.
+- **Históricos en la barra superior**: la entrada del archivo (Masas, Salidas) se selecciona por **pestaña + overlay**;
+  entrar al archivo desde su módulo o desde la fila deja seleccionada la entrada del archivo, y elegir el lanzamiento
+  la suelta.
+
 ### 7. i18n: no borrar claves compartidas
 
 La limpieza de las claves de Massas eliminó por error `reports.copied` y `loading.copied`, y el E2E de
