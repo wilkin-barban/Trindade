@@ -279,6 +279,8 @@ class MainActivity : ComponentActivity() {
                     var historyOpen by remember { mutableStateOf(false) }
                     var loadingHistoryOpen by remember { mutableStateOf(false) }
                     var loadingShareDay by remember { mutableStateOf<String?>(null) }
+                    // El día que se acaba de cerrar se comparte con Editar; el que viene del histórico, no.
+                    var loadingShareSaved by remember { mutableStateOf(false) }
                     var massasHistoryOpen by remember { mutableStateOf(false) }
                     var salidaHistoryOpen by remember { mutableStateOf(false) }
                     var stockHistoryOpen by remember { mutableStateOf(false) }
@@ -349,6 +351,7 @@ class MainActivity : ComponentActivity() {
                         historyOpen = false
                         loadingHistoryOpen = false
                         loadingShareDay = null
+                        loadingShareSaved = false
                         massasHistoryOpen = false
                         salidaHistoryOpen = false
                         stockHistoryOpen = false
@@ -455,14 +458,23 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         loadingShareDay != null -> {
-                            val onBackLoadingShare = {
+                            // La vista de compartir tiene dos orígenes y por eso dos salidas: el día que se
+                            // acaba de cerrar vuelve a su grilla --y ofrece Editar para corregirlo--, mientras
+                            // que el que se abrió desde el histórico vuelve al histórico y no edita nada.
+                            val closeLoadingShare = {
                                 loadingShareDay = null
-                                loadingHistoryOpen = true
+                                if (loadingShareSaved) {
+                                    loadingShareSaved = false
+                                } else {
+                                    loadingHistoryOpen = true
+                                }
                             }
-                            BackHandler(onBack = onBackLoadingShare)
+                            BackHandler(onBack = closeLoadingShare)
                             LoadingShareRoute(
                                 date = loadingShareDay!!,
-                                onBack = onBackLoadingShare,
+                                onBack = closeLoadingShare,
+                                mode = if (loadingShareSaved) ShareCardMode.SAVED else ShareCardMode.FROM_HISTORY,
+                                onEdit = if (loadingShareSaved) closeLoadingShare else null,
                             )
                         }
                         profileOpen -> {
@@ -513,6 +525,11 @@ class MainActivity : ComponentActivity() {
                                     loadingDay = null
                                     loadingDayFromHistory = false
                                     loadingHistoryOpen = true
+                                },
+                                // Salvar Horario abre la vista de compartir del día, que es donde vive el PDF.
+                                onSaveDay = { day ->
+                                    loadingShareSaved = true
+                                    loadingShareDay = day
                                 },
                                 onEditEntry = { id, day ->
                                     editingScheduleId = id

@@ -38,6 +38,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.ui.platform.testTag
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -89,6 +90,39 @@ import com.trindade.app.ui.components.NavigationActionButton
  * scroll, and the action is about the whole day, so it would otherwise sit behind every slot it
  * describes.
  */
+/**
+ * El pie del horario: cierra el día.
+ *
+ * Es la acción primaria de la pantalla y por eso no viaja con la grilla: el día se salva cuando el operario
+ * terminó de asignar fleteros, no cuando llegó al final de la lista de turnos.
+ */
+@Composable
+internal fun LoadingSaveBar(
+    enabled: Boolean,
+    onSave: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag(LOADING_SAVE_BAR_TAG),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shadowElevation = 8.dp,
+    ) {
+        AdminPrimaryButton(
+            onClick = onSave,
+            text = stringResource(R.string.loading_save),
+            enabled = enabled,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+        )
+    }
+}
+
+/** El tag con el que un test encuentra el pie del horario. */
+const val LOADING_SAVE_BAR_TAG: String = "loading-save-btn"
+
 @Composable
 fun LoadingScreen(
     state: LoadingViewModel.UiState,
@@ -107,6 +141,8 @@ fun LoadingScreen(
     onDelete: (Int) -> Unit,
     onEditEntry: (Int, String) -> Unit,
     onLoadExport: () -> Unit,
+    /** Cierra el día: abre su vista de compartir, donde vive el PDF y el botón de WhatsApp. */
+    onSaveDay: (String) -> Unit = {},
     modifier: Modifier = Modifier,
     onShareText: () -> Unit = {},
     onSharePdf: () -> Unit = {},
@@ -119,8 +155,11 @@ fun LoadingScreen(
     val clipboard = LocalClipboardManager.current
     var showHelpDialog by remember { mutableStateOf(false) }
 
+    // La grilla scrollea; el cierre del día no. Salvar Horario abre la vista de compartir del día, que es
+    // donde vive el PDF y donde el operario confirma lo que va a mandar.
+    Column(modifier = modifier.fillMaxSize()) {
     LazyColumn(
-        modifier = modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier.weight(1f).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         item {
@@ -331,7 +370,11 @@ fun LoadingScreen(
             rows = result.refusals.map { refusal -> refusalLine(refusal) },
         )
     }
-
+    LoadingSaveBar(
+        enabled = state.schedules.isNotEmpty() && !state.loading && !state.readOnly,
+        onSave = { onSaveDay(state.date) },
+    )
+    }
     if (showHelpDialog) {
         ModuleHelpDialog(
             title = stringResource(R.string.help_loading_title),
@@ -894,6 +937,7 @@ internal fun describe(entry: SchedulesResponseSchedulesInner): String {
 fun LoadingRoute(
     onBack: () -> Unit,
     onOpenHistory: () -> Unit,
+    onSaveDay: (String) -> Unit = {},
     onEditEntry: (Int, String) -> Unit,
     date: String? = null,
     stale: Boolean = false,
@@ -951,6 +995,7 @@ fun LoadingRoute(
         onDelete = viewModel::deleteEntry,
         onEditEntry = onEditEntry,
         onLoadExport = viewModel::loadExport,
+        onSaveDay = onSaveDay,
         onShareText = viewModel::shareText,
         onSharePdf = viewModel::sharePdf,
         onOpenWhatsApp = viewModel::openWhatsAppFor,

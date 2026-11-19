@@ -99,6 +99,9 @@ fun LoadingShareScreen(
     onPdf: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    /** El día que se acaba de cerrar ofrece Editar; el histórico de un día pasado, no. */
+    mode: ShareCardMode = ShareCardMode.FROM_HISTORY,
+    onEdit: (() -> Unit)? = null,
 ) {
     ShareCard(
         title = stringResource(R.string.loading_title),
@@ -107,10 +110,10 @@ fun LoadingShareScreen(
         text = state.exportText,
         loading = state.loading,
         error = state.message,
-        mode = ShareCardMode.FROM_HISTORY,
+        mode = mode,
         onShare = onShare,
         onPdf = onPdf,
-        onEdit = null,
+        onEdit = onEdit,
         onClose = onBack,
         modifier = modifier.fillMaxSize().padding(16.dp),
     )
@@ -121,6 +124,8 @@ fun LoadingShareRoute(
     date: String,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    mode: ShareCardMode = ShareCardMode.FROM_HISTORY,
+    onEdit: (() -> Unit)? = null,
     viewModel: LoadingShareViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
@@ -136,5 +141,7 @@ fun LoadingShareRoute(
         onPdf = viewModel::sharePdf,
         onBack = onBack,
         modifier = modifier,
+        mode = mode,
+        onEdit = onEdit,
     )
 }
