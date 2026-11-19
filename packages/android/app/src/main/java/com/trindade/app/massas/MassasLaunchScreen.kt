@@ -150,6 +150,16 @@ enum class MassasOrigin {
     HISTORY,
 }
 
+/**
+ * Si esta visita ofrece el sync del espejo del ERP.
+ *
+ * Dos hechos, y los dos tienen que valer: la pantalla es el histórico (el lanzamiento no sincroniza, lanza) y el
+ * día está abierto. Preguntar sólo por el origen dejaba el botón a la vista en una fecha pasada, que es un día que
+ * el servidor va a rechazar.
+ */
+internal fun offersErpSync(origin: MassasOrigin, readOnly: Boolean): Boolean =
+    origin == MassasOrigin.HISTORY && !readOnly
+
 @Composable
 fun MassasLaunchScreen(
     viewModel: MassasLaunchViewModel,
@@ -311,8 +321,10 @@ fun MassasLaunchScreen(
             date = state.date,
             syncedAt = state.aeroSyncedAt,
             isSyncing = state.isSyncingAero,
-            // El sync del espejo es del histórico: el lanzamiento lanza y el día se consulta donde se lee.
-            onSync = if (origin == MassasOrigin.HISTORY) viewModel::syncAeroDay else null,
+            // El sync del espejo es del histórico y sólo de un día abierto: el lanzamiento lanza y el día se
+            // consulta donde se lee, pero un día pasado no se sincroniza. Se pregunta por las dos cosas y no sólo
+            // por el origen, que es de donde venía el botón en una fecha cerrada.
+            onSync = if (offersErpSync(origin, state.isReadOnly)) viewModel::syncAeroDay else null,
             readOnly = state.isReadOnly,
         )
 

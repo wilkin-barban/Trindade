@@ -639,6 +639,10 @@ class MassasLaunchViewModel @Inject constructor(
     /** Reads the plant's day and stores it on the backend, then reloads what was stored. */
     fun syncAeroDay() {
         val current = state.value
+        // Un día cerrado no se sincroniza: el servidor lo rechaza y el espejo de ayer no se toca. La pantalla ya no
+        // ofrece la acción en el pasado; esto es la misma regla del lado que escribe, por si alguna superficie la
+        // ofreciera igual.
+        if (current.isReadOnly) return
         if (current.isSyncingAero || readInFlight) return
         val settings = current.aeroSettings
         if (!settings.ready) {

@@ -1630,6 +1630,31 @@ class MassasLaunchViewModelTest {
         assertEquals(9, testVm.state.value.queuedLaunches)
     }
 
+    /**
+     * Un día pasado no se sincroniza ni desde el ViewModel.
+     *
+     * La pantalla ya no dibuja el botón en una fecha cerrada; esto cierra la otra mitad: aunque una superficie lo
+     * ofreciera, no sale una lectura al ERP ni se escribe el espejo de ayer. El pasado es el registro de lo que la
+     * planta hizo.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun syncAeroDay_onAClosedDay_neverReachesThePlant() = runTest {
+        val repo = DayRepository(massasApi, dayWith())
+        val testVm = newViewModel(repo)
+        testScheduler.runCurrent()
+
+        testVm.loadDay("2020-01-01")
+        testScheduler.runCurrent()
+        testVm.syncAeroDay()
+        testScheduler.runCurrent()
+
+        assertTrue(testVm.state.value.isReadOnly)
+        assertTrue("la lectura al ERP no sale en el pasado", erpPort.readDates.isEmpty())
+        assertTrue(mirrorPort.snapshots.isEmpty())
+        assertNull("y no hay respuesta que dar", testVm.state.value.resultDialogMessage)
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun syncAeroDay_whenThePlantDoesNotAnswer_keepsThePreviousSnapshot() = runTest {
