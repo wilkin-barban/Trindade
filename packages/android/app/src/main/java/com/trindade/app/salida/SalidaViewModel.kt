@@ -34,6 +34,15 @@ data class SalidaUiState(
     /** El teléfono al que se manda el día; se recuerda mientras la pantalla vive. */
     val historyPhone: String = "",
     val loading: Boolean = true,
+    /**
+     * Las salidas que el ERP registró para el día elegido, como las muestra el Relatório: espejo más lanzamientos
+     * locales, con el operario y su marca de `erpOnly`. Se lee del servidor; esta pantalla no lanza nada.
+     */
+    val salidaDay: com.trindade.app.contract.models.SalidaReportDayView? = null,
+    /** Una sincronización del espejo en vuelo, para que el botón no se apriete dos veces. */
+    val erpSyncing: Boolean = false,
+    /** Lo que dijo el ERP o la falta de credenciales, para leerlo debajo del botón. */
+    val erpError: com.trindade.app.ui.UiText? = null,
 ) {
     /** Lo que la baja va a mandar: sólo los productos de los bloques activos, con una cantidad válida. */
     val selection: SalidaSelection
@@ -61,6 +70,10 @@ data class SalidaNotice(val message: String, val isError: Boolean)
 @HiltViewModel
 class SalidaViewModel @Inject constructor(
     private val repository: SalidaRepository,
+    // El bloque de salidas del día vive en el Relatório, y su lectura y su sync son los mismos de esta pantalla.
+    private val reportsRepository: com.trindade.app.reports.ReportsRepository? = null,
+    private val aeroDispatcher: com.trindade.app.aero.AeroDispatcher? = null,
+    private val aeroSettingsStore: com.trindade.app.aero.AeroSettingsPort? = null,
     // La tabla aprobada del WhatsApp viaja con el mensaje: un share con nombres completos sería otro mensaje.
     private val abbreviationsSource: com.trindade.app.massas.WhatsappAbbreviationsSource? = null,
     // La compresión es la misma del Relatório: una foto de cámara no viaja a tamaño completo por la red de planta.
@@ -236,6 +249,67 @@ class SalidaViewModel @Inject constructor(
             abbreviations = abbreviationsSource?.table ?: com.trindade.app.massas.WhatsappAbbreviations.EMPTY,
             labels = labels,
         )
+    }
+
+    /**
+     * Lee del servidor las salidas del día elegido, sin tocar Trindade ni el ERP.
+     *
+     * Es la misma lectura que alimenta el bloque de Salidas del Relatório (`reportsRepository.salidaDay`), y trae
+     * lo que el ERP registró más lo que se lanzó aquí. Se llama al abrir el día de hoy.
+     */
+    fun loadSalidaDay(date: String) {
+        val reports = reportsRepository ?: return
+        viewModelScope.launch {
+            val day = runCatching { reports.salidaDay(date) }.getOrNull()
+            _state.value = _state.value.copy(
+                salidaDay = day ?: _state.value.salidaDay,
+                erpError = if (day == null) com.trindade.app.ui.UiText.of(com.trindade.app.R.string.report_salida_read_error) else null,
+            )
+        }
+    }
+
+    /**
+     * Trae del ERP los movimientos de salida del día, incluidos los que lanzaron otros usuarios.
+     *
+     * Es el mismo viaje del Relatório: `syncDay(..., includeExits = true)` lee los dos lados del día y deja el
+     * espejo listo; después se relee el bloque del servidor. No escribe nada en Trindade -- sólo el espejo y la
+     * marca de última sincronización, como la lectura del Relatório.
+     */
+    fun syncSalidaDay() {
+        if (_state.value.erpSyncing) return
+        val dispatcher = aeroDispatcher
+        val store = aeroSettingsStore
+        val reports = reportsRepository
+        val date = _state.value.historyDate ?: _state.value.date
+        if (dispatcher == null || store == null || reports == null) {
+            _state.value = _state.value.copy(erpError = com.trindade.app.ui.UiText.of(com.trindade.app.R.string.report_erp_not_configured))
+            return
+        }
+        viewModelScope.launch {
+            val settings = store.load()
+            if (!settings.ready) {
+                _state.value = _state.value.copy(erpError = com.trindade.app.ui.UiText.of(com.trindade.app.R.string.report_erp_not_configured))
+                return@launch
+            }
+            _state.value = _state.value.copy(erpSyncing = true, erpError = null)
+            when (val outcome = dispatcher.syncDay(settings, date, includeExits = true)) {
+                is com.trindade.app.aero.AeroSyncOutcome.Synced -> {
+                    store.markSynced(date, com.trindade.app.massas.MassasLaunchViewModel.nowLabel())
+                    val day = runCatching { reports.salidaDay(date) }.getOrNull()
+                    _state.value = _state.value.copy(
+                        erpSyncing = false,
+                        salidaDay = day ?: _state.value.salidaDay,
+                        erpError = if (day == null) {
+                            com.trindade.app.ui.UiText.of(com.trindade.app.R.string.report_salida_read_error)
+                        } else {
+                            null
+                        },
+                    )
+                }
+                is com.trindade.app.aero.AeroSyncOutcome.Failed ->
+                    _state.value = _state.value.copy(erpSyncing = false, erpError = outcome.failure.describe())
+            }
+        }
     }
 
     fun onHistoryPhoneChange(phone: String) {

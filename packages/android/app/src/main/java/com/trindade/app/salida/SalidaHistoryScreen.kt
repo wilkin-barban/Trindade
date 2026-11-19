@@ -23,6 +23,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
+import com.trindade.app.ui.resolve
+import com.trindade.app.reports.SalidaReportCard
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -122,6 +129,11 @@ internal fun SalidaHistoryEmpty(
 @Composable
 fun SalidaHistoryScreen(
     viewModel: SalidaViewModel,
+    /**
+     * La cuenta que está mirando. Las fotos de un movimiento son de quien lo lanzó: las de otro operario -- o las
+     * que vinieron del ERP -- se ven y no se tocan.
+     */
+    viewerUsername: String = "",
     onOpenWhatsApp: (String) -> Unit = {},
     /** La vuelta al lanzamiento desde el día vacío de hoy. */
     onLaunch: () -> Unit = {},
@@ -168,17 +180,9 @@ fun SalidaHistoryScreen(
 
         Spacer(Modifier.height(12.dp))
 
-        state.notice?.let { notice ->
-            Text(
-                notice.message,
-                style = MaterialTheme.typography.bodySmall,
-                color = if (notice.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(bottom = 8.dp),
-            )
-        }
-
-        // Hoy siempre está, aunque el servidor todavía no lo haya devuelto: es el día que el operario viene a
-        // mirar. Debajo, las cinco fechas anteriores más recientes -- o todas, si pidió todas.
+        // El día que el operario viene a mirar. Los chips son la única navegación que queda arriba, y en el
+        // pasado lo único que se muestra debajo es el bloque de WhatsApp: el resto es información de un día que
+        // ya se lanzó y no se toca.
         val today = state.date
         val selected = state.historyDate ?: today
         val days = state.history
@@ -192,6 +196,44 @@ fun SalidaHistoryScreen(
             onSelect = viewModel::selectHistoryDate,
             onToggleAll = viewModel::toggleHistoryAll,
         )
+
+        val summaryLabels = salidaSummaryLabels()
+
+        if (salidaHistoryShowsDayBody(selected, today)) {
+            // Hoy es el día que se consulta y se sincroniza. El pasado se queda con el share solo -- ni sync, ni
+            // bloque del ERP, ni tarjetas --, que es la regla que el dueño pidió dos veces.
+            SalidaErpBlock(
+                isSyncing = state.erpSyncing,
+                onSync = viewModel::syncSalidaDay,
+                day = state.salidaDay,
+                error = state.erpError,
+            )
+            LaunchedEffect(selected) { viewModel.loadSalidaDay(selected) }
+        }
+
+        if (!salidaHistoryShowsDayBody(selected, today)) {
+            // Pasado: sólo el bloque de compartir, con el texto del servidor o la prévia vacía si ese día no tuvo
+            // salidas. Sin tarjetas, sin fotos, sin filtros, sin pendientes y sin nota de solo lectura.
+            SalidaWhatsAppShare(
+                text = viewModel.dayShareText(summaryLabels),
+                phone = state.historyPhone,
+                onPhoneChange = viewModel::onHistoryPhoneChange,
+                walletLink = viewModel.historyWhatsAppLink(summaryLabels),
+                onOpenWhatsApp = {
+                    viewModel.historyWhatsAppLink(summaryLabels)?.let { onOpenWhatsApp(it) }
+                },
+            )
+            return@Column
+        }
+
+        state.notice?.let { notice ->
+            Text(
+                notice.message,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (notice.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+        }
 
         // Los pendientes que esperan viaje al ERP se cuentan en la cabecera del día, no en cada tarjeta: es la
         // pregunta que el operario hace al abrir el histórico por la mañana.
@@ -230,10 +272,6 @@ fun SalidaHistoryScreen(
                     .testTag("salida-history-readonly-note"),
             )
         }
-
-        // Las etiquetas del mensaje, resueltas acá: el operario que comparte y el que lee la prévia ven el mismo
-        // texto, en el idioma de la app.
-        val summaryLabels = salidaSummaryLabels()
 
         val movements = days.firstOrNull { it.date == selected }?.movements.orEmpty()
 
@@ -292,12 +330,18 @@ fun SalidaHistoryScreen(
                     movement = movement,
                     // Las fotos son de hoy: el pasado es el registro de lo que se lanzó, y la web esconde el
                     // selector en un día cerrado. El share y el reenvío pendiente siguen disponibles.
-                    onAddPhoto = if (selected == today) {
+                    // Sólo hoy y sólo si el movimiento es de esta cuenta: el de otro operario se lee, como el
+                    // asiento que vino del ERP.
+                    onAddPhoto = if (selected == today && movement.owns(viewerUsername)) {
                         { pendingPhotoMovement = movement.id }
                     } else {
                         null
                     },
-                    onDeletePhoto = if (selected == today) viewModel::deletePhoto else null,
+                    onDeletePhoto = if (selected == today && movement.owns(viewerUsername)) {
+                        viewModel::deletePhoto
+                    } else {
+                        null
+                    },
                     onShare = { onOpenWhatsApp(viewModel.movementShareLink(movement, summaryLabels)) },
                     onResend = if (viewModel.isPending(movement)) viewModel::resendPending else null,
                 )
@@ -346,6 +390,74 @@ fun SalidaHistoryScreen(
  */
 fun salidaHistoryVisibleDates(today: String, dates: List<String>, all: Boolean): List<String> =
     (listOf(today) + historyQuickDays(today, dates, all)).distinct()
+
+/**
+ * Si el movimiento es de la cuenta que está mirando.
+ *
+ * La comparación es por `username` y sin mayúsculas: es la identidad con la que el movimiento se firmó, y es la
+ * misma que el servidor guarda como dueño. Un nombre vacío -- una sesión sin nombre, un invitado -- no es dueño de
+ * nada, y entonces sólo lee.
+ */
+internal fun SalidaCreateResponseMovement.owns(viewerUsername: String): Boolean =
+    viewerUsername.isNotBlank() && username.equals(viewerUsername, ignoreCase = true)
+
+/** El tag con el que un test encuentra la sincronización del espejo en este histórico. */
+const val SALIDA_HISTORY_ERP_SYNC_TAG: String = "salida-history-erp-sync"
+
+/**
+ * Las salidas del ERP del día, con la acción que las trae. Sólo se dibuja en el día de hoy.
+ *
+ * Es el mismo bloque del Relatório (`SalidaReportCard`): la lectura es `reportsRepository.salidaDay` y el viaje es
+ * `syncDay(..., includeExits = true)`, así que no hay una segunda forma de traerlas ni de nombrarlas. El botón no
+ * escribe en Trindade: refresca el espejo y vuelve a leer, y su error -- sin credenciales, sin red, el ERP
+ * rechazando -- se lee debajo, con la misma frase que el resto de la app.
+ */
+@Composable
+internal fun SalidaErpBlock(
+    isSyncing: Boolean,
+    onSync: () -> Unit,
+    day: com.trindade.app.contract.models.SalidaReportDayView?,
+    error: com.trindade.app.ui.UiText?,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        FilledTonalButton(
+            onClick = onSync,
+            enabled = !isSyncing,
+            modifier = Modifier
+                .fillMaxWidth()
+                .defaultMinSize(minHeight = 48.dp)
+                .testTag(SALIDA_HISTORY_ERP_SYNC_TAG),
+        ) {
+            if (isSyncing) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+                Spacer(Modifier.width(8.dp))
+            }
+            Text(stringResource(R.string.report_erp_sync), style = MaterialTheme.typography.labelLarge)
+        }
+        error?.let {
+            Text(
+                text = it.resolve(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+        SalidaReportCard(day = day, error = null, modifier = Modifier.testTag("salida-history-erp-block"))
+    }
+}
+
+/**
+ * Si esta fecha muestra el día completo o sólo el bloque de WhatsApp.
+ *
+ * Hoy es el día que se lee y se opera, así que conserva producción, filtros, tarjetas, fotos y pendientes. Una
+ * fecha pasada es el registro de lo que se lanzó: debajo de los chips queda únicamente el mensaje del servidor con
+ * su acción, y nada más -- ni tarjetas, ni fotos, ni filtros, ni la nota de solo lectura.
+ */
+internal fun salidaHistoryShowsDayBody(selected: String, today: String): Boolean = selected == today
 
 /**
  * Las fechas del histórico: hoy, las cinco anteriores y la puerta a todas.

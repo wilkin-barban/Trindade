@@ -151,6 +151,16 @@ enum class MassasOrigin {
 }
 
 /**
+ * Si el día muestra su cuerpo -- producción, filas, filtros, resumen -- o sólo el mensaje que se comparte.
+ *
+ * En el histórico, una fecha pasada no se opera: debajo del encabezado con sus fechas queda el bloque de WhatsApp
+ * y nada más. Hoy, que es el día que se lee y se corrige, conserva el cuerpo completo. El lanzamiento no entra en
+ * esta pregunta: su pantalla no monta el bloque del histórico.
+ */
+internal fun massasHistoryShowsDayBody(origin: MassasOrigin, readOnly: Boolean): Boolean =
+    origin == MassasOrigin.LAUNCH || !readOnly
+
+/**
  * Si esta visita ofrece el sync del espejo del ERP.
  *
  * Dos hechos, y los dos tienen que valer: la pantalla es el histórico (el lanzamiento no sincroniza, lanza) y el
@@ -317,16 +327,19 @@ fun MassasLaunchScreen(
         // La cabecera se lleva la acción y la hora del último intento, en el mismo alto que la fila de la
         // fecha: antes había un botón aquí y una tarjeta entera debajo, los dos refrescando lo mismo.
         // PASO 1: Data de Produção e sincronização com o ERP.
-        MassasDayHeader(
-            date = state.date,
-            syncedAt = state.aeroSyncedAt,
-            isSyncing = state.isSyncingAero,
-            // El sync del espejo es del histórico y sólo de un día abierto: el lanzamiento lanza y el día se
-            // consulta donde se lee, pero un día pasado no se sincroniza. Se pregunta por las dos cosas y no sólo
-            // por el origen, que es de donde venía el botón en una fecha cerrada.
-            onSync = if (offersErpSync(origin, state.isReadOnly)) viewModel::syncAeroDay else null,
-            readOnly = state.isReadOnly,
-        )
+        // En un día pasado ni siquiera esta tarjeta: el encabezado con sus fechas y el mensaje alcanzan. Hoy (y el
+        // lanzamiento) conservan la fecha, la última lectura y el sync que corresponda.
+        if (massasHistoryShowsDayBody(origin, state.isReadOnly)) {
+            MassasDayHeader(
+                date = state.date,
+                syncedAt = state.aeroSyncedAt,
+                isSyncing = state.isSyncingAero,
+                // El sync del espejo es del histórico y sólo de un día abierto: el lanzamiento lanza y el día se
+                // consulta donde se lee, pero un día pasado no se sincroniza.
+                onSync = if (offersErpSync(origin, state.isReadOnly)) viewModel::syncAeroDay else null,
+                readOnly = state.isReadOnly,
+            )
+        }
 
         // PASO 2 es del lanzamiento: la vista de día del historial no pide cantidades, sólo lee el día.
         if (origin == MassasOrigin.LAUNCH && !state.isReadOnly) {
@@ -409,6 +422,18 @@ fun MassasLaunchScreen(
         // Del PASO 3 al PASO 6 la pantalla es el histórico del día: producción, lanzamientos, resumen y el
         // mensaje que se comparte. El lanzamiento se queda con la grilla, la confirmación y la barra sticky.
         if (origin == MassasOrigin.HISTORY) {
+        // Un día pasado es el registro de lo que la planta hizo: debajo del encabezado y sus fechas queda
+        // únicamente el mensaje que se comparte. Sin producción, sin filas, sin filtros, sin importar y sin
+        // sincronizar; el día vacío deja la prévia vacía y el envío deshabilitado.
+        if (!massasHistoryShowsDayBody(origin, state.isReadOnly)) {
+            MassasWhatsAppShare(
+                shareText = viewModel.getShareText(),
+                phone = state.phone,
+                onPhoneChange = viewModel::onPhoneChange,
+                whatsappLink = viewModel.getWhatsAppLink(),
+            )
+            return@Column
+        }
         // PASO 3: Produção do Dia (tabela unificada: lançado aqui, no ERP e só no ERP).
         MassasUnifiedTable(
             state = state,

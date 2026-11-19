@@ -698,6 +698,9 @@ class MainActivity : ComponentActivity() {
                                     if (salidaHistoryOpen) {
                                         com.trindade.app.salida.SalidaHistoryScreen(
                                             viewModel = salidaViewModel,
+                                            // Las fotos de un movimiento son de quien lo lanzó: la pantalla lo
+                                            // sabe por esta cuenta.
+                                            viewerUsername = sessionUsername.orEmpty(),
                                             // El día vacío de hoy ofrece lanzar la primera baja: vuelve a la
                                             // pantalla de lanzamiento, no al tablero.
                                             onLaunch = { salidaHistoryOpen = false },

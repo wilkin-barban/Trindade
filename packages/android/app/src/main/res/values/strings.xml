@@ -1051,6 +1051,7 @@
     <string name="report_receipts_units">%1$s un</string>
     <string name="report_erp_sync_success">Movimentações do ERP sincronizadas.</string>
     <string name="report_erp_sync_failed">Falha ao sincronizar com ERP: %1$s</string>
+    <string name="report_salida_read_error">Não foi possível ler as saídas do ERP.</string>
     <string name="report_erp_not_configured">Configure a integração com o ERP em Administração antes de sincronizar.</string>
     <!-- Unified massas table: the three states one day can have. -->
     <string name="massas_empty_day">Nenhum lançamento neste dia.</string>

@@ -210,10 +210,9 @@ describe('SalidaHistoryPage', () => {
     expect(screen.queryByTestId('salida-resend-1')).toBeNull();
     expect(screen.getByTestId('salida-resend-2')).toBeInTheDocument();
 
-    // A partial reconciliation is not pending: resending it would duplicate the seats the company already has.
-    fireEvent.click(screen.getByTestId('salida-history-day-2026-11-12'));
-    await waitFor(() => expect(screen.getByTestId('salida-movement-3')).toBeInTheDocument());
-    expect(screen.queryByTestId('salida-resend-3')).toBeNull();
+    // Un movimiento conciliado en parte no está pendiente; su tarjeta vive en un día pasado, que ya no dibuja
+    // tarjetas: la regla del pasado es sólo el bloque de compartir.
+    expect(screen.queryByTestId('salida-resend-1')).toBeNull();
   });
 
   it('narrows the day by block', async () => {
@@ -228,14 +227,17 @@ describe('SalidaHistoryPage', () => {
     expect(screen.getByTestId('salida-movement-1')).toBeInTheDocument();
   });
 
-  it('opens another day from its chip', async () => {
+  it('opens another day from its chip, and the past keeps only the share block', async () => {
     await renderReady();
 
-    expect(screen.queryByTestId('salida-movement-3')).toBeNull();
+    expect(screen.queryByTestId('salida-share-day')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('salida-history-day-2026-11-12'));
 
-    await waitFor(() => expect(screen.getByTestId('salida-movement-3')).toBeInTheDocument());
-    expect(screen.getByTestId('salida-badge-3').textContent).toBe('Parcial');
+    await waitFor(() => expect(screen.getByTestId('salida-share-day')).toBeInTheDocument());
+    // Ni tarjetas, ni estados, ni fotos: el día pasado sólo se comparte.
+    expect(screen.queryByTestId('salida-movement-3')).toBeNull();
+    expect(screen.queryByTestId('salida-badge-3')).toBeNull();
+    expect(screen.queryByTestId('salida-history-actions')).toBeNull();
   });
 
   it('opens on plant today by default, showing empty state when today has no movements (Requirement 2)', async () => {
@@ -278,7 +280,11 @@ describe('SalidaHistoryPage', () => {
     expect(screen.getByTestId('salida-history-empty')).toBeInTheDocument();
   });
 
-  it('shows read-only note and hides relaunch and photo controls on an earlier day (S9)', async () => {
+  /**
+   * El pasado es el registro de lo que se lanzó: debajo del selector de fecha queda **sólo** el bloque de
+   * compartir. Sin nota de solo lectura, sin filtros, sin tarjetas, sin fotos y sin el sync del ERP, que es de hoy.
+   */
+  it('on an earlier day only the share block is drawn, and yesterday offers no ERP sync', async () => {
     get.mockImplementation(async (url: string) =>
       url === '/salida/history'
         ? {
@@ -307,26 +313,30 @@ describe('SalidaHistoryPage', () => {
               },
             ],
           }
-        : {},
+        : url === '/reports/day/salidas?date=2026-11-13'
+          ? { date: '2026-11-13', operators: [], totalUnits: 0, movementCount: 0 }
+          : {},
     );
 
-    // Today (2026-11-13): manageable
+    // Hoy: se opera, se comparte y se sincroniza.
     await renderReady('/salida-history?date=2026-11-13');
-    expect(screen.queryByTestId('salida-history-readonly-note')).toBeNull();
+    expect(screen.getByTestId('salida-history-actions')).toBeInTheDocument();
+    expect(screen.getByTestId('salida-history-erp-sync')).toBeInTheDocument();
+    expect(screen.getByTestId('salida-report-section')).toBeInTheDocument();
     expect(screen.getByTestId('salida-resend-2')).toBeInTheDocument();
 
-    // Earlier day (2026-11-12): read-only
+    // El pasado: sólo el share.
     fireEvent.click(screen.getByTestId('salida-history-day-2026-11-12'));
-    await waitFor(() => expect(screen.getByTestId('salida-history-readonly-note')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId('salida-share-day')).toBeInTheDocument());
 
-    expect(screen.getByTestId('salida-history-readonly-note').textContent).toBe(i18n.t('history.readOnly'));
+    expect(screen.queryByTestId('salida-history-readonly-note')).toBeNull();
+    expect(screen.queryByTestId('salida-history-actions')).toBeNull();
     expect(screen.queryByTestId('salida-resend-88')).toBeNull();
+    expect(screen.queryByTestId('salida-photo-881')).toBeNull();
     expect(screen.queryByTestId('salida-photo-input')).toBeNull();
-    expect(screen.queryByTestId('salida-photo-delete-881')).toBeNull();
-    expect(screen.getByTestId('salida-photo-881')).toBeInTheDocument();
-    // Requirement 3: Past days keep no per-card share; day-level share stays
     expect(screen.queryByTestId('salida-share-88')).toBeNull();
-    expect(screen.getByTestId('salida-share-day')).toBeInTheDocument();
+    expect(screen.queryByTestId('salida-history-erp-sync')).toBeNull();
+    expect(screen.queryByTestId('salida-report-section')).toBeNull();
   });
 
   it('hands the movement summary to the share helper from the card action', async () => {
@@ -799,6 +809,36 @@ describe('SalidaHistoryPage — T3 per-movement state, relaunch, operator filter
     const newFile = new File(['image-bytes'], 'test.jpg', { type: 'image/jpeg' });
     fireEvent.change(photoInput, { target: { files: [newFile] } });
     await waitFor(() => expect(upload).toHaveBeenCalledWith('/salida/50/photos', expect.any(FormData)));
+  });
+
+  /**
+   * Las fotos de un movimiento son de quien lo lanzó.
+   *
+   * El histórico muestra lo de todos, y también lo que llegó del ERP. Una foto de otro operario se ve y no se
+   * toca: sin selector para agregar y sin borrar. El servidor rechaza el intento igual (403 `SALIDA_NOT_OWNER`);
+   * esto es la mitad que se ve.
+   */
+  it('does not offer photo actions on a movement launched by another operator', async () => {
+    const foreign = movement({
+      id: 70,
+      username: 'ana',
+      display_name: 'Ana',
+      photos: [
+        { id: 701, file_path: 'a.jpg', file_size: 100, mime_type: 'image/jpeg', url: '/api/salida/photos/701', created_at: '' },
+      ],
+    });
+
+    get.mockImplementation(async (url: string) =>
+      url === '/salida/history'
+        ? { days: [{ date: '2026-11-13', total_units: 20, movements: [foreign] }] }
+        : {},
+    );
+
+    await renderReady('/salida-history?date=2026-11-13');
+
+    expect(screen.getByTestId('salida-photo-701')).toBeInTheDocument();
+    expect(screen.queryByTestId('salida-photo-delete-701')).toBeNull();
+    expect(screen.queryByTestId('salida-photo-input')).toBeNull();
   });
 
   it('shows max photos reached notice when a movement already has 3 photos and hides add control', async () => {

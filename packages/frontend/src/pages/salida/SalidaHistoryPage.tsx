@@ -10,6 +10,10 @@ import { HistoryDayPanel, type HistoryDay } from '../../components/ui/HistoryDay
 import { ModuleHelpModal, type HelpSection } from '../../components/ui/ModuleHelpModal';
 import { SalidaBlockFilter, SalidaMovementCard } from '../../components/salida/SalidaMovementCard';
 import { SalidaWhatsAppShare } from '../../components/salida/SalidaWhatsAppShare';
+import { aeroSettingsReady, type AeroSettings } from '../../lib/aero-integration';
+import { fetchAeroVaultSettings } from '../../lib/aero-vault';
+import { triggerAeroMovementsSync } from '../../lib/aero-mirror';
+import { SalidaReportSection } from '../../components/reports/SalidaReportSection';
 import {
   SalidaSuccessDialog,
   type SalidaErpOutcome,
@@ -131,6 +135,47 @@ export function SalidaHistoryPage() {
 
   const date = isRealPastOrToday(asked) ? asked : today;
   const isReadOnly = isSalidaReadOnly(date, today);
+
+  // El sync del espejo es del día de hoy y no escribe en Trindade: lee las salidas que el ERP registró -- las de
+  // otros operarios incluidas -- y el bloque del Relatório las muestra. El pasado se queda con el share solo.
+  const [erpSyncing, setErpSyncing] = useState(false);
+  const [erpNote, setErpNote] = useState<string | null>(null);
+  const [erpRefetchKey, setErpRefetchKey] = useState(0);
+
+  const handleSyncErp = useCallback(async () => {
+    if (erpSyncing) return;
+    setErpSyncing(true);
+    setErpNote(null);
+    try {
+      const vault = await fetchAeroVaultSettings();
+      if (!vault.configured) {
+        setErpNote(t('salida.erpSyncUnavailable'));
+        return;
+      }
+      const settings: AeroSettings = {
+        wsUrl: vault.wsUrl ?? '',
+        username: vault.username ?? '',
+        hasPassword: vault.hasPassword,
+        syncEnabled: true,
+        lastSyncAt: null,
+      };
+      if (!aeroSettingsReady(settings)) {
+        setErpNote(t('salida.erpSyncUnavailable'));
+        return;
+      }
+      const fired = await triggerAeroMovementsSync(settings, {
+        date,
+        callbackPath: location.pathname,
+        includeExits: true,
+      });
+      setErpNote(t(fired ? 'salida.erpSyncRequested' : 'salida.erpSyncUnavailable'));
+    } catch {
+      setErpNote(t('salida.erpSyncUnavailable'));
+    } finally {
+      setErpSyncing(false);
+      setErpRefetchKey((key) => key + 1);
+    }
+  }, [date, erpSyncing, location.pathname, t]);
 
   const labels = useMemo<Record<SalidaBlock, string>>(
     () => ({
@@ -522,33 +567,29 @@ export function SalidaHistoryPage() {
           failedMessage={t('salida.historyDaysUnavailable')}
         />
 
-        {isReadOnly && (
-          <p
-            className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600"
-            data-testid="salida-history-readonly-note"
-          >
-            {t('history.readOnly')}
-          </p>
-        )}
+        {/* El pasado no se opera: debajo del selector de fecha queda únicamente el bloque de compartir. Todos
+            estos controles son del día de hoy, que es el que se lanza y se corrige. */}
+        {!isReadOnly && (
+          <>
+            {/* El filtro, y nada más: este histórico muestra lo que el operario lanzó. */}
+            <div
+              data-testid="salida-history-actions"
+              className="grid grid-cols-1 gap-2 border-t border-gray-100 pt-3 sm:flex sm:items-center sm:justify-between"
+            >
+              <SalidaBlockFilter value={block} onChange={setBlock} />
+            </div>
 
-        {/* El filtro, y nada más: este histórico muestra lo que el operario lanzó. La lectura del espejo del ERP
-            vive en el Relatório, que es donde se sincroniza el día. */}
-        <div
-          data-testid="salida-history-actions"
-          className="grid grid-cols-1 gap-2 border-t border-gray-100 pt-3 sm:flex sm:items-center sm:justify-between"
-        >
-          <SalidaBlockFilter value={block} onChange={setBlock} />
-        </div>
-
-        {pendingCount > 0 && (
-          <p className="text-xs text-amber-800" data-testid="salida-pending-count">
-            {t('salida.erpPending')}: {pendingCount}
-          </p>
+            {pendingCount > 0 && (
+              <p className="text-xs text-amber-800" data-testid="salida-pending-count">
+                {t('salida.erpPending')}: {pendingCount}
+              </p>
+            )}
+          </>
         )}
 
       </div>
 
-      {visibleMovements.length === 0 ? (
+      {!isReadOnly && visibleMovements.length === 0 ? (
         <div
           className="rounded-xl border border-gray-200 bg-white p-6 text-center shadow-sm"
           data-testid="salida-history-empty"
@@ -568,7 +609,7 @@ export function SalidaHistoryPage() {
             {t('salida.launch')}
           </Button>
         </div>
-      ) : (
+      ) : !isReadOnly ? (
         <div className="space-y-3">
           {visibleMovements.map((movement) => (
             <SalidaMovementCard
@@ -580,8 +621,32 @@ export function SalidaHistoryPage() {
               onRefresh={() => void load()}
               resending={resendingId === movement.id}
               readOnly={isReadOnly}
+              canManagePhotos={movement.username === user?.username}
             />
           ))}
+        </div>
+      ) : null}
+
+      {/* El sync del espejo y el bloque del Relatório: sólo en el día de hoy. */}
+      {!isReadOnly && (
+        <div className="space-y-2" data-testid="salida-history-erp">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void handleSyncErp()}
+            disabled={erpSyncing}
+            className="min-h-[44px] w-full"
+            data-testid="salida-history-erp-sync"
+          >
+            {erpSyncing ? <LoadingSpinner /> : null}
+            {t('salida.erpSync')}
+          </Button>
+          {erpNote && (
+            <p className="text-xs text-gray-500" data-testid="salida-history-erp-note">
+              {erpNote}
+            </p>
+          )}
+          <SalidaReportSection date={date} refetchKey={erpRefetchKey} />
         </div>
       )}
 

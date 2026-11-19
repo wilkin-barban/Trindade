@@ -1036,7 +1036,10 @@
     "totalUnits": "Total",
     "share": "Compartir",
     "noPhotos": "Sin fotos",
-    "launchShort": "Lanzar"
+    "launchShort": "Lanzar",
+    "erpSync": "Sincronizar con ERP",
+    "erpSyncRequested": "Leyendo las salidas del ERP…",
+    "erpSyncUnavailable": "El ERP no está configurado en este dispositivo."
   },
   "stock": {
     "add": "Agregar",

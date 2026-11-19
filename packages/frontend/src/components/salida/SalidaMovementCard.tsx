@@ -37,6 +37,8 @@ export function SalidaMovementCard({
   onRefresh,
   resending = false,
   readOnly = false,
+  /** Las fotos son de quien lanzó el movimiento: las de otro operario se ven y no se tocan. */
+  canManagePhotos = true,
 }: {
   movement: SalidaMovement;
   timeLabel: string;
@@ -45,6 +47,7 @@ export function SalidaMovementCard({
   onRefresh?: () => void;
   resending?: boolean;
   readOnly?: boolean;
+  canManagePhotos?: boolean;
 }) {
   const { t } = useTranslation();
   // The retention cleanup deletes the file and its row together, so a card drawn from a cached page can point at
@@ -198,7 +201,7 @@ export function SalidaMovementCard({
                     <span className="text-[11px] font-semibold leading-tight text-gray-700">
                       {t('salida.photoUnavailable')}
                     </span>
-                    {!readOnly && (
+                    {!readOnly && canManagePhotos && (
                       <button
                         type="button"
                         onClick={() => void handleDeletePhoto(photo.id)}
@@ -228,7 +231,7 @@ export function SalidaMovementCard({
                         onError={() => markPhotoUnavailable(photo.id)}
                       />
                     </a>
-                    {!readOnly && (
+                    {!readOnly && canManagePhotos && (
                       <button
                         type="button"
                         onClick={() => void handleDeletePhoto(photo.id)}
@@ -254,7 +257,7 @@ export function SalidaMovementCard({
           <p className="mt-3 text-xs text-gray-400">{t('salida.noPhotos')}</p>
         )}
 
-        {!readOnly && (
+        {!readOnly && canManagePhotos && (
           movement.photos.length >= SALIDA_MAX_PHOTOS ? (
             <p className="mt-2 text-xs font-medium text-gray-500" data-testid={`salida-photos-max-${movement.id}`}>
               {t('salida.photosMaxReached')}
@@ -273,7 +276,7 @@ export function SalidaMovementCard({
           )
         )}
 
-        {!readOnly && (
+        {!readOnly && canManagePhotos && (
           <div className="mt-3 flex flex-wrap gap-2">
             <Button
               type="button"
