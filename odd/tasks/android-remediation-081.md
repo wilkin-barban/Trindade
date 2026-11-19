@@ -634,6 +634,18 @@ el historial: separar las responsabilidades.
 **Sección 8 cerrada**: 8.1, 8.1-b, 8.2, 8.3, 8.4 y 8.5 en PASS, con la APK `0.8.4 (8007)` instalada en
 `emulator-5554`. Sin release, tag ni asset; la 0.7.5 y `packages/backend/apk` intactos.
 
+## 16. Vuelta en la cabecera, ERP en el mensaje del archivo, edición con las tres tarjetas
+
+- **`ShareCardMode.FROM_HISTORY`**: la vuelta pasa a la cabecera izquierda (`share-card-back`) y el botón inferior
+  desaparece; `SAVED` conserva su `Cerrar` abajo. Aplica a `ReportDetailScreen` y `LoadingShareScreen` sin cambios
+  en esas pantallas.
+- **Mensaje del Histórico de Salida**: `salidaDaySummaryText` fusiona los operarios/productos que sólo están en el
+  ERP (o que suman a un operario del día) con la misma tabla y formato, sin repetir operario ni producto; sin día
+  del ERP el texto no cambia. `SalidaViewModel.dayShareText` toma `salidaDay.operators`.
+- **Edición de Relatório**: `ReportEditScreen`/`ReportEditViewModel` muestran `ErpMovementsCard` (Massa do dia +
+  Insumos) y `SalidaReportCard` con **un** `Sincronizar com ERP` (`includeExits`), estado de carga y error; el
+  `update` no se tocó.
+
 ## 15. Miniaturas de fotos en las superficies de compartir (web y Android)
 
 - **Web** (`0e887983`): `ShareCard` acepta `photos` y dibuja una fila de miniaturas **arriba del texto** (`report-share-photos`,
