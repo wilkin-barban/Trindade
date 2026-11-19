@@ -168,6 +168,13 @@ fun MassasLaunchScreen(
      * día mira ese estado y no lo que el ViewModel alcanzó a mostrar.
      */
     onSelectDay: ((String) -> Unit)? = null,
+    /**
+     * Las fechas que el archivo del servidor reportó, para los chips del día abierto desde el historial.
+     *
+     * Vacía mientras la lectura no llega, o cuando esta superficie es la pestaña de lanzamiento: en los dos
+     * casos el encabezado dibuja hoy y el archivo, y las anteriores aparecen cuando el servidor las dice.
+     */
+    historyDates: List<String> = emptyList(),
 ) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
@@ -222,6 +229,7 @@ fun MassasLaunchScreen(
             MassasHistoryDayHeader(
                 today = MassasLaunchViewModel.saopauloToday(),
                 selectedDate = state.date,
+                historyDates = historyDates,
                 onBack = onBackToHistory,
                 onSelectDate = onSelectDay ?: viewModel::loadDay,
                 onOpenList = onBackToHistory,

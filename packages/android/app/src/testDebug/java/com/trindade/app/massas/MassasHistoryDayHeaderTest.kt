@@ -31,6 +31,9 @@ import org.robolectric.annotation.GraphicsMode
  * teléfono y la lista quedaba detrás. Lo que se afirma, entonces, es el nombre, el Voltar en un día de hoy y
  * las fechas -- hoy, cinco anteriores y el archivo -- con el destino que cada toque reporta.
  *
+ * Las fechas son las que el archivo del servidor reportó -- no cinco días de calendario --, así que la lista
+ * de arriba es la del archivo: incluye hoy, salta los días que la planta no produjo y trae más de cinco.
+ *
  * La pieza se prueba sin `MassasLaunchViewModel`, como la barra de lanzamiento y el vacío de Salida: es una
  * decisión sobre qué se ve y a dónde lleva cada toque, y esa decisión no necesita el día leído para ser cierta.
  */
@@ -49,8 +52,18 @@ class MassasHistoryDayHeaderTest {
 
     private val today = "2026-11-18"
 
+    /** El archivo tal como lo devuelve `/massas-launch/history`: hoy y seis días más, con huecos. */
+    private val archive = listOf(
+        "2026-11-18", "2026-11-17", "2026-11-16", "2026-11-13",
+        "2026-11-12", "2026-11-11", "2026-11-10", "2026-11-09",
+    )
+
+    /** Las cinco anteriores del archivo, que son las que el recorte deja pasar. */
+    private val earlier = listOf("2026-11-17", "2026-11-16", "2026-11-13", "2026-11-12", "2026-11-11")
+
     private fun render(
         selectedDate: String = today,
+        historyDates: List<String> = archive,
         onBack: () -> Unit = {},
         onSelectDate: (String) -> Unit = {},
         onOpenList: () -> Unit = {},
@@ -61,6 +74,7 @@ class MassasHistoryDayHeaderTest {
                 MassasHistoryDayHeader(
                     today = today,
                     selectedDate = selectedDate,
+                    historyDates = historyDates,
                     onBack = onBack,
                     onSelectDate = onSelectDate,
                     onOpenList = onOpenList,
@@ -80,9 +94,10 @@ class MassasHistoryDayHeaderTest {
 
         // Las cinco anteriores se dibujan aunque no entren en el ancho: la fila scrollea, y el archivo de un
         // día tiene que poder caminar hacia atrás desde acá sin volver primero a la lista.
-        for (date in massasHistoryCalendarDays(today)) {
+        for (date in earlier) {
             composeRule.onNodeWithTag(massasHistoryDayChipTag(date)).assertExists()
         }
+        assertEquals(5, earlier.size)
         composeRule.onNodeWithTag(MASSAS_HISTORY_DAY_ALL_TAG).assertExists()
     }
 
@@ -120,6 +135,29 @@ class MassasHistoryDayHeaderTest {
 
         assertEquals(1, backed)
         assertEquals(1, listed)
+    }
+
+    /**
+     * La fuente es el archivo del servidor: un día que la planta no produjo no tiene chip, y uno que el archivo
+     * trajo sin ser de la última semana sí -- las dos cosas que un calendario local contestaría al revés.
+     */
+    @Test
+    fun `the quick dates are the archive's, not the calendar's`() {
+        render(historyDates = listOf(today, "2026-11-17", "2026-10-02"))
+
+        composeRule.onNodeWithTag(massasHistoryDayChipTag("2026-11-17")).assertExists()
+        composeRule.onNodeWithTag(massasHistoryDayChipTag("2026-10-02")).assertExists()
+        // El 15 de noviembre está entre medio del calendario y no lo produjo nadie: no hay chip.
+        composeRule.onNodeWithTag(massasHistoryDayChipTag("2026-11-15")).assertDoesNotExist()
+    }
+
+    /** Hoy se dibuja siempre, aunque el archivo todavía no lo haya devuelto. */
+    @Test
+    fun `today is offered even before the archive reports it`() {
+        render(historyDates = emptyList())
+
+        composeRule.onNodeWithTag(MASSAS_HISTORY_DAY_TODAY_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(MASSAS_HISTORY_DAY_ALL_TAG).assertExists()
     }
 
     @Test

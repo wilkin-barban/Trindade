@@ -50,6 +50,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -666,6 +667,18 @@ class MainActivity : ComponentActivity() {
                                 Tab.MASSAS_LAUNCH -> {
                                     BackHandler(enabled = !drawerState.isOpen, onBack = onBackMassasLaunchTab)
                                     val massasViewModel: com.trindade.app.massas.MassasLaunchViewModel = hiltViewModel()
+                                    // Las fechas rápidas del día abierto del historial salen del archivo del
+                                    // servidor -- `/massas-launch/history` -- y no de un calendario local, igual que
+                                    // en la web. La vista de día comparte el ViewModel del historial, así que la
+                                    // lectura es la misma que la lista reusa al volver: una sola, no dos.
+                                    val massasHistoryDates: List<String> = if (massasDayFromList) {
+                                        val historyViewModel: com.trindade.app.massas.MassasHistoryViewModel =
+                                            hiltViewModel()
+                                        val historyState by historyViewModel.state.collectAsState()
+                                        historyState.days.map { it.date }
+                                    } else {
+                                        emptyList()
+                                    }
                                     LaunchedEffect(massasLaunchDay) {
                                         if (massasLaunchDay != null) {
                                             massasViewModel.loadDay(massasLaunchDay!!)
@@ -693,6 +706,7 @@ class MainActivity : ComponentActivity() {
                                             massasDayFromHistory =
                                                 date != com.trindade.app.massas.MassasLaunchViewModel.saopauloToday()
                                         },
+                                        historyDates = massasHistoryDates,
                                     )
                                 }
                                 // O histórico mostra o que o dia produziu; a correção acontece na

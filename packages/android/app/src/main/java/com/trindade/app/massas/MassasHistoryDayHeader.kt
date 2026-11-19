@@ -16,7 +16,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.trindade.app.R
 import com.trindade.app.ui.components.HistoryHeader
-import java.time.LocalDate
 
 /** El chip del día de planta, que no se repite entre las fechas anteriores. */
 const val MASSAS_HISTORY_TODAY_LABEL: String = "Hoje"
@@ -34,25 +33,17 @@ const val MASSAS_HISTORY_DAY_TODAY_TAG: String = "massas-history-day-today"
 const val MASSAS_HISTORY_DAY_ALL_TAG: String = "massas-history-day-all"
 
 /**
- * Las [count] fechas anteriores a [today], de la más reciente a la más vieja.
- *
- * La lista del histórico recorta las fechas que el servidor devolvió -- ahí se consulta qué se produjo. La
- * vista de un día no hizo esa lectura: abre *un* día del archivo, y lo que necesita es poder caminar hacia
- * atrás. Por eso ofrece el calendario, no el listado: cinco días existan o no en el historial. Un día sin
- * lanzamientos tiene su estado vacío, que es una respuesta; esconderlo sería afirmar que ese día no ocurrió.
- */
-fun massasHistoryCalendarDays(today: String, count: Int = 5): List<String> {
-    val day = LocalDate.parse(today)
-    return (1..count).map { offset -> day.minusDays(offset.toLong()).toString() }
-}
-
-/**
  * El encabezado del día del Histórico de Massas: volver, el nombre del archivo y sus fechas rápidas.
  *
  * La vista de día nació como una subpantalla del lanzamiento y por eso conservaba su barra: el "Voltar" sólo
  * aparecía en un día pasado, y con hoy abierto desde el archivo el único camino de vuelta era el botón físico
  * del teléfono. Esta pieza dice lo que la pantalla es -- Histórico de Massas -- y pone a mano lo que la web
- * pone a mano: hoy, las cinco fechas anteriores y el archivo completo.
+ * pone a mano: hoy, las cinco fechas anteriores **que el archivo reportó** y el archivo completo.
+ *
+ * Las fechas son las del servidor y no el calendario: la web dibuja sus chips desde `/massas-launch/history`, y
+ * un chip de un día que la planta no produjo llevaría a una pantalla vacía que el archivo nunca ofreció. El
+ * recorte es la misma regla de la lista -- hoy aparte, cinco anteriores -- para que las dos superficies no
+ * ofrezcan fechas distintas.
  *
  * Vive fuera de `MassasLaunchScreen` para poder probarse sin su ViewModel: es una decisión sobre qué se ve y
  * a dónde lleva cada toque, y esa decisión no necesita el día leído para ser cierta.
@@ -61,6 +52,8 @@ fun massasHistoryCalendarDays(today: String, count: Int = 5): List<String> {
 fun MassasHistoryDayHeader(
     today: String,
     selectedDate: String,
+    /** Las fechas que `/massas-launch/history` reportó, de la más reciente a la más vieja. */
+    historyDates: List<String>,
     onBack: () -> Unit,
     onSelectDate: (String) -> Unit,
     onOpenList: () -> Unit,
@@ -85,7 +78,9 @@ fun MassasHistoryDayHeader(
                 label = { Text(MASSAS_HISTORY_TODAY_LABEL) },
                 modifier = Modifier.defaultMinSize(minHeight = 44.dp).testTag(MASSAS_HISTORY_DAY_TODAY_TAG),
             )
-            massasHistoryCalendarDays(today).forEach { date ->
+            // Hoy siempre se dibuja -- el archivo puede no haber devuelto todavía el día de planta -- y las
+            // anteriores son las que el servidor conoce, con el mismo recorte de cinco que la lista.
+            massasHistoryShownDays(today, historyDates, all = false).forEach { date ->
                 FilterChip(
                     selected = selectedDate == date,
                     onClick = { onSelectDate(date) },
