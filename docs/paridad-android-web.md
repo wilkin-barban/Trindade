@@ -458,10 +458,11 @@ texto del servidor, estado de carga/error y acciones de WhatsApp/PDF, con `Edita
 - **Android**: la vista de detalle de un histórico es una pantalla de solo lectura con el texto del servidor, acciones
   de compartir/PDF y un botón Volver; no es el formulario de edición ni una grilla editable. El botón Volver y los
   destinos deben coincidir con los de la web.
-- **Fechas rápidas de los históricos**: la fila ofrece siempre **cinco fechas anteriores** y «Todas as datas». Las
-  que el archivo del servidor reportó van primero; si el archivo tiene menos de cinco, el calendario las completa
-  hacia atrás, sin repetir y sin pasar de hoy. Una fecha sin datos abre su estado vacío —que es una respuesta—,
-  mientras que una fecha ausente no se puede consultar. «Todas as datas» no se completa: es el archivo.
+- **Fechas rápidas de los históricos**: la fila ofrece siempre **las cinco fechas de calendario inmediatamente
+  anteriores a hoy** (`hoy-1 … hoy-5`, hoy aparte) y «Todas as datas» para el archivo completo. No son las cinco
+  primeras del archivo: con un archivo de 18, 17, 16, 13 y 12/11 esas serían las ofrecidas y se saltarían el 15 y
+  el 14, que son las dos fechas pasadas más recientes. Un chip sin producción abre su estado vacío —que es una
+  respuesta— y el pasado es de solo lectura; «Todas as datas» no se rellena, muestra lo que el servidor reportó.
 - **Editar en el día de hoy**: la tarjeta dibuja `Editar` cuando quien la abre lo ofrece, sea cual sea la puerta. Si un
   día se puede corregir es un hecho de ese día y de quien lo mira — hoy, y permitido por el servidor —, no de si se
   llegó desde el archivo. En el informe manda `report.canEdit && report_date == hoy`; en el cargamento, el día es hoy

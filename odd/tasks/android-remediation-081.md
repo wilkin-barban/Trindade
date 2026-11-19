@@ -673,11 +673,13 @@ Todo pendiente al abrir esta sección; se cierra por slices con su commit.
   `docs/paridad-android-web.md` (Horario de Cargamento). Evidencia: `:app:testDebugUnitTest` verde, 159+ pruebas
   del paquete `loading` incluidas las nuevas de la grilla y de la pantalla de compartir.
 - **Corrección de P0-2 · hecha (`63d2a2b2`)** — los chips no salen del calendario sino del archivo del servidor
-  (`/massas-launch/history`), como la web: **Hoje** se dibuja siempre, las anteriores son las que el servidor
-  reportó y **Todas as datas** abre el archivo. La vista de día comparte el ViewModel del historial, así que abrir
-  el día y volver a la lista cuesta una sola lectura. **Ajuste de la verificación en 0.8.5**: con tres días de
-  archivo solo aparecían tres chips; la regla pasa a ser **archivo primero y calendario completando hasta cinco**
-  (`historyQuickDays`), sin repetir y sin pasar de hoy; «Todas as datas» sigue mostrando solo lo que existe.
+  (`/massas-launch/history`), como la web: **Hoje** se dibuja siempre y **Todas as datas** abre el archivo. La
+  vista de día comparte el ViewModel del historial, así que abrir el día y volver a la lista cuesta una sola
+  lectura. **Regla final de la fila (verificación en 0.8.5, segunda pasada)**: las cinco anteriores son **siempre
+  las cinco de calendario** `hoy-1 … hoy-5`, nunca las cinco primeras del archivo -- con un archivo de 18, 17, 16,
+  13 y 12/11 la regla vieja se saltaba el 15 y el 14, las dos fechas más recientes que faltaban. Los días del
+  archivo fuera de esa ventana viven en «Todas as datas», que no se rellena. `historyQuickDays` es la regla única
+  para Masas y Salida; un chip sin producción abre su estado vacío y el pasado sigue read-only.
 - **P1-3 · hecho (`31c8477c`)** — `ShareCard` dibuja **Editar** siempre que quien la abre lo ofrezca, en cualquier
   modo; el modo decide la salida (`Cerrar` el día recién guardado, `Volver` la puerta que la abrió). Quién lo
   ofrece es la regla de la web: el informe, `report.canEdit && report_date == hoy` (más siempre el recién
