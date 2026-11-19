@@ -132,6 +132,7 @@ class MainActivity : ComponentActivity() {
         LOADING_HISTORY,
         STOCK_HISTORY,
         ADMIN_AUDIT,
+        SALIDA_HISTORY,
     }
 
     /** One tab, and the overlay the visit opens on top of it. */
@@ -197,6 +198,14 @@ class MainActivity : ComponentActivity() {
             DrawerEntry.Link(Destination(RolePolicy.EntryPoint.LOADING, R.string.nav_loading, R.drawable.ic_truck, NavTarget(Tab.LOADING))),
             DrawerEntry.Link(Destination(RolePolicy.EntryPoint.MASSAS_LAUNCH, R.string.massas_title, R.drawable.ic_layers, NavTarget(Tab.MASSAS_LAUNCH))),
             DrawerEntry.Link(Destination(RolePolicy.EntryPoint.SALIDA, R.string.nav_salida, R.drawable.ic_package_minus, NavTarget(Tab.SALIDA))),
+            DrawerEntry.Link(
+                Destination(
+                    RolePolicy.EntryPoint.SALIDA_HISTORY,
+                    R.string.nav_salida_history,
+                    R.drawable.ic_history,
+                    NavTarget(Tab.SALIDA, Overlay.SALIDA_HISTORY),
+                ),
+            ),
             DrawerEntry.Link(Destination(RolePolicy.EntryPoint.ASSAI_ORDER, R.string.nav_assai, R.drawable.ic_calculator, NavTarget(Tab.ASSAI))),
             DrawerEntry.Link(Destination(RolePolicy.EntryPoint.STOCK_COUNTER, R.string.nav_stock_counter, R.drawable.ic_boxes, NavTarget(Tab.STOCK_COUNTER))),
             DrawerEntry.Link(
@@ -341,6 +350,8 @@ class MainActivity : ComponentActivity() {
                         loadingHistoryOpen = false
                         loadingShareDay = null
                         massasHistoryOpen = false
+                        salidaHistoryOpen = false
+                        stockHistoryOpen = false
                         massasLaunchDay = null
                         massasDayFromHistory = false
                         loadingDay = null
@@ -519,6 +530,8 @@ class MainActivity : ComponentActivity() {
                                 massasHistoryOpen -> Overlay.MASSAS_HISTORY
                                 historyOpen -> Overlay.REPORTS_HISTORY
                                 loadingHistoryOpen -> Overlay.LOADING_HISTORY
+                                stockHistoryOpen -> Overlay.STOCK_HISTORY
+                                salidaHistoryOpen -> Overlay.SALIDA_HISTORY
                                 else -> null
                             },
                             onSelectTab = { tab = it },
@@ -541,6 +554,7 @@ class MainActivity : ComponentActivity() {
                                 historyOpen = false
                                 loadingHistoryOpen = false
                                 stockHistoryOpen = false
+                                salidaHistoryOpen = false
                                 adminRequestedSection = null
                                 if (target.tab != Tab.LOADING) {
                                     loadingDay = null
@@ -555,6 +569,7 @@ class MainActivity : ComponentActivity() {
                                     Overlay.REPORTS_HISTORY -> historyOpen = true
                                     Overlay.LOADING_HISTORY -> loadingHistoryOpen = true
                                     Overlay.STOCK_HISTORY -> stockHistoryOpen = true
+                                    Overlay.SALIDA_HISTORY -> salidaHistoryOpen = true
                                     Overlay.ADMIN_AUDIT -> adminRequestedSection =
                                         com.trindade.app.admin.AdminSection.AUDIT
                                     null -> Unit

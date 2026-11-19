@@ -674,6 +674,7 @@ class MainActivityNavigationTest {
                 R.string.nav_loading,
                 R.string.massas_title,
                 R.string.nav_salida,
+                R.string.nav_salida_history,
                 R.string.nav_assai,
                 R.string.nav_stock_counter,
                 R.string.massas_history_title,
@@ -734,6 +735,35 @@ class MainActivityNavigationTest {
         val destination = chosen
         assertEquals(MainActivity.Tab.MASSAS_LAUNCH, destination?.target?.tab)
         assertEquals(MainActivity.Overlay.MASSAS_HISTORY, destination?.target?.overlay)
+    }
+
+    @Test
+    fun `choosing salida history in the drawer targets salida tab with salida history overlay`() {
+        var chosen: MainActivity.Destination? = null
+        composeRule.setContent {
+            TrindadeTheme {
+                MainAppShell(
+                    role = RolePolicy.WORKER,
+                    currentTab = MainActivity.Tab.DASHBOARD,
+                    onSelectTab = {},
+                    onOpenProfile = {},
+                    onSelectDrawerEntry = { chosen = it },
+                ) {
+                    Text("Body")
+                }
+            }
+        }
+
+        composeRule.onNodeWithContentDescription(copy(R.string.nav_menu)).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNode(
+            hasText(copy(R.string.nav_salida_history)).and(hasAnyAncestor(hasTestTag("navigation_drawer_sheet"))),
+        ).performScrollTo().performClick()
+        composeRule.waitForIdle()
+
+        val destination = chosen
+        assertEquals(MainActivity.Tab.SALIDA, destination?.target?.tab)
+        assertEquals(MainActivity.Overlay.SALIDA_HISTORY, destination?.target?.overlay)
     }
     @Test
     fun `administrator sees admin destination in drawer without horizontal hunting`() {

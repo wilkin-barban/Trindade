@@ -510,6 +510,7 @@
     <string name="nav_stock_history">Histórico de Contagem</string>
     <string name="nav_share">Compartilhar App</string>
     <string name="nav_salida">Saída / Baixa</string>
+    <string name="nav_salida_history">Histórico de Saídas</string>
     <string name="dashboard_stock_counter">Conte e some as caixas do dia</string>
     <string name="dashboard_share_app">Envie o aplicativo e os acessos para o próximo celular.</string>
     <string name="dashboard_stock_history">Os dias já contados, só com o que foi contado</string>
@@ -624,7 +625,7 @@
     <string name="help_massas_step2_title">Resumo Coletivo em Tempo Real</string>
     <string name="help_massas_step2_desc">Acompanhe os totais da fábrica somados automaticamente. O painel sincroniza a cada 15 segundos entre todos os aparelhos.</string>
     <string name="help_massas_step3_title">Compartilhar no WhatsApp</string>
-    <string name="help_massas_step3_desc">Envie o resumo formatado com os produtos lançados e a lista de operadores participantes com um clique.</string>
+    <string name="help_massas_step3_desc">Envie o resumo formatado com os produtos lançados e a lista de operadores participantes.</string>
 
     <string name="help_massas_history_title">Histórico de Produção de Massas</string>
     <string name="help_massas_history_desc">Consulte lançamentos de dias anteriores, verifique totais consolidados e operadores que registraram produção.</string>
@@ -659,6 +660,49 @@
 
     <string name="help_share_title">Compartilhar Aplicativo</string>
     <string name="help_share_desc">Compartilhe o link do aplicativo com operadores e motoristas por WhatsApp, cópia de link ou código QR na tela.</string>
+
+    <string name="help_salida_title">Como Funciona a Saída / Baixa</string>
+    <string name="help_salida_desc">Registre a saída de produtos acabados, embalagens e matérias-primas com contagem de caixas e controle de estoque.</string>
+    <string name="help_salida_section1_title">Seleção de Produtos e Blocos</string>
+    <string name="help_salida_section1_desc">Ative os blocos de produtos necessários e informe as quantidades a retirar. O total de unidades é calculado automaticamente.</string>
+    <string name="help_salida_section2_title">Confirmação de Baixa</string>
+    <string name="help_salida_section2_desc">Confira os produtos e quantidades no resumo antes de efetivar o lançamento para manter o estoque correto.</string>
+
+    <string name="help_salida_history_title">Histórico de Saídas</string>
+    <string name="help_salida_history_desc">Consulte os lançamentos de saída e baixas registrados anteriormente por data e operador.</string>
+    <string name="help_salida_history_section1_title">Consulta por Data</string>
+    <string name="help_salida_history_section1_desc">Veja o detalhe das saídas realizadas em cada dia e os totais de itens baixados.</string>
+
+    <string name="help_loading_slots_title">Organização por Faixas Horárias</string>
+    <string name="help_loading_slots_desc">Consulte os motoristas e veículos alocados por horário. O painel indica a ocupação máxima por faixa horária.</string>
+    <string name="help_loading_export_title">Exportação e Comunicação</string>
+    <string name="help_loading_export_desc">Exporte o cronograma completo para compartilhamento ou acione motoristas diretamente no WhatsApp.</string>
+
+    <string name="help_massas_history_section1_title">Consulta por Data</string>
+    <string name="help_massas_history_section1_desc">Toque em qualquer dia da lista para visualizar a discriminação completa de caixas, unidades e operadores.</string>
+    <string name="help_massas_history_section2_title">Totais Consolidados</string>
+    <string name="help_massas_history_section2_desc">Cada cartão exibe a soma de caixas e unidades produzidas na fábrica naquele dia.</string>
+
+    <string name="help_dashboard_section1_title">Módulos Operacionais</string>
+    <string name="help_dashboard_section1_desc">Navegue diretamente pelos cartões ou use o menu lateral para acessar Relatórios, Cronogramas, Massas, Estoque e Calculadoras.</string>
+    <string name="help_dashboard_section2_title">Lançamento de Massas</string>
+    <string name="help_dashboard_section2_desc">Acesse a 3ª posição do painel para lançar as caixas produzidas do dia ou consultar o histórico de produção.</string>
+
+    <string name="help_reports_section1_title">Checklist e Turnos</string>
+    <string name="help_reports_section1_desc">Preencha as tarefas operacionais de início ou fim de turno e selecione o turno correspondente.</string>
+    <string name="help_reports_section2_title">Temperaturas e Câmaras</string>
+    <string name="help_reports_section2_desc">Registre as medições de temperatura das câmaras frias para garantir o padrão de qualidade e auditoria.</string>
+
+    <string name="help_reports_history_section1_title">Consulta de Relatórios</string>
+    <string name="help_reports_history_section1_desc">Revise os relatórios finalizados com dados de temperatura, checklist e operadores responsáveis.</string>
+
+    <string name="help_loading_history_section1_title">Consulta de Cronogramas</string>
+    <string name="help_loading_history_section1_desc">Consulte os cronogramas de carregamento salvos e verifique as saídas de viagens de cada dia.</string>
+
+    <string name="help_stock_history_section1_title">Histórico de Fechamento</string>
+    <string name="help_stock_history_section1_desc">Consulte as contagens de estoque registradas em datas anteriores para fechamento de fábrica e conferência de sobras.</string>
+
+    <string name="loading_save">Salvar Horário</string>
 
     <!-- Additional Screen Labels & Common Actions -->
     <string name="dashboard_massas_launch_now">Lançar agora</string>
