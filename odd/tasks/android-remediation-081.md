@@ -655,3 +655,14 @@ La web es la referencia. Registro de la auditoría del dueño, con lo que hay qu
   instalación en `emulator-5554`, PASS/FAIL módulo por módulo.
 
 Todo pendiente al abrir esta sección; se cierra por slices con su commit.
+
+### Avance
+
+- **P0-1 · hecho (`0ace959d`)** — `LoadingScreen` ya no dibuja `Gerar texto do WhatsApp`, Copiar, Compartilhar,
+  PDF ni la lista de fleteros: `Salvar Horário` quedó como única acción del día. Los fleteros con teléfono se
+  mudaron a `LoadingShareViewModel` (lee el día y el plantel junto al texto) y `LoadingShareScreen` los dibuja
+  junto a la `ShareCard`; un chat que el dispositivo no puede abrir lo dice en su propia línea, sin reemplazar
+  el texto. `LoadingViewModel` perdió el flujo de export y los dos renderers que inyectaba. La norma quedó en
+  `docs/paridad-android-web.md` (Horario de Cargamento). Evidencia: `:app:testDebugUnitTest` verde, 159+ pruebas
+  del paquete `loading` incluidas las nuevas de la grilla y de la pantalla de compartir.
+- **Pendiente**: P0-2, P1-3, P1-4, P1-5, P1-7.
