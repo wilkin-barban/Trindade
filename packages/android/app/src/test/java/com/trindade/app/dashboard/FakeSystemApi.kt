@@ -80,7 +80,11 @@ class FakeSystemApi(
          * when there is not, so the two states the server can be in are what a test has to choose
          * between.
          */
-        fun summary(latestReportId: Int? = LATEST_REPORT_ID) = DashboardSummary(
+        fun summary(
+            latestReportId: Int? = LATEST_REPORT_ID,
+            latestReportCanEdit: Boolean = false,
+            activeScheduleCanEdit: Boolean = false,
+        ) = DashboardSummary(
             reportsToday = REPORTS_TODAY,
             schedulesTomorrow = SCHEDULES_TOMORROW,
             activeScheduleDate = ACTIVE_SCHEDULE_DATE,
@@ -94,6 +98,8 @@ class FakeSystemApi(
             higieneTotal = HIGIENE_TOTAL,
             recepcionDone = RECEPCION_DONE,
             recepcionTotal = RECEPCION_TOTAL,
+            latestReportCanEdit = latestReportCanEdit,
+            activeScheduleCanEdit = activeScheduleCanEdit,
         )
 
         /** The body a refusal carries. No caller reads it, and this fake does not read it either. */

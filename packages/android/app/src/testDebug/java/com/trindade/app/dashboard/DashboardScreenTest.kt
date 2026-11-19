@@ -10,6 +10,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasProgressBarRangeInfo
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -430,5 +431,77 @@ class DashboardScreenTest {
         composeRule.onNodeWithText(copy(R.string.dashboard_reports_total)).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(copy(R.string.dashboard_schedules_total)).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(copy(R.string.dashboard_deferred_notice)).performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun `the report and schedule cards offer Compartir, and Editar only when the server allows it`() {
+        var sharedReport = 0
+        var editedReport = 0
+        var sharedSchedule = ""
+        var editedSchedule = ""
+        composeRule.setContent {
+            com.trindade.app.ui.theme.TrindadeTheme {
+                DashboardScreen(
+                    state = state(
+                        summary = FakeSystemApi.summary(
+                            latestReportId = 7,
+                            latestReportCanEdit = true,
+                            activeScheduleCanEdit = true,
+                        ),
+                    ),
+                    onOpenReport = {},
+                    onOpenReports = {},
+                    onOpenLoading = {},
+                    onOpenLoadingDay = {},
+                    onOpenStock = {},
+                    onOpenAssai = {},
+                    onOpenShare = {},
+                    onShareActiveSchedule = {},
+                    onOpenReportShare = { sharedReport = it },
+                    onEditLatestReport = { editedReport = it },
+                    onOpenScheduleShare = { sharedSchedule = it },
+                    onEditActiveSchedule = { editedSchedule = it },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("dashboard-report-share").performClick()
+        composeRule.onNodeWithTag("dashboard-report-edit").performClick()
+        composeRule.onNodeWithTag("dashboard-share-active-schedule").performClick()
+        composeRule.onNodeWithTag("dashboard-active-schedule-edit").performClick()
+
+        assertEquals(7, sharedReport)
+        assertEquals(7, editedReport)
+        assertEquals(FakeSystemApi.ACTIVE_SCHEDULE_BATCH_DATE, sharedSchedule)
+        assertEquals(FakeSystemApi.ACTIVE_SCHEDULE_BATCH_DATE, editedSchedule)
+    }
+
+    @Test
+    fun `a worker who may not edit sees no Editar on either card`() {
+        composeRule.setContent {
+            com.trindade.app.ui.theme.TrindadeTheme {
+                DashboardScreen(
+                    state = state(
+                        summary = FakeSystemApi.summary(
+                            latestReportId = 7,
+                            latestReportCanEdit = false,
+                            activeScheduleCanEdit = false,
+                        ),
+                    ),
+                    onOpenReport = {},
+                    onOpenReports = {},
+                    onOpenLoading = {},
+                    onOpenLoadingDay = {},
+                    onOpenStock = {},
+                    onOpenAssai = {},
+                    onOpenShare = {},
+                    onShareActiveSchedule = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("dashboard-report-share").assertIsDisplayed()
+        composeRule.onNodeWithTag("dashboard-report-edit").assertDoesNotExist()
+        composeRule.onNodeWithTag("dashboard-active-schedule-edit").assertDoesNotExist()
     }
 }
