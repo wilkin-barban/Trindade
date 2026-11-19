@@ -387,6 +387,9 @@ No cambiar el alcance de release: **sin release/tag/asset**.
 
 ## 7. Avance de implementación
 
+Registro cronológico: cada fase aparece primero como alcance y después con su cierre. Cuando el mismo nombre
+aparece dos veces, **manda la última entrada**; las primeras se conservan como punto de partida, no como estado.
+
 ### F0 — cerrada
 ODD en el repo y versión por defecto del módulo en **0.8.1 (8004)** (`080d8e6a`). Baseline previa: Android 1433,
 backend 983, web node 754 + unit 243. El fix de `GUSTAVO H → Gustavo` ya estaba desplegado y no se tocó.
@@ -412,7 +415,7 @@ Suite completa de Android **verde** al cerrar la fase. Sin build de APK todavía
 
 **Pendiente de F1**: nada de código. La verificación en emulador de R1/R2/R3/R9/R10/R14 va en F7 con el resto.
 
-### F2 — siguiente, no empezada
+### F2 — punto de partida (histórico; cerrada más abajo)
 Alcance confirmado por §6 C. Punto de partida exacto:
 - `SalidaRepository.history()` devuelve hoy una lista plana de movimientos; debe devolver días (`date`, `total_units`,
   `movements`), que el contrato ya trae.
@@ -443,7 +446,7 @@ Suite `salida.*` verde al cerrar la fase. TestIDs de §6 C implementados: `salid
 **Pendiente de F2**: R4 (Masas: hoy + 5 + todas con operaciones y share) no se tocó — el histórico de Masas sigue
 como lista de días. Va junto con F3 o en una unidad propia.
 
-### F3 — siguiente
+### F3 — alcance (histórico; slices cerrados más abajo)
 Bloque `SalidaReportSection` en `ReportGeneratorScreen`/`ReportEditScreen` (`salidaDay`/`salidaLoading`/`salidaError`
 en los ViewModels, como ya hace el detalle), nombre + `(username)`, spinner/error/vacío/total y `testTag("report-salida-block")`;
 después el selector de fotos múltiple en creación y edición con compresión y subida tras guardar.
@@ -461,8 +464,9 @@ Test: `ReportSalidaBlockTest`.
 
 Suite completa de Android **verde** al cerrar estos dos slices.
 
-### F3 slice 2 — siguiente (no empezado)
-Fotos en creacion y edicion del Reporte:
+### F3 slice 2 — cerrada
+Fotos en creacion y edicion del Reporte (implementado; ver `ReportPhotosSection`, `pendingPhotos` en
+`ReportGeneratorViewModel` y `ReportEditViewModel`, y `ReportPhotosSectionTest` / `ReportGeneratorScreenTest`):
 - `pendingPhotos` en `ReportGeneratorViewModel` y `ReportEditViewModel` (JPEG ya comprimidos, tope 5 y 5 MB, error visible).
 - `ReportPhotosSection` con `PickMultipleVisualMedia` + camara, compresion por `PhotoCompressor`, previews y borrado
   (`report-photo-input`, `remove-pending-photo-btn`).
@@ -601,9 +605,12 @@ el historial: separar las responsabilidades.
 | 8.1 barra superior + orden del cajón | **hecho** | `be12ac08`: Salida / Baixas en la fila; Histórico de Salidas movido debajo de Histórico de Masas |
 | 8.1-b selección por overlay | **hecho** | `231dcd34`: `selectedTabIndex(row, tab, overlay)`; el historial entra en la fila y no marca el lanzamiento. Test en `MainActivityNavigationTest` |
 | 8.2 Historial de Masas abre en Hoy + Volver al historial | **hecho** | `f5a1f04c`: `openMassasHistory` apunta al día de planta; `onBackMassasLaunchTab` vuelve a la lista para cualquier día abierto desde el archivo. **Sin test unitario**: el estado vive en la composición de `MainActivity`; se verifica en el dispositivo (8.5) |
-| 8.3 Lanzamiento sin share ni gestión ERP | **pendiente** | `MassasLaunchScreen` todavía monta `MassasWhatsAppShare` cuando `origin == HISTORY` |
-| 8.4 CTA del día vacío en Salidas | **pendiente** | `SalidaHistoryScreen` devuelve sólo un texto cuando el día no tiene movimientos |
-| 8.5 bump 0.8.2 (8005) + verificación | **pendiente** | build, `adb install -r`, capturas en `/tmp/trindade-082/`, PASS/FAIL de los cinco |
+| 8.3 Lanzamiento sin share ni gestión ERP | **hecho** | `MassasLaunchScreen` monta el share **sólo** con `origin == HISTORY`, que es lo que 8.2 pide: la grilla de lanzamiento no lo dibuja (PASS en dispositivo, 0.8.4/8007) |
+| 8.4 CTA del día vacío en Salidas | **hecho** | `d48d5431`; `SalidaHistoryEmpty` + `SalidaHistoryEmptyTest` (hoy con CTA, pasado sin CTA) |
+| 8.5 bump 0.8.2 (8005) + verificación | **hecho** | el cierre se hizo con **0.8.4 (8007)**, instalada en `emulator-5554`; capturas en `/tmp/trindade-084/` |
+
+> Esta tabla se escribió al abrir §8; la cierra la sección «§8 — cierre verificado en dispositivo (0.8.4 / 8007)»
+> de más abajo, que manda sobre ella.
 
 ### §8 — cierre verificado en dispositivo (0.8.4 / 8007)
 

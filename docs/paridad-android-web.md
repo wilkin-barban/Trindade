@@ -263,8 +263,8 @@ de lanzamiento; el pasado se consulta en el histórico. En Android, lo mismo: si
   mundo; `/api/salida` sigue siendo la beta privada de un usuario). Devuelve `{ date, operators[], totalUnits,
   movementCount }`, cada operario con `{ name, username, units, products[{ code, name, block, units }], erpOnly }`.
 - **Salida abierta (2026-11-18)**: la web admite a cualquier cuenta autenticada en Salida / Baixa y su histórico; la
-  beta de `wilkin` terminó y el servidor ya no filtra por nombre. Android no se toca todavía: cuando implemente el
-  módulo, su histórico tampoco muestra `Conferir no ERP`, porque el sync del ERP es del Relatório. El invitado
+  beta de `wilkin` terminó y el servidor ya no filtra por nombre. Android sigue la misma regla: el módulo nació sin
+  beta y su histórico tampoco muestra `Conferir no ERP`, porque el sync del ERP es del Relatório. El invitado
   conserva su regla de solo lectura, que es de la cuenta y no del módulo.
 - **Administración en diálogo (normativa)**: el alta y la edición de `categories`, `tasks`, `drivers`, `vehicles`,
   `timeSlots` y `workers` usan un diálogo modal con `Aceptar` / `Cancelar`, nunca un formulario inline. El trabajador
@@ -555,10 +555,12 @@ Antes de dar una pantalla por terminada, verificar:
 
 1. **HEIC/HEIF en iPhone real**: backend y frontend validan las firmas; falta la prueba física de captura en planta.
 2. **Cabecera `Server`**: la terminación TLS la hace el reverse proxy del host; fuera del alcance de este repo.
-3. **Pantallas Android**: los modelos Kotlin de Salida, Masas y del sobre multi-paso están generados, pero faltan las
-   pantallas Compose, ViewModels y repositorios de Salida, Masas, Horario, Relatório e Administración.
-4. **Vistas de histórico web**: la `ShareCard` de solo lectura para Carregamento y Relatórios se estaba cerrando al
-   escribir esto; Android debe replicarla después de que el E2E de 390 px quede verde.
+3. **Pantallas Android** — **cerrado**: existen y están en uso las pantallas Compose, ViewModels y repositorios de
+   Salida, Masas, Horario, Relatório y Administración. Lo que queda se mide con el checklist de arriba (§10) y con
+   los históricos de `ShareCard`, no con «falta la pantalla».
+4. **Vistas de histórico web** — **cerrado**: la `ShareCard` de solo lectura de Carregamento y Relatórios está
+   implementada en los dos clientes; Android la replica en `LoadingShareScreen` y en el historial de Reportes, con
+   `Volver` y `Editar` sólo hoy (§5 «Editar en el día de hoy»).
 5. **Medición real del sobre de 2 MB**: conviene medir un día de Masas con muchos movimientos en producción para
    confirmar que el compuesto no descarta `read` con frecuencia.
 6. **Verificación con cuenta no-wilkin en producción**: la matriz de rutas está cubierta por tests, pero falta una
