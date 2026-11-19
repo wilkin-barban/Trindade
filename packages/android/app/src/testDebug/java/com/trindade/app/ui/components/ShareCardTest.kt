@@ -7,6 +7,8 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -239,6 +241,66 @@ class ShareCardTest {
         }
 
         assertEquals(0, composeRule.onAllNodesWithText("Copiar", substring = true).fetchSemanticsNodes().size)
+    }
+
+    /**
+     * Las fotos van arriba del texto, en una fila de solo lectura.
+     *
+     * La tarjeta comparte; borrar o agregar fotos es de la pantalla del reporte. La miniatura no es un botón y no
+     * cambia el texto ni la acción de enviar.
+     */
+    @Test
+    fun `photos ride above the text as thumbnails and are not buttons`() {
+        composeRule.setContent {
+            TrindadeTheme {
+                ShareCard(
+                    title = "Relatório #10",
+                    subtitle = "2026-11-18 · João",
+                    text = "Texto do servidor",
+                    loading = false,
+                    error = null,
+                    mode = ShareCardMode.SAVED,
+                    onShare = {},
+                    onPdf = {},
+                    onEdit = null,
+                    onClose = {},
+                    photos = listOf("https://example.test/1.jpg", "https://example.test/2.jpg"),
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("share-card-photos").assertIsDisplayed()
+        composeRule.onNodeWithTag("share-card-photo-0").assertIsDisplayed()
+        composeRule.onNodeWithTag("share-card-photo-1").assertIsDisplayed()
+        val bounds = composeRule.onNodeWithTag("share-card-photo-0").getUnclippedBoundsInRoot()
+        assertTrue(
+            "la miniatura debe medir al menos 44dp; medía ${bounds.bottom - bounds.top}",
+            bounds.bottom - bounds.top >= 44.dp,
+        )
+        // No hay acción de borrar dentro de la fila.
+        assertEquals(0, composeRule.onAllNodesWithContentDescription("Remover").fetchSemanticsNodes().size)
+    }
+
+    @Test
+    fun `without photos the card draws no strip, as before`() {
+        composeRule.setContent {
+            TrindadeTheme {
+                ShareCard(
+                    title = "Relatório #10",
+                    subtitle = null,
+                    text = "Texto",
+                    loading = false,
+                    error = null,
+                    mode = ShareCardMode.SAVED,
+                    onShare = {},
+                    onPdf = {},
+                    onEdit = null,
+                    onClose = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("share-card-photos").assertDoesNotExist()
     }
 
     @Test

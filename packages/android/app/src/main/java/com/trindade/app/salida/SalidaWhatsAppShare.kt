@@ -22,6 +22,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.trindade.app.contract.models.SalidaCreateResponseMovement
 import com.trindade.app.massas.WhatsappAbbreviations
+import com.trindade.app.ui.components.PhotoThumbnails
 import com.trindade.app.massas.brazilianDate
 
 /**
@@ -111,6 +112,8 @@ fun SalidaWhatsAppShare(
     walletLink: String?,
     onOpenWhatsApp: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Las fotos del día o del movimiento, como miniaturas arriba de la prévia. Solo lectura. */
+    photos: List<String> = emptyList(),
 ) {
     Card(
         modifier = modifier.fillMaxWidth().testTag("salida-whatsapp-share-card"),
@@ -136,6 +139,11 @@ fun SalidaWhatsAppShare(
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                 Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
                     Text(stringResource(R.string.salida_share_preview), style = MaterialTheme.typography.labelMedium)
+                    PhotoThumbnails(
+                        photos = photos,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                        testTagPrefix = "salida-share",
+                    )
                     Text(
                         text = text.ifBlank { stringResource(R.string.salida_none_this_day) },
                         style = MaterialTheme.typography.bodySmall,

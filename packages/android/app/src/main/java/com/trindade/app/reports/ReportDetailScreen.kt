@@ -364,6 +364,8 @@ fun ReportDetailRoute(
             },
             onClose = onBack,
             modifier = Modifier.fillMaxSize().padding(16.dp),
+            // Las mismas fotos del reporte: la miniatura dice qué viaja con el texto.
+            photos = state.photos.mapNotNull { it.publicUrl ?: it.url },
         )
     } else {
         ReportDetailScreen(

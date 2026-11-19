@@ -58,6 +58,13 @@ fun ShareCard(
     onEdit: (() -> Unit)?,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
+    /**
+     * Las fotos que viajan con el mensaje, como miniaturas arriba del texto.
+     *
+     * Son de solo lectura: la tarjeta comparte y la galería de la pantalla es donde se borran. La app no trae una
+     * librería de imágenes, así que la miniatura se decodifica con las APIs del sistema desde la URL pública.
+     */
+    photos: List<String> = emptyList(),
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -87,6 +94,14 @@ fun ShareCard(
             }
 
             HorizontalDivider()
+
+            PhotoThumbnails(
+                photos = photos,
+                modifier = Modifier.fillMaxWidth(),
+                testTagPrefix = "share-card",
+            )
+
+            if (photos.isNotEmpty()) HorizontalDivider()
 
             if (loading) {
                 Box(

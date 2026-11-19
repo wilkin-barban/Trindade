@@ -88,12 +88,15 @@ internal fun SalidaHistoryEmptyDay(
     walletLink: String?,
     onOpenWhatsApp: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Las fotos del movimiento vacío no existen; el parámetro deja la firma igual a la del día con datos. */
+    photos: List<String> = emptyList(),
 ) {
     Column(modifier = modifier) {
         SalidaHistoryEmpty(isToday = isToday, onLaunch = onLaunch)
         Spacer(Modifier.height(12.dp))
         SalidaWhatsAppShare(
             text = shareText,
+            photos = photos,
             phone = phone,
             onPhoneChange = onPhoneChange,
             walletLink = walletLink,
@@ -216,6 +219,8 @@ fun SalidaHistoryScreen(
             // salidas. Sin tarjetas, sin fotos, sin filtros, sin pendientes y sin nota de solo lectura.
             SalidaWhatsAppShare(
                 text = viewModel.dayShareText(summaryLabels),
+                photos = days.firstOrNull { it.date == selected }?.movements.orEmpty()
+                    .flatMap { movement -> movement.photos.mapNotNull { it.publicUrl ?: it.url } },
                 phone = state.historyPhone,
                 onPhoneChange = viewModel::onHistoryPhoneChange,
                 walletLink = viewModel.historyWhatsAppLink(summaryLabels),
@@ -356,6 +361,8 @@ fun SalidaHistoryScreen(
         if (movements.isNotEmpty()) {
             SalidaWhatsAppShare(
                 text = viewModel.dayShareText(summaryLabels),
+                // Las fotos del día acompañan al mensaje: la miniatura dice qué viaja con el texto.
+                photos = movements.flatMap { movement -> movement.photos.mapNotNull { it.publicUrl ?: it.url } },
                 phone = state.historyPhone,
                 onPhoneChange = viewModel::onHistoryPhoneChange,
                 walletLink = viewModel.historyWhatsAppLink(summaryLabels),
