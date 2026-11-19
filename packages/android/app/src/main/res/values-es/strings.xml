@@ -683,9 +683,9 @@
     <string name="help_share_desc">Comparta el enlace de la aplicación con operarios y choferes por WhatsApp, copia de enlace o código QR en pantalla.</string>
 
     <string name="salida_title">Salida / Baja</string>
-    <string name="salida_block_embalagens">Envases</string>
+    <string name="salida_block_embalagens">Embalajes</string>
     <string name="salida_block_bobinas">Bobinas</string>
-    <string name="salida_block_materia_prima">Materia prima</string>
+    <string name="salida_block_materia_prima">Materia Prima</string>
     <string name="salida_products_count">%1$d productos</string>
     <string name="salida_units_format">%1$d un</string>
     <string name="salida_launch">Lanzar salida</string>
@@ -715,6 +715,11 @@
     <string name="report_photos_pending_count">Fotos (%1$d/%2$d)</string>
     <string name="report_photos_add">Agregar fotos</string>
     <string name="report_photo_number">Foto %1$d</string>
+    <string name="salida_day_share_title">Salidas del día</string>
+    <string name="salida_day_share_movements">Movimientos</string>
+    <string name="salida_share_title">Compartir por WhatsApp</string>
+    <string name="salida_share_preview">Vista previa</string>
+    <string name="salida_none_this_day">Ninguna salida registrada en este día.</string>
     <string name="help_salida_title">Cómo Funciona la Salida / Baja</string>
     <string name="help_salida_desc">Registre la salida de productos terminados, envases y materias primas con conteo de cajas y control de stock.</string>
     <string name="help_salida_section1_title">Selección de Productos y Bloques</string>

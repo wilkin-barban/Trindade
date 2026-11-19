@@ -41,6 +41,18 @@ import com.trindade.app.ui.components.HistoryHeader
  * Muestra lo que hay en Trindade y su estado contra el ERP. No lee el espejo ni ofrece conciliar: ese trabajo es
  * del Relatório, que es donde el día se sincroniza. Cada tarjeta dice el estado en una palabra.
  */
+/** Las etiquetas del mensaje del día, en el idioma de la app. */
+@Composable
+private fun salidaSummaryLabels(): SalidaSummaryLabels = SalidaSummaryLabels(
+    title = stringResource(R.string.salida_day_share_title),
+    movements = stringResource(R.string.salida_day_share_movements),
+    blocks = mapOf(
+        SalidaCatalog.BLOCK_EMBALAGENS to stringResource(R.string.salida_block_embalagens),
+        SalidaCatalog.BLOCK_BOBINAS to stringResource(R.string.salida_block_bobinas),
+        SalidaCatalog.BLOCK_MATERIA_PRIMA to stringResource(R.string.salida_block_materia_prima),
+    ),
+)
+
 /**
  * El día sin movimientos: una frase y, sólo si es hoy, la puerta al lanzamiento.
  *
@@ -176,6 +188,10 @@ fun SalidaHistoryScreen(
             )
         }
 
+        // Las etiquetas del mensaje, resueltas acá: el operario que comparte y el que lee la prévia ven el mismo
+        // texto, en el idioma de la app.
+        val summaryLabels = salidaSummaryLabels()
+
         val day = days.firstOrNull { it.date == selected }
         if (day == null || day.movements.isEmpty()) {
             SalidaHistoryEmpty(isToday = selected == today, onLaunch = onLaunch)
@@ -225,7 +241,7 @@ fun SalidaHistoryScreen(
                     movement = movement,
                     onAddPhoto = { pendingPhotoMovement = movement.id },
                     onDeletePhoto = viewModel::deletePhoto,
-                    onShare = { onOpenWhatsApp(viewModel.movementShareLink(movement)) },
+                    onShare = { onOpenWhatsApp(viewModel.movementShareLink(movement, summaryLabels)) },
                     onResend = if (viewModel.isPending(movement)) viewModel::resendPending else null,
                 )
             }
@@ -234,11 +250,13 @@ fun SalidaHistoryScreen(
             // de abreviaturas, la prévia a la vista y una sola acción.
             val phone = state.historyPhone
             SalidaWhatsAppShare(
-                text = viewModel.dayShareText(),
+                text = viewModel.dayShareText(summaryLabels),
                 phone = phone,
                 onPhoneChange = viewModel::onHistoryPhoneChange,
-                walletLink = viewModel.historyWhatsAppLink(),
-                onOpenWhatsApp = { viewModel.historyWhatsAppLink()?.let { onOpenWhatsApp(it) } },
+                walletLink = viewModel.historyWhatsAppLink(summaryLabels),
+                onOpenWhatsApp = {
+                    viewModel.historyWhatsAppLink(summaryLabels)?.let { onOpenWhatsApp(it) }
+                },
             )
         }
     }

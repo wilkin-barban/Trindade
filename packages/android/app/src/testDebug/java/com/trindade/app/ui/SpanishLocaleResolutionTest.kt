@@ -44,6 +44,18 @@ class SpanishLocaleResolutionTest {
         assertEquals("Calculadora de Stock", context.getString(R.string.nav_stock_counter))
         assertEquals("Historial de Conteo", context.getString(R.string.nav_stock_history))
 
+        // El mensaje de WhatsApp de Salida: las mismas etiquetas que pasa la web, y el bloque de compartir.
+        assertEquals("Salidas del día", context.getString(R.string.salida_day_share_title))
+        assertEquals("Movimientos", context.getString(R.string.salida_day_share_movements))
+        assertEquals("Embalajes", context.getString(R.string.salida_block_embalagens))
+        assertEquals("Materia Prima", context.getString(R.string.salida_block_materia_prima))
+        assertEquals("Compartir por WhatsApp", context.getString(R.string.salida_share_title))
+        assertEquals("Vista previa", context.getString(R.string.salida_share_preview))
+        assertEquals(
+            "Ninguna salida registrada en este día.",
+            context.getString(R.string.salida_none_this_day),
+        )
+
         // Format string test
         val formattedUnits = context.getString(R.string.massas_calculated_units_format, 100, 10)
         assertEquals("= 100 unidades (10 un/cx)", formattedUnits)
@@ -78,6 +90,18 @@ class SpanishLocaleResolutionTest {
         assertEquals("Fotos (1/3)", context.getString(R.string.report_photos_pending_count, 1, 3))
 
         assertEquals("Calculadora de Estoque", context.getString(R.string.nav_stock_counter))
+
+        // El portugués de la planta, tal como lo publica la web en su tabla de bloques.
+        assertEquals("Saídas do dia", context.getString(R.string.salida_day_share_title))
+        assertEquals("Movimentos", context.getString(R.string.salida_day_share_movements))
+        assertEquals("Embalagens", context.getString(R.string.salida_block_embalagens))
+        assertEquals("Matéria-Prima", context.getString(R.string.salida_block_materia_prima))
+        assertEquals("Compartilhar por WhatsApp", context.getString(R.string.salida_share_title))
+        assertEquals("Pré-visualização", context.getString(R.string.salida_share_preview))
+        assertEquals(
+            "Nenhuma saída registrada neste dia.",
+            context.getString(R.string.salida_none_this_day),
+        )
 
         // Format string test
         val formattedUnits = context.getString(R.string.massas_calculated_units_format, 100, 10)

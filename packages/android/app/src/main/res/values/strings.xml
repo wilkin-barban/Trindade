@@ -687,7 +687,7 @@
     <string name="salida_title">Saída / Baixa</string>
     <string name="salida_block_embalagens">Embalagens</string>
     <string name="salida_block_bobinas">Bobinas</string>
-    <string name="salida_block_materia_prima">Matéria-prima</string>
+    <string name="salida_block_materia_prima">Matéria-Prima</string>
     <string name="salida_products_count">%1$d produtos</string>
     <string name="salida_units_format">%1$d un</string>
     <string name="salida_launch">Lançar saída</string>
@@ -717,6 +717,11 @@
     <string name="report_photos_pending_count">Fotos (%1$d/%2$d)</string>
     <string name="report_photos_add">Adicionar fotos</string>
     <string name="report_photo_number">Foto %1$d</string>
+    <string name="salida_day_share_title">Saídas do dia</string>
+    <string name="salida_day_share_movements">Movimentos</string>
+    <string name="salida_share_title">Compartilhar por WhatsApp</string>
+    <string name="salida_share_preview">Pré-visualização</string>
+    <string name="salida_none_this_day">Nenhuma saída registrada neste dia.</string>
     <string name="help_salida_title">Como Funciona a Saída / Baixa</string>
     <string name="help_salida_desc">Registre a saída de produtos acabados, embalagens e matérias-primas com contagem de caixas e controle de estoque.</string>
     <string name="help_salida_section1_title">Seleção de Produtos e Blocos</string>

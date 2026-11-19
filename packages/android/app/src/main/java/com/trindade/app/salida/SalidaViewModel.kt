@@ -221,14 +221,20 @@ class SalidaViewModel @Inject constructor(
         _state.value = _state.value.copy(history = days)
     }
 
-    /** El texto del día elegido, listo para el share. Vacío cuando el día no tiene movimientos. */
-    fun dayShareText(): String {
+    /**
+     * El texto del día elegido, listo para el share. Vacío cuando el día no tiene movimientos.
+     *
+     * Las etiquetas llegan de la pantalla -- es quien sabe en qué idioma está la app -- y por defecto son las del
+     * portugués, que es la tabla de la web.
+     */
+    fun dayShareText(labels: SalidaSummaryLabels = SalidaSummaryLabels()): String {
         val chosen = _state.value.historyDate ?: _state.value.date
         val day = _state.value.history.firstOrNull { it.date == chosen } ?: return ""
         return salidaDaySummaryText(
             date = day.date,
             movements = day.movements,
             abbreviations = abbreviationsSource?.table ?: com.trindade.app.massas.WhatsappAbbreviations.EMPTY,
+            labels = labels,
         )
     }
 
@@ -237,8 +243,8 @@ class SalidaViewModel @Inject constructor(
     }
 
     /** El enlace del día elegido: con teléfono abre ese chat; sin teléfono deja elegir el chat. */
-    fun historyWhatsAppLink(): String? {
-        val text = dayShareText()
+    fun historyWhatsAppLink(labels: SalidaSummaryLabels = SalidaSummaryLabels()): String? {
+        val text = dayShareText(labels)
         if (text.isBlank()) return null
         return com.trindade.app.ui.waMeLink(_state.value.historyPhone, text)
             ?: com.trindade.app.ui.whatsAppShareLink(text)
@@ -278,11 +284,15 @@ class SalidaViewModel @Inject constructor(
     }
 
     /** El enlace de WhatsApp de un movimiento suelto: su texto, con o sin teléfono. */
-    fun movementShareLink(movement: com.trindade.app.contract.models.SalidaCreateResponseMovement): String {
+    fun movementShareLink(
+        movement: com.trindade.app.contract.models.SalidaCreateResponseMovement,
+        labels: SalidaSummaryLabels = SalidaSummaryLabels(),
+    ): String {
         val text = salidaDaySummaryText(
             date = movement.movementDate,
             movements = listOf(movement),
             abbreviations = abbreviationsSource?.table ?: com.trindade.app.massas.WhatsappAbbreviations.EMPTY,
+            labels = labels,
         )
         return com.trindade.app.ui.waMeLink(_state.value.historyPhone, text)
             ?: com.trindade.app.ui.whatsAppShareLink(text)

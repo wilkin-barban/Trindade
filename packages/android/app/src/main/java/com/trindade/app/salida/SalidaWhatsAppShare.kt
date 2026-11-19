@@ -15,6 +15,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import com.trindade.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -23,47 +25,76 @@ import com.trindade.app.massas.WhatsappAbbreviations
 import com.trindade.app.massas.brazilianDate
 
 /**
- * El resumen del día tal como se manda por WhatsApp.
+ * Las etiquetas del mensaje, resueltas por quien dibuja la pantalla.
+ *
+ * Los valores por defecto son los del portugués, que es el idioma de la planta: la tabla de la web
+ * (`lib/salida.ts`) con los mismos nombres y el mismo emoji por bloque. Un locale distinto los sustituye con los
+ * suyos sin que el constructor del texto sepa de idiomas.
+ */
+data class SalidaSummaryLabels(
+    val title: String = "Saídas do dia",
+    val movements: String = "Movimentos",
+    val blocks: Map<String, String> = SALIDA_BLOCK_LABELS_PT,
+)
+
+/** Los nombres de bloque del mensaje, como los publica la web para el portugués. */
+val SALIDA_BLOCK_LABELS_PT: Map<String, String> = mapOf(
+    SalidaCatalog.BLOCK_EMBALAGENS to "Embalagens",
+    SalidaCatalog.BLOCK_BOBINAS to "Bobinas",
+    SalidaCatalog.BLOCK_MATERIA_PRIMA to "Matéria-Prima",
+)
+
+/** Un emoji por bloque, como la web: el mensaje los lleva delante del nombre, no en lugar de él. */
+private val salidaBlockEmojis: Map<String, String> = mapOf(
+    SalidaCatalog.BLOCK_EMBALAGENS to "📦",
+    SalidaCatalog.BLOCK_BOBINAS to "🧵",
+    SalidaCatalog.BLOCK_MATERIA_PRIMA to "🌾",
+)
+
+/**
+ * El resumen del día tal como se manda por WhatsApp, **exactamente** como lo arma la web.
  *
  * Es el día, no una salida: la planta comparte lo que salió junto, por operario y por bloque, con la tabla de
  * abreviaturas que comparten el Relatório y los demás históricos. Sin códigos de producto y sin la etiqueta del
  * ERP: lo que el grupo lee es qué salió y cuánto.
+ *
+ * La forma es la de `salidaDaySummaryText` en `packages/frontend/src/lib/salida.ts`, y no una variante: el
+ * operario va en mayúsculas y **sin negrita**, con dos puntos; sus líneas empiezan con `- ` y separan nombre y
+ * cantidad con dos puntos; los bloques salen en el orden del catálogo (no en el que llegaron) y sólo si tienen
+ * algo; y entre un operario y el siguiente va una línea en blanco. Un mensaje que se desviara en cualquiera de
+ * esas marcas sería el mismo mensaje en dos versiones, que es lo que el grupo terminaría notando.
+ *
+ * El operario es `username`, no el nombre visible: es la identidad con la que la planta firmó el movimiento y la
+ * que la web escribe.
  */
 fun salidaDaySummaryText(
     date: String,
     movements: List<SalidaCreateResponseMovement>,
     abbreviations: WhatsappAbbreviations = WhatsappAbbreviations.EMPTY,
+    labels: SalidaSummaryLabels = SalidaSummaryLabels(),
 ): String {
     if (movements.isEmpty()) return ""
 
     val lines = mutableListOf<String>()
-    lines.add("🚛 *Salidas del día — ${brazilianDate(date)}*")
-    lines.add("Movimientos: ${movements.size}")
+    lines.add("🚛 *${labels.title} — ${brazilianDate(date)}*")
+    lines.add("${labels.movements}: ${movements.size}")
+    lines.add("")
 
-    for (movement in movements) {
-        val operator = (movement.displayName.takeIf { it.isNotBlank() }
-            ?: movement.username.takeIf { it.isNotBlank() }
-            ?: "Operador").uppercase()
-        lines.add("")
-        lines.add("👤 *$operator*")
-
-        val byBlock = movement.items.groupBy { it.block.value }
-        for ((block, items) in byBlock) {
-            lines.add("*${blockLabel(block)}*")
+    movements.forEachIndexed { index, movement ->
+        if (index > 0) lines.add("")
+        lines.add("👤 ${movement.username.uppercase()}:")
+        for (block in SalidaCatalog.blocks) {
+            val items = movement.items.filter { it.block.value == block }
+            if (items.isEmpty()) continue
+            lines.add("*${salidaBlockEmojis[block]} ${labels.blocks[block]}*")
             for (item in items) {
                 val name = abbreviations.shortName(item.productCode, item.productName)
-                lines.add("• $name — ${item.quantity} un")
+                lines.add("- $name: ${item.quantity} un")
             }
         }
     }
 
-    return lines.joinToString("\n")
-}
-
-private fun blockLabel(block: String): String = when (block) {
-    SalidaCatalog.BLOCK_EMBALAGENS -> "📦 Embalajes"
-    SalidaCatalog.BLOCK_BOBINAS -> "🧵 Bobinas"
-    else -> "🧪 Matéria-Prima"
+    return lines.joinToString("\n").trimEnd()
 }
 
 /**
@@ -90,7 +121,7 @@ fun SalidaWhatsAppShare(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text = "Compartilhar por WhatsApp",
+                text = stringResource(R.string.salida_share_title),
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
             )
             OutlinedTextField(
@@ -104,9 +135,9 @@ fun SalidaWhatsAppShare(
             )
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                 Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
-                    Text("Pré-visualização", style = MaterialTheme.typography.labelMedium)
+                    Text(stringResource(R.string.salida_share_preview), style = MaterialTheme.typography.labelMedium)
                     Text(
-                        text = text.ifBlank { "Nenhuma saída registrada neste dia." },
+                        text = text.ifBlank { stringResource(R.string.salida_none_this_day) },
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.testTag("salida-preview-message"),
                     )
