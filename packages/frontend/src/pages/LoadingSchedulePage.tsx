@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { LucideSave, LucideArrowLeft } from 'lucide-react';
+import { LucideSave, LucideArrowLeft, LucideTruck } from 'lucide-react';
 import { api } from '../api/client';
 import { Button } from '../components/ui/button';
 import { LoadingSpinner } from '../components/ui/loading-spinner';
@@ -212,6 +212,20 @@ export function LoadingSchedulePage() {
             {t('reports.backToHistory')}
           </Link>
         )}
+        {/* La puerta a los fleteros: el día se manda también uno a uno a los conductores con teléfono del
+            lote. Se perdió cuando la tarjeta reemplazó al diálogo viejo, y vuelve acá, junto al share general. */}
+        <Button
+          variant="outline"
+          className="mb-3 min-h-11 w-full gap-2"
+          onClick={() => setExportOpen(true)}
+          data-testid="loading-share-fleteros"
+        >
+          <LucideTruck className="h-4 w-4" />
+          {t('loading.sendToFleteros', 'Enviar a fleteros')}
+        </Button>
+        {/* El diálogo de fleteros se monta también en esta rama: la vista de compartir retorna antes del
+            return principal, y por eso la puerta abría un estado que nadie dibujaba. */}
+        <ScheduleExportView date={shareDate} open={exportOpen} onClose={() => setExportOpen(false)} />
         <ShareCard
           testIdPrefix="loading"
           title={t('loading.exportTitle')}

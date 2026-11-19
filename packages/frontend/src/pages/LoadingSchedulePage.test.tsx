@@ -81,6 +81,26 @@ describe('LoadingSchedulePage', () => {
     expect(get.mock.calls.some(([url]) => String(url).includes('date=2026-11-10'))).toBe(false);
   });
 
+  it('keeps the way to the fleteros next to the share card', async () => {
+    // La puerta a los fleteros se perdió cuando la ShareCard reemplazó al diálogo: el botón de guardar abría la
+    // tarjeta y no quedaba forma de mandar el día a cada conductor. Vuelve al lado del share general.
+    render(
+      <MemoryRouter initialEntries={['/loading?share=1&date=2026-11-10&from=history']}>
+        <LoadingSchedulePage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('loading-share-text')).toBeInTheDocument());
+    const door = screen.getByTestId('loading-share-fleteros');
+    expect(door).toBeInTheDocument();
+
+    fireEvent.click(door);
+    // El diálogo se abre con el texto del día; la lista de fleteros aparece sólo si el lote trae alguno con
+    // teléfono, y eso lo cubre el test del propio diálogo.
+    await waitFor(() => expect(screen.getByTestId('loading-export-modal')).toBeInTheDocument());
+    expect(screen.getByTestId('loading-export-close')).toBeInTheDocument();
+  });
+
   it('shows Editar in fromHistory when the date is today and user can edit', async () => {
     const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
     render(
