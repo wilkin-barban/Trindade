@@ -177,6 +177,10 @@ class MainActivity : ComponentActivity() {
             Destination(RolePolicy.EntryPoint.REPORTS, R.string.nav_reports, R.drawable.ic_reports, NavTarget(Tab.REPORTS)),
             Destination(RolePolicy.EntryPoint.LOADING, R.string.nav_loading, R.drawable.ic_truck, NavTarget(Tab.LOADING)),
             Destination(RolePolicy.EntryPoint.MASSAS_LAUNCH, R.string.massas_title, R.drawable.ic_layers, NavTarget(Tab.MASSAS_LAUNCH)),
+            // Salida vive en la barra: la web la tiene en el mismo orden, y una pantalla que sólo existe en el
+            // cajón es una pantalla que la mitad de la planta no encuentra. El historial queda en el cajón: dos
+            // entradas de la misma pestaña rompen la selección de la fila, que se resuelve por pestaña.
+            Destination(RolePolicy.EntryPoint.SALIDA, R.string.nav_salida, R.drawable.ic_package_minus, NavTarget(Tab.SALIDA)),
             Destination(RolePolicy.EntryPoint.ASSAI_ORDER, R.string.nav_assai, R.drawable.ic_calculator, NavTarget(Tab.ASSAI)),
             Destination(RolePolicy.EntryPoint.STOCK_COUNTER, R.string.nav_stock_counter, R.drawable.ic_boxes, NavTarget(Tab.STOCK_COUNTER)),
             Destination(RolePolicy.EntryPoint.ADMIN_PANEL, R.string.admin_panel_title, R.drawable.ic_admin, NavTarget(Tab.ADMIN)),
@@ -198,14 +202,6 @@ class MainActivity : ComponentActivity() {
             DrawerEntry.Link(Destination(RolePolicy.EntryPoint.LOADING, R.string.nav_loading, R.drawable.ic_truck, NavTarget(Tab.LOADING))),
             DrawerEntry.Link(Destination(RolePolicy.EntryPoint.MASSAS_LAUNCH, R.string.massas_title, R.drawable.ic_layers, NavTarget(Tab.MASSAS_LAUNCH))),
             DrawerEntry.Link(Destination(RolePolicy.EntryPoint.SALIDA, R.string.nav_salida, R.drawable.ic_package_minus, NavTarget(Tab.SALIDA))),
-            DrawerEntry.Link(
-                Destination(
-                    RolePolicy.EntryPoint.SALIDA_HISTORY,
-                    R.string.nav_salida_history,
-                    R.drawable.ic_history,
-                    NavTarget(Tab.SALIDA, Overlay.SALIDA_HISTORY),
-                ),
-            ),
             DrawerEntry.Link(Destination(RolePolicy.EntryPoint.ASSAI_ORDER, R.string.nav_assai, R.drawable.ic_calculator, NavTarget(Tab.ASSAI))),
             DrawerEntry.Link(Destination(RolePolicy.EntryPoint.STOCK_COUNTER, R.string.nav_stock_counter, R.drawable.ic_boxes, NavTarget(Tab.STOCK_COUNTER))),
             DrawerEntry.Link(
@@ -214,6 +210,14 @@ class MainActivity : ComponentActivity() {
                     R.string.massas_history_title,
                     R.drawable.ic_calendar,
                     NavTarget(Tab.MASSAS_LAUNCH, Overlay.MASSAS_HISTORY),
+                ),
+            ),
+            DrawerEntry.Link(
+                Destination(
+                    RolePolicy.EntryPoint.SALIDA_HISTORY,
+                    R.string.nav_salida_history,
+                    R.drawable.ic_history,
+                    NavTarget(Tab.SALIDA, Overlay.SALIDA_HISTORY),
                 ),
             ),
             DrawerEntry.Link(
