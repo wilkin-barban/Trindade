@@ -634,6 +634,16 @@ el historial: separar las responsabilidades.
 **Sección 8 cerrada**: 8.1, 8.1-b, 8.2, 8.3, 8.4 y 8.5 en PASS, con la APK `0.8.4 (8007)` instalada en
 `emulator-5554`. Sin release, tag ni asset; la 0.7.5 y `packages/backend/apk` intactos.
 
+## 17. Texto del Relatório: prefijo de bloque en Salidas y sin total de sección
+
+- `export.service.ts`: la sección `📤 *SAÍDAS / BAIXA*` antepone **`EMB.`** a embalagens y **`BOB.`** a bobinas, sin
+  prefijo para materia prima, y no lo repite cuando la tabla ya lo trae (`BOB. DISCO` → una sola vez). Se eliminó la
+  línea `📊 Total: N un` de esa sección; los totales de otras secciones no se tocaron.
+- Golden y `export.service.test.ts` actualizados con el ejemplo exacto (`- EMB. DISCO 400g: 9000 un`,
+  `- BOB. ROLO 2kg: 6000 un`, `- BOB. BOBINA ROLO: 10 un`, `- GORDURA: 7 un`) y la ausencia del total.
+- Web y Android muestran el texto del servidor tal cual (`GET /reports/:id/export`), así que no hubo cambio de
+  cliente.
+
 ## 16. Vuelta en la cabecera, ERP en el mensaje del archivo, edición con las tres tarjetas
 
 - **`ShareCardMode.FROM_HISTORY`**: la vuelta pasa a la cabecera izquierda (`share-card-back`) y el botón inferior
