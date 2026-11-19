@@ -457,7 +457,7 @@ class ReportGeneratorScreenTest {
         assertEquals(1, openedHistory)
 
         val submitNode = composeRule.onNodeWithText(copy(R.string.report_submit))
-        submitNode.performScrollTo().assertIsDisplayed()
+        submitNode.assertIsDisplayed()
         val submitBounds = submitNode.getUnclippedBoundsInRoot()
         assertTrue(
             "Submit height must be >= 48dp but was ${submitBounds.bottom - submitBounds.top}",
@@ -627,7 +627,6 @@ class ReportGeneratorScreenTest {
         // withholding is live again.
         composeRule.onNodeWithText(copy(R.string.report_temperatures_required)).assertDoesNotExist()
         composeRule.onNodeWithText(copy(R.string.report_submit))
-            .performScrollTo()
             .assertIsEnabled()
             .performClick()
 

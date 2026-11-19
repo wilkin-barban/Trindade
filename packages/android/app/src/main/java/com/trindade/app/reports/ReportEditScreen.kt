@@ -73,8 +73,11 @@ fun ReportEditScreen(
         missingReadings = state.missingReadings,
     )
 
+    // El formulario scrollea y el guardado no: el mismo pie que el alta, para que Actualizar esté donde el
+    // operario lo dejó aunque la lista de tareas sea larga.
+    Column(modifier = modifier.fillMaxSize()) {
     Column(
-        modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         // The same way out the detail draws, with this screen's own title beside it: the two are one
@@ -164,14 +167,17 @@ fun ReportEditScreen(
                 )
             }
 
-            AdminPrimaryButton(
-                onClick = onSubmit,
-                text = stringResource(R.string.report_update),
-                enabled = state.canSubmit,
-                loading = state.submitting,
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-            )
         }
+    }
+
+    if (!state.readOnly) {
+        ReportSaveBar(
+            enabled = state.canSubmit,
+            loading = state.submitting,
+            label = stringResource(R.string.report_update),
+            onSubmit = onSubmit,
+        )
+    }
     }
 }
 

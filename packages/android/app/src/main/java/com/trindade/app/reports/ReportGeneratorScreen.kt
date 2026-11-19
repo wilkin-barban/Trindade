@@ -21,6 +21,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Surface
+import androidx.compose.ui.platform.testTag
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -57,6 +59,42 @@ import com.trindade.app.ui.components.NavigationActionButton
  * categories the endpoint serves, beside their parent, which is what the web's own `CategorySection`
  * does, with the indent as the only visual difference.
  */
+/**
+ * El pie que guarda: la acción del formulario, fuera del scroll.
+ *
+ * Es el mismo patrón que la barra de Salida y la de Masas: el botón que cierra el trabajo está siempre en el
+ * mismo lugar, y la lista larga se desplaza por debajo.
+ */
+@Composable
+internal fun ReportSaveBar(
+    enabled: Boolean,
+    loading: Boolean,
+    label: String,
+    onSubmit: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag(REPORT_SAVE_BAR_TAG),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shadowElevation = 8.dp,
+    ) {
+        AdminPrimaryButton(
+            onClick = onSubmit,
+            text = label,
+            enabled = enabled,
+            loading = loading,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+        )
+    }
+}
+
+/** El tag con el que un test encuentra el pie de guardado. */
+const val REPORT_SAVE_BAR_TAG: String = "report-save-bar"
+
 @Composable
 fun ReportGeneratorScreen(
     state: ReportGeneratorViewModel.UiState,
@@ -90,8 +128,11 @@ fun ReportGeneratorScreen(
         )
     }
 
+    // El formulario scrollea; el guardado no. Un reporte tiene treinta casillas y el botón que lo cierra no
+    // puede quedar al final de la lista: se guarda cuando el operario terminó, no cuando llegó al fondo.
+    Column(modifier = modifier.fillMaxSize()) {
     LazyColumn(
-        modifier = modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier.weight(1f).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         // The history lives here rather than in a third tab, and that is the deliberate part of this
@@ -278,19 +319,18 @@ fun ReportGeneratorScreen(
                     }
                 }
 
-                item {
-                    AdminPrimaryButton(
-                        onClick = onSubmit,
-                        text = stringResource(R.string.report_submit),
-                        enabled = state.ready && !state.submitting && state.createdReportId == null,
-                        loading = state.submitting,
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    )
-                }
             }
 
             ReportGeneratorViewModel.Stage.FAILED -> Unit
         }
+    }
+
+    ReportSaveBar(
+        enabled = state.ready && !state.submitting && state.createdReportId == null,
+        loading = state.submitting,
+        label = stringResource(R.string.report_submit),
+        onSubmit = onSubmit,
+    )
     }
 
     if (showHelpDialog) {

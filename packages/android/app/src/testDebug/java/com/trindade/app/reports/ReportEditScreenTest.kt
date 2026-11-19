@@ -263,8 +263,8 @@ class ReportEditScreenTest {
         displayed("Leitura 1")
         displayed("Leitura 2")
 
+        // El guardado vive en el pie fijo: se alcanza sin desplazar el formulario.
         composeRule.onNodeWithText(copy(R.string.report_update))
-            .performScrollTo()
             .assertIsEnabled()
             .performClick()
         composeRule.waitForIdle()
@@ -323,7 +323,7 @@ class ReportEditScreenTest {
         render(state(temperatures = mapOf(TEMPERATURE_TASK_ID to listOf("4.5", ""))))
 
         displayed(copy(R.string.report_temperatures_required))
-        composeRule.onNodeWithText(copy(R.string.report_update)).performScrollTo().assertIsNotEnabled()
+        composeRule.onNodeWithText(copy(R.string.report_update)).assertIsNotEnabled()
     }
 
     /**
@@ -377,7 +377,7 @@ class ReportEditScreenTest {
         assertEquals(1, backed)
 
         val submitNode = composeRule.onNodeWithText(copy(R.string.report_update))
-        submitNode.performScrollTo().assertIsDisplayed()
+        submitNode.assertIsDisplayed()
         val submitBounds = submitNode.getUnclippedBoundsInRoot()
         assertTrue(
             "Submit height must be >= 48dp but was ${submitBounds.bottom - submitBounds.top}",
