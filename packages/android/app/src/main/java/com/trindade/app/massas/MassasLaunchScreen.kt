@@ -231,7 +231,6 @@ fun MassasLaunchScreen(
                 today = MassasLaunchViewModel.saopauloToday(),
                 selectedDate = state.date,
                 historyDates = historyDates,
-                onBack = onBackToHistory,
                 onSelectDate = onSelectDay ?: viewModel::loadDay,
                 onOpenList = onBackToHistory,
                 onHelp = { viewModel.toggleHelpDialog(true) },

@@ -32,15 +32,12 @@ import com.trindade.app.contract.models.ReportReceipts
 import java.math.BigDecimal
 
 /**
- * Las dos lecturas del ERP en el Relatório, cada una en su tarjeta.
+ * Las lecturas del ERP en el Relatório: una acción y dos tarjetas.
  *
- * Eran dos bloques dentro de una sola tarjeta, separados por una línea: dos listas con dos orígenes -- la
- * producción del día y los insumos recibidos -- presentadas como si fueran una. Ahora son dos tarjetas
- * independientes, con la forma de la del bloque de Salidas, y cada una lleva el encabezado de lo que muestra.
- *
- * La sincronización es una sola: el ERP se lee de una vez y llena las dos. Para no esconderla detrás de una de
- * las dos tarjetas, cada encabezado dibuja la misma acción sobre el mismo `onSync` -- una lógica, dos lugares
- * donde apretarla, como la web.
+ * La sincronización es del bloque, no de cada lista: una lectura del ERP trae la producción del día, los insumos y
+ * las salidas a la vez (`syncDay(..., includeExits = true)`), así que un botón por tarjeta era la misma acción
+ * dibujada dos veces -- y el bloque de Salidas, que se refresca con esa misma lectura, se quedaba sin ninguno.
+ * Ahora hay un solo «Sincronizar com ERP» en el encabezado del bloque, y las dos tarjetas de abajo sólo muestran.
  */
 @Composable
 fun ErpMovementsCard(
@@ -54,10 +51,9 @@ fun ErpMovementsCard(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        ErpBlockHeader(isSyncing = isSyncing, onSync = onSync)
         ErpSectionCard(
             title = stringResource(R.string.report_massas_day_title),
-            isSyncing = isSyncing,
-            onSync = onSync,
             contentTag = "report-massas-block",
         ) {
             MassasDayBody(massasDay)
@@ -65,11 +61,77 @@ fun ErpMovementsCard(
         ErpSectionCard(
             title = stringResource(R.string.report_receipts_title),
             subtitle = stringResource(R.string.report_receipts_subtitle),
-            isSyncing = isSyncing,
-            onSync = onSync,
             contentTag = "report-receipts-block",
         ) {
             ReceiptsBody(receipts)
+        }
+    }
+}
+
+/**
+ * El encabezado del bloque: el nombre de lo que se está leyendo y la única acción que lo relee.
+ *
+ * Se parte en dos renglones en un teléfono y se queda en uno en una tablet, decidido por el ancho que recibe --
+ * el mismo criterio y el mismo punto de corte que el resto de estas tarjetas.
+ */
+@Composable
+private fun ErpBlockHeader(
+    isSyncing: Boolean,
+    onSync: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        val stacked = maxWidth < HEADER_STACK_BREAKPOINT
+
+        val title: @Composable (Modifier) -> Unit = { titleModifier ->
+            Text(
+                text = stringResource(R.string.report_erp_movements_title),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = titleModifier,
+            )
+        }
+
+        val action: @Composable (Modifier) -> Unit = { actionModifier ->
+            // Tonal, que es el papel de esta acción: relee lo que el bloque muestra y no cambia nada.
+            FilledTonalButton(
+                onClick = onSync,
+                enabled = !isSyncing,
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                modifier = actionModifier.heightIn(min = 48.dp),
+            ) {
+                if (isSyncing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+                Text(
+                    text = stringResource(R.string.report_erp_sync),
+                    style = MaterialTheme.typography.labelLarge,
+                )
+            }
+        }
+
+        if (stacked) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                title(Modifier.fillMaxWidth())
+                action(Modifier.fillMaxWidth())
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                title(Modifier.weight(1f).padding(end = 8.dp))
+                action(Modifier)
+            }
         }
     }
 }
@@ -83,8 +145,6 @@ fun ErpMovementsCard(
 @Composable
 private fun ErpSectionCard(
     title: String,
-    isSyncing: Boolean,
-    onSync: () -> Unit,
     contentTag: String,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
@@ -98,66 +158,18 @@ private fun ErpSectionCard(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                val stacked = maxWidth < HEADER_STACK_BREAKPOINT
-
-                val heading: @Composable (Modifier) -> Unit = { headingModifier ->
-                    Column(modifier = headingModifier) {
-                        Text(
-                            text = title,
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        if (subtitle != null) {
-                            Text(
-                                text = subtitle,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-
-                val action: @Composable (Modifier) -> Unit = { actionModifier ->
-                    // Tonal, que es el papel de esta acción: relee lo que la tarjeta muestra y no cambia nada.
-                    FilledTonalButton(
-                        onClick = onSync,
-                        enabled = !isSyncing,
-                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
-                        modifier = actionModifier.heightIn(min = 48.dp),
-                    ) {
-                        if (isSyncing) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                        }
-                        Text(
-                            text = stringResource(R.string.report_erp_sync),
-                            style = MaterialTheme.typography.labelLarge,
-                        )
-                    }
-                }
-
-                if (stacked) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        heading(Modifier.fillMaxWidth())
-                        action(Modifier.fillMaxWidth())
-                    }
-                } else {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        heading(Modifier.weight(1f).padding(end = 8.dp))
-                        action(Modifier)
-                    }
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                if (subtitle != null) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
 

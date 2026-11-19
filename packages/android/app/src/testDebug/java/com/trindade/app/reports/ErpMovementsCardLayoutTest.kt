@@ -57,44 +57,39 @@ class ErpMovementsCardLayoutTest {
     }
 
     /** El encabezado de cada tarjeta, medido: en el teléfono la acción va debajo del título. */
+    /** El encabezado del bloque, medido: en el teléfono la única acción va debajo del título. */
     @Test
-    fun `on a phone each card's sync action sits below its title rather than beside it`() {
+    fun `on a phone the block's only action sits below its title`() {
         drawCardIn(360)
-
-        assertHeaderStacked(R.string.report_massas_day_title, index = 0)
-        assertHeaderStacked(R.string.report_receipts_title, index = 1)
+        assertHeaderStacked()
     }
 
     @Test
-    fun `on a tablet the sync action returns beside the title`() {
+    fun `on a tablet the block's action returns beside the title`() {
         drawCardIn(720)
-
-        assertHeaderBeside(R.string.report_massas_day_title, index = 0)
-        assertHeaderBeside(R.string.report_receipts_title, index = 1)
+        assertHeaderBeside()
     }
 
-    private fun assertHeaderStacked(titleRes: Int, index: Int) {
-        // El título de cada tarjeta es único; lo que se repite es la acción, una por tarjeta.
-        val title = composeRule
-            .onNodeWithText(context.getString(titleRes))
-            .getUnclippedBoundsInRoot()
-        val button = composeRule
-            .onAllNodesWithText(context.getString(R.string.report_erp_sync), substring = true)[index]
-            .getUnclippedBoundsInRoot()
+    private fun title() = composeRule
+        .onNodeWithText(context.getString(R.string.report_erp_movements_title))
+        .getUnclippedBoundsInRoot()
+
+    private fun action() = composeRule
+        .onNodeWithText(context.getString(R.string.report_erp_sync), substring = true)
+        .getUnclippedBoundsInRoot()
+
+    private fun assertHeaderStacked() {
+        val title = title()
+        val button = action()
         assertTrue(
             "the action must start below the title, not beside it; title=$title button=$button",
             button.top >= title.bottom,
         )
     }
 
-    private fun assertHeaderBeside(titleRes: Int, index: Int) {
-        // El título de cada tarjeta es único; lo que se repite es la acción, una por tarjeta.
-        val title = composeRule
-            .onNodeWithText(context.getString(titleRes))
-            .getUnclippedBoundsInRoot()
-        val button = composeRule
-            .onAllNodesWithText(context.getString(R.string.report_erp_sync), substring = true)[index]
-            .getUnclippedBoundsInRoot()
+    private fun assertHeaderBeside() {
+        val title = title()
+        val button = action()
         assertTrue(
             "the action must sit to the right of the title; title=$title button=$button",
             button.left > title.left && button.top < title.bottom,

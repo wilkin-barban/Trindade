@@ -64,7 +64,6 @@ class MassasHistoryDayHeaderTest {
     private fun render(
         selectedDate: String = today,
         historyDates: List<String> = archive,
-        onBack: () -> Unit = {},
         onSelectDate: (String) -> Unit = {},
         onOpenList: () -> Unit = {},
         onHelp: (() -> Unit)? = null,
@@ -75,7 +74,6 @@ class MassasHistoryDayHeaderTest {
                     today = today,
                     selectedDate = selectedDate,
                     historyDates = historyDates,
-                    onBack = onBack,
                     onSelectDate = onSelectDate,
                     onOpenList = onOpenList,
                     onHelp = onHelp,
@@ -89,7 +87,9 @@ class MassasHistoryDayHeaderTest {
         render()
 
         composeRule.onNodeWithText(copy(R.string.massas_history_title)).assertIsDisplayed()
-        composeRule.onNodeWithText(copy(R.string.report_back)).assertIsDisplayed()
+        // El «Voltar» duplicado se retiró: la navegación es la barra superior y «Todas as datas» la vuelta al
+        // archivo. Lo que no puede pasar es que la pantalla se quede sin salida, así que el chip está.
+        composeRule.onNodeWithText(copy(R.string.report_back)).assertDoesNotExist()
         composeRule.onNodeWithText(MASSAS_HISTORY_TODAY_LABEL).assertIsDisplayed()
 
         // Las cinco anteriores se dibujan aunque no entren en el ancho: la fila scrollea, y el archivo de un
@@ -124,16 +124,14 @@ class MassasHistoryDayHeaderTest {
     }
 
     @Test
-    fun `the way back and the whole archive report their own destination`() {
-        var backed = 0
+    fun `the whole archive is the way out of the day`() {
         var listed = 0
-        render(onBack = { backed++ }, onOpenList = { listed++ })
+        render(onOpenList = { listed++ })
 
-        composeRule.onNodeWithText(copy(R.string.report_back)).performClick()
+        composeRule.onNodeWithText(copy(R.string.report_back)).assertDoesNotExist()
         composeRule.onNodeWithTag(MASSAS_HISTORY_DAY_ALL_TAG).performScrollTo().performClick()
         composeRule.waitForIdle()
 
-        assertEquals(1, backed)
         assertEquals(1, listed)
     }
 

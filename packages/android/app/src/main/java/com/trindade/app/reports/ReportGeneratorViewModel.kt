@@ -395,16 +395,21 @@ class ReportGeneratorViewModel @Inject constructor(
                 return@launch
             }
             _state.update { it.copy(isSyncingErp = true, message = null, messageIsError = false) }
-            when (val outcome = dispatcher.syncDay(settings, date)) {
+            // Las salidas viajan en la misma lectura: el bloque de Salidas del reporte necesita los dos lados del
+            // día (ENTSAI null, no E), así que una sincronización sin `includeExits` dejaba una de las tres
+            // lecturas vieja hasta la próxima vez que se abriera la pantalla.
+            when (val outcome = dispatcher.syncDay(settings, date, includeExits = true)) {
                 is AeroSyncOutcome.Synced -> {
                     store.markSynced(date, MassasLaunchViewModel.nowLabel())
                     val massas = massasDaySource?.reportDay(date)
                     val receipts = repository.receipts(date)
+                    val salidaDay = runCatching { repository.salidaDay(date) }.getOrNull()
                     _state.update {
                         it.copy(
                             isSyncingErp = false,
                             massasDay = massas ?: it.massasDay,
                             receipts = receipts ?: it.receipts,
+                            salidaDay = salidaDay ?: it.salidaDay,
                             message = UiText.of(R.string.report_erp_sync_success),
                             messageIsError = false,
                         )

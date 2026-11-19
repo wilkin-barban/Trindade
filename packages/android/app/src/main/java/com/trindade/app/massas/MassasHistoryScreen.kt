@@ -63,7 +63,6 @@ fun massasHistoryShownDays(today: String, dates: List<String>, all: Boolean): Li
 @Composable
 fun MassasHistoryScreen(
     viewModel: MassasHistoryViewModel,
-    onBack: () -> Unit,
     onSelectDate: (String) -> Unit,
     modifier: Modifier = Modifier,
     /** El día de planta: es el que el chip «Hoje» ofrece aunque el servidor todavía no lo haya devuelto. */
@@ -95,7 +94,9 @@ fun MassasHistoryScreen(
         HistoryHeader(
             title = stringResource(R.string.massas_history_title),
             subtitle = pluralStringResource(R.plurals.massas_history_days_count, state.days.size, state.days.size),
-            onBack = onBack,
+            // Sin «Voltar»: esta pantalla se abre desde la fila superior y desde el chip «Todas as datas», y
+            // el camino de vuelta es el mismo que el de entrada. Duplicarlo aquí era un segundo botón para lo
+            // que la barra ya hace.
             onHelp = { viewModel.toggleHelpDialog(true) },
         )
 

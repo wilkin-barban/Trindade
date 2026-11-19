@@ -54,7 +54,6 @@ fun MassasHistoryDayHeader(
     selectedDate: String,
     /** Las fechas que `/massas-launch/history` reportó, de la más reciente a la más vieja. */
     historyDates: List<String>,
-    onBack: () -> Unit,
     onSelectDate: (String) -> Unit,
     onOpenList: () -> Unit,
     modifier: Modifier = Modifier,
@@ -63,9 +62,9 @@ fun MassasHistoryDayHeader(
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         HistoryHeader(
             // El nombre del archivo, no el del módulo: quien entró desde el histórico está leyendo el
-            // histórico, y la pestaña que lo trajo no cambia eso.
+            // histórico, y la pestaña que lo trajo no cambia eso. Sin «Voltar»: la navegación es la barra
+            // superior y «Todas as datas» es la vuelta al archivo.
             title = stringResource(R.string.massas_history_title),
-            onBack = onBack,
             onHelp = onHelp,
         )
         Row(

@@ -121,7 +121,6 @@ internal fun SalidaHistoryEmpty(
 @Composable
 fun SalidaHistoryScreen(
     viewModel: SalidaViewModel,
-    onBack: () -> Unit,
     onOpenWhatsApp: (String) -> Unit = {},
     /** La vuelta al lanzamiento desde el día vacío de hoy. */
     onLaunch: () -> Unit = {},
@@ -150,12 +149,12 @@ fun SalidaHistoryScreen(
     }
 
     Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-        // El mismo header que Masas, Cargamento, Reportes y Contagem: título, contador y Volver de 48 dp.
+        // El mismo header que los demás históricos: título, contador y ayuda.
         HistoryHeader(
             title = stringResource(R.string.salida_history_title),
             // Días, no un número suelto: «3» sobre un historial no decía tres qué.
             subtitle = pluralStringResource(R.plurals.salida_history_days, state.history.size, state.history.size),
-            onBack = onBack,
+            // Sin «Voltar»: la barra superior tiene Lanzamiento al lado y el atrás físico cierra el archivo.
             onHelp = { showHelpDialog = true },
         )
 
@@ -289,8 +288,14 @@ fun SalidaHistoryScreen(
                 .forEach { movement ->
                 SalidaMovementCard(
                     movement = movement,
-                    onAddPhoto = { pendingPhotoMovement = movement.id },
-                    onDeletePhoto = viewModel::deletePhoto,
+                    // Las fotos son de hoy: el pasado es el registro de lo que se lanzó, y la web esconde el
+                    // selector en un día cerrado. El share y el reenvío pendiente siguen disponibles.
+                    onAddPhoto = if (selected == today) {
+                        { pendingPhotoMovement = movement.id }
+                    } else {
+                        null
+                    },
+                    onDeletePhoto = if (selected == today) viewModel::deletePhoto else null,
                     onShare = { onOpenWhatsApp(viewModel.movementShareLink(movement, summaryLabels)) },
                     onResend = if (viewModel.isPending(movement)) viewModel::resendPending else null,
                 )
@@ -397,7 +402,7 @@ private fun statusLabel(status: com.trindade.app.contract.models.SalidaMovementE
 internal fun SalidaMovementCard(
     movement: SalidaCreateResponseMovement,
     onAddPhoto: (() -> Unit)? = null,
-    onDeletePhoto: (Int) -> Unit = {},
+    onDeletePhoto: ((Int) -> Unit)? = null,
     onShare: (() -> Unit)? = null,
     onResend: (() -> Unit)? = null,
 ) {
@@ -466,11 +471,14 @@ internal fun SalidaMovementCard(
                             maxLines = 1,
                             modifier = Modifier.weight(1f).padding(end = 8.dp),
                         )
-                        TextButton(
-                            onClick = { onDeletePhoto(photo.id) },
-                            modifier = Modifier.defaultMinSize(minHeight = 48.dp),
-                        ) {
-                            Text(stringResource(R.string.salida_photo_delete))
+                        // Sin `onDeletePhoto` la foto se muestra y no se toca: es lo que un día cerrado permite.
+                        onDeletePhoto?.let { delete ->
+                            TextButton(
+                                onClick = { delete(photo.id) },
+                                modifier = Modifier.defaultMinSize(minHeight = 48.dp),
+                            ) {
+                                Text(stringResource(R.string.salida_photo_delete))
+                            }
                         }
                     }
                 }

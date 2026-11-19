@@ -133,4 +133,30 @@ class SalidaMovementCardTest {
         composeRule.onNodeWithTag("salida-photos-7").assertDoesNotExist()
         composeRule.onNodeWithTag("salida-photo-picker").assertIsDisplayed()
     }
+
+    /**
+     * Un día cerrado enseña sus fotos y no deja tocar ninguna.
+     *
+     * El pasado es el registro de lo que se lanzó: sin selector para agregar y sin borrar, que es lo que la web
+     * hace con `readOnly`. Compartir y reinviar pendientes siguen disponibles, porque no cambian el registro.
+     */
+    @Test
+    fun `a closed day shows the photos and offers no photo action`() {
+        composeRule.setContent {
+            com.trindade.app.ui.theme.TrindadeTheme {
+                SalidaMovementCard(
+                    movement = movement(photos = listOf(photo(91, "/p/uno.jpg"))),
+                    onAddPhoto = null,
+                    onDeletePhoto = null,
+                    onShare = {},
+                    onResend = null,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("salida-photos-7").assertIsDisplayed()
+        composeRule.onNodeWithTag("salida-photo-picker").assertDoesNotExist()
+        composeRule.onNodeWithText("Excluir foto").assertDoesNotExist()
+        composeRule.onNodeWithTag("salida-share-7").assertIsDisplayed()
+    }
 }

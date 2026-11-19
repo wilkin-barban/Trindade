@@ -25,7 +25,8 @@ import com.trindade.app.R
 @Composable
 fun HistoryHeader(
     title: String,
-    onBack: () -> Unit,
+    /** El camino de vuelta, cuando esa superficie lo necesita. Null = la navegación es la barra superior. */
+    onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     backLabel: String = stringResource(R.string.report_back),
@@ -41,7 +42,9 @@ fun HistoryHeader(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            NavigationActionButton(onClick = onBack, text = backLabel)
+            if (onBack != null) {
+                NavigationActionButton(onClick = onBack, text = backLabel)
+            }
             Column {
                 Text(
                     text = title,

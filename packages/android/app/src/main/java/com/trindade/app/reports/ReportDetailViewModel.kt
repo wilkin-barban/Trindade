@@ -197,12 +197,15 @@ class ReportDetailViewModel @Inject constructor(
                     val massas = massasRepository?.reportDay(date)
                     val recs = repository.receipts(date)
                     val export = repository.exportText(currentReport.id)
+                    // El bloque de salidas se refresca con la misma lectura, no con la próxima visita.
+                    val salidaDay = runCatching { repository.salidaDay(date) }.getOrNull()
                     _state.update {
                         it.copy(
                             isSyncingErp = false,
                             massasDay = massas,
                             receipts = recs,
                             exportText = export ?: it.exportText,
+                            salidaDay = salidaDay ?: it.salidaDay,
                             message = UiText.of(R.string.report_erp_sync_success),
                         )
                     }

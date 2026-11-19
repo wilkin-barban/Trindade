@@ -609,12 +609,13 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         massasHistoryOpen -> {
+                            // El atrás físico del archivo vuelve al día que se estaba leyendo; el camino visible
+                            // es la barra superior, porque el «Voltar» duplicado se retiró.
                             val onBackMassasHistory = { massasHistoryOpen = false }
                             BackHandler(onBack = onBackMassasHistory)
                             val historyViewModel: com.trindade.app.massas.MassasHistoryViewModel = hiltViewModel()
                             com.trindade.app.massas.MassasHistoryScreen(
                                 viewModel = historyViewModel,
-                                onBack = onBackMassasHistory,
                                 onSelectDate = { date ->
                                     massasHistoryOpen = false
                                     massasLaunchDay = date
@@ -687,12 +688,16 @@ class MainActivity : ComponentActivity() {
                                     AssaiCalculatorScreen()
                                 }
                                 Tab.SALIDA -> {
-                                    BackHandler(enabled = !drawerState.isOpen, onBack = { tab = Tab.DASHBOARD })
+                                    // El atrás físico cierra el archivo antes de salir del módulo: la pantalla ya
+                                    // no dibuja un «Voltar», y sin esto el único gesto de vuelta sería irse a
+                                    // otra pestaña.
+                                    BackHandler(enabled = !drawerState.isOpen) {
+                                        if (salidaHistoryOpen) salidaHistoryOpen = false else tab = Tab.DASHBOARD
+                                    }
                                     val salidaViewModel: com.trindade.app.salida.SalidaViewModel = hiltViewModel()
                                     if (salidaHistoryOpen) {
                                         com.trindade.app.salida.SalidaHistoryScreen(
                                             viewModel = salidaViewModel,
-                                            onBack = { salidaHistoryOpen = false },
                                             // El día vacío de hoy ofrece lanzar la primera baja: vuelve a la
                                             // pantalla de lanzamiento, no al tablero.
                                             onLaunch = { salidaHistoryOpen = false },

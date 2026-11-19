@@ -107,13 +107,26 @@ class ReportGeneratorViewModelTest {
         assertFalse(model.state.value.isSyncingErp)
     }
 
+    /**
+     * Una sola acción del bloque ERP refresca las tres lecturas: massas, insumos y salidas.
+     *
+     * La lectura viaja con `includeExits = true`, que es lo que el bloque de Salidas necesita (ENTSAI null, no E).
+     * Sin eso, la tarjeta de salidas del reporte quedaba con lo que había al abrir la pantalla hasta la próxima
+     * visita, y el operario no tenía ningún botón que la refrescara.
+     */
     @Test
-    fun `syncErp stores the plant's day and refreshes both halves of the card`() {
+    fun `syncErp stores the plant's day and refreshes the three readings of the block`() {
         api.receiptsToReturn = com.trindade.app.contract.models.ReportReceipts(
             date = "2026-05-04",
             migrated = true,
             syncedAt = "07:10",
             receipts = emptyList(),
+        )
+        api.salidaDayToReturn = com.trindade.app.contract.models.SalidaReportDayView(
+            date = "2026-05-04",
+            operators = emptyList(),
+            totalUnits = 0,
+            movementCount = 0,
         )
         val mirror = object : com.trindade.app.aero.AeroMirrorPort {
             val snapshots = mutableListOf<String>()
@@ -141,6 +154,7 @@ class ReportGeneratorViewModelTest {
         )
         assertFalse(model.state.value.messageIsError)
         assertNotNull(model.state.value.receipts)
+        assertNotNull("la sincronización también refresca las salidas", model.state.value.salidaDay)
         assertFalse(model.state.value.isSyncingErp)
     }
 

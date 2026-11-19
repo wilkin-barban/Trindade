@@ -60,18 +60,18 @@ class ErpMovementsCardSyncButtonTest {
     }
 
     /**
-     * Las dos tarjetas ofrecen la sincronización, porque es una sola lectura del ERP para las dos.
+     * Una sola acción para el bloque entero.
      *
-     * La lógica es una -- el mismo `onSync`, el mismo estado -- y por eso el test aprieta la de Insumos y cuenta
-     * una sola llamada: dos botones no son dos sincronizaciones.
+     * La lectura del ERP trae las tres listas a la vez -- massas, insumos y salidas --, así que un botón por
+     * tarjeta era la misma acción repetida, y la tarjeta de Salidas, que se refresca con ella, no tenía ninguno.
      */
     @Test
-    fun `each card carries the action, and pressing either is one sync`() {
+    fun `the block carries exactly one action, and pressing it is one sync`() {
         drawCard()
 
         val label = context.getString(R.string.report_erp_sync)
-        composeRule.onAllNodesWithText(label).assertCountEquals(2)
-        composeRule.onAllNodesWithText(label)[1].assertIsEnabled().performClick()
+        composeRule.onAllNodesWithText(label).assertCountEquals(1)
+        composeRule.onNodeWithText(label).assertIsEnabled().performClick()
         composeRule.waitForIdle()
 
         org.junit.Assert.assertEquals(1, syncs)
@@ -80,24 +80,20 @@ class ErpMovementsCardSyncButtonTest {
     }
 
     @Test
-    fun `both actions keep the 48dp target`() {
+    fun `the action keeps the 48dp target`() {
         drawCard()
 
-        composeRule.onAllNodesWithText(context.getString(R.string.report_erp_sync)).fetchSemanticsNodes().forEachIndexed { index, _ ->
-            val bounds = composeRule
-                .onAllNodesWithText(context.getString(R.string.report_erp_sync))[index]
-                .getUnclippedBoundsInRoot()
-            val height = bounds.bottom - bounds.top
-            assertTrue("the action must be at least 48dp tall; height=$height bounds=$bounds", height >= 48.dp)
-        }
+        val bounds = composeRule
+            .onNodeWithText(context.getString(R.string.report_erp_sync))
+            .getUnclippedBoundsInRoot()
+        val height = bounds.bottom - bounds.top
+        assertTrue("the action must be at least 48dp tall; height=$height bounds=$bounds", height >= 48.dp)
     }
 
     @Test
     fun `a sync in flight cannot be fired twice`() {
         drawCard(isSyncing = true)
 
-        composeRule.onAllNodesWithText(context.getString(R.string.report_erp_sync)).fetchSemanticsNodes().forEachIndexed { index, _ ->
-            composeRule.onAllNodesWithText(context.getString(R.string.report_erp_sync))[index].assertIsNotEnabled()
-        }
+        composeRule.onNodeWithText(context.getString(R.string.report_erp_sync)).assertIsNotEnabled()
     }
 }
