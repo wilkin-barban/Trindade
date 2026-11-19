@@ -430,7 +430,8 @@ class DashboardScreenTest {
         composeRule.onNodeWithText(copy(R.string.dashboard_active_users)).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(copy(R.string.dashboard_reports_total)).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(copy(R.string.dashboard_schedules_total)).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText(copy(R.string.dashboard_deferred_notice)).performScrollTo().assertIsDisplayed()
+        // El aviso de "módulos futuros" se fue: la web ya no lo tiene y prometía lo que ya está.
+        composeRule.onNodeWithText("Novos módulos estarão disponíveis em versões futuras.").assertDoesNotExist()
     }
 
     @Test

@@ -402,12 +402,6 @@ fun DashboardScreen(
                     }
                 }
 
-                Text(
-                    text = stringResource(R.string.dashboard_deferred_notice),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-
                 if (showHelpDialog) {
                     ModuleHelpDialog(
                         title = stringResource(R.string.help_dashboard_title),
