@@ -604,3 +604,16 @@ el historial: separar las responsabilidades.
 | 8.3 Lanzamiento sin share ni gestión ERP | **pendiente** | `MassasLaunchScreen` todavía monta `MassasWhatsAppShare` cuando `origin == HISTORY` |
 | 8.4 CTA del día vacío en Salidas | **pendiente** | `SalidaHistoryScreen` devuelve sólo un texto cuando el día no tiene movimientos |
 | 8.5 bump 0.8.2 (8005) + verificación | **pendiente** | build, `adb install -r`, capturas en `/tmp/trindade-082/`, PASS/FAIL de los cinco |
+
+### §8 — cierre verificado en dispositivo (0.8.4 / 8007)
+
+| Punto | Estado | Evidencia |
+| --- | --- | --- |
+| 8.1 barra superior + cajón | **PASS** | barra con Salida; cajón: Histórico de Massas → Histórico de Saídas → Contagem |
+| 8.1-b historial en la fila | hecho (test) | `selectedTabIndex(tab, overlay)` |
+| 8.2 Historial de Masas abre Hoy sin grilla | **PASS** | `8ba06b04`; en pantalla: Data de Produção, Produção do dia, Lançamentos Individuais, Resumo Coletivo — sin “Lançar Produção por Caixas” |
+| 8.3 Lanzamiento sin share/filtros/ERP | **PASS** | misma captura: nada de lanzamiento en el día del historial; Volver lleva a la lista con chips (`Hoje`) |
+| 8.4 CTA día vacío en Salidas | hecho, sin captura | `d48d5431` |
+| 8.5 build/install | **PASS** | 0.8.4 (8007) instalada; capturas en `/tmp/trindade-084/` |
+
+**Causa del FAIL anterior**: el gate de la grilla se aplicó al primer `!isReadOnly` (ajustes ERP) y no al segundo, que es el grid de cantidades; y la tarjeta del dashboard entraba por otro camino que el cajón. Ambos corregidos en `8ba06b04`.
