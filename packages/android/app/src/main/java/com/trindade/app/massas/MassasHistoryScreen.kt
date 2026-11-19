@@ -114,7 +114,7 @@ fun MassasHistoryScreen(
             FilterChip(
                 selected = false,
                 onClick = { onSelectDate(today) },
-                label = { Text("Hoje") },
+                label = { Text(MASSAS_HISTORY_TODAY_LABEL) },
                 modifier = Modifier.defaultMinSize(minHeight = 44.dp).testTag("massas-history-today"),
             )
             shown.forEach { day ->
@@ -130,7 +130,7 @@ fun MassasHistoryScreen(
             FilterChip(
                 selected = showAll,
                 onClick = { showAll = !showAll },
-                label = { Text(if (showAll) "Últimas datas" else "Todas as datas") },
+                label = { Text(if (showAll) "Últimas datas" else MASSAS_HISTORY_ALL_LABEL) },
                 modifier = Modifier.defaultMinSize(minHeight = 44.dp).testTag("massas-history-all"),
             )
         }

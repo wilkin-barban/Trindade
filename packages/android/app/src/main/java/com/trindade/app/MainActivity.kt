@@ -684,6 +684,15 @@ class MainActivity : ComponentActivity() {
                                         } else {
                                             com.trindade.app.massas.MassasOrigin.LAUNCH
                                         },
+                                        // Las fechas rápidas del día abierto del historial: el día sigue viviendo en
+                                        // este estado, así que el que el operario eligió sobrevive a salir de la
+                                        // pestaña y volver, y el atrás físico del teléfono ve el día correcto.
+                                        onSelectDay = { date ->
+                                            massasLaunchDay = date
+                                            massasDayFromList = true
+                                            massasDayFromHistory =
+                                                date != com.trindade.app.massas.MassasLaunchViewModel.saopauloToday()
+                                        },
                                     )
                                 }
                                 // O histórico mostra o que o dia produziu; a correção acontece na

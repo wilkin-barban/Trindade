@@ -67,7 +67,6 @@ import com.trindade.app.ui.components.ModuleHelpButton
 import com.trindade.app.ui.components.ActionResultDialog
 import com.trindade.app.ui.components.ModuleHelpDialog
 import com.trindade.app.ui.components.ModuleHistoryButton
-import com.trindade.app.ui.components.NavigationActionButton
 import com.trindade.app.ui.resolve
 import com.trindade.app.ui.filterPhoneDigits
 import androidx.compose.ui.platform.testTag
@@ -161,6 +160,14 @@ fun MassasLaunchScreen(
      * histórico y, aun así, tiene que mostrar las operaciones del día y su share.
      */
     origin: MassasOrigin = if (onBackToHistory != null) MassasOrigin.HISTORY else MassasOrigin.LAUNCH,
+    /**
+     * Qué hacer cuando el día abierto desde el historial pide otra fecha.
+     *
+     * Nulo carga el día en este mismo ViewModel. La pantalla que sí guarda el día -- `MainActivity` -- pasa su
+     * propio callback para que el día pedido sobreviva a salir de la pestaña y volver: el efecto que relee el
+     * día mira ese estado y no lo que el ViewModel alcanzó a mostrar.
+     */
+    onSelectDay: ((String) -> Unit)? = null,
 ) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
@@ -208,39 +215,45 @@ fun MassasLaunchScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        // Encabezado: sus acciones en las esquinas, sin repetir el título que la pestaña ya dice, y la
-        // frase del módulo debajo de ellas. El "Voltar" sólo aparece en el día leído desde el histórico,
-        // que es la subpantalla de este módulo.
-        // The actions and the module's line are one block, 4dp apart, the same block the other three
-        // modules draw: the line belongs to the header, not to the gap between the header and the next card.
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (state.isReadOnly && onBackToHistory != null) {
-                    NavigationActionButton(
-                        onClick = onBackToHistory,
-                        text = stringResource(R.string.report_back),
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                }
-                // La grilla es del lanzamiento: la vista de día que abre el historial no la monta, y por eso el
-                // operario que entra a consultar no se encuentra el formulario encima de lo que vino a leer.
-                if (origin == MassasOrigin.LAUNCH && !state.isReadOnly) {
-                    ModuleHistoryButton(onClick = onNavigateToHistory)
-                }
-                Spacer(modifier = Modifier.weight(1f))
-                ModuleHelpButton(onClick = { viewModel.toggleHelpDialog(true) })
-            }
-            // The tagline is the module's own line, not a read-only notice: the date and the read-only
-            // state are already in the card below, and swapping the description for the date left the
-            // header saying two different kinds of thing depending on who was looking at it.
-            Text(
-                text = stringResource(R.string.massas_tagline),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+        // Encabezado. El día que abre el historial no es una subpantalla del lanzamiento: es una vista del
+        // archivo, y por eso lleva el nombre del archivo, el Voltar a la lista -- hoy también, que era el caso
+        // sin salida visible -- y sus fechas rápidas. La barra del lanzamiento queda tal cual para la pestaña.
+        if (onBackToHistory != null) {
+            MassasHistoryDayHeader(
+                today = MassasLaunchViewModel.saopauloToday(),
+                selectedDate = state.date,
+                onBack = onBackToHistory,
+                onSelectDate = onSelectDay ?: viewModel::loadDay,
+                onOpenList = onBackToHistory,
+                onHelp = { viewModel.toggleHelpDialog(true) },
             )
+        } else {
+            // Encabezado: sus acciones en las esquinas, sin repetir el título que la pestaña ya dice, y la
+            // frase del módulo debajo de ellas.
+            // The actions and the module's line are one block, 4dp apart, the same block the other three
+            // modules draw: the line belongs to the header, not to the gap between the header and the next card.
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    // La grilla es del lanzamiento: la vista de día que abre el historial no la monta, y por eso el
+                    // operario que entra a consultar no se encuentra el formulario encima de lo que vino a leer.
+                    if (origin == MassasOrigin.LAUNCH && !state.isReadOnly) {
+                        ModuleHistoryButton(onClick = onNavigateToHistory)
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    ModuleHelpButton(onClick = { viewModel.toggleHelpDialog(true) })
+                }
+                // The tagline is the module's own line, not a read-only notice: the date and the read-only
+                // state are already in the card below, and swapping the description for the date left the
+                // header saying two different kinds of thing depending on who was looking at it.
+                Text(
+                    text = stringResource(R.string.massas_tagline),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
 
         // Banners de Notificación / Error
