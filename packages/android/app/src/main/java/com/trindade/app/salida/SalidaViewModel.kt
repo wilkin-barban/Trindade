@@ -244,6 +244,39 @@ class SalidaViewModel @Inject constructor(
             ?: com.trindade.app.ui.whatsAppShareLink(text)
     }
 
+    /**
+     * Un movimiento está pendiente cuando el ERP no lo aceptó: o nunca se intentó, o el viaje falló.
+     *
+     * Reconciliado y parcial no se reenvían: el asiento ya existe en la empresa y reintentar duplicaría la baja.
+     */
+    fun isPending(movement: com.trindade.app.contract.models.SalidaCreateResponseMovement): Boolean {
+        val erp = movement.erp?.status?.value?.lowercase()
+        val reconciliation = movement.reconciliation.status.value.lowercase()
+        if (reconciliation == "reconciled" || reconciliation == "partial") return false
+        return erp == null || erp == "failed"
+    }
+
+    /** Los pendientes del día elegido, que es lo que la cabecera cuenta. */
+    fun pendingCount(): Int {
+        val chosen = _state.value.historyDate ?: _state.value.date
+        val day = _state.value.history.firstOrNull { it.date == chosen } ?: return 0
+        return day.movements.count { isPending(it) }
+    }
+
+    /** Reenvía la cola al ERP con el mismo cliente que usa el lanzamiento. */
+    fun resendPending() {
+        viewModelScope.launch {
+            val outcome = repository.retryPending()
+            _state.value = _state.value.copy(
+                notice = SalidaNotice(
+                    if (outcome is SalidaErpOutcome.Failed) "Reenvío con fallas: ${outcome.message}" else "Reenvío completado.",
+                    isError = outcome is SalidaErpOutcome.Failed,
+                ),
+            )
+            refreshHistory()
+        }
+    }
+
     /** El enlace de WhatsApp de un movimiento suelto: su texto, con o sin teléfono. */
     fun movementShareLink(movement: com.trindade.app.contract.models.SalidaCreateResponseMovement): String {
         val text = salidaDaySummaryText(

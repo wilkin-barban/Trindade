@@ -106,6 +106,30 @@ fun SalidaHistoryScreen(
             onToggleAll = viewModel::toggleHistoryAll,
         )
 
+        // Los pendientes que esperan viaje al ERP se cuentan en la cabecera del día, no en cada tarjeta: es la
+        // pregunta que el operario hace al abrir el histórico por la mañana.
+        val pending = viewModel.pendingCount()
+        if (pending > 0) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "$pending pendentes",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.testTag("salida-pending-count"),
+                )
+                TextButton(
+                    onClick = viewModel::resendPending,
+                    modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("salida-resend-pending"),
+                ) {
+                    Text("Reenviar pendentes")
+                }
+            }
+        }
+
         Spacer(Modifier.height(8.dp))
 
         if (selected != today) {
@@ -130,6 +154,34 @@ fun SalidaHistoryScreen(
             return@Column
         }
 
+        // El filtro por bloque es de la pantalla y no del servidor: los movimientos del día ya están acá.
+        var block by remember { mutableStateOf<String?>(null) }
+        val blocks = day.movements.flatMap { movement -> movement.items.map { it.block.value } }.distinct().sorted()
+        if (blocks.size > 1) {
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                FilterChip(
+                    selected = block == null,
+                    onClick = { block = null },
+                    label = { Text("Todos") },
+                    modifier = Modifier.defaultMinSize(minHeight = 44.dp).testTag("salida-history-block-all"),
+                )
+                blocks.forEach { candidate ->
+                    FilterChip(
+                        selected = block == candidate,
+                        onClick = { block = if (block == candidate) null else candidate },
+                        label = { Text(candidate) },
+                        modifier = Modifier
+                            .defaultMinSize(minHeight = 44.dp)
+                            .testTag("salida-history-block-$candidate"),
+                    )
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+
         Text(
             text = "${day.totalUnits} un",
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
@@ -138,12 +190,15 @@ fun SalidaHistoryScreen(
         )
 
         Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            day.movements.forEach { movement ->
+            day.movements
+                .filter { movement -> block == null || movement.items.any { it.block.value == block } }
+                .forEach { movement ->
                 SalidaMovementCard(
                     movement = movement,
                     onAddPhoto = { pendingPhotoMovement = movement.id },
                     onDeletePhoto = viewModel::deletePhoto,
                     onShare = { onOpenWhatsApp(viewModel.movementShareLink(movement)) },
+                    onResend = if (viewModel.isPending(movement)) viewModel::resendPending else null,
                 )
             }
             Spacer(Modifier.height(12.dp))
@@ -246,6 +301,7 @@ internal fun SalidaMovementCard(
     onAddPhoto: (() -> Unit)? = null,
     onDeletePhoto: (Int) -> Unit = {},
     onShare: (() -> Unit)? = null,
+    onResend: (() -> Unit)? = null,
 ) {
     Card(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
         Column(modifier = Modifier.padding(12.dp)) {
@@ -326,6 +382,14 @@ internal fun SalidaMovementCard(
                         modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("salida-share-${movement.id}"),
                     ) {
                         Text("Compartir", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+                if (onResend != null) {
+                    OutlinedButton(
+                        onClick = onResend,
+                        modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("salida-resend-${movement.id}"),
+                    ) {
+                        Text("Reenviar ao ERP", style = MaterialTheme.typography.labelMedium)
                     }
                 }
             }

@@ -104,6 +104,25 @@ class SalidaMovementCardTest {
     }
 
     @Test
+    fun `a pending movement offers the resend action and a settled one does not`() {
+        var resent = 0
+        composeRule.setContent {
+            com.trindade.app.ui.theme.TrindadeTheme {
+                SalidaMovementCard(
+                    movement = movement(emptyList()),
+                    onAddPhoto = {},
+                    onDeletePhoto = {},
+                    onShare = {},
+                    onResend = { resent += 1 },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("salida-resend-7").performClick()
+        assertEquals(1, resent)
+    }
+
+    @Test
     fun `a movement without photos shows no photo block but still offers the picker`() {
         composeRule.setContent {
             com.trindade.app.ui.theme.TrindadeTheme {
