@@ -425,3 +425,25 @@ Alcance confirmado por §6 C. Punto de partida exacto:
   `salida-share-<id>`, `salida-resend-<id>`, `salida-pending-count`.
 - Después: F3 (salidas en creación/edición + fotos), F4 (fleteros web + sticky), F5b (tarjetas del dashboard),
   F6 (abreviaturas en Stock/Assaí) y F7 (build 8004, instalación, capturas, PASS/FAIL).
+
+### F2 — cerrada (Android, §6 C / R4–R5)
+
+| Commit | Alcance | Test |
+| --- | --- | --- |
+| `592ba641` | `SalidaRepository.history()` devuelve días completos; estado con `historyDate`/`historyAll`; pantalla con Hoy + 5 + “Todas”, nota de solo lectura y total del día | `SalidaHistoryDatesTest` (3 casos) |
+| `6d7e3d61` | `salidaDaySummaryText` con la tabla compartida + `SalidaWhatsAppShare` (teléfono, prévia, una acción, `wa.me` con respaldo general) | `SalidaDaySummaryTextTest` |
+| `5cd892e4` | Fotos por movimiento: `photos`/`attachPhoto`/`deletePhoto`, compresión, previews, borrado, selector y compartir con fotos (`shareTextWithPhotos` = `ACTION_SEND_MULTIPLE` con degradación) | `SalidaMovementCardTest` |
+| `d2044d79` | Pendientes (`isPending`), contador y reenvío del día y por movimiento (`retryPending`), filtro por bloque | `SalidaMovementCardTest` (reenvío) |
+
+Suite `salida.*` verde al cerrar la fase. TestIDs de §6 C implementados: `salida-history-today`,
+`salida-history-chip-<date>`, `salida-history-all`, `salida-history-readonly-note`, `salida-whatsapp-share-card`,
+`salida-share-day`, `salida-preview-message`, `salida-photo-picker`, `salida-share-<id>`, `salida-resend-<id>`,
+`salida-pending-count`, más `salida-history-block-*` y `salida-photos-<id>`.
+
+**Pendiente de F2**: R4 (Masas: hoy + 5 + todas con operaciones y share) no se tocó — el histórico de Masas sigue
+como lista de días. Va junto con F3 o en una unidad propia.
+
+### F3 — siguiente
+Bloque `SalidaReportSection` en `ReportGeneratorScreen`/`ReportEditScreen` (`salidaDay`/`salidaLoading`/`salidaError`
+en los ViewModels, como ya hace el detalle), nombre + `(username)`, spinner/error/vacío/total y `testTag("report-salida-block")`;
+después el selector de fotos múltiple en creación y edición con compresión y subida tras guardar.
