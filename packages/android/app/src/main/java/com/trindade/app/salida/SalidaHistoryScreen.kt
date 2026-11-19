@@ -44,6 +44,7 @@ import com.trindade.app.ui.components.HistoryHeader
 fun SalidaHistoryScreen(
     viewModel: SalidaViewModel,
     onBack: () -> Unit,
+    onOpenWhatsApp: (String) -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
     var showHelpDialog by remember { mutableStateOf(false) }
@@ -119,6 +120,17 @@ fun SalidaHistoryScreen(
             day.movements.forEach { movement ->
                 SalidaMovementCard(movement)
             }
+            Spacer(Modifier.height(12.dp))
+            // El compartir es del día entero y vive donde el día se lee: con el mensaje armado desde la tabla
+            // de abreviaturas, la prévia a la vista y una sola acción.
+            val phone = state.historyPhone
+            SalidaWhatsAppShare(
+                text = viewModel.dayShareText(),
+                phone = phone,
+                onPhoneChange = viewModel::onHistoryPhoneChange,
+                walletLink = viewModel.historyWhatsAppLink(),
+                onOpenWhatsApp = { viewModel.historyWhatsAppLink()?.let { onOpenWhatsApp(it) } },
+            )
         }
     }
 

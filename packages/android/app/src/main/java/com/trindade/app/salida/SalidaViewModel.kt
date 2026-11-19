@@ -31,6 +31,8 @@ data class SalidaUiState(
     val historyDate: String? = null,
     /** Si el histórico muestra todas las fechas en vez de hoy más las cinco anteriores. */
     val historyAll: Boolean = false,
+    /** El teléfono al que se manda el día; se recuerda mientras la pantalla vive. */
+    val historyPhone: String = "",
     val loading: Boolean = true,
 ) {
     /** Lo que la baja va a mandar: sólo los productos de los bloques activos, con una cantidad válida. */
@@ -59,6 +61,8 @@ data class SalidaNotice(val message: String, val isError: Boolean)
 @HiltViewModel
 class SalidaViewModel @Inject constructor(
     private val repository: SalidaRepository,
+    // La tabla aprobada del WhatsApp viaja con el mensaje: un share con nombres completos sería otro mensaje.
+    private val abbreviationsSource: com.trindade.app.massas.WhatsappAbbreviationsSource? = null,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SalidaUiState(date = saoPauloDate()))
@@ -167,6 +171,29 @@ class SalidaViewModel @Inject constructor(
             format.timeZone = TimeZone.getTimeZone("America/Sao_Paulo")
             return format.format(now)
         }
+    }
+
+    /** El texto del día elegido, listo para el share. Vacío cuando el día no tiene movimientos. */
+    fun dayShareText(): String {
+        val chosen = _state.value.historyDate ?: _state.value.date
+        val day = _state.value.history.firstOrNull { it.date == chosen } ?: return ""
+        return salidaDaySummaryText(
+            date = day.date,
+            movements = day.movements,
+            abbreviations = abbreviationsSource?.table ?: com.trindade.app.massas.WhatsappAbbreviations.EMPTY,
+        )
+    }
+
+    fun onHistoryPhoneChange(phone: String) {
+        _state.value = _state.value.copy(historyPhone = phone)
+    }
+
+    /** El enlace del día elegido: con teléfono abre ese chat; sin teléfono deja elegir el chat. */
+    fun historyWhatsAppLink(): String? {
+        val text = dayShareText()
+        if (text.isBlank()) return null
+        return com.trindade.app.ui.waMeLink(_state.value.historyPhone, text)
+            ?: com.trindade.app.ui.whatsAppShareLink(text)
     }
 
     /** Elige el día que el histórico muestra; null es hoy. */
