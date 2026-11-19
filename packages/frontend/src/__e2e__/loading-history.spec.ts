@@ -85,7 +85,7 @@ test.describe('Loading History — Filters and pagination', () => {
    * The schedule screen shows today only, so the card is the door: it has to open the day it names, with its
    * rows, and not a blank edit screen for whatever date happened to be in the address bar.
    */
-  test('opens the day of a batch from its card', async ({ page }) => {
+  test('opens the share card of the batch from its card', async ({ page }) => {
     const date = today();
     const stamp = Date.now();
     const driver = await apiPost(page, '/loading/drivers', {
@@ -105,8 +105,9 @@ test.describe('Loading History — Filters and pagination', () => {
 
     await card.locator('a').first().click();
 
-    await page.waitForURL(new RegExp(`/loading/edit\\?date=${date}`));
-    await expect(page.locator('[data-testid="edit-schedule-list"]')).toContainText(`Hist ${stamp}`);
+    // La tarjeta abre la vista de compartir del día, no el editor: es donde se lee lo que se manda al grupo.
+    await page.waitForURL(new RegExp(`/loading\\?share=1&date=${date}&from=history`));
+    await expect(page.getByTestId('loading-share-text')).toBeVisible({ timeout: 15000 });
   });
 
   test('keeps the date and the actions on one compact row at 390x844', async ({ page }) => {

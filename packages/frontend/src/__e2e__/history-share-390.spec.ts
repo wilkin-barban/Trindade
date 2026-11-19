@@ -36,7 +36,7 @@ test.describe('los históricos abren la tarjeta de compartir', () => {
     await expect(page).toHaveURL(/\/loading\/history$/);
   });
 
-  test('el historial de reportes abre la tarjeta del reporte, sin Editar', async ({ page }) => {
+  test('el historial de reportes abre la tarjeta del reporte, con Editar si es de hoy', async ({ page }) => {
     const identities = await getE2EIdentities(page);
     await goToProtected(page, '/loading/reports-history', identities.admin);
 
@@ -60,7 +60,9 @@ test.describe('los históricos abren la tarjeta de compartir', () => {
     await expect(page).toHaveURL(/\/reports\/\d+\?share=1/);
     await expect(page.getByTestId('report-share-back')).toBeVisible();
     await expect(page.getByTestId('report-share-text')).toBeVisible();
-    await expect(page.getByTestId('report-share-edit')).toHaveCount(0);
+    // El reporte es de hoy y lo creó este administrador: la directiva pide Editar para dueño o admin en el día,
+    // y el pasado sigue sin ofrecerlo.
+    await expect(page.getByTestId('report-share-edit')).toBeVisible();
 
     await page.getByTestId('report-share-back').click();
     await expect(page).toHaveURL(/\/loading\/reports-history$/);
