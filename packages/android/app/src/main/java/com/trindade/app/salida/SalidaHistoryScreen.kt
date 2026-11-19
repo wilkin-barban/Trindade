@@ -46,6 +46,8 @@ fun SalidaHistoryScreen(
     viewModel: SalidaViewModel,
     onBack: () -> Unit,
     onOpenWhatsApp: (String) -> Unit = {},
+    /** La vuelta al lanzamiento desde el día vacío de hoy. */
+    onLaunch: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
     var showHelpDialog by remember { mutableStateOf(false) }
@@ -151,6 +153,19 @@ fun SalidaHistoryScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(top = 24.dp).testTag("salida-history-empty"),
             )
+            // Un día de hoy vacío tiene una salida: lanzar la primera baja. El pasado no la ofrece porque no se
+            // lanza en el pasado -- ahí sólo se lee lo que hubo.
+            if (selected == today) {
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = onLaunch,
+                    modifier = Modifier
+                        .defaultMinSize(minHeight = 48.dp)
+                        .testTag("salida-empty-cta"),
+                ) {
+                    Text("Lanzar salida")
+                }
+            }
             return@Column
         }
 

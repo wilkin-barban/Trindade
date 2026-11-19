@@ -647,6 +647,9 @@ class MainActivity : ComponentActivity() {
                                         com.trindade.app.salida.SalidaHistoryScreen(
                                             viewModel = salidaViewModel,
                                             onBack = { salidaHistoryOpen = false },
+                                            // El día vacío de hoy ofrece lanzar la primera baja: vuelve a la
+                                            // pantalla de lanzamiento, no al tablero.
+                                            onLaunch = { salidaHistoryOpen = false },
                                         )
                                     } else {
                                         com.trindade.app.salida.SalidaLaunchScreen(
