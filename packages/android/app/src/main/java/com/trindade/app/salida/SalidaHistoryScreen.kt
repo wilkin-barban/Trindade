@@ -59,6 +59,39 @@ private fun salidaSummaryLabels(): SalidaSummaryLabels = SalidaSummaryLabels(
  * En el pasado no se lanza nada, así que ahí la frase va sola. Está aparte de la pantalla porque es lo único
  * que se puede probar sin levantar el ViewModel, y es justo la regla que se quiere fijar.
  */
+/**
+ * El día sin movimientos, completo: la frase, la puerta al lanzamiento si es hoy y el bloque de WhatsApp.
+ *
+ * La web monta las dos cosas -- el estado vacío y `SalidaWhatsAppShare` deshabilitado -- porque un bloque que
+ * desaparece deja al operario sin saber si el día no tuvo salidas o si la pantalla no cargó. Sin movimientos no
+ * hay texto que mandar, así que la prévia lleva la frase del día vacío y el botón queda apagado; la acción de
+ * lanzar, cuando el día es hoy, es la que sigue viva. Se prueba junto y sin ViewModel: es una composición, no un
+ * estado.
+ */
+@Composable
+internal fun SalidaHistoryEmptyDay(
+    isToday: Boolean,
+    onLaunch: () -> Unit,
+    shareText: String,
+    phone: String,
+    onPhoneChange: (String) -> Unit,
+    walletLink: String?,
+    onOpenWhatsApp: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier) {
+        SalidaHistoryEmpty(isToday = isToday, onLaunch = onLaunch)
+        Spacer(Modifier.height(12.dp))
+        SalidaWhatsAppShare(
+            text = shareText,
+            phone = phone,
+            onPhoneChange = onPhoneChange,
+            walletLink = walletLink,
+            onOpenWhatsApp = onOpenWhatsApp,
+        )
+    }
+}
+
 @Composable
 internal fun SalidaHistoryEmpty(
     isToday: Boolean,
@@ -193,14 +226,28 @@ fun SalidaHistoryScreen(
         val summaryLabels = salidaSummaryLabels()
 
         val day = days.firstOrNull { it.date == selected }
-        if (day == null || day.movements.isEmpty()) {
-            SalidaHistoryEmpty(isToday = selected == today, onLaunch = onLaunch)
-            return@Column
-        }
+        val movements = day?.movements.orEmpty()
 
         // El filtro por bloque es de la pantalla y no del servidor: los movimientos del día ya están acá.
         var block by remember { mutableStateOf<String?>(null) }
-        val blocks = day.movements.flatMap { movement -> movement.items.map { it.block.value } }.distinct().sorted()
+
+        // El día vacío se dibuja como en la web: su estado -- con la puerta al lanzamiento si es hoy -- y,
+        // debajo, el bloque de compartir con la prévia vacía y el envío deshabilitado. Ocultarlo dejaba al
+        // operario sin saber si el día no tenía nada o si la pantalla no había cargado.
+        if (movements.isEmpty()) {
+            SalidaHistoryEmptyDay(
+                isToday = selected == today,
+                onLaunch = onLaunch,
+                shareText = viewModel.dayShareText(summaryLabels),
+                phone = state.historyPhone,
+                onPhoneChange = viewModel::onHistoryPhoneChange,
+                walletLink = null,
+                onOpenWhatsApp = {
+                    viewModel.historyWhatsAppLink(summaryLabels)?.let { onOpenWhatsApp(it) }
+                },
+            )
+        } else {
+        val blocks = movements.flatMap { movement -> movement.items.map { it.block.value } }.distinct().sorted()
         if (blocks.size > 1) {
             Row(
                 modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -227,14 +274,14 @@ fun SalidaHistoryScreen(
         }
 
         Text(
-            text = stringResource(R.string.salida_units_format, day.totalUnits),
+            text = stringResource(R.string.salida_units_format, day?.totalUnits ?: 0),
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(bottom = 8.dp).testTag("salida-history-total"),
         )
 
         Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            day.movements
+            movements
                 .filter { movement -> block == null || movement.items.any { it.block.value == block } }
                 .forEach { movement ->
                 SalidaMovementCard(
@@ -246,12 +293,16 @@ fun SalidaHistoryScreen(
                 )
             }
             Spacer(Modifier.height(12.dp))
-            // El compartir es del día entero y vive donde el día se lee: con el mensaje armado desde la tabla
-            // de abreviaturas, la prévia a la vista y una sola acción.
-            val phone = state.historyPhone
+        }
+        }
+
+        // El compartir es del día entero y vive donde el día se lee: con el mensaje armado desde la tabla
+        // de abreviaturas, la prévia a la vista y una sola acción. El día vacío monta su propio bloque, con la
+        // prévia vacía y el envío deshabilitado, junto al estado que lo explica.
+        if (movements.isNotEmpty()) {
             SalidaWhatsAppShare(
                 text = viewModel.dayShareText(summaryLabels),
-                phone = phone,
+                phone = state.historyPhone,
                 onPhoneChange = viewModel::onHistoryPhoneChange,
                 walletLink = viewModel.historyWhatsAppLink(summaryLabels),
                 onOpenWhatsApp = {
