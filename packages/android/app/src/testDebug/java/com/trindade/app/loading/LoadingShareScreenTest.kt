@@ -158,6 +158,67 @@ class LoadingShareScreenTest {
     }
 
     /**
+     * El día de hoy abierto desde el historial ofrece Editar; el pasado no.
+     *
+     * La tarjeta no decide esto: lo decide el ViewModel, que es quien sabe si el día es hoy y si su lote sigue
+     * activo. Lo que esta prueba fija es que la pantalla lo dibuja cuando se le dice que sí y lo esconde cuando
+     * se le dice que no -- el caso que el dueño reportó era un día de hoy sin ninguna forma de corregirlo.
+     */
+    @Test
+    fun `a day that can still be corrected shows Editar and reports it`() {
+        var edited = 0
+        val state = LoadingShareViewModel.UiState(
+            date = "2026-11-18",
+            exportText = "CRONOGRAMA DE CARREGAMENTO",
+            canEdit = true,
+        )
+
+        composeRule.setContent {
+            TrindadeTheme {
+                LoadingShareScreen(
+                    date = "2026-11-18",
+                    state = state,
+                    onShare = {},
+                    onPdf = {},
+                    onBack = {},
+                    onEdit = { edited++ },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Editar").assertIsDisplayed().performClick()
+        composeRule.onNodeWithText("Volver").assertIsDisplayed()
+        composeRule.waitForIdle()
+
+        assertEquals(1, edited)
+    }
+
+    @Test
+    fun `a past day keeps the card read-only even when the caller hands a way in`() {
+        val state = LoadingShareViewModel.UiState(
+            date = "2026-11-18",
+            exportText = "CRONOGRAMA DE CARREGAMENTO",
+            canEdit = false,
+        )
+
+        composeRule.setContent {
+            TrindadeTheme {
+                LoadingShareScreen(
+                    date = "2026-11-18",
+                    state = state,
+                    onShare = {},
+                    onPdf = {},
+                    onBack = {},
+                    onEdit = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Editar").assertDoesNotExist()
+        composeRule.onNodeWithText("Volver").assertIsDisplayed()
+    }
+
+    /**
      * Los fleteros con teléfono del día viven acá, junto al share general.
      *
      * La grilla los tenía al lado del texto exportado, y la web los tiene en la tarjeta del día cerrado:

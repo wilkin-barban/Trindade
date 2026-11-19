@@ -61,6 +61,44 @@ class ShareCardTest {
         assertEquals(1, closed)
     }
 
+    /**
+     * La tarjeta dibuja Editar cuando el que la abre lo ofrece, sea cual sea la puerta.
+     *
+     * Si un día todavía se puede corregir es un hecho de ese día y de quien lo mira -- hoy, y permitido por el
+     * servidor --, no de si se llegó desde el archivo. El historial de hoy es justamente donde el operario
+     * encuentra un día para corregir: una tarjeta que sólo edita en la vista de "recién guardado" lo manda a
+     * buscar la grilla por otro camino.
+     */
+    @Test
+    fun `FROM_HISTORY mode offers Editar when the caller does, and keeps Volver`() {
+        var edited = 0
+        var closed = 0
+        composeRule.setContent {
+            TrindadeTheme {
+                ShareCard(
+                    title = "Relatório #10",
+                    subtitle = "2026-11-18 · João",
+                    text = "Texto do servidor",
+                    loading = false,
+                    error = null,
+                    mode = ShareCardMode.FROM_HISTORY,
+                    onShare = {},
+                    onPdf = {},
+                    onEdit = { edited++ },
+                    onClose = { closed++ },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Editar").assertIsDisplayed().performClick()
+        composeRule.onNodeWithText("Volver").assertIsDisplayed().performClick()
+        composeRule.waitForIdle()
+
+        assertEquals(1, edited)
+        assertEquals(1, closed)
+        composeRule.onNodeWithText("Cerrar").assertDoesNotExist()
+    }
+
     @Test
     fun `SHARE mode shows Volver and no Editar, and invokes onClose`() {
         var closed = 0

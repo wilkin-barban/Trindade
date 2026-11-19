@@ -60,6 +60,14 @@ class LoadingShareViewModel @Inject constructor(
         /** The day's own fleteros a chat can reach, in the order the day draws them. */
         val fleteros: List<DriversResponseDriversInner> = emptyList(),
         /**
+         * Whether this day can still be corrected from here.
+         *
+         * Hoy y sólo hoy -- el pasado es el registro de lo que la planta hizo -- y sólo si el día se pudo leer
+         * y su lote sigue activo, que es la misma regla con la que la grilla decide si acepta escrituras. Un día
+         * que no se pudo leer no ofrece corregirse: no se sabe qué hay adentro.
+         */
+        val canEdit: Boolean = false,
+        /**
          * The sentence a chat that could not be opened earns.
          *
          * Kept apart from [message] because that one replaces the day's text -- the card draws an error
@@ -69,6 +77,21 @@ class LoadingShareViewModel @Inject constructor(
          */
         val shareNote: UiText? = null,
     )
+
+    /**
+     * Hoy en São Paulo, sustituible en las pruebas.
+     *
+     * El pasado no se edita, así que esta pantalla tiene una regla que depende del calendario; pedir el día en
+     * vez de capturarlo es lo que permite probar "hoy" y "ayer" sin que la prueba dependa del día en que corre.
+     */
+    private var today: () -> String = ::saoPauloToday
+
+    internal constructor(
+        repository: LoadingRepository,
+        today: () -> String,
+    ) : this(repository) {
+        this.today = today
+    }
 
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
@@ -84,12 +107,13 @@ class LoadingShareViewModel @Inject constructor(
             // longer offers it. A failed side read costs the list, never the text: the card's job is the
             // message, and an error over it would hide the thing that did arrive.
             val drivers = repository.drivers().orEmpty()
-            val schedules = repository.schedules(date)?.rows.orEmpty()
+            val day = repository.schedules(date)
             _state.update {
                 it.copy(
                     loading = false,
                     exportText = text,
-                    fleteros = fleterosWithPhone(schedules, drivers),
+                    fleteros = fleterosWithPhone(day?.rows.orEmpty(), drivers),
+                    canEdit = day != null && day.active && date == today(),
                     message = if (text == null) UiText.of(R.string.report_error_generic) else null,
                 )
             }
@@ -221,7 +245,9 @@ fun LoadingShareScreen(
             mode = mode,
             onShare = onShare,
             onPdf = onPdf,
-            onEdit = onEdit,
+            // El día recién cerrado siempre se corrige; el que se abrió del historial, sólo si es hoy y el día
+            // sigue activo. Lo decide el ViewModel porque es un hecho del día, no de la tarjeta.
+            onEdit = if (mode == ShareCardMode.SAVED || state.canEdit) onEdit else null,
             onClose = onBack,
             modifier = Modifier.fillMaxWidth().weight(1f, fill = false),
         )

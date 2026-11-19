@@ -170,6 +170,49 @@ class LoadingShareViewModelTest {
     }
 
     @Test
+    fun `today's active day is the one that can still be corrected`() {
+        val api = FakeLoadingApi(schedulesToReturn = listOf(FakeLoadingApi.entry(7, "04:00")))
+        val model = LoadingShareViewModel(LoadingRepository(api)) { "2026-11-18" }
+
+        model.load("2026-11-18")
+
+        assertTrue(model.state.value.canEdit)
+    }
+
+    @Test
+    fun `a past day is the record of what happened and offers no correction`() {
+        val api = FakeLoadingApi(schedulesToReturn = listOf(FakeLoadingApi.entry(7, "04:00")))
+        val model = LoadingShareViewModel(LoadingRepository(api)) { "2026-11-19" }
+
+        model.load("2026-11-18")
+
+        assertFalse(model.state.value.canEdit)
+    }
+
+    @Test
+    fun `today with its batch switched off offers no correction either`() {
+        val api = FakeLoadingApi(
+            schedulesToReturn = listOf(FakeLoadingApi.entry(7, "04:00")),
+            dayActive = false,
+        )
+        val model = LoadingShareViewModel(LoadingRepository(api)) { "2026-11-18" }
+
+        model.load("2026-11-18")
+
+        assertFalse(model.state.value.canEdit)
+    }
+
+    @Test
+    fun `a day that could not be read offers no correction, because nobody knows what it holds`() {
+        val api = FakeLoadingApi(failForDate = "2026-11-18")
+        val model = LoadingShareViewModel(LoadingRepository(api)) { "2026-11-18" }
+
+        model.load("2026-11-18")
+
+        assertFalse(model.state.value.canEdit)
+    }
+
+    @Test
     fun `load brings the day's own fleteros a chat can reach, each one once`() {
         val api = FakeLoadingApi(
             schedulesToReturn = listOf(

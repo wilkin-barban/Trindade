@@ -253,7 +253,8 @@ de lanzamiento; el pasado se consulta en el histórico. En Android, lo mismo: si
 - Los días pasados son de solo lectura y **sin el compartir por tarjeta individual**; el compartir del día completo
   sigue disponible: en Salida, el botón del final; en Masas, el bloque de WhatsApp, que se muestra siempre y queda
   deshabilitado con la prévia vacía si no hay datos. La vista de detalle del histórico es la `ShareCard` de solo
-  lectura, con botón Volver y sin Editar (ver sección 2026-11-18).
+  lectura, con botón Volver y sin Editar salvo el día de hoy, que ofrece Editar si el servidor todavía permite
+  corregirlo (ver sección 2026-11-18).
 - El histórico de Salidas conserva además sus fotos (máximo 3) y el relanzar al ERP cuando el envío no fue aceptado.
 
 ### Bloque de Salidas dentro del reporte
@@ -457,6 +458,10 @@ texto del servidor, estado de carga/error y acciones de WhatsApp/PDF, con `Edita
 - **Android**: la vista de detalle de un histórico es una pantalla de solo lectura con el texto del servidor, acciones
   de compartir/PDF y un botón Volver; no es el formulario de edición ni una grilla editable. El botón Volver y los
   destinos deben coincidir con los de la web.
+- **Editar en el día de hoy**: la tarjeta dibuja `Editar` cuando quien la abre lo ofrece, sea cual sea la puerta. Si un
+  día se puede corregir es un hecho de ese día y de quien lo mira — hoy, y permitido por el servidor —, no de si se
+  llegó desde el archivo. En el informe manda `report.canEdit && report_date == hoy`; en el cargamento, el día es hoy
+  y su lote sigue activo. `Editar` abre el editor del día, no una copia de la tarjeta.
 - **Implementación**: la pasada web de estas dos vistas se estaba cerrando al escribir este documento; la norma de
   arriba es la que Android debe replicar una vez validada por el E2E de 390 px.
 
@@ -528,8 +533,9 @@ Antes de dar una pantalla por terminada, verificar:
   primaria; copia solo como fallback.
 - [ ] **Estado vacío**: el bloque de compartir de Masas se muestra con la prévia vacía y el botón deshabilitado; no
   se inventa un mensaje con solo el encabezado.
-- [ ] **Históricos**: detalle de solo lectura con `ShareCard`/texto del servidor, sin Editar y con Volver; el editor
-  sigue siendo el único lugar con Salvar/Editar.
+- [ ] **Históricos**: detalle de solo lectura con `ShareCard`/texto del servidor y con Volver; **Editar solo el día
+  de hoy** y solo si el servidor lo permite (`canEdit` en el informe; día activo y de hoy en el cargamento). El pasado
+  no se edita: es el registro de lo que la planta hizo. El editor sigue siendo el único lugar con Salvar.
 - [ ] **Días pasados**: sin compartir por tarjeta individual; el compartir del día completo sigue disponible.
 - [ ] **Roles**: Salida/Baixa para toda cuenta autenticada; invitado solo lectura; sin beta por nombre; Administración
   con el mismo alcance por rol.

@@ -37,8 +37,11 @@ enum class ShareCardMode {
  *
  * Displays the server's text verbatim, handles sharing via WhatsApp and PDF export,
  * and provides navigation according to [mode]:
- * - [ShareCardMode.SAVED]: offers edit (if [onEdit] is present) and close.
- * - [ShareCardMode.SHARE] and [ShareCardMode.FROM_HISTORY]: offers a single back action and no edit.
+ * - Editar is drawn whenever [onEdit] is present, whatever the mode: whether a day can still be corrected is a
+ *   fact about that day and that viewer -- today, and allowed by the server -- not about the door it was opened
+ *   from. The caller is what knows it, so the caller supplies the callback or does not.
+ * - [ShareCardMode.SAVED] closes with Cerrar; [ShareCardMode.SHARE] and [ShareCardMode.FROM_HISTORY] close with
+ *   Volver, which is the door that opened them.
  *
  * Never renders a copy button. All actions are full-width and maintain >= 44dp touch targets.
  */
@@ -131,30 +134,24 @@ fun ShareCard(
                     modifier = Modifier.fillMaxWidth(),
                 )
 
-                when (mode) {
-                    ShareCardMode.SAVED -> {
-                        if (onEdit != null) {
-                            AdminSecondaryButton(
-                                onClick = onEdit,
-                                text = stringResource(R.string.share_card_edit),
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
-                        AdminSecondaryButton(
-                            onClick = onClose,
-                            text = stringResource(R.string.share_card_close),
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                    ShareCardMode.SHARE,
-                    ShareCardMode.FROM_HISTORY -> {
-                        AdminSecondaryButton(
-                            onClick = onClose,
-                            text = stringResource(R.string.share_card_back),
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
+                if (onEdit != null) {
+                    AdminSecondaryButton(
+                        onClick = onEdit,
+                        text = stringResource(R.string.share_card_edit),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
+
+                AdminSecondaryButton(
+                    onClick = onClose,
+                    text = stringResource(
+                        when (mode) {
+                            ShareCardMode.SAVED -> R.string.share_card_close
+                            ShareCardMode.SHARE, ShareCardMode.FROM_HISTORY -> R.string.share_card_back
+                        },
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
     }

@@ -499,8 +499,17 @@ class MainActivity : ComponentActivity() {
                         }
                         loadingShareDay != null -> {
                             // La vista de compartir tiene dos orígenes y por eso dos salidas: el día que se
-                            // acaba de cerrar vuelve a su grilla --y ofrece Editar para corregirlo--, mientras
-                            // que el que se abrió desde el histórico vuelve al histórico y no edita nada.
+                            // acaba de cerrar vuelve a su grilla, mientras que el que se abrió desde el
+                            // histórico vuelve al histórico. Editar, en cambio, lleva a la grilla del día en los
+                            // dos casos: es donde el día se corrige, y si el botón se dibuja lo decide la
+                            // tarjeta -- hoy y con el lote activo, nunca en el pasado.
+                            val openLoadingEditor = { day: String ->
+                                loadingShareDay = null
+                                loadingShareSaved = false
+                                loadingDay = day
+                                loadingDayFromHistory = false
+                                tab = Tab.LOADING
+                            }
                             val closeLoadingShare = {
                                 loadingShareDay = null
                                 if (loadingShareSaved) {
@@ -514,7 +523,7 @@ class MainActivity : ComponentActivity() {
                                 date = loadingShareDay!!,
                                 onBack = closeLoadingShare,
                                 mode = if (loadingShareSaved) ShareCardMode.SAVED else ShareCardMode.FROM_HISTORY,
-                                onEdit = if (loadingShareSaved) closeLoadingShare else null,
+                                onEdit = { openLoadingEditor(loadingShareDay!!) },
                             )
                         }
                         profileOpen -> {

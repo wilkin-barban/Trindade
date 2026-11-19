@@ -282,6 +282,24 @@ private fun newCaptureFile(context: Context): File {
 /** The five the server accepts, mirrored so the add action can be withheld instead of refused. */
 private const val MAX_PHOTOS = 5
 
+/**
+ * Whether a report's share card offers Editar.
+ *
+ * Dos hechos, como en la web: el informe que se acaba de guardar se puede corregir siempre -- es el que el
+ * operario está mirando después de guardarlo -- y uno abierto desde el historial sólo si es el día de hoy y el
+ * servidor todavía responde `canEdit`. El pasado no se edita: es el registro de lo que la planta hizo, y una
+ * tarjeta que ofreciera corregirlo prometería un guardado que el servidor va a rechazar.
+ */
+internal fun reportShareAllowsEdit(
+    mode: ShareCardMode,
+    canEdit: Boolean,
+    reportDate: String?,
+    today: String,
+): Boolean = when (mode) {
+    ShareCardMode.SAVED -> true
+    ShareCardMode.SHARE, ShareCardMode.FROM_HISTORY -> canEdit && reportDate == today
+}
+
 @Composable
 fun ReportDetailRoute(
     reportId: Int,
@@ -330,7 +348,20 @@ fun ReportDetailRoute(
             mode = mode,
             onShare = viewModel::shareExport,
             onPdf = viewModel::sharePdf,
-            onEdit = if (mode == ShareCardMode.SAVED) onEdit else null,
+            // El informe que se acaba de guardar se corrige; el que se abre desde el historial, sólo hoy y si
+            // el servidor todavía lo permite. El pasado es el registro de lo que la planta hizo.
+            onEdit = if (
+                reportShareAllowsEdit(
+                    mode = mode,
+                    canEdit = state.report?.canEdit == true,
+                    reportDate = state.report?.reportDate,
+                    today = com.trindade.app.loading.saoPauloToday(),
+                )
+            ) {
+                onEdit
+            } else {
+                null
+            },
             onClose = onBack,
             modifier = Modifier.fillMaxSize().padding(16.dp),
         )
