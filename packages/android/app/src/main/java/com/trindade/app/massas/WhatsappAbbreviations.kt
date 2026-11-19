@@ -33,6 +33,10 @@ class WhatsappAbbreviations private constructor(
     private val erpByName: Map<String, String>,
 ) {
 
+    /** Sin tabla no hay abreviaturas: el llamador conserva el nombre que trajo el servidor. */
+    val isEmpty: Boolean
+        get() = catalogueByCode.isEmpty() && catalogueByName.isEmpty() && erpByName.isEmpty()
+
     /** The approved short name for a line, never longer than [WHATSAPP_NAME_MAX]. */
     fun shortName(code: String, name: String): String {
         val repaired = repairErpEncoding(name).trim()

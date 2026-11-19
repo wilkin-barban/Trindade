@@ -30,7 +30,11 @@ import kotlinx.coroutines.launch
  * count is a document about a day and a phone timed elsewhere must not label it with tomorrow's date.
  */
 @HiltViewModel
-class StockViewModel @Inject constructor(private val repository: StockRepository) : ViewModel() {
+class StockViewModel @Inject constructor(
+    private val repository: StockRepository,
+    // La tabla aprobada del WhatsApp, la misma que usan el Relatório y los históricos.
+    private val abbreviationsSource: com.trindade.app.massas.WhatsappAbbreviationsSource? = null,
+) : ViewModel() {
 
     /** The mailbox the plant reads the counts in. Never the author's address. */
     companion object {
@@ -78,7 +82,10 @@ class StockViewModel @Inject constructor(private val repository: StockRepository
 
     fun hasSomethingToSend(): Boolean = (state.value.day?.totalBoxes ?: 0) > 0
 
-    fun message(): String = state.value.day?.let { stockMessage(it) } ?: ""
+    fun message(): String = state.value.day?.let { stockMessage(it, abbreviations()) } ?: ""
+
+    private fun abbreviations() = abbreviationsSource?.table
+        ?: com.trindade.app.massas.WhatsappAbbreviations.EMPTY
 
     fun emailBody(): String = state.value.day?.let { stockEmailBody(it) } ?: ""
 

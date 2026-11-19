@@ -88,13 +88,19 @@ fun assaiVisibleErrors(lines: List<AssaiLine>, blurred: Set<String>, focused: St
         .map { it.product }
 
 /** The message the order travels with: one line per product, and the total at the end. */
-fun assaiMessage(lines: List<AssaiLine>, day: String? = null): String {
+fun assaiMessage(
+    lines: List<AssaiLine>,
+    day: String? = null,
+    abbreviations: com.trindade.app.massas.WhatsappAbbreviations = com.trindade.app.massas.WhatsappAbbreviations.EMPTY,
+): String {
     val trimmedDay = day?.trim().orEmpty()
     val header = if (trimmedDay.isNotEmpty()) "🛒 Pedido Assaí $trimmedDay" else "🛒 Pedido Assaí"
     val ordered = lines.filter { it.filled && it.exact }
     if (ordered.isEmpty()) {
         return "$header\nNenhum produto com quantidade informada."
     }
-    val rows = ordered.joinToString("\n") { "${it.product}: ${it.boxes} caixas" }
+    val rows = ordered.joinToString("\n") {
+        "${if (abbreviations.isEmpty) it.product else abbreviations.shortName("", it.product)}: ${it.boxes} caixas"
+    }
     return "$header\n\n$rows\n\nTotal: ${assaiTotalBoxes(lines)} caixas"
 }

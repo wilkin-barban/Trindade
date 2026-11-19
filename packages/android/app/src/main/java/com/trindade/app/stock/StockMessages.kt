@@ -15,7 +15,16 @@ import java.net.URLEncoder
  */
 private fun counted(day: StockDay): List<StockDayProductsInner> = day.products.filter { it.units > 0 }
 
-fun stockMessage(day: StockDay): String {
+/**
+ * El mensaje de la contagem, con la tabla de abreviaturas aprobada.
+ *
+ * La tabla es la misma que usa el Relatório: un nombre largo se corta a lo que el grupo lee, y un producto que
+ * la tabla no conoce viaja con el nombre que trajo el servidor, recortado al mismo límite.
+ */
+fun stockMessage(
+    day: StockDay,
+    abbreviations: com.trindade.app.massas.WhatsappAbbreviations = com.trindade.app.massas.WhatsappAbbreviations.EMPTY,
+): String {
     val products = counted(day)
     if (products.isEmpty()) {
         return "🗒️ *Contagem de estoque* — ${day.date}\n\nNenhuma caixa contada até agora."
@@ -25,7 +34,10 @@ fun stockMessage(day: StockDay): String {
         val emoji = if (category == "Massas") "🍝" else "📦"
         lines += "$emoji *$category*"
         products.filter { it.category == category }.forEach {
-            lines += "  • ${it.name} — ${it.units} un"
+            // Sin tabla el nombre viaja tal cual: recortar el prefijo MASSA acá inventaría un nombre que la
+            // contagem no dijo.
+            val name = if (abbreviations.isEmpty) it.name else abbreviations.shortName(it.code, it.name)
+            lines += "  • $name — ${it.units} un"
         }
         lines += ""
     }
