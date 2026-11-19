@@ -22,6 +22,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.trindade.app.contract.models.SalidaCreateResponseMovement
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.res.stringResource
+import com.trindade.app.R
+import com.trindade.app.ui.components.HelpSection
+import com.trindade.app.ui.components.ModuleHelpDialog
+import androidx.compose.runtime.setValue
 import com.trindade.app.ui.components.HistoryHeader
 
 /**
@@ -36,6 +43,7 @@ fun SalidaHistoryScreen(
     onBack: () -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
+    var showHelpDialog by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
         // El mismo header que Masas, Cargamento, Reportes y Contagem: título, contador y Volver de 48 dp.
@@ -43,6 +51,7 @@ fun SalidaHistoryScreen(
             title = "Histórico de Salidas",
             subtitle = state.history.size.toString(),
             onBack = onBack,
+            onHelp = { showHelpDialog = true },
         )
 
         Spacer(Modifier.height(12.dp))
@@ -70,6 +79,20 @@ fun SalidaHistoryScreen(
                 SalidaMovementCard(movement)
             }
         }
+    }
+
+    if (showHelpDialog) {
+        ModuleHelpDialog(
+            title = stringResource(R.string.help_salida_history_title),
+            description = stringResource(R.string.help_salida_history_desc),
+            sections = listOf(
+                HelpSection(
+                    title = stringResource(R.string.help_salida_history_section1_title),
+                    description = stringResource(R.string.help_salida_history_section1_desc),
+                ),
+            ),
+            onDismissRequest = { showHelpDialog = false },
+        )
     }
 }
 
@@ -117,4 +140,6 @@ private fun SalidaMovementCard(movement: SalidaCreateResponseMovement) {
             }
         }
     }
+
+    
 }

@@ -26,6 +26,14 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.stringResource
+import com.trindade.app.R
+import com.trindade.app.ui.components.HelpSection
+import com.trindade.app.ui.components.ModuleHelpButton
+import com.trindade.app.ui.components.ModuleHelpDialog
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -59,6 +67,7 @@ internal fun SalidaHeader(
     date: String,
     onOpenHistory: () -> Unit,
     modifier: Modifier = Modifier,
+    onHelp: () -> Unit = {},
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -69,9 +78,12 @@ internal fun SalidaHeader(
             Text("Salida / Baixa", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Text(date, style = MaterialTheme.typography.bodySmall)
         }
-        // La píldora canónica de los históricos: mismo alto, mismo target y mismo icono que Masas, Cargamento,
-        // Reportes y Contagem. Un texto plano al lado del título no era el mismo botón.
-        ModuleHistoryButton(onClick = onOpenHistory, label = "Histórico")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // La píldora canónica de los históricos: mismo alto, mismo target y mismo icono que Masas,
+            // Cargamento, Reportes y Contagem. Un texto plano al lado del título no era el mismo botón.
+            ModuleHistoryButton(onClick = onOpenHistory, label = "Histórico")
+            ModuleHelpButton(onClick = onHelp)
+        }
     }
 }
 
@@ -83,8 +95,14 @@ fun SalidaLaunchScreen(
 ) {
     val state by viewModel.state.collectAsState()
 
+    var showHelpDialog by remember { mutableStateOf(false) }
+
     Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-        SalidaHeader(date = state.date, onOpenHistory = onOpenHistory)
+        SalidaHeader(
+            date = state.date,
+            onOpenHistory = onOpenHistory,
+            onHelp = { showHelpDialog = true },
+        )
 
         Spacer(Modifier.height(12.dp))
 
@@ -195,6 +213,24 @@ fun SalidaLaunchScreen(
             dismissButton = {
                 OutlinedButton(onClick = { viewModel.dismissConfirmation() }) { Text("Cancelar") }
             },
+        )
+    }
+
+    if (showHelpDialog) {
+        ModuleHelpDialog(
+            title = stringResource(R.string.help_salida_title),
+            description = stringResource(R.string.help_salida_desc),
+            sections = listOf(
+                HelpSection(
+                    title = stringResource(R.string.help_salida_section1_title),
+                    description = stringResource(R.string.help_salida_section1_desc),
+                ),
+                HelpSection(
+                    title = stringResource(R.string.help_salida_section2_title),
+                    description = stringResource(R.string.help_salida_section2_desc),
+                ),
+            ),
+            onDismissRequest = { showHelpDialog = false },
         )
     }
 }
