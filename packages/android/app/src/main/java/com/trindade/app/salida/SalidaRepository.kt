@@ -5,6 +5,7 @@ import com.trindade.app.aero.AeroSettings
 import com.trindade.app.aero.AeroSettingsPort
 import com.trindade.app.aero.AeroWriteResult
 import com.trindade.app.contract.models.SalidaCreateResponseMovement
+import com.trindade.app.contract.models.SalidaHistoryResponseDaysInner
 import com.trindade.app.contract.models.SalidaErpResultRequest
 import com.trindade.app.network.SalidaApi
 import com.trindade.app.network.toCreateRequest
@@ -150,8 +151,15 @@ class SalidaRepository @Inject constructor(
         }
     }
 
-    suspend fun history(): List<SalidaCreateResponseMovement> = withContext(Dispatchers.IO) {
-        api.history().body()?.days?.flatMap { it.movements } ?: emptyList()
+    /**
+     * Los días del histórico, cada uno con sus movimientos y su total.
+     *
+     * Aplanarlos acá perdía la fecha y el total del día, que es justo lo que la pantalla necesita para mostrar
+     * hoy, las cinco fechas anteriores y el resto: el contrato ya manda los días agrupados y el repositorio los
+     * devuelve como llegan.
+     */
+    suspend fun history(): List<SalidaHistoryResponseDaysInner> = withContext(Dispatchers.IO) {
+        api.history().body()?.days ?: emptyList()
     }
 
     suspend fun day(date: String): List<SalidaCreateResponseMovement> = withContext(Dispatchers.IO) {

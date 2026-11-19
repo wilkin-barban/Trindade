@@ -3,6 +3,7 @@ package com.trindade.app.salida
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trindade.app.contract.models.SalidaCreateResponseMovement
+import com.trindade.app.contract.models.SalidaHistoryResponseDaysInner
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -24,7 +25,12 @@ data class SalidaUiState(
     val submitting: Boolean = false,
     val notice: SalidaNotice? = null,
     val day: List<SalidaCreateResponseMovement> = emptyList(),
-    val history: List<SalidaCreateResponseMovement> = emptyList(),
+    /** Los días del histórico, del más nuevo al más viejo, como los manda el servidor. */
+    val history: List<SalidaHistoryResponseDaysInner> = emptyList(),
+    /** La fecha elegida en el histórico; null es «hoy», que es donde la pantalla abre. */
+    val historyDate: String? = null,
+    /** Si el histórico muestra todas las fechas en vez de hoy más las cinco anteriores. */
+    val historyAll: Boolean = false,
     val loading: Boolean = true,
 ) {
     /** Lo que la baja va a mandar: sólo los productos de los bloques activos, con una cantidad válida. */
@@ -161,5 +167,15 @@ class SalidaViewModel @Inject constructor(
             format.timeZone = TimeZone.getTimeZone("America/Sao_Paulo")
             return format.format(now)
         }
+    }
+
+    /** Elige el día que el histórico muestra; null es hoy. */
+    fun selectHistoryDate(date: String?) {
+        _state.value = _state.value.copy(historyDate = date)
+    }
+
+    /** Pasa de «hoy más cinco» a todas las fechas, y vuelve. */
+    fun toggleHistoryAll() {
+        _state.value = _state.value.copy(historyAll = !_state.value.historyAll)
     }
 }

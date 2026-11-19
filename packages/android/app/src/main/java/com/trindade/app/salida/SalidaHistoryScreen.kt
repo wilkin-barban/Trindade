@@ -12,6 +12,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.material3.FilterChip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -65,17 +68,55 @@ fun SalidaHistoryScreen(
             )
         }
 
-        if (state.history.isEmpty()) {
+        // Hoy siempre está, aunque el servidor todavía no lo haya devuelto: es el día que el operario viene a
+        // mirar. Debajo, las cinco fechas anteriores más recientes -- o todas, si pidió todas.
+        val today = state.date
+        val selected = state.historyDate ?: today
+        val days = state.history
+        val visibleDates = salidaHistoryVisibleDates(today, days.map { it.date }, state.historyAll)
+
+        SalidaHistoryChips(
+            dates = visibleDates,
+            selected = selected,
+            today = today,
+            all = state.historyAll,
+            onSelect = viewModel::selectHistoryDate,
+            onToggleAll = viewModel::toggleHistoryAll,
+        )
+
+        Spacer(Modifier.height(8.dp))
+
+        if (selected != today) {
+            // El pasado no se toca: el histórico muestra lo que se lanzó y su estado, y nada de eso se edita.
             Text(
-                "Nenhuma saída registrada.",
+                text = "Fecha pasada: solo lectura.",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .padding(bottom = 8.dp)
+                    .testTag("salida-history-readonly-note"),
+            )
+        }
+
+        val day = days.firstOrNull { it.date == selected }
+        if (day == null || day.movements.isEmpty()) {
+            Text(
+                if (selected == today) "Nenhuma saída registrada hoje." else "Nenhuma saída registrada.",
                 style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(top = 24.dp),
+                modifier = Modifier.padding(top = 24.dp).testTag("salida-history-empty"),
             )
             return@Column
         }
 
+        Text(
+            text = "${day.totalUnits} un",
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(bottom = 8.dp).testTag("salida-history-total"),
+        )
+
         Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            state.history.forEach { movement ->
+            day.movements.forEach { movement ->
                 SalidaMovementCard(movement)
             }
         }
@@ -92,6 +133,63 @@ fun SalidaHistoryScreen(
                 ),
             ),
             onDismissRequest = { showHelpDialog = false },
+        )
+    }
+}
+
+/**
+ * Las fechas que el histórico ofrece: hoy primero, después las cinco anteriores más recientes.
+ *
+ * Hoy entra siempre, aunque el servidor todavía no lo haya devuelto: es el día que el operario viene a mirar, y
+ * una pantalla que abre sin él lo hace dudar de si lanzó algo. Con [all] la lista entera pasa a estar disponible
+ * desde el chip, que es lo que el botón «Todas las fechas» hace.
+ */
+fun salidaHistoryVisibleDates(today: String, dates: List<String>, all: Boolean): List<String> {
+    val earlier = dates.filter { it != today }
+    val shown = if (all) earlier else earlier.take(5)
+    return (listOf(today) + shown).distinct()
+}
+
+/**
+ * Las fechas del histórico: hoy, las cinco anteriores y la puerta a todas.
+ *
+ * La pantalla abría en una lista corrida de días sin decir cuál se estaba mirando. Hoy va primero aunque el
+ * servidor todavía no lo haya devuelto, porque es el día que el operario viene a ver; las demás fechas son lo
+ * que ya pasó, y se muestran como referencia.
+ */
+@Composable
+internal fun SalidaHistoryChips(
+    dates: List<String>,
+    selected: String,
+    today: String,
+    all: Boolean,
+    onSelect: (String) -> Unit,
+    onToggleAll: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        dates.forEach { date ->
+            FilterChip(
+                selected = date == selected,
+                onClick = { onSelect(date) },
+                label = { Text(if (date == today) "Hoje" else com.trindade.app.massas.brazilianDate(date)) },
+                modifier = Modifier
+                    .defaultMinSize(minHeight = 44.dp)
+                    .testTag(if (date == today) "salida-history-today" else "salida-history-chip-$date"),
+            )
+        }
+        FilterChip(
+            selected = all,
+            onClick = onToggleAll,
+            label = { Text(if (all) "Últimas datas" else "Todas as datas") },
+            modifier = Modifier
+                .defaultMinSize(minHeight = 44.dp)
+                .testTag("salida-history-all"),
         )
     }
 }
