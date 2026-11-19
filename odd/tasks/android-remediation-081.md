@@ -682,7 +682,19 @@ Todo pendiente al abrir esta sección; se cierra por slices con su commit.
   excluir cuando el servidor lo permite; y, en Contagem, que el día es una lectura y que la corrección se hace en
   la calculadora. Textos en `values`/`values-es` (8 claves por módulo). Cada pantalla tiene su test que abre la
   ayuda, lee dos secciones y la cierra.
-- **Pendiente**: P1-5, P1-7.
+- **P1-5 · hecho (`416ef27f`)** — los textos de Salida salieron del código a recursos PT/ES: `SalidaLaunchScreen`
+  (título `Saída / Baixa`, bloques, productos/unidades, `Lançar saída`, diálogo de confirmación), `SalidaHistoryScreen`
+  (título, vacío de hoy y del pasado, pendientes, data pasada read-only, estados, fotos, compartilhar/reenviar) y
+  `ReportPhotosSection` (fotos pendientes, agregar, numeración, remover). El botón de lanzamiento muestra la
+  **cantidad de productos distintos** como la web (`Lançar saída (N)`, sin sufijo si no hay): la barra se extrajo a
+  `SalidaLaunchBar` (tag `salida-launch`) para poder probar el rótulo sin el ViewModel. Rótulo revisado:
+  `Calculador de Estoque` → **`Calculadora de Estoque`** (PT) / **`Calculadora de Stock`** (ES), también en
+  `help_stock_title`, y `help_stock_history_title` en ES pasa a «Historial de Conteo». Tests: `SalidaLaunchBarTest`
+  (conteo, deshabilitado, en vuelo), `SpanishLocaleResolutionTest` con las claves nuevas en los dos idiomas, y las
+  pruebas de Salida alineadas a recursos. **Decisión a confirmar**: la web todavía dice «Calculador de Estoque» en
+  los dos locales; Android dice «Calculadora» en PT y «Calculadora de Stock» en ES, sin mezclar el portugués en el
+  español.
+- **Pendiente**: P1-7.
 
 - **P0-2 · hecho (`6a0a5927`)** — el día que abre el Historial de Massas dejó la barra de la pestaña y trae la
   suya: **Histórico de Massas**, **Voltar** siempre visible (hoy incluido; antes sólo en el pasado) y las fechas
