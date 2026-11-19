@@ -50,6 +50,50 @@ class ReportsHistoryScreenTest {
 
     private fun copy(id: Int, vararg args: Any): String = context.getString(id, *args)
 
+    /**
+     * La ayuda vive en el encabezado y cuenta lo que esta pantalla hace.
+     *
+     * El texto es el del historial y nada más: filtrar por día o mes, abrir la tarjeta del reporte -- con el
+     * compartir y el PDF del servidor, y Editar sólo cuando el día es hoy y el servidor lo permite -- y las tres
+     * acciones que el servidor habilita. No promete un editor ni una pantalla que este archivo no tenga.
+     */
+    @Test
+    fun `the header offers the help, and it explains what this history does`() {
+        val state = ReportsHistoryViewModel.UiState(
+            date = null,
+            month = null,
+            loaded = true,
+            loading = false,
+            items = listOf(FakeReportsApi.historyItem(id = 1)),
+        )
+
+        composeRule.setContent {
+            TrindadeTheme {
+                ReportsHistoryScreen(
+                    state = state,
+                    onBack = {},
+                    onOpenReport = {},
+                    onDateSelected = {},
+                    onMonthSelected = {},
+                    onClearFilters = {},
+                    onPrevious = {},
+                    onNext = {},
+                    onRetry = {},
+                    onDeactivate = {},
+                    onDelete = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(copy(R.string.help_button_label)).performClick()
+        composeRule.onNodeWithText(copy(R.string.history_help_title)).assertIsDisplayed()
+        composeRule.onNodeWithText(copy(R.string.history_help_open_desc)).assertExists()
+        composeRule.onNodeWithText(copy(R.string.history_help_lifecycle_desc)).assertExists()
+
+        composeRule.onNodeWithText(copy(R.string.help_dialog_understood)).performClick()
+        composeRule.onNodeWithText(copy(R.string.history_help_title)).assertDoesNotExist()
+    }
+
     @Test
     fun `navigation back and filter actions meet 48dp touch targets and invoke callbacks`() {
         var backed = 0

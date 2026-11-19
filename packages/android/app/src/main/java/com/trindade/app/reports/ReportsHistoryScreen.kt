@@ -48,6 +48,8 @@ import com.trindade.app.ui.resolve
 import com.trindade.app.ui.saoPauloLocalDate
 import java.time.LocalDate
 import java.util.Locale
+import com.trindade.app.ui.components.HelpSection
+import com.trindade.app.ui.components.ModuleHelpDialog
 
 /**
  * The report history: one page of reports, filtered by a day or a month.
@@ -98,6 +100,9 @@ fun ReportsHistoryScreen(
      */
     var confirmingActivate by remember { mutableStateOf<Int?>(null) }
 
+    // A secas: la ayuda cuenta lo que esta pantalla hace -- filtrar, abrir, desactivar -- y no cuesta una
+    // lectura ni un ViewModel. El diálogo es el mismo de los otros módulos.
+    var showHelpDialog by remember { mutableStateOf(false) }
     LazyColumn(
         modifier = modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -113,6 +118,7 @@ fun ReportsHistoryScreen(
                     else -> stringResource(R.string.history_all_reports)
                 },
                 onBack = onBack,
+                onHelp = { showHelpDialog = true },
             )
         }
 
@@ -239,6 +245,28 @@ fun ReportsHistoryScreen(
                 )
             }
         }
+    }
+
+    if (showHelpDialog) {
+        ModuleHelpDialog(
+            title = stringResource(R.string.history_help_title),
+            description = stringResource(R.string.history_help_desc),
+            sections = listOf(
+                HelpSection(
+                    title = stringResource(R.string.history_help_filters_title),
+                    description = stringResource(R.string.history_help_filters_desc),
+                ),
+                HelpSection(
+                    title = stringResource(R.string.history_help_open_title),
+                    description = stringResource(R.string.history_help_open_desc),
+                ),
+                HelpSection(
+                    title = stringResource(R.string.history_help_lifecycle_title),
+                    description = stringResource(R.string.history_help_lifecycle_desc),
+                ),
+            ),
+            onDismissRequest = { showHelpDialog = false },
+        )
     }
 
     if (pickingMonth) {

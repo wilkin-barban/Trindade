@@ -79,6 +79,25 @@ class StockHistoryScreenTest {
         }
     }
 
+    /**
+     * La ayuda vive en el encabezado y dice la verdad de esta pantalla: un día se lee, no se corrige.
+     *
+     * El texto nombre las tres cosas que hay -- el día del calendario, los totales del servidor y el envío del
+     * resumen -- y la que no hay: la corrección, que se hace en la calculadora.
+     */
+    @Test
+    fun `the header offers the help, and it says the day is a reading`() {
+        render(StockHistoryViewModel.UiState(date = "2026-10-23", day = day()))
+
+        composeRule.onNodeWithText(copy(R.string.help_button_label)).performClick()
+        composeRule.onNodeWithText(copy(R.string.stock_history_help_title)).assertIsDisplayed()
+        composeRule.onNodeWithText(copy(R.string.stock_history_help_readonly_desc)).assertExists()
+        composeRule.onNodeWithText(copy(R.string.stock_history_help_share_desc)).assertExists()
+
+        composeRule.onNodeWithText(copy(R.string.help_dialog_understood)).performClick()
+        composeRule.onNodeWithText(copy(R.string.stock_history_help_title)).assertDoesNotExist()
+    }
+
     @Test
     fun `the day reads as the collective summary with the server totals`() {
         render(StockHistoryViewModel.UiState(date = "2026-10-23", day = day()))

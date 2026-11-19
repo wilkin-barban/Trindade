@@ -648,6 +648,30 @@
     <string name="help_loading_title">Cronograma de Carga</string>
     <string name="help_loading_desc">Planeje as viagens, motoristas, veículos e horários de carregamento para a frota e fleteros com visualização por dia.</string>
 
+    <string name="history_help_title">Sobre o Histórico de Relatórios</string>
+    <string name="history_help_desc">Os relatórios salvos aparecem do mais recente ao mais antigo, com data, turno e operador.</string>
+    <string name="history_help_filters_title">Filtrar por dia ou mês</string>
+    <string name="history_help_filters_desc">Escolha um dia ou um mês para reduzir a lista. O botão Limpar volta a mostrar o histórico completo.</string>
+    <string name="history_help_open_title">Abrir um relatório</string>
+    <string name="history_help_open_desc">O toque abre a mensagem que o servidor gerou, com o compartilhar por WhatsApp e o PDF. O histórico é somente leitura; no dia de hoje, quem ainda pode corrigir vê também Editar.</string>
+    <string name="history_help_lifecycle_title">Desativar, reativar e excluir</string>
+    <string name="history_help_lifecycle_desc">Desativar marca o relatório como inativo e Reativar o devolve. Excluir apaga o registro. Cada ação aparece apenas quando o servidor a permite para a sua conta.</string>
+    <string name="loading_history_help_title">Sobre o Histórico de Cargamento</string>
+    <string name="loading_history_help_desc">Os dias de carregamento já lançados, do mais recente ao mais antigo, com o total de cada dia.</string>
+    <string name="loading_history_help_filters_title">Filtrar por dia ou mês</string>
+    <string name="loading_history_help_filters_desc">Escolha um dia ou um mês para reduzir a lista. O botão Limpar volta a mostrar o histórico completo.</string>
+    <string name="loading_history_help_open_title">Abrir um dia</string>
+    <string name="loading_history_help_open_desc">O toque abre a mensagem do dia, com o compartilhar por WhatsApp, o PDF e os fleteros com telefone para enviar um a um. No dia de hoje, quem pode corrigir vê também Editar, que abre a grade do dia.</string>
+    <string name="loading_history_help_lifecycle_title">Desativar e excluir</string>
+    <string name="loading_history_help_lifecycle_desc">Desativar bloqueia novos lançamentos naquele dia sem apagar o que já existe, e Reativar o devolve. Excluir apaga o dia. Cada ação aparece apenas quando o servidor a permite.</string>
+    <string name="stock_history_help_title">Sobre o Histórico de Contagem</string>
+    <string name="stock_history_help_desc">A contagem de um dia, como o servidor a totalizou, com os mesmos totais da calculadora.</string>
+    <string name="stock_history_help_day_title">Escolher o dia</string>
+    <string name="stock_history_help_day_desc">O painel do dia abre o calendário do último mês. A leitura é sempre de um dia por vez.</string>
+    <string name="stock_history_help_readonly_title">Somente leitura</string>
+    <string name="stock_history_help_readonly_desc">O histórico não corrige a contagem: a contagem se faz na calculadora. Aqui só se consulta, com a data e os totais do servidor.</string>
+    <string name="stock_history_help_share_title">Compartilhar o resumo</string>
+    <string name="stock_history_help_share_desc">Com o número preenchido, o resumo do dia vai por WhatsApp; o mesmo resumo pode ser enviado por e-mail. O envio fica indisponível enquanto o dia não tiver produtos.</string>
     <string name="help_loading_history_title">Histórico de Cargas</string>
     <string name="help_loading_history_desc">Consulte carregamentos de datas anteriores e exporte listas organizadas para motoristas e conferentes.</string>
 

@@ -55,6 +55,49 @@ class LoadingHistoryScreenTest {
     private fun quantity(id: Int, count: Int): String =
         context.resources.getQuantityString(id, count, count)
 
+    /**
+     * La ayuda vive en el encabezado y cuenta lo que esta pantalla hace.
+     *
+     * El texto es el del archivo de días: filtrar, abrir el día con su texto, su PDF y sus fleteros, y desactivar
+     * o excluir cuando el servidor lo permite. No promete editar el pasado ni una pantalla que no exista.
+     */
+    @Test
+    fun `the header offers the help, and it explains what this history does`() {
+        val state = LoadingHistoryViewModel.UiState(
+            date = null,
+            month = null,
+            loaded = true,
+            loading = false,
+            items = listOf(FakeLoadingApi.historyItem(batchDate = "2026-09-18")),
+        )
+
+        composeRule.setContent {
+            TrindadeTheme {
+                LoadingHistoryScreen(
+                    state = state,
+                    onBack = {},
+                    onOpenBatch = {},
+                    onDateSelected = {},
+                    onMonthSelected = {},
+                    onClearFilters = {},
+                    onPrevious = {},
+                    onNext = {},
+                    onRetry = {},
+                    onDeactivate = {},
+                    onDelete = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(copy(R.string.help_button_label)).performClick()
+        composeRule.onNodeWithText(copy(R.string.loading_history_help_title)).assertIsDisplayed()
+        composeRule.onNodeWithText(copy(R.string.loading_history_help_open_desc)).assertExists()
+        composeRule.onNodeWithText(copy(R.string.loading_history_help_lifecycle_desc)).assertExists()
+
+        composeRule.onNodeWithText(copy(R.string.help_dialog_understood)).performClick()
+        composeRule.onNodeWithText(copy(R.string.loading_history_help_title)).assertDoesNotExist()
+    }
+
     @Test
     fun `navigation back and filter actions meet 48dp touch targets and invoke callbacks`() {
         var backed = 0

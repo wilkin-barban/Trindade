@@ -25,6 +25,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -45,6 +48,8 @@ import com.trindade.app.ui.displayDate
 import com.trindade.app.ui.saoPauloLocalDate
 import java.time.LocalDate
 import java.util.Locale
+import com.trindade.app.ui.components.HelpSection
+import com.trindade.app.ui.components.ModuleHelpDialog
 
 /**
  * A past day of counting, as a place of its own.
@@ -111,6 +116,10 @@ internal fun StockHistoryContent(
 ) {
     val summary = state.day?.let { stockCollectiveSummary(it) } ?: emptyList()
 
+    // A secas: la ayuda cuenta lo que esta pantalla hace -- leer un día, no corregirlo, y compartir el
+    // resumen -- y no cuesta una lectura ni un ViewModel.
+    var showHelpDialog by remember { mutableStateOf(false) }
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -122,6 +131,7 @@ internal fun StockHistoryContent(
             title = stringResource(R.string.nav_stock_history),
             subtitle = stringResource(R.string.stock_history_subtitle_readonly),
             onBack = onBack,
+            onHelp = { showHelpDialog = true },
         )
 
         // The day the history is read for. It was a text field beside a "pick a date" button, and a field
@@ -250,6 +260,28 @@ internal fun StockHistoryContent(
                 )
             }
         }
+    }
+
+    if (showHelpDialog) {
+        ModuleHelpDialog(
+            title = stringResource(R.string.stock_history_help_title),
+            description = stringResource(R.string.stock_history_help_desc),
+            sections = listOf(
+                HelpSection(
+                    title = stringResource(R.string.stock_history_help_day_title),
+                    description = stringResource(R.string.stock_history_help_day_desc),
+                ),
+                HelpSection(
+                    title = stringResource(R.string.stock_history_help_readonly_title),
+                    description = stringResource(R.string.stock_history_help_readonly_desc),
+                ),
+                HelpSection(
+                    title = stringResource(R.string.stock_history_help_share_title),
+                    description = stringResource(R.string.stock_history_help_share_desc),
+                ),
+            ),
+            onDismissRequest = { showHelpDialog = false },
+        )
     }
 }
 
