@@ -489,7 +489,11 @@ texto del servidor, estado de carga/error y acciones de WhatsApp/PDF, con `Edita
   su día, histórico de Salidas) no dibujan un Volver; la vuelta es la fila superior y, en Masas, el chip «Todas as
   datas». Los históricos que no tienen entrada propia en la fila (Reportes, Cargamento, Contagem) lo conservan.
 - **Pasado de Salidas**: un día cerrado muestra sus fotos pero **no** deja agregarlas ni borrarlas; compartir y
-  reenviar pendientes siguen disponibles.
+  reenviar pendientes siguen disponibles. La información del día va primero y el bloque de compartir **después de
+  las tarjetas**, dentro del mismo scroll: nunca por encima ni fijo. Sin contador de días en el encabezado y sin
+  total suelto sobre las tarjetas — cada tarjeta dice sus unidades.
+- **Pasado de Masas**: sin `Sincronizar com ERP`. La acción exige histórico **y** día abierto (`offersErpSync`), y el
+  ViewModel se niega a leer el ERP en un día cerrado. Producción, filtro, chips y share se conservan.
 - **Históricos en la barra superior**: la entrada del archivo (Masas, Salidas) se selecciona por **pestaña + overlay**;
   entrar al archivo desde su módulo o desde la fila deja seleccionada la entrada del archivo, y elegir el lanzamiento
   la suelta.

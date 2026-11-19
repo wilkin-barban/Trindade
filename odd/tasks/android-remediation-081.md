@@ -634,6 +634,19 @@ el historial: separar las responsabilidades.
 **Sección 8 cerrada**: 8.1, 8.1-b, 8.2, 8.3, 8.4 y 8.5 en PASS, con la APK `0.8.4 (8007)` instalada en
 `emulator-5554`. Sin release, tag ni asset; la 0.7.5 y `packages/backend/apk` intactos.
 
+## 12. Remediaciones de la 0.8.5, cuarta pasada
+
+- **Histórico de Salidas, día pasado: el día se lee y el share va al final** (`d0df0fca`). La columna de movimientos
+  vivía en un `Column(weight(1f).verticalScroll())` dentro de un contenedor sin altura acotada: se colapsaba y el
+  bloque de WhatsApp, dibujado después, quedaba arriba. Ahora el día entero es **un solo scroll** —cabecera,
+  estado, tarjetas y, al final, el bloque de WhatsApp—; el día vacío conserva su frase, su CTA en hoy y su bloque
+  con prévia vacía. Se quitó el contador del `HistoryHeader` y el total suelto «13 un» encima de las tarjetas: cada
+  tarjeta dice sus unidades y su total.
+- **Histórico de Masas, día pasado sin sync** (`5fc444e4`). El botón «Sincronizar com ERP» se preguntaba sólo por el
+  origen; ahora `offersErpSync(origin, readOnly)` exige histórico **y** día abierto, y `syncAeroDay()` se niega en un
+  día cerrado (sin lectura al ERP ni escritura del espejo). Producción, filtro por trabajador, chips de cinco fechas,
+  tarjetas y share se conservan; las acciones de fila ya estaban detrás del `readOnly` del día.
+
 ## 11. Remediaciones de la 0.8.5, tercera pasada
 
 - **Una sola sincronización del ERP en el Relatório.** La acción vive en el encabezado del bloque
