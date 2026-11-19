@@ -468,3 +468,23 @@ Fotos en creacion y edicion del Reporte:
   (`report-photo-input`, `remove-pending-photo-btn`).
 - Subida con `ReportsApi.attachPhoto` **despues** de crear o actualizar, cuando el `reportId` ya existe.
 - Tests: seleccion multiple, tope de 5, compresion una vez por foto, subida tras guardar, borrado.
+
+### F3 slice 2 — cerrada (F3 completa)
+`db63cc78` — `pendingPhotos` en los dos ViewModels del Reporte con tope 5 fotos y 5 MB (rechazo antes del viaje,
+mensaje `report_photo_too_big`); `ReportPhotosSection` con `PickMultipleVisualMedia` + `report-photo-input` y
+`remove-pending-photo-btn`; foto copiada a la caché antes de comprimir (el permiso del URI no sobrevive al cambio
+de app); compresión con `AndroidPhotoCompressor`; subida atada al `reportId` (tras crear o tras actualizar).
+Test: `ReportPhotosSectionTest`.
+Suite completa de Android **verde** al cerrar F3.
+
+**Nota de colocación**: la sección va al final de la lista del formulario. Delante del bloque de salidas sacaba
+de la ventana de composición perezosa textos que los tests del formulario ya buscaban, y además es el último paso
+real del operario.
+
+### Resto de la directiva (no empezado)
+- **F4** R11: restaurar la puerta a fleteros en la ShareCard web (`ScheduleExportView`), testIDs
+  `loading-export-fletero-<id>`; sticky de Salvar/Reporte en web.
+- **F5b** R13: tarjetas de Reporte y Cronograma del dashboard con ShareCard/Compartir/Editar en web y Android.
+- **F6** R8: Stock y Assaí (Android y web) con la tabla de abreviaturas y goldens.
+- **F7**: build **0.8.1 (8004)**, `adb install -r` en `emulator-5554`, capturas 390 dp y PASS/FAIL de los 15 puntos,
+  más CI y deploy api+web.
