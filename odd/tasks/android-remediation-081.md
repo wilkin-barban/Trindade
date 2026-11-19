@@ -536,3 +536,71 @@ completa de Android, CI y deploy api+web si corresponde.
 viejo y no pude confirmar el chunk desplegado por HTTP; se comprueba con un build local fresco o en el navegador.
 Y las capturas/PASS-FAIL de R3, R5, R7/R15, R9, R10, R12, R13 y R14 en los cinco historiales, que el
 `uiautomator dump` no permitió tomar.
+
+---
+
+## 8. Addendum 2 — segunda inspección del usuario (barra superior, Massas/Salidas)
+
+La web es la fuente de verdad. Cinco defectos reportados tras probar la 0.8.1 (8004), con sus causas verificadas:
+
+### 8.1 Barra superior y orden del menú
+- `MainActivity.TAB_DESTINATIONS` no incluye `SALIDA` ni `SALIDA_HISTORY`: por eso Salida/Bajas y su historial
+  no aparecen en la barra superior donde están los demás módulos.
+- `DRAWER_ENTRIES` pone `SALIDA_HISTORY` justo después de `SALIDA`, antes de Masas. El usuario pide que el
+  **Histórico de Salidas vaya debajo de Histórico de Masas**.
+- La web (`AppShell.tsx:100-125`) ordena: Reportes, Cargamento, Masas, Salida, Assaí, Stock, Histórico de Masas,
+  **Histórico de Salidas**, Histórico de Contagem, Histórico de Reportes, Histórico de Cargamento.
+
+**Cambio:** añadir a la barra superior **Salida / Baixas** y **Histórico de Salidas** (RolePolicy.EntryPoint.SALIDA /
+SALIDA_HISTORY; el historial con `NavTarget(Tab.SALIDA, Overlay.SALIDA_HISTORY)`). En el drawer, mover Histórico de
+Salidas justo debajo de Histórico de Masas, manteniendo Salida en Operações. La barra sigue scrollable; seleccionar
+el historial abre `salidaHistoryOpen=true`, no el lanzamiento. Tests de navegación y de targets.
+
+### 8.2 Historial de Masas: abrir en Hoy y volver al historial
+- `MassasHistoryScreen` es hoy una **lista de días**; al entrar desde el drawer no muestra el día.
+- Al elegir una fecha, `MainActivity` pone `tab=MASSAS_LAUNCH` + `origin=HISTORY`; para hoy
+  `massasDayFromHistory=false`, así que `onBackMassasLaunchTab` cae en Dashboard/Lanzamiento, no en el historial.
+- La web (`MassasHistoryPage.tsx:135-149, 210-217`) abre en `saoPauloToday()` y muestra el día con todos los
+  controles; los chips permiten cambiar de fecha.
+
+**Cambio:** al abrir Historial de Masas, mostrar **Hoy** con todas las operaciones, no una lista inicial. El Volver
+de la vista de hoy debe volver al **historial de Masas** (lista/Todas las datas), nunca a Lanzamiento. Pasado
+read-only con ShareCard/WhatsApp. Mantener chips Hoy + 5 + Todas. No reutilizar `MassasLaunchScreen` como si fuera
+el historial: separar las responsabilidades.
+
+### 8.3 Lanzamiento de Masas sin compartir ni gestión de histórico
+- `MassasLaunchScreen` todavía monta `MassasWhatsAppShare` cuando `origin == HISTORY` (aprox. 700-706); el usuario
+  lo ve en Lanzamiento.
+- Lanzamiento de Masas debe tener **solo** grilla/confirmación/barra de lanzamiento: sin share, sin filtros de
+  trabajador, sin gestión de pendientes ERP.
+- Historial de Masas es donde se ve/filtra por trabajador, se gestiona lo no enviado al ERP y se comparte por
+  WhatsApp. Hoy con todos los controles; pasado read-only con share.
+
+### 8.4 Historial de Salidas: hoy operativo y CTA en día vacío
+- `SalidaHistoryScreen` devuelve solo un `Text` cuando el día no tiene movimientos y no ofrece ninguna acción.
+- La web (`SalidaHistoryPage.tsx:550-568`) muestra un CTA `salida-empty-cta` que navega a `/salida`.
+- Añadir el CTA **Lanzar salida** en el día vacío de hoy; `MainActivity` debe pasar `onLaunch` y volver a
+  `salidaHistoryOpen=false`. En pasado no mostrar CTA; solo vacío read-only. El día con datos conserva fotos,
+  compartir y reenviar pendientes; el pasado read-only con ShareCard/WhatsApp.
+
+### 8.5 Verificación
+- Tests de navegación: Salida e Historial en la barra superior; drawer con Historial de Salidas debajo de
+  Historial de Masas; cada entrada abre la pantalla correcta.
+- Massas: Historial abre Hoy; Volver va al historial; pasado read-only; Lanzamiento sin share/filtros ERP;
+  Historial con share/filtros.
+- Salidas: día vacío de hoy muestra CTA y abre Lanzamiento; pasado vacío no; fotos/share/retry siguen.
+- Capturas en `/tmp/trindade-082/`: barra superior, drawer, Massas Hoy/Historial/Lanzamiento, Salidas Hoy
+  vacío/con datos/Pasado y share.
+- Bump a **0.8.2 (8005)**, instalar en `emulator-5554`, PASS/FAIL de estos cinco puntos antes de cualquier
+  release. Sin release/tag/asset.
+
+### §8 — estado de implementación (fuente de verdad)
+
+| Punto | Estado | Commit / evidencia |
+| --- | --- | --- |
+| 8.1 barra superior + orden del cajón | **hecho** | `be12ac08`: Salida / Baixas en la fila; Histórico de Salidas movido debajo de Histórico de Masas |
+| 8.1-b selección por overlay | **hecho** | `231dcd34`: `selectedTabIndex(row, tab, overlay)`; el historial entra en la fila y no marca el lanzamiento. Test en `MainActivityNavigationTest` |
+| 8.2 Historial de Masas abre en Hoy + Volver al historial | **hecho** | `f5a1f04c`: `openMassasHistory` apunta al día de planta; `onBackMassasLaunchTab` vuelve a la lista para cualquier día abierto desde el archivo. **Sin test unitario**: el estado vive en la composición de `MainActivity`; se verifica en el dispositivo (8.5) |
+| 8.3 Lanzamiento sin share ni gestión ERP | **pendiente** | `MassasLaunchScreen` todavía monta `MassasWhatsAppShare` cuando `origin == HISTORY` |
+| 8.4 CTA del día vacío en Salidas | **pendiente** | `SalidaHistoryScreen` devuelve sólo un texto cuando el día no tiene movimientos |
+| 8.5 bump 0.8.2 (8005) + verificación | **pendiente** | build, `adb install -r`, capturas en `/tmp/trindade-082/`, PASS/FAIL de los cinco |
