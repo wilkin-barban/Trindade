@@ -348,6 +348,51 @@ describe('salida routes', () => {
   });
 
   describe('photos', () => {
+    /**
+     * Las fotos son de quien lanzó el movimiento.
+     *
+     * Un asiento de otro operario -- o el que vino del ERP -- se lee y no se toca: ni una foto se le puede anexar
+     * ni se puede borrar la que ya tiene. El cliente esconde los controles; esto es la mitad que manda.
+     */
+    it('refuses a photo uploaded by an operator who did not launch the movement', async () => {
+      const movementId = await launchOne('1357', 4);
+
+      const { body, boundary } = multipartBody('image/jpeg', fakeJpeg);
+      const response = await app.inject({
+        method: 'POST',
+        url: `/api/salida/${movementId}/photos`,
+        headers: { ...auth(workerToken), 'content-type': `multipart/form-data; boundary=${boundary}` },
+        payload: body,
+      });
+
+      assert.equal(response.statusCode, 403, response.body);
+      assert.equal(JSON.parse(response.body).code, 'SALIDA_NOT_OWNER');
+      const count = db
+        .prepare('SELECT COUNT(*) AS total FROM salida_photos WHERE movement_id = ?')
+        .get(movementId) as { total: number };
+      assert.equal(count.total, 0);
+    });
+
+    it('refuses the owner of another movement deleting a photo that is not theirs', async () => {
+      const movementId = await launchOne('1357', 4);
+      const uploaded = await uploadPhoto(movementId);
+      assert.equal(uploaded.statusCode, 201, uploaded.body);
+      const photoId = JSON.parse(uploaded.body).photo.id as number;
+
+      const refused = await app.inject({
+        method: 'DELETE',
+        url: `/api/salida/photos/${photoId}`,
+        headers: auth(workerToken),
+      });
+
+      assert.equal(refused.statusCode, 403, refused.body);
+      assert.equal(JSON.parse(refused.body).code, 'SALIDA_NOT_OWNER');
+      const still = db.prepare('SELECT COUNT(*) AS total FROM salida_photos WHERE id = ?').get(photoId) as {
+        total: number;
+      };
+      assert.equal(still.total, 1);
+    });
+
     it('accepts three photos and refuses the fourth', async () => {
       const movementId = await launchOne('1357', 4);
 

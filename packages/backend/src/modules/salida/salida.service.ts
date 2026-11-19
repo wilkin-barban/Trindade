@@ -107,6 +107,20 @@ function readPhotoRow(db: Database.Database, where: string, value: string | numb
 }
 
 /** Whether the movement exists, which the photo routes ask before answering 404 or a count. */
+/**
+ * Quién lanzó el movimiento, o null cuando no existe.
+ *
+ * Las fotos son del movimiento y de quien lo lanzó: un asiento que vino del ERP, o el de otro operario, se lee y
+ * no se toca. Las rutas preguntan esto antes de aceptar una foto o de borrarla.
+ */
+export function salidaMovementOwnerId(db: Database.Database, movementId: number): number | null {
+  const row = db.prepare('SELECT user_id AS owner FROM salida_movements WHERE id = ?').get(movementId) as
+    | { owner: number | null }
+    | undefined;
+  if (!row || row.owner === null || row.owner === undefined) return null;
+  return Number(row.owner);
+}
+
 export function salidaMovementExists(db: Database.Database, movementId: number): boolean {
   const row = db.prepare('SELECT 1 AS present FROM salida_movements WHERE id = ?').get(movementId);
   return row !== undefined;

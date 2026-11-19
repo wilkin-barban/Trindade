@@ -262,6 +262,14 @@ export async function salidaRoutes(fastify: FastifyInstance, options: SalidaRout
     if (!service.salidaMovementExists(fastify.db, movementId)) {
       return reply.status(404).send(apiError('Movimento não encontrado', SALIDA_ERROR_CODES.NOT_FOUND));
     }
+    // Sólo el dono do movimento anexa fotos: el asiento de otro operario -- o el que vino del ERP -- se lee, y
+    // su foto no se toca.
+    const owner = service.salidaMovementOwnerId(fastify.db, movementId);
+    if (owner === null || owner !== request.user!.sub) {
+      return reply
+        .status(403)
+        .send(apiError('Somente quem lançou o movimento pode anexar fotos.', SALIDA_ERROR_CODES.NOT_OWNER));
+    }
 
     let data: Buffer | undefined;
     let mimeType: string | undefined;
@@ -416,6 +424,17 @@ export async function salidaRoutes(fastify: FastifyInstance, options: SalidaRout
   fastify.delete('/photos/:photoId', { preHandler: signedIn }, async (request: FastifyRequest, reply: FastifyReply) => {
     const photoId = parseId((request.params as { photoId: string }).photoId);
     if (photoId === null) return invalidId(reply);
+
+    const stored = service.getSalidaPhotoById(fastify.db, photoId);
+    if (!stored) {
+      return reply.status(404).send(apiError('Foto não encontrada', SALIDA_ERROR_CODES.NOT_FOUND));
+    }
+    const photoOwner = service.salidaMovementOwnerId(fastify.db, stored.movement_id);
+    if (photoOwner === null || photoOwner !== request.user!.sub) {
+      return reply
+        .status(403)
+        .send(apiError('Somente quem lançou o movimento pode apagar suas fotos.', SALIDA_ERROR_CODES.NOT_OWNER));
+    }
 
     const deleted = service.deleteSalidaPhoto(fastify.db, photoId);
     if (!deleted) {
