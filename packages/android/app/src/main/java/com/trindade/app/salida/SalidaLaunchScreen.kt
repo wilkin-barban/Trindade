@@ -32,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.trindade.app.ui.components.ModuleHistoryButton
 
 /** Los nombres de los bloques, como los lee la planta. */
 private val blockLabels = mapOf(
@@ -46,6 +47,34 @@ private val blockLabels = mapOf(
  * La barra no es un adorno: es el total que el operario confirma en el diálogo, y sale de la misma selección que
  * viaja. El botón abre la confirmación y no manda nada.
  */
+/**
+ * The screen's head: the day it is about and the way to the history.
+ *
+ * It lives apart from the screen for one reason: the history pill is a shared component with a shared target
+ * size, and a screen that can only be reached through a Hilt view model cannot be asked whether it still uses
+ * it. Extracting the row makes that a test instead of a reading.
+ */
+@Composable
+internal fun SalidaHeader(
+    date: String,
+    onOpenHistory: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column {
+            Text("Salida / Baixa", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(date, style = MaterialTheme.typography.bodySmall)
+        }
+        // La píldora canónica de los históricos: mismo alto, mismo target y mismo icono que Masas, Cargamento,
+        // Reportes y Contagem. Un texto plano al lado del título no era el mismo botón.
+        ModuleHistoryButton(onClick = onOpenHistory, label = "Histórico")
+    }
+}
+
 @Composable
 fun SalidaLaunchScreen(
     viewModel: SalidaViewModel,
@@ -55,19 +84,7 @@ fun SalidaLaunchScreen(
     val state by viewModel.state.collectAsState()
 
     Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column {
-                Text("Salida / Baixa", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text(state.date, style = MaterialTheme.typography.bodySmall)
-            }
-            TextButton(onClick = onOpenHistory, modifier = Modifier.defaultMinSize(minHeight = 44.dp)) {
-                Text("Histórico")
-            }
-        }
+        SalidaHeader(date = state.date, onOpenHistory = onOpenHistory)
 
         Spacer(Modifier.height(12.dp))
 

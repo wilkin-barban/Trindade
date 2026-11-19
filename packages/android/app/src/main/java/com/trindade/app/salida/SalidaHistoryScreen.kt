@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.trindade.app.contract.models.SalidaCreateResponseMovement
+import com.trindade.app.ui.components.HistoryHeader
 
 /**
  * El histórico de la baja: lo que este operario lanzó, por día.
@@ -37,16 +38,12 @@ fun SalidaHistoryScreen(
     val state by viewModel.state.collectAsState()
 
     Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("Histórico de Salidas", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            TextButton(onClick = onBack, modifier = Modifier.defaultMinSize(minHeight = 44.dp)) {
-                Text("Volver")
-            }
-        }
+        // El mismo header que Masas, Cargamento, Reportes y Contagem: título, contador y Volver de 48 dp.
+        HistoryHeader(
+            title = "Histórico de Salidas",
+            subtitle = state.history.size.toString(),
+            onBack = onBack,
+        )
 
         Spacer(Modifier.height(12.dp))
 
