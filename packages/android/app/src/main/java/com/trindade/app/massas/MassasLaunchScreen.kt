@@ -225,7 +225,9 @@ fun MassasLaunchScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                 }
-                if (!state.isReadOnly) {
+                // La grilla es del lanzamiento: la vista de día que abre el historial no la monta, y por eso el
+                // operario que entra a consultar no se encuentra el formulario encima de lo que vino a leer.
+                if (origin == MassasOrigin.LAUNCH && !state.isReadOnly) {
                     ModuleHistoryButton(onClick = onNavigateToHistory)
                 }
                 Spacer(modifier = Modifier.weight(1f))
@@ -708,12 +710,15 @@ fun MassasLaunchScreen(
         }
     }
 
-    MassasLaunchBar(
-        hasAnyQuantity = state.quantities.values.any { (it.toIntOrNull() ?: 0) > 0 },
-        isSubmitting = state.isSubmitting,
-        onClear = viewModel::clearQuantities,
-        onLaunch = viewModel::requestLaunchConfirmation,
-    )
+    // La barra de lanzar tampoco es del historial: ahí no se lanza nada.
+    if (origin == MassasOrigin.LAUNCH) {
+        MassasLaunchBar(
+            hasAnyQuantity = state.quantities.values.any { (it.toIntOrNull() ?: 0) > 0 },
+            isSubmitting = state.isSubmitting,
+            onClear = viewModel::clearQuantities,
+            onLaunch = viewModel::requestLaunchConfirmation,
+        )
+    }
     }
 
     // Modal de Ayuda Contextual
