@@ -488,3 +488,12 @@ real del operario.
 - **F6** R8: Stock y Assaí (Android y web) con la tabla de abreviaturas y goldens.
 - **F7**: build **0.8.1 (8004)**, `adb install -r` en `emulator-5554`, capturas 390 dp y PASS/FAIL de los 15 puntos,
   más CI y deploy api+web.
+
+### F4 — mitad web (fleteros) cerrada
+`77a5db34` — `Enviar a fleteros` (`loading-share-fleteros`) junto al share general en la ShareCard del Horario.
+Causa del sintoma reportado: la vista de compartir retorna antes del `return` principal, y `ScheduleExportView` sólo
+se montaba en ese return, asi que abrir el estado no dibujaba nada. Montado tambien en la rama de compartir.
+Test: `LoadingSchedulePage.test.tsx` (clic en la puerta -> `loading-export-modal`). Suite unit web **244/244**.
+
+**Pendiente de F4**: sticky del bloque de guardar en web (`ReportsPage` y `ReportEditPage`, patron
+`sticky bottom-0` de `SalidaSummaryBar`), con su E2E.
