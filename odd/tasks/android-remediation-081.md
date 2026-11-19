@@ -676,7 +676,13 @@ Todo pendiente al abrir esta sección; se cierra por slices con su commit.
   día -- en cargamento ya no se limita a cerrar la tarjeta -- y el pasado sigue read-only. Norma en
   `docs/paridad-android-web.md` (§ Históricos). Evidencia: lane `loading`/`reports`/`ShareCard` y suite Android
   completa verdes (`ReportShareEditTest`, `MassasHistory…`, `LoadingShareViewModelTest.canEdit`, `ShareCardTest`).
-- **Pendiente**: P1-4, P1-5, P1-7.
+- **P1-4 · hecho (`778a45cf`)** — `ReportsHistoryScreen`, `LoadingHistoryScreen` y `StockHistoryScreen` tienen el
+  botón de ayuda en su `HistoryHeader` y un diálogo por módulo con lo que cada pantalla **hace**: filtrar por día o
+  mes; abrir el registro con el texto del servidor, su WhatsApp/PDF y Editar sólo hoy; desactivar/reactivar y
+  excluir cuando el servidor lo permite; y, en Contagem, que el día es una lectura y que la corrección se hace en
+  la calculadora. Textos en `values`/`values-es` (8 claves por módulo). Cada pantalla tiene su test que abre la
+  ayuda, lee dos secciones y la cierra.
+- **Pendiente**: P1-5, P1-7.
 
 - **P0-2 · hecho (`6a0a5927`)** — el día que abre el Historial de Massas dejó la barra de la pestaña y trae la
   suya: **Histórico de Massas**, **Voltar** siempre visible (hoy incluido; antes sólo en el pasado) y las fechas
