@@ -619,3 +619,10 @@ el historial: separar las responsabilidades.
 **Causa del FAIL anterior**: el gate de la grilla se aplicó al primer `!isReadOnly` (ajustes ERP) y no al segundo, que es el grid de cantidades; y la tarjeta del dashboard entraba por otro camino que el cajón. Ambos corregidos en `8ba06b04`.
 
 **8.4 en dispositivo (0.8.4/8007)**: PASS parcial. El Historial de Salidas abre en `Hoje` con `Nenhuma saída registrada hoje.` y el CTA **`Lanzar salida`** visible (`/tmp/trindade-084/03-salida-vacia-cta.png`). **Sin verificar**: que el CTA abra el lanzamiento y que una fecha pasada vacía NO muestre el CTA — el toque de chip no cambió de día en el intento final.
+
+**8.4 — PASS final**: el estado vacío se extrajo a `SalidaHistoryEmpty(isToday, onLaunch)` y se prueba sin ViewModel
+(`SalidaHistoryEmptyTest`): hoy muestra el CTA y el toque llega al callback; el pasado muestra la frase y
+`assertDoesNotExist` sobre el CTA. Suite completa de Android verde; CI `44516361297` success (`verify` + `android`).
+
+**Sección 8 cerrada**: 8.1, 8.1-b, 8.2, 8.3, 8.4 y 8.5 en PASS, con la APK `0.8.4 (8007)` instalada en
+`emulator-5554`. Sin release, tag ni asset; la 0.7.5 y `packages/backend/apk` intactos.
