@@ -60,6 +60,16 @@ interface ShareManager {
      * @param title Optional chooser title shown to the operator.
      * @return true if the chooser was launched successfully, false otherwise.
      */
+    /**
+     * Comparte un texto con sus fotos.
+     *
+     * El share de una salida lleva la evidencia: el texto del movimiento y las fotos que se le subieron. Una
+     * implementación que no pueda mandar varias fotos comparte sólo el texto -- la hoja nativa es la que decide
+     * qué hacer con lo que recibe, y el mensaje no se pierde por una foto.
+     */
+    fun shareTextWithPhotos(text: String, photos: List<File>, title: String? = null): Boolean =
+        shareText(text, title)
+
     fun shareApk(file: File, title: String? = null): Boolean
 
     /**
@@ -179,6 +189,29 @@ class AndroidShareManager @Inject constructor(
             true
         } catch (_: Throwable) {
             false
+        }
+    }
+
+    override fun shareTextWithPhotos(text: String, photos: List<File>, title: String?): Boolean {
+        val files = photos.filter { it.exists() && it.length() > 0 }
+        if (files.isEmpty()) return shareText(text, title)
+        return try {
+            val uris = ArrayList<Uri>()
+            for (file in files) {
+                uris.add(FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file))
+            }
+            val send = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                type = "image/*"
+                putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+                putExtra(Intent.EXTRA_TEXT, text)
+                putExtra(Intent.EXTRA_TITLE, title ?: "")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(Intent.createChooser(send, title ?: text.take(0)))
+            true
+        } catch (_: Throwable) {
+            // Sin proveedor que acepte varias fotos, el mensaje viaja solo: la evidencia no puede borrar el texto.
+            shareText(text, title)
         }
     }
 

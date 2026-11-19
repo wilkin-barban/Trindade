@@ -15,6 +15,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material3.FilterChip
 import androidx.compose.ui.platform.testTag
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -48,6 +49,26 @@ fun SalidaHistoryScreen(
 ) {
     val state by viewModel.state.collectAsState()
     var showHelpDialog by remember { mutableStateOf(false) }
+    // La foto se elige del carrete y se sube comprimida al movimiento que la pidió: la cámara del teléfono ya
+    // deja el archivo en el carrete de la planta, así que una sola puerta alcanza para las dos.
+    var pendingPhotoMovement by remember { mutableStateOf<Int?>(null) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val pickPhotos = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia(3),
+    ) { uris ->
+        val movementId = pendingPhotoMovement
+        pendingPhotoMovement = null
+        if (movementId == null) return@rememberLauncherForActivityResult
+        uris.take(3).forEach { uri ->
+            val target = java.io.File(context.cacheDir, "salida-${System.currentTimeMillis()}.jpg")
+            runCatching {
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    target.outputStream().use { output -> input.copyTo(output) }
+                }
+            }.getOrNull()
+            viewModel.attachPhotoFromPath(movementId, target.absolutePath)
+        }
+    }
 
     Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
         // El mismo header que Masas, Cargamento, Reportes y Contagem: título, contador y Volver de 48 dp.
@@ -118,7 +139,12 @@ fun SalidaHistoryScreen(
 
         Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             day.movements.forEach { movement ->
-                SalidaMovementCard(movement)
+                SalidaMovementCard(
+                    movement = movement,
+                    onAddPhoto = { pendingPhotoMovement = movement.id },
+                    onDeletePhoto = viewModel::deletePhoto,
+                    onShare = { onOpenWhatsApp(viewModel.movementShareLink(movement)) },
+                )
             }
             Spacer(Modifier.height(12.dp))
             // El compartir es del día entero y vive donde el día se lee: con el mensaje armado desde la tabla
@@ -215,7 +241,12 @@ private fun statusLabel(status: com.trindade.app.contract.models.SalidaMovementE
 }
 
 @Composable
-private fun SalidaMovementCard(movement: SalidaCreateResponseMovement) {
+internal fun SalidaMovementCard(
+    movement: SalidaCreateResponseMovement,
+    onAddPhoto: (() -> Unit)? = null,
+    onDeletePhoto: (Int) -> Unit = {},
+    onShare: (() -> Unit)? = null,
+) {
     Card(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(
@@ -247,6 +278,56 @@ private fun SalidaMovementCard(movement: SalidaCreateResponseMovement) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("Total", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
                 Text("${movement.totalUnits} un", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+            }
+
+            // Las fotos son la evidencia de la baja: viven en la tarjeta del movimiento, no en el día.
+            if (movement.photos.isNotEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = "Fotos (${movement.photos.size})",
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.testTag("salida-photos-${movement.id}"),
+                )
+                movement.photos.forEach { photo ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = photo.filePath.substringAfterLast('/'),
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1,
+                            modifier = Modifier.weight(1f).padding(end = 8.dp),
+                        )
+                        TextButton(
+                            onClick = { onDeletePhoto(photo.id) },
+                            modifier = Modifier.defaultMinSize(minHeight = 48.dp),
+                        ) {
+                            Text("Borrar foto")
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (onAddPhoto != null) {
+                    OutlinedButton(
+                        onClick = onAddPhoto,
+                        modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("salida-photo-picker"),
+                    ) {
+                        Text("Agregar foto", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+                if (onShare != null) {
+                    OutlinedButton(
+                        onClick = onShare,
+                        modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("salida-share-${movement.id}"),
+                    ) {
+                        Text("Compartir", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
             }
         }
     }

@@ -1,5 +1,11 @@
 package com.trindade.app.salida
 
+import okhttp3.RequestBody.Companion.toRequestBody
+
+import okhttp3.MediaType.Companion.toMediaType
+
+import okhttp3.MultipartBody
+
 import com.trindade.app.aero.AeroErpClient
 import com.trindade.app.aero.AeroSettings
 import com.trindade.app.aero.AeroSettingsPort
@@ -160,6 +166,36 @@ class SalidaRepository @Inject constructor(
      */
     suspend fun history(): List<SalidaHistoryResponseDaysInner> = withContext(Dispatchers.IO) {
         api.history().body()?.days ?: emptyList()
+    }
+
+    /**
+     * Las fotos del movimiento, o null cuando el servidor no puede contestar.
+     *
+     * Una lista vacía es un movimiento sin evidencia; null es una lectura que falló, y la pantalla las distingue
+     * porque no es lo mismo «no hay fotos» que «no se pudieron leer».
+     */
+    suspend fun photos(movementId: Int): List<com.trindade.app.contract.models.PhotosResponsePhotosInner>? =
+        withContext(Dispatchers.IO) {
+            val response = runCatching { api.photos(movementId) }.getOrNull() ?: return@withContext null
+            if (!response.isSuccessful) return@withContext null
+            response.body()?.photos
+        }
+
+    /** Sube una foto ya comprimida a JPEG; el tipo declarado tiene que coincidir con los bytes. */
+    suspend fun attachPhoto(movementId: Int, jpeg: ByteArray): Boolean = withContext(Dispatchers.IO) {
+        val part = MultipartBody.Part.createFormData(
+            name = "file",
+            filename = "photo.jpg",
+            body = jpeg.toRequestBody("image/jpeg".toMediaType()),
+        )
+        val response = runCatching { api.uploadPhoto(movementId, part) }.getOrNull() ?: return@withContext false
+        response.isSuccessful
+    }
+
+    /** Borra una foto del movimiento. */
+    suspend fun deletePhoto(photoId: Int): Boolean = withContext(Dispatchers.IO) {
+        val response = runCatching { api.deletePhoto(photoId) }.getOrNull() ?: return@withContext false
+        response.isSuccessful
     }
 
     suspend fun day(date: String): List<SalidaCreateResponseMovement> = withContext(Dispatchers.IO) {

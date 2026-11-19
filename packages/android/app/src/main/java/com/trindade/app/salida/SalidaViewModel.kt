@@ -63,6 +63,8 @@ class SalidaViewModel @Inject constructor(
     private val repository: SalidaRepository,
     // La tabla aprobada del WhatsApp viaja con el mensaje: un share con nombres completos sería otro mensaje.
     private val abbreviationsSource: com.trindade.app.massas.WhatsappAbbreviationsSource? = null,
+    // La compresión es la misma del Relatório: una foto de cámara no viaja a tamaño completo por la red de planta.
+    private val compressor: com.trindade.app.reports.PhotoCompressor? = null,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SalidaUiState(date = saoPauloDate()))
@@ -173,6 +175,52 @@ class SalidaViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Sube una foto a un movimiento y refresca el histórico.
+     *
+     * La foto se comprime antes de llegar acá, y el histórico se vuelve a leer después: la tarjeta muestra lo que
+     * el servidor guardó, no lo que la pantalla creía que había guardado.
+     */
+    fun attachPhoto(movementId: Int, jpeg: ByteArray) {
+        viewModelScope.launch {
+            val saved = repository.attachPhoto(movementId, jpeg)
+            _state.value = _state.value.copy(
+                notice = if (saved) {
+                    SalidaNotice("Foto guardada.", isError = false)
+                } else {
+                    SalidaNotice("No se pudo guardar la foto.", isError = true)
+                },
+            )
+            if (saved) refreshHistory()
+        }
+    }
+
+    /** Comprime y sube una foto elegida en la galería, por su ruta local. */
+    fun attachPhotoFromPath(movementId: Int, path: String) {
+        val engine = compressor ?: return
+        viewModelScope.launch {
+            val jpeg = engine.compressToJpeg(path) ?: run {
+                _state.value = _state.value.copy(notice = SalidaNotice("No se pudo leer la foto.", isError = true))
+                return@launch
+            }
+            attachPhoto(movementId, jpeg)
+        }
+    }
+
+    /** Borra una foto del movimiento. */
+    fun deletePhoto(photoId: Int) {
+        viewModelScope.launch {
+            val removed = repository.deletePhoto(photoId)
+            if (removed) refreshHistory()
+            else _state.value = _state.value.copy(notice = SalidaNotice("No se pudo borrar la foto.", isError = true))
+        }
+    }
+
+    private suspend fun refreshHistory() {
+        val days = runCatching { repository.history() }.getOrDefault(_state.value.history)
+        _state.value = _state.value.copy(history = days)
+    }
+
     /** El texto del día elegido, listo para el share. Vacío cuando el día no tiene movimientos. */
     fun dayShareText(): String {
         val chosen = _state.value.historyDate ?: _state.value.date
@@ -194,6 +242,18 @@ class SalidaViewModel @Inject constructor(
         if (text.isBlank()) return null
         return com.trindade.app.ui.waMeLink(_state.value.historyPhone, text)
             ?: com.trindade.app.ui.whatsAppShareLink(text)
+    }
+
+    /** El enlace de WhatsApp de un movimiento suelto: su texto, con o sin teléfono. */
+    fun movementShareLink(movement: com.trindade.app.contract.models.SalidaCreateResponseMovement): String {
+        val text = salidaDaySummaryText(
+            date = movement.movementDate,
+            movements = listOf(movement),
+            abbreviations = abbreviationsSource?.table ?: com.trindade.app.massas.WhatsappAbbreviations.EMPTY,
+        )
+        return com.trindade.app.ui.waMeLink(_state.value.historyPhone, text)
+            ?: com.trindade.app.ui.whatsAppShareLink(text)
+            ?: ""
     }
 
     /** Elige el día que el histórico muestra; null es hoy. */
