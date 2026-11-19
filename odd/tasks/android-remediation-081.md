@@ -634,6 +634,21 @@ el historial: separar las responsabilidades.
 **Sección 8 cerrada**: 8.1, 8.1-b, 8.2, 8.3, 8.4 y 8.5 en PASS, con la APK `0.8.4 (8007)` instalada en
 `emulator-5554`. Sin release, tag ni asset; la 0.7.5 y `packages/backend/apk` intactos.
 
+## 14. Web: el botón de compartir del Relatório
+
+- **Causa doble** (`3dabc269`): producción servía un bundle viejo (`index-BCOgFz_U.js`, sin el camino de compartir del
+  Relatório) y, además, `shareOrCopy` devolvía `failed` sin abrir nada cuando no había hoja nativa y el portapapeles
+  faltaba o lo rechazaba.
+- **Respaldo explícito**: si las dos vías fallan, el texto viaja en el enlace de WhatsApp
+  (`api.whatsapp.com/send?text=…`) y el resultado es `whatsapp`; una ventana bloqueada dice `failed`; el portapapeles
+  sigue siendo el camino barato cuando funciona; la hoja descartada no copia nada. La página muestra la nota de cada
+  salida y ya no se traga las excepciones.
+- **Tests**: 7 casos del ayudante con `node:test` y un caso de la página que aprieta el botón sin `navigator.share` y
+  con el portapapeles rechazando.
+- **Despliegue**: `docker compose build web && docker compose up -d web`; producción pasó de
+  `index-BCOgFz_U.js` a `index-DeDK3alR.js`, y el bundle servido contiene el respaldo (`api.whatsapp.com/send?text=`)
+  y la nota nueva (`shareWhatsAppOpened`).
+
 ## 13. Salida: sync del ERP (sólo hoy) y pasado sólo con el share
 
 - **Sync del espejo en el Histórico de Salida** (`0fd92282`): botón «Sincronizar com ERP» + bloque del Relatório
