@@ -634,6 +634,17 @@ el historial: separar las responsabilidades.
 **Sección 8 cerrada**: 8.1, 8.1-b, 8.2, 8.3, 8.4 y 8.5 en PASS, con la APK `0.8.4 (8007)` instalada en
 `emulator-5554`. Sin release, tag ni asset; la 0.7.5 y `packages/backend/apk` intactos.
 
+## 15. Miniaturas de fotos en las superficies de compartir (web y Android)
+
+- **Web** (`0e887983`): `ShareCard` acepta `photos` y dibuja una fila de miniaturas **arriba del texto** (`report-share-photos`,
+  `report-share-photo-<id>`, `alt`), de solo lectura. `ReportViewPage` pasa las fotos que ya carga (guardado e
+  historial); `SalidaWhatsAppShare` acepta fotos y las muestra arriba de la prévia, y `SalidaHistoryPage` le pasa las
+  del día elegido, también en el pasado share-only.
+- **Android** (`565a213a`): `ShareCard(photos)` y `SalidaWhatsAppShare(photos)` con `PhotoThumbnails`: fila horizontal
+  de 56 dp, decodificada con `BitmapFactory` desde la URL pública en IO (sin agregar librería), rectángulo neutro
+  mientras carga o si falla. `ReportDetailScreen` pasa `state.photos` y `SalidaHistoryScreen` las del día/movimiento.
+- Sin botones de borrar/agregar en las miniaturas; el texto y la lógica de envío no cambian.
+
 ## 14. Web: el botón de compartir del Relatório
 
 - **Causa doble** (`3dabc269`): producción servía un bundle viejo (`index-BCOgFz_U.js`, sin el camino de compartir del
