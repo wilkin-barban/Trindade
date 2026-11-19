@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.trindade.app.R
+import com.trindade.app.contract.models.DriversResponseDriversInner
 import com.trindade.app.export.PdfGenerator
 import com.trindade.app.export.ShareManager
 import com.trindade.app.ui.UiText
@@ -154,5 +155,77 @@ class LoadingShareScreenTest {
         }
 
         composeRule.onNodeWithText(errorSentence).assertIsDisplayed()
+    }
+
+    /**
+     * Los fleteros con teléfono del día viven acá, junto al share general.
+     *
+     * La grilla los tenía al lado del texto exportado, y la web los tiene en la tarjeta del día cerrado:
+     * la lista se mudó, no se perdió. Lo que se afirma es que llegó a esta pantalla y que cada nombre abre
+     * el chat de esa persona -- no el de cualquiera -- mientras el texto del servidor sigue a la vista.
+     */
+    @Test
+    fun `the fleteros with a number are offered beside the card and report the driver they open`() {
+        val opened = mutableListOf<Int>()
+        val ana = DriversResponseDriversInner(
+            id = 7,
+            name = "Ana",
+            licensePlate = null,
+            phone = "+55 (11) 98888-7777",
+            driverType = DriversResponseDriversInner.DriverType.fletero,
+        )
+        val state = LoadingShareViewModel.UiState(
+            date = "2026-11-18",
+            loading = false,
+            exportText = "CRONOGRAMA DE CARREGAMENTO",
+            message = null,
+            fleteros = listOf(ana),
+        )
+
+        composeRule.setContent {
+            TrindadeTheme {
+                LoadingShareScreen(
+                    date = "2026-11-18",
+                    state = state,
+                    onShare = {},
+                    onPdf = {},
+                    onBack = {},
+                    onOpenWhatsApp = { opened += it.id },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(copy(R.string.export_send_to_fletero)).assertIsDisplayed()
+        composeRule.onNodeWithText("CRONOGRAMA DE CARREGAMENTO").assertIsDisplayed()
+        composeRule.onNodeWithText("Ana").assertIsDisplayed().performClick()
+        composeRule.waitForIdle()
+
+        assertEquals(listOf(7), opened)
+    }
+
+    /** Un día sin fleteros con número no dibuja la sección: el lugar vacío no es un fallo. */
+    @Test
+    fun `a day with no fleteros who can be reached draws no fletero section`() {
+        val state = LoadingShareViewModel.UiState(
+            date = "2026-11-18",
+            loading = false,
+            exportText = "CRONOGRAMA DE CARREGAMENTO",
+            message = null,
+        )
+
+        composeRule.setContent {
+            TrindadeTheme {
+                LoadingShareScreen(
+                    date = "2026-11-18",
+                    state = state,
+                    onShare = {},
+                    onPdf = {},
+                    onBack = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(copy(R.string.export_send_to_fletero)).assertDoesNotExist()
+        composeRule.onNodeWithText("Volver").assertIsDisplayed()
     }
 }

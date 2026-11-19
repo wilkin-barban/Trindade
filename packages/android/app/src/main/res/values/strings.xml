@@ -701,6 +701,7 @@
     <string name="help_stock_history_section1_title">Histórico de Fechamento</string>
     <string name="help_stock_history_section1_desc">Consulte as contagens de estoque registradas em datas anteriores para fechamento de fábrica e conferência de sobras.</string>
 
+    <string name="loading_whatsapp_unavailable">Não foi possível abrir o WhatsApp. Verifique o número do fletero.</string>
     <string name="loading_save">Salvar Horário</string>
 
     <!-- Additional Screen Labels & Common Actions -->

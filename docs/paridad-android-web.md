@@ -343,10 +343,15 @@ El módulo usa la misma tarjeta que el reporte, con su propio texto y su propio 
 - **Vista de solo lectura del histórico**: el “Ver horário de carregamento” abre la `ShareCard` con
   `/loading?share=1&date=…&from=history`; no muestra Editar y tiene un botón Volver al histórico. El botón
   `Salvar Horário` no existe en esa vista (solo en el editor).
+- **Fleteros con teléfono**: la lista uno a uno vive en la tarjeta del día, no en la grilla. El editor tiene
+  **una sola acción**, `Salvar Horário`; el texto, el PDF y los chips de cada fletero con número se dibujan en
+  la pantalla de compartir, junto a la tarjeta.
 - **Sin botón de copiar**, igual que en el reporte.
 
 Para Android: el texto sale del mismo endpoint (no reconstruirlo), el compartir es `ACTION_SEND` con el texto, el PDF
-se genera del mismo texto y la tarjeta no se dispara sola al guardar un turno.
+se genera del mismo texto y la tarjeta no se dispara sola al guardar un turno. La grilla no dibuja el flujo de envío:
+`LoadingScreen` conserva `Salvar Horário` como única acción del día y `LoadingShareScreen` dibuja, junto a la
+`ShareCard`, los fleteros del día cuyo número permite abrir el chat.
 
 ---
 

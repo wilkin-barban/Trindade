@@ -4,10 +4,7 @@ import android.content.Context
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.platform.ClipboardManager
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
@@ -15,7 +12,6 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
-import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
@@ -30,7 +26,6 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.dp
@@ -233,7 +228,6 @@ class LoadingScreenTest {
                     onDismissBatchResult = onDismissBatchResult,
                     onDelete = {},
                     onEditEntry = { _, _ -> },
-                    onLoadExport = {},
                 )
             }
         }
@@ -256,7 +250,6 @@ class LoadingScreenTest {
                     onConfirmAdd = {},
                     onDelete = {},
                     onEditEntry = { _, _ -> },
-                    onLoadExport = {},
                 )
             }
         }
@@ -500,7 +493,6 @@ class LoadingScreenTest {
                     onConfirmAdd = {},
                     onDelete = {},
                     onEditEntry = { id, date -> opened += id to date },
-                    onLoadExport = {},
                 )
             }
         }
@@ -571,7 +563,6 @@ class LoadingScreenTest {
                     onConfirmAdd = {},
                     onDelete = { deletedId = it },
                     onEditEntry = { _, _ -> },
-                    onLoadExport = {},
                 )
             }
         }
@@ -663,7 +654,6 @@ class LoadingScreenTest {
                         editedId = id
                         editedDate = date
                     },
-                    onLoadExport = {},
                 )
             }
         }
@@ -715,8 +705,7 @@ class LoadingScreenTest {
                         onConfirmAdd = {},
                         onDelete = {},
                         onEditEntry = { _, _ -> },
-                        onLoadExport = {},
-                    )
+                        )
                 }
             }
         }
@@ -741,11 +730,11 @@ class LoadingScreenTest {
         assertTrue("The pill must grow with the label at 1.5x but stayed at $pillHeight", pillHeight >= 36.dp)
         assertTrue("History button width >= 48dp at 1.5x", historyBounds.right - historyBounds.left >= 48.dp)
 
-        // Export action
-        val exportNode = composeRule.onNodeWithText(copy(R.string.export_load)).performScrollTo()
-        assertWithinViewport(exportNode)
-        val exportBounds = exportNode.getUnclippedBoundsInRoot()
-        assertTrue("Export button height >= 48dp at 1.5x", exportBounds.bottom - exportBounds.top >= 48.dp)
+        // La acción del día: el pie, que no viaja con la grilla y por eso se mide donde está fijo.
+        val saveNode = composeRule.onNodeWithText(copy(R.string.loading_save))
+        assertWithinViewport(saveNode)
+        val saveBounds = saveNode.getUnclippedBoundsInRoot()
+        assertTrue("Salvar Horário height >= 48dp at 1.5x", saveBounds.bottom - saveBounds.top >= 48.dp)
 
         // Slot heading and fletero counter
         val slotHeadingNode = composeRule.onNodeWithText("04:00").performScrollTo()
@@ -808,8 +797,7 @@ class LoadingScreenTest {
                         onConfirmAdd = {},
                         onDelete = {},
                         onEditEntry = { _, _ -> },
-                        onLoadExport = {},
-                    )
+                        )
                 }
             }
         }
@@ -827,11 +815,11 @@ class LoadingScreenTest {
         )
         assertTrue("History button width >= 48dp at 2.0x", historyBounds.right - historyBounds.left >= 48.dp)
 
-        // Export action
-        val exportNode = composeRule.onNodeWithText(copy(R.string.export_load)).performScrollTo()
-        assertWithinViewport(exportNode)
-        val exportBounds = exportNode.getUnclippedBoundsInRoot()
-        assertTrue("Export button height >= 48dp at 2.0x", exportBounds.bottom - exportBounds.top >= 48.dp)
+        // La acción del día: el pie, que no viaja con la grilla y por eso se mide donde está fijo.
+        val saveNode = composeRule.onNodeWithText(copy(R.string.loading_save))
+        assertWithinViewport(saveNode)
+        val saveBounds = saveNode.getUnclippedBoundsInRoot()
+        assertTrue("Salvar Horário height >= 48dp at 2.0x", saveBounds.bottom - saveBounds.top >= 48.dp)
 
         // Slot heading and fletero counter
         val slotHeadingNode = composeRule.onNodeWithText("04:00").performScrollTo()
@@ -1098,289 +1086,56 @@ class LoadingScreenTest {
         )
     }
 
-    // ---- Export actions ----
+    // ---- The day's only action ----
 
-    private class TestClipboardManager : ClipboardManager {
-        private var clip: AnnotatedString? = null
-        override fun getText(): AnnotatedString? = clip
-        override fun setText(annotatedString: AnnotatedString) {
-            clip = annotatedString
-        }
-        override fun hasText(): Boolean = clip != null
-    }
-
+    /**
+     * La acción del día es una sola, y es Salvar Horário.
+     *
+     * La grilla conservaba el flujo viejo -- generar el texto, copiarlo, compartirlo, el PDF -- al lado
+     * del pie que cierra el día, y la web tiene una sola acción. Lo que se afirma acá es la ausencia: el
+     * día terminado se dibuja en la pantalla de compartir, y una segunda copia de ese flujo en la grilla
+     * es una segunda pantalla que dice lo mismo con otros botones.
+     */
     @Test
-    fun `does not offer export actions until export text is available`() {
-        render()
+    fun `the grid's only day action is Salvar Horário and none of the old export flow is drawn`() {
+        renderState(state())
 
-        composeRule.onNodeWithText(copy(R.string.export_load)).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText(copy(R.string.export_copy)).assertDoesNotExist()
-        composeRule.onNodeWithText(copy(R.string.export_share_text)).assertDoesNotExist()
-        composeRule.onNodeWithText(copy(R.string.export_share_pdf)).assertDoesNotExist()
-    }
+        composeRule.onNodeWithText(copy(R.string.loading_save)).assertIsDisplayed()
 
-    @Test
-    fun `the export dialog offers the one-on-one chat for the day's fleteros that have a number`() {
-        val opened = mutableListOf<Int>()
-        val withNumber = DriversResponseDriversInner(
-            id = 7, name = "Ana", licensePlate = null, phone = "+55 (11) 98888-7777",
-            driverType = DriversResponseDriversInner.DriverType.fletero,
-        )
-        val withoutNumber = DriversResponseDriversInner(
-            id = 8, name = "Beto", licensePlate = null, phone = null,
-            driverType = DriversResponseDriversInner.DriverType.fletero,
-        )
-
-        composeRule.setContent {
-            TrindadeTheme {
-                LoadingScreen(
-                    state = state().copy(
-                        exportText = "CRONOGRAMA DE CARREGAMENTO",
-                        schedules = listOf(FakeLoadingApi.entry(7, "04:00"), FakeLoadingApi.entry(8, "05:00")),
-                        drivers = listOf(withNumber, withoutNumber),
-                    ),
-                    onBack = {},
-                    onOpenHistory = {},
-                    onStartAdding = {},
-                    onCancelAdding = {},
-                    onPickerTabSelected = {},
-                    onFleteroPicked = { _, _ -> },
-                    onCasaPicked = { _, _ -> },
-                    onCasaVehiclePicked = { _, _ -> },
-                    onConfirmAdd = {},
-                    onDelete = {},
-                    onEditEntry = { _, _ -> },
-                    onLoadExport = {},
-                    onShareText = {},
-                    onSharePdf = {},
-                    onOpenWhatsApp = { opened += it.id },
-                )
-            }
+        for (gone in listOf(
+            R.string.export_load,
+            R.string.export_copy,
+            R.string.export_share_text,
+            R.string.export_share_pdf,
+            R.string.export_send_to_fletero,
+        )) {
+            composeRule.onNodeWithText(copy(gone)).assertDoesNotExist()
         }
-
-        // Offered only for the fletero the chat can actually reach, and the label names the person
-        // rather than the action, because which driver a message goes to is the choice being made here.
-        composeRule.onNodeWithText(copy(R.string.export_send_to_fletero)).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Ana").performScrollTo().assertIsDisplayed().performClick()
-        composeRule.onNodeWithText("Beto").assertDoesNotExist()
-        composeRule.waitForIdle()
-        assertEquals(listOf(7), opened)
     }
 
     /**
-     * The overlap the operator saw: two fleteros in one day drew one button on top of the other.
+     * El día que sí tenía fleteros con número tampoco los dibuja acá: la lista se mudó, no se perdió.
      *
-     * The names come from the roster rather than from a fixed list, so a column of buttons borrowed each
-     * line from the one above it as soon as a second driver had a number. What the assertion reads is the
-     * placement itself -- the second button starts either after the first one ends on the same line, or below
-     * it -- because presence alone would pass for a screen that drew both in the same place, which is exactly
-     * the layout that was reported.
+     * Es el caso en que el bloque viejo tenía contenido, así que la ausencia de arriba sola no alcanzaría:
+     * una grilla que simplemente dejó de pintar la lista cuando está vacía pasaría igual, y lo que se
+     * tiene que leer es que el nombre no está en la grilla sino en la tarjeta del día.
      */
     @Test
-    fun `two fleteros with numbers get their own space in the dialog`() {
+    fun `a day whose fleteros have numbers draws no one-on-one list on the grid`() {
         val ana = DriversResponseDriversInner(
             id = 7, name = "Ana", licensePlate = null, phone = "+55 (11) 98888-7777",
             driverType = DriversResponseDriversInner.DriverType.fletero,
         )
-        val beto = DriversResponseDriversInner(
-            id = 8, name = "Beto", licensePlate = null, phone = "+55 (11) 97777-6666",
-            driverType = DriversResponseDriversInner.DriverType.fletero,
+        renderState(
+            state().copy(
+                schedules = listOf(FakeLoadingApi.entry(7, "04:00")),
+                timeSlots = listOf("04:00"),
+                drivers = listOf(ana),
+            ),
         )
 
-        composeRule.setContent {
-            TrindadeTheme {
-                LoadingScreen(
-                    state = state().copy(
-                        exportText = "CRONOGRAMA DE CARREGAMENTO",
-                        schedules = listOf(FakeLoadingApi.entry(7, "04:00"), FakeLoadingApi.entry(8, "05:00")),
-                        drivers = listOf(ana, beto),
-                    ),
-                    onBack = {},
-                    onOpenHistory = {},
-                    onStartAdding = {},
-                    onCancelAdding = {},
-                    onPickerTabSelected = {},
-                    onFleteroPicked = { _, _ -> },
-                    onCasaPicked = { _, _ -> },
-                    onCasaVehiclePicked = { _, _ -> },
-                    onConfirmAdd = {},
-                    onDelete = {},
-                    onEditEntry = { _, _ -> },
-                    onLoadExport = {},
-                    onShareText = {},
-                    onSharePdf = {},
-                    onOpenWhatsApp = {},
-                )
-            }
-        }
-
-        val first = composeRule.onNodeWithText("Ana").performScrollTo().getUnclippedBoundsInRoot()
-        val second = composeRule.onNodeWithText("Beto").performScrollTo().getUnclippedBoundsInRoot()
-
-        val gapOnOneLine = second.left >= first.right
-        val lineOfItsOwn = second.top >= first.bottom
-        assertTrue(
-            "Ana [$first] and Beto [$second] overlap: neither a gap on one line nor a line of their own",
-            gapOnOneLine || lineOfItsOwn,
-        )
-    }
-
-    @Test
-    fun `offers export actions when export text is available`() {
-        val sampleText = "CRONOGRAMA DE CARREGAMENTO - 15/01/2025"
-        var shareTextCalls = 0
-        var sharePdfCalls = 0
-
-        composeRule.setContent {
-            TrindadeTheme {
-                LoadingScreen(
-                    state = state().copy(exportText = sampleText),
-                    onBack = {},
-                    onOpenHistory = {},
-                    onStartAdding = {},
-                    onCancelAdding = {},
-                    onPickerTabSelected = {},
-                    onFleteroPicked = { _, _ -> },
-                    onCasaPicked = { _, _ -> },
-                    onCasaVehiclePicked = { _, _ -> },
-                    onConfirmAdd = {},
-                    onDelete = {},
-                    onEditEntry = { _, _ -> },
-                    onLoadExport = {},
-                    onShareText = { shareTextCalls++ },
-                    onSharePdf = { sharePdfCalls++ },
-                )
-            }
-        }
-
-        composeRule.onNodeWithText(copy(R.string.export_copy)).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText(copy(R.string.export_share_text)).performScrollTo().assertIsDisplayed().performClick()
-        composeRule.waitForIdle()
-        assertEquals(1, shareTextCalls)
-        assertEquals(0, sharePdfCalls)
-
-        composeRule.onNodeWithText(copy(R.string.export_share_pdf)).performScrollTo().assertIsDisplayed().performClick()
-        composeRule.waitForIdle()
-        assertEquals(1, shareTextCalls)
-        assertEquals(1, sharePdfCalls)
-    }
-
-    @Test
-    fun `export copy action writes exact text to clipboard`() {
-        val sampleText = "CRONOGRAMA DE CARREGAMENTO - 15/01/2025"
-        val testClipboard = TestClipboardManager()
-
-        composeRule.setContent {
-            CompositionLocalProvider(
-                LocalClipboardManager provides testClipboard,
-            ) {
-                TrindadeTheme {
-                    LoadingScreen(
-                        state = state().copy(exportText = sampleText),
-                        onBack = {},
-                        onOpenHistory = {},
-                        onStartAdding = {},
-                        onCancelAdding = {},
-                        onPickerTabSelected = {},
-                        onFleteroPicked = { _, _ -> },
-                        onCasaPicked = { _, _ -> },
-                        onCasaVehiclePicked = { _, _ -> },
-                        onConfirmAdd = {},
-                        onDelete = {},
-                        onEditEntry = { _, _ -> },
-                        onLoadExport = {},
-                    )
-                }
-            }
-        }
-
-        composeRule.onNodeWithText(copy(R.string.export_copy)).performScrollTo().assertIsDisplayed().performClick()
-        composeRule.waitForIdle()
-
-        assertEquals(sampleText, testClipboard.getText()?.text)
-    }
-
-    @Test
-    fun `exporting pdf displays progress indicator and disables pdf action`() {
-        val sampleText = "CRONOGRAMA DE CARREGAMENTO - 15/01/2025"
-        var sharePdfCalls = 0
-
-        composeRule.setContent {
-            TrindadeTheme {
-                LoadingScreen(
-                    state = state().copy(exportText = sampleText, exportingPdf = true),
-                    onBack = {},
-                    onOpenHistory = {},
-                    onStartAdding = {},
-                    onCancelAdding = {},
-                    onPickerTabSelected = {},
-                    onFleteroPicked = { _, _ -> },
-                    onCasaPicked = { _, _ -> },
-                    onCasaVehiclePicked = { _, _ -> },
-                    onConfirmAdd = {},
-                    onDelete = {},
-                    onEditEntry = { _, _ -> },
-                    onLoadExport = {},
-                    onSharePdf = { sharePdfCalls++ },
-                )
-            }
-        }
-
-        composeRule.onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate))
-            .performScrollTo()
-            .assertIsDisplayed()
-        val pdfButton = composeRule.onNodeWithText(copy(R.string.export_share_pdf))
-        pdfButton.assertIsNotEnabled().performClick()
-        composeRule.waitForIdle()
-        assertEquals(0, sharePdfCalls)
-    }
-
-    @Test
-    @Config(qualifiers = "w320dp-h1000dp")
-    fun `export actions at 320dp with 2x font wrap and stay within bounds`() {
-        val sampleText = "CRONOGRAMA DE CARREGAMENTO - 15/01/2025"
-
-        composeRule.setContent {
-            CompositionLocalProvider(
-                LocalDensity provides Density(
-                    density = LocalDensity.current.density,
-                    fontScale = 2.0f,
-                ),
-            ) {
-                TrindadeTheme {
-                    LoadingScreen(
-                        state = responsiveState().copy(exportText = sampleText),
-                        onBack = {},
-                        onOpenHistory = {},
-                        onStartAdding = {},
-                        onCancelAdding = {},
-                        onPickerTabSelected = {},
-                        onFleteroPicked = { _, _ -> },
-                        onCasaPicked = { _, _ -> },
-                        onCasaVehiclePicked = { _, _ -> },
-                        onConfirmAdd = {},
-                        onDelete = {},
-                        onEditEntry = { _, _ -> },
-                        onLoadExport = {},
-                    )
-                }
-            }
-        }
-
-        val copyNode = composeRule.onNodeWithText(copy(R.string.export_copy)).performScrollTo()
-        assertWithinViewport(copyNode)
-        val copyBounds = copyNode.getUnclippedBoundsInRoot()
-        assertTrue("Copy button height >= 48dp at 2x", copyBounds.bottom - copyBounds.top >= 48.dp)
-
-        val shareTextNode = composeRule.onNodeWithText(copy(R.string.export_share_text)).performScrollTo()
-        assertWithinViewport(shareTextNode)
-        val shareTextBounds = shareTextNode.getUnclippedBoundsInRoot()
-        assertTrue("Share text button height >= 48dp at 2x", shareTextBounds.bottom - shareTextBounds.top >= 48.dp)
-
-        val sharePdfNode = composeRule.onNodeWithText(copy(R.string.export_share_pdf)).performScrollTo()
-        assertWithinViewport(sharePdfNode)
-        val sharePdfBounds = sharePdfNode.getUnclippedBoundsInRoot()
-        assertTrue("Share PDF button height >= 48dp at 2x", sharePdfBounds.bottom - sharePdfBounds.top >= 48.dp)
+        composeRule.onNodeWithText(copy(R.string.export_send_to_fletero)).assertDoesNotExist()
+        composeRule.onNodeWithText("Ana").assertDoesNotExist()
     }
 
     @Test
@@ -1401,7 +1156,6 @@ class LoadingScreenTest {
                     onConfirmAdd = {},
                     onDelete = {},
                     onEditEntry = { _, _ -> },
-                    onLoadExport = {},
                     onQuickAdd = { name, plate, phone -> quickAdded = Triple(name, plate, phone) },
                 )
             }

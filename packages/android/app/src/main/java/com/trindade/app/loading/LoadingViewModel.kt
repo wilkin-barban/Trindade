@@ -6,13 +6,7 @@ import com.trindade.app.contract.models.CreateScheduleRequest
 import com.trindade.app.contract.models.DriversResponseDriversInner
 import com.trindade.app.contract.models.SchedulesResponseSchedulesInner
 import com.trindade.app.contract.models.VehiclesResponseVehiclesInner
-import com.trindade.app.export.NoOpPdfGenerator
-import com.trindade.app.export.NoOpShareManager
-import com.trindade.app.export.PdfGenerator
-import com.trindade.app.export.ShareManager
 import com.trindade.app.ui.DayClock
-import com.trindade.app.ui.waMeLink
-import com.trindade.app.ui.waMeNumber
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.LocalDate
 import java.time.ZoneId
@@ -28,8 +22,6 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class LoadingViewModel @Inject constructor(
     private val repository: LoadingRepository,
-    private val pdfGenerator: PdfGenerator,
-    private val shareManager: ShareManager,
     /**
      * Today in São Paulo, asked for rather than captured.
      *
@@ -42,7 +34,7 @@ class LoadingViewModel @Inject constructor(
     internal constructor(
         repository: LoadingRepository,
         today: () -> String = ::saoPauloToday,
-    ) : this(repository, NoOpPdfGenerator, NoOpShareManager, DayClock(today))
+    ) : this(repository, DayClock(today))
 
     data class UiState(
         val date: String = saoPauloToday(),
@@ -87,17 +79,6 @@ class LoadingViewModel @Inject constructor(
          * batch is over: the dialog opens and the grid's inline sentence steps aside.
          */
         val batchResult: BatchResult? = null,
-        /**
-         * The WhatsApp text the server rendered for [date], or null when there is nothing to copy.
-         *
-         * Null covers both "not asked for yet" and "asked for and the server could not render it", and
-         * that is deliberate: the operator sees the same thing either way -- the action, ready to be
-         * tried -- while the reason lives in [message] for the second case. A separate flag would exist
-         * only to distinguish two states nothing on the screen treats differently.
-         */
-        val exportText: String? = null,
-        val loadingExport: Boolean = false,
-        val exportingPdf: Boolean = false,
     ) {
         /**
          * Whether the day is in the past, which is when it stops accepting writes.
@@ -170,25 +151,6 @@ class LoadingViewModel @Inject constructor(
         fun fleteroCountIn(slot: String): Int = FleteroQuota.countInWindow(schedules, slot)
 
         fun isExceeded(slot: String): Boolean = FleteroQuota.isExceeded(schedules, slot)
-
-        /**
-         * The day's own fleteros whose number is known, each one once, in the order the day draws them.
-         *
-         * Built from this day rather than from the fleet: a schedule sent to a driver who is not on it is
-         * a message about a day that does not concern them. Which driver is a fletero on a given day is
-         * the day's own row that says it -- the fleet record is where the number lives, not where the
-         * day's use of them is decided -- and a driver whose number nobody has yet has no chat to open, so
-         * they are not offered until that field is filled. The number is the one a link can actually use.
-         */
-        fun fleterosWithPhone(): List<DriversResponseDriversInner> {
-            val byId = drivers.associateBy { it.id }
-            return schedules
-                .filter { it.driverType == SchedulesResponseSchedulesInner.DriverType.fletero }
-                .mapNotNull { it.driverId }
-                .distinct()
-                .mapNotNull { byId[it] }
-                .filter { waMeNumber(it.phone.orEmpty()).isNotEmpty() }
-        }
 
         /**
          * The fleet, split the way the picker's two tabs are.
@@ -323,11 +285,8 @@ class LoadingViewModel @Inject constructor(
      * token writes a non-null schedules answer. Callers that do not need completion may ignore it.
      */
     fun load(date: String = state.value.date): Deferred<Boolean> {
-        // The export text is dropped on every reload, and that includes the one a successful mutation
-        // triggers: the text describes the day's entries, so leaving it on screen after they changed
-        // would hand the operator a message about a day that no longer exists. It is one tap away.
         val load = ++newestLoad
-        _state.update { it.copy(date = date, loading = true, message = null, exportText = null) }
+        _state.update { it.copy(date = date, loading = true, message = null) }
 
         return viewModelScope.async {
             val day = repository.schedules(date)
@@ -568,76 +527,6 @@ class LoadingViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Fetches the server-rendered WhatsApp text for the day on screen. Never assembled here.
-     *
-     * The date is the grid's own, not a second control, so the text and the entries below it cannot
-     * describe different days. Fetched on demand rather than with the grid, because it is one more call
-     * the operator may not want and the grid is the point of the screen.
-     */
-    fun loadExport() {
-        if (state.value.loadingExport) return
-        _state.update { it.copy(loadingExport = true, message = null) }
-
-        viewModelScope.launch {
-            val text = repository.exportText(state.value.date)
-            _state.update {
-                it.copy(
-                    loadingExport = false,
-                    exportText = text,
-                    // 400 is the only refusal the server has here and it answers a malformed date, which
-                    // this client cannot send; what is left is an absent answer, and saying so is honest.
-                    message = if (text == null) EXPORT_FAILED else null,
-                )
-            }
-        }
-    }
-
-    /** Shares the server export text via the platform chooser. */
-    fun shareText() {
-        val text = state.value.exportText ?: return
-        shareManager.shareText(text)
-    }
-
-    /**
-     * Opens the one-on-one chat for [driver], carrying this day's own export text.
-     *
-     * What goes out is the schedule the announcement sends, to the number the fleet has for that person,
-     * and the device being unable to open it is reported rather than left to look sent.
-     */
-    fun openWhatsAppFor(driver: DriversResponseDriversInner) {
-        val text = state.value.exportText ?: return
-        val link = waMeLink(driver.phone.orEmpty(), text) ?: return
-        if (!shareManager.openLink(link)) {
-            _state.update { it.copy(message = SHARE_FAILED) }
-        }
-    }
-
-    /**
-     * Generates an A4 PDF named cronograma-<date>.pdf in cache and launches the platform chooser.
-     */
-    fun sharePdf() {
-        val text = state.value.exportText ?: return
-        val date = state.value.date
-        if (state.value.exportingPdf) return
-
-        _state.update { it.copy(exportingPdf = true, message = null) }
-
-        viewModelScope.launch {
-            try {
-                val file = pdfGenerator.generate(text, "cronograma-$date.pdf")
-                val shared = shareManager.sharePdf(file)
-                if (!shared) {
-                    _state.update { it.copy(message = SHARE_FAILED) }
-                }
-            } catch (_: Throwable) {
-                _state.update { it.copy(message = PDF_FAILED) }
-            } finally {
-                _state.update { it.copy(exportingPdf = false) }
-            }
-        }
-    }
-
     /** Quick-add for a driver who is not in the list yet. Always a `fletero`, per the contract. */
     fun quickAddDriver(name: String, licensePlate: String?, phone: String? = null, assignToSlot: Boolean = true) {
         val slot = state.value.addingToSlot
@@ -755,9 +644,6 @@ class LoadingViewModel @Inject constructor(
         const val BATCH_DEACTIVATED_MESSAGE =
             "O lote deste dia está desativado. Reative-o no histórico para carregar de novo."
         const val GENERIC = "Não foi possível concluir. Tente de novo."
-        const val EXPORT_FAILED = "Não foi possível gerar o texto agora. Tente de novo."
-        const val SHARE_FAILED = "Não foi possível compartilhar. Tente de novo."
-        const val PDF_FAILED = "Não foi possível gerar o PDF. Tente de novo."
     }
 }
 

@@ -25,7 +25,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -51,17 +50,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trindade.app.R
-import com.trindade.app.contract.models.DriversResponseDriversInner
 import com.trindade.app.contract.models.SchedulesResponseSchedulesInner
 import com.trindade.app.contract.models.VehiclesResponseVehiclesInner
 import com.trindade.app.ui.cleanPhone
@@ -86,9 +82,10 @@ import com.trindade.app.ui.components.NavigationActionButton
  * fourth, so it never withholds anything, and when the window is exceeded the slot says so rather than
  * refusing.
  *
- * The export lives with the day's header rather than at the end of the grid. The grid is long enough to
- * scroll, and the action is about the whole day, so it would otherwise sit behind every slot it
- * describes.
+ * The day's only action is Salvar Horário, at the screen's foot. What the day becomes once it is saved --
+ * the text the group receives, the PDF and the one-on-one message to each fletero with a number -- lives
+ * in [LoadingShareScreen], which is where the operator lands: the grid is not a share surface, and the
+ * old export block drew a second, older copy of that flow beside it.
  */
 /**
  * El pie del horario: cierra el día.
@@ -140,19 +137,13 @@ fun LoadingScreen(
     onConfirmAdd: () -> Unit,
     onDelete: (Int) -> Unit,
     onEditEntry: (Int, String) -> Unit,
-    onLoadExport: () -> Unit,
     /** Cierra el día: abre su vista de compartir, donde vive el PDF y el botón de WhatsApp. */
     onSaveDay: (String) -> Unit = {},
     modifier: Modifier = Modifier,
-    onShareText: () -> Unit = {},
-    onSharePdf: () -> Unit = {},
-    onOpenWhatsApp: (DriversResponseDriversInner) -> Unit = {},
-    onCopyExport: (String) -> Unit = {},
     onQuickAdd: (String, String?, String?) -> Unit = { _, _, _ -> },
     onRetry: () -> Unit = {},
     onDismissBatchResult: () -> Unit = {},
 ) {
-    val clipboard = LocalClipboardManager.current
     var showHelpDialog by remember { mutableStateOf(false) }
 
     // La grilla scrollea; el cierre del día no. Salvar Horario abre la vista de compartir del día, que es
@@ -190,26 +181,7 @@ fun LoadingScreen(
         }
 
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(text = state.date, style = MaterialTheme.typography.bodyMedium)
-                OutlinedButton(
-                    onClick = onLoadExport,
-                    enabled = !state.loadingExport,
-                    modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp),
-                ) {
-                    if (state.loadingExport) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                            Text(stringResource(R.string.export_load), style = MaterialTheme.typography.labelLarge)
-                        }
-                    } else {
-                        Text(stringResource(R.string.export_load), style = MaterialTheme.typography.labelLarge)
-                    }
-                }
-            }
+            Text(text = state.date, style = MaterialTheme.typography.bodyMedium)
         }
 
         if (state.readOnly) {
@@ -251,78 +223,6 @@ fun LoadingScreen(
                         modifier = Modifier.defaultMinSize(minHeight = 48.dp),
                     ) {
                         Text(stringResource(R.string.loading_retry), style = MaterialTheme.typography.labelLarge)
-                    }
-                }
-            }
-        }
-
-        // The server's own text, shown verbatim and copied as it stands. It is the product's output, so
-        // there is nothing here to assemble and nothing to reformat for a narrower screen.
-        state.exportText?.let { text ->
-            item {
-                Text(text = text, style = MaterialTheme.typography.bodyMedium)
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    AdminPrimaryButton(
-                        onClick = {
-                            clipboard.setText(AnnotatedString(text))
-                            onCopyExport(text)
-                        },
-                        text = stringResource(R.string.export_copy),
-                    )
-                    AdminPrimaryButton(
-                        onClick = onShareText,
-                        text = stringResource(R.string.export_share_text),
-                    )
-                }
-                // The one-on-one list sits with the day's own text, because what it sends IS that text: the
-                // label names the person rather than the action, since which driver a message reaches is
-                // the choice being made here, and only the drivers a chat can actually open are offered.
-                state.fleterosWithPhone().let { fleteros ->
-                    if (fleteros.isNotEmpty()) {
-                        Text(
-                            text = stringResource(R.string.export_send_to_fletero),
-                            style = MaterialTheme.typography.labelLarge,
-                        )
-                        // One row per name was a column of buttons that overlapped: the names come from the
-                        // roster rather than from a fixed list, so the line each one took was borrowed from
-                        // the one above it and two fleteros in a day could not be told apart or pressed.
-                        // `FlowRow` is what fits them: as many as fit on a line, wrapped, with the same gap
-                        // between neighbours on a line as between the lines themselves.
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            fleteros.forEach { driver ->
-                                NavigationActionButton(
-                                    onClick = { onOpenWhatsApp(driver) },
-                                    text = driver.name,
-                                )
-                            }
-                        }
-                    }
-                }
-                OutlinedButton(
-                    onClick = onSharePdf,
-                    enabled = !state.exportingPdf,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp)
-                        .defaultMinSize(minHeight = 48.dp),
-                ) {
-                    if (state.exportingPdf) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                            Text(stringResource(R.string.export_share_pdf), style = MaterialTheme.typography.labelLarge)
-                        }
-                    } else {
-                        Text(stringResource(R.string.export_share_pdf), style = MaterialTheme.typography.labelLarge)
                     }
                 }
             }
@@ -994,11 +894,7 @@ fun LoadingRoute(
         onConfirmAdd = viewModel::confirmAdd,
         onDelete = viewModel::deleteEntry,
         onEditEntry = onEditEntry,
-        onLoadExport = viewModel::loadExport,
         onSaveDay = onSaveDay,
-        onShareText = viewModel::shareText,
-        onSharePdf = viewModel::sharePdf,
-        onOpenWhatsApp = viewModel::openWhatsAppFor,
         onQuickAdd = viewModel::quickAddDriver,
         onRetry = { viewModel.load() },
         onDismissBatchResult = viewModel::dismissBatchResult,

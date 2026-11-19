@@ -5,12 +5,9 @@ import com.trindade.app.contract.models.DriversResponseDriversInner
 import com.trindade.app.contract.models.SchedulesResponse
 import com.trindade.app.contract.models.SchedulesResponseSchedulesInner
 import com.trindade.app.contract.models.VehiclesResponseVehiclesInner
-import com.trindade.app.export.PdfGenerator
-import com.trindade.app.export.ShareManager
 import com.trindade.app.network.LoadingApi
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.ResponseBody.Companion.toResponseBody
-import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -40,10 +37,9 @@ import retrofit2.Response
  * with a bug; what is checked here is that it is a date, and the timezone behaviour is named as
  * untestable without an injected clock.
  *
- * The export assertions are about what the operator would get wrong: the text is the server's and is
- * copied verbatim, it is asked for only when wanted, and it is **dropped when the day's entries
- * change**, because the failure mode of leaving it on screen is a WhatsApp message sent with a driver
- * that was just removed.
+ * The export flow is not here because the grid does not have one: the day's only action is Salvar
+ * Horário, and the text, the PDF and the one-on-one list live in `LoadingShareViewModel`, whose lane
+ * asserts them.
  *
  * The arrival's read is asserted in both directions, because the rule that decides it cuts both ways.
  * The day already on screen is not read again -- that skip is what keeps an ordinary entry to the tab at
@@ -64,20 +60,10 @@ class LoadingViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun driver(id: Int, name: String, phone: String?) = DriversResponseDriversInner(
-        id = id,
-        name = name,
-        licensePlate = null,
-        phone = phone,
-        driverType = DriversResponseDriversInner.DriverType.fletero,
-    )
-
     private fun viewModel(
         api: FakeLoadingApi,
-        pdfGenerator: PdfGenerator = RecordingPdfGenerator(),
-        shareManager: ShareManager = RecordingShareManager(),
         today: () -> String = { "2026-09-18" },
-    ) = LoadingViewModel(LoadingRepository(api), pdfGenerator, shareManager, today)
+    ) = LoadingViewModel(LoadingRepository(api), today)
 
     @Test
     fun `loads the day's entries and the configured slots`() {
@@ -718,245 +704,5 @@ class LoadingViewModelTest {
         // acknowledge, because it started no request.
         assertEquals(null, model.onDateChange(model.state.value.date))
         assertEquals(3, reads)
-    }
-
-    @Test
-    fun `does not ask the server for the export until it is requested`() {
-        val api = FakeLoadingApi()
-        val model = viewModel(api)
-
-        // The export is the one thing on the screen the operator may not want, and it is a call of its
-        // own; fetching it with the grid would make every visit pay for it.
-        assertEquals(null, model.state.value.exportText)
-        assertEquals(null, api.lastExportDate)
-    }
-
-    @Test
-    fun `renders the export for the day on screen, verbatim`() {
-        val api = FakeLoadingApi()
-        val model = viewModel(api)
-        model.loadExport()
-
-        // The grid's own date rather than a second control, so the text and the entries below it cannot
-        // describe different days. Verbatim because the text is the product's output: a client that
-        // reformatted it would be a second implementation to keep in agreement with the first.
-        assertEquals(model.state.value.date, api.lastExportDate)
-        assertEquals(FakeLoadingApi.EXPORT_TEXT, model.state.value.exportText)
-        assertFalse(model.state.value.loadingExport)
-    }
-
-    @Test
-    fun `says so when the server cannot render the export`() {
-        val api = FakeLoadingApi(exportToReturn = null)
-        val model = viewModel(api)
-        model.loadExport()
-
-        // Nothing to copy and nothing shown: an empty copy button would be a silent failure. The date is
-        // the only refusable input here and this client always sends a well-formed one, so what is left
-        // is an answer that never arrived.
-        assertEquals(null, model.state.value.exportText)
-        assertNotNull(model.state.value.message)
-    }
-
-    @Test
-    fun `drops the rendered export once the day's entries change`() {
-        val api = FakeLoadingApi(schedulesToReturn = listOf(FakeLoadingApi.entry(7, "04:00")))
-        val model = viewModel(api)
-        model.loadExport()
-        assertNotNull(model.state.value.exportText)
-
-        model.deleteEntry(7)
-
-        // The text describes the day's entries, so after they change it describes a day that no longer
-        // exists -- and the failure mode of leaving it on screen is a WhatsApp message sent with a
-        // driver that was just removed. It is one tap away, and the tap is the point.
-        assertEquals(null, model.state.value.exportText)
-    }
-
-    @Test
-    fun `shareText delegates export text to share manager`() {
-        val shareManager = RecordingShareManager()
-        val model = viewModel(api = FakeLoadingApi(), shareManager = shareManager)
-
-        model.loadExport()
-        model.shareText()
-
-        assertEquals(FakeLoadingApi.EXPORT_TEXT, shareManager.lastSharedText)
-    }
-
-    @Test
-    fun `the one-on-one list is the day's own fleteros with a number, each one once`() {
-        val api = FakeLoadingApi(
-            schedulesToReturn = listOf(
-                FakeLoadingApi.entry(7, "04:00"),
-                FakeLoadingApi.entry(7, "05:00"),
-                FakeLoadingApi.entry(8, "06:00"),
-                FakeLoadingApi.entry(9, "07:00", type = SchedulesResponseSchedulesInner.DriverType.casa),
-            ),
-            driversToReturn = listOf(
-                driver(7, "Ana", "+55 (11) 98888-7777"),
-                driver(8, "Beto", null),
-                driver(9, "Carlos", "+55 (11) 91111-2222"),
-            ),
-        )
-        val model = viewModel(api)
-        model.load()
-
-        // The day's own fleet rather than the whole one, each driver once however many slots they hold,
-        // and only where a chat can actually be opened: a message about a day is for the people on it.
-        assertEquals(listOf(7), model.state.value.fleterosWithPhone().map { it.id })
-    }
-
-    @Test
-    fun `openWhatsAppFor opens that driver's chat carrying the day's own text`() {
-        val api = FakeLoadingApi(
-            schedulesToReturn = listOf(FakeLoadingApi.entry(7, "04:00")),
-            driversToReturn = listOf(driver(7, "Ana", "+55 (11) 98888-7777")),
-        )
-        val shareManager = RecordingShareManager()
-        val model = viewModel(api, shareManager = shareManager)
-        model.load()
-        model.loadExport()
-
-        model.openWhatsAppFor(model.state.value.fleterosWithPhone().single())
-
-        assertEquals(
-            "https://api.whatsapp.com/send?phone=5511988887777&text=" +
-                java.net.URLEncoder.encode(FakeLoadingApi.EXPORT_TEXT, "UTF-8").replace("+", "%20"),
-            shareManager.lastOpenedLink,
-        )
-    }
-
-    @Test
-    fun `a chat the device cannot open says so instead of pretending it went out`() {
-        val api = FakeLoadingApi(
-            schedulesToReturn = listOf(FakeLoadingApi.entry(7, "04:00")),
-            driversToReturn = listOf(driver(7, "Ana", "+55 (11) 98888-7777")),
-        )
-        val shareManager = RecordingShareManager(returns = false)
-        val model = viewModel(api, shareManager = shareManager)
-        model.load()
-        model.loadExport()
-
-        model.openWhatsAppFor(model.state.value.fleterosWithPhone().single())
-
-        assertEquals(LoadingViewModel.SHARE_FAILED, model.state.value.message)
-    }
-
-    @Test
-    fun `shareText does nothing when exportText is null`() {
-        val shareManager = RecordingShareManager()
-        val model = viewModel(api = FakeLoadingApi(), shareManager = shareManager)
-
-        model.shareText()
-
-        assertNull(shareManager.lastSharedText)
-    }
-
-    @Test
-    fun `sharePdf generates native PDF named cronograma-date and shares it via share manager`() {
-        val pdfGenerator = RecordingPdfGenerator()
-        val shareManager = RecordingShareManager()
-        val model = viewModel(
-            api = FakeLoadingApi(),
-            pdfGenerator = pdfGenerator,
-            shareManager = shareManager,
-        )
-
-        model.loadExport()
-        model.sharePdf()
-
-        assertEquals("cronograma-${model.state.value.date}.pdf", pdfGenerator.lastFileName)
-        assertEquals(FakeLoadingApi.EXPORT_TEXT, pdfGenerator.lastText)
-        assertEquals(pdfGenerator.fileToReturn, shareManager.lastSharedPdf)
-        assertFalse(model.state.value.exportingPdf)
-    }
-
-    @Test
-    fun `sharePdf sets error message when PDF generation fails`() {
-        val pdfGenerator = RecordingPdfGenerator(shouldThrow = true)
-        val shareManager = RecordingShareManager()
-        val model = viewModel(
-            api = FakeLoadingApi(),
-            pdfGenerator = pdfGenerator,
-            shareManager = shareManager,
-        )
-
-        model.loadExport()
-        model.sharePdf()
-
-        assertEquals(LoadingViewModel.PDF_FAILED, model.state.value.message)
-        assertFalse(model.state.value.exportingPdf)
-        assertNull(shareManager.lastSharedPdf)
-    }
-
-    @Test
-    fun `sharePdf sets error message when shareManager returns false`() {
-        val pdfGenerator = RecordingPdfGenerator()
-        val shareManager = RecordingShareManager(returns = false)
-        val model = viewModel(
-            api = FakeLoadingApi(),
-            pdfGenerator = pdfGenerator,
-            shareManager = shareManager,
-        )
-
-        model.loadExport()
-        model.sharePdf()
-
-        assertEquals(LoadingViewModel.SHARE_FAILED, model.state.value.message)
-        assertFalse(model.state.value.exportingPdf)
-    }
-
-    @Test
-    fun `sharePdf does nothing when exportText is null`() {
-        val pdfGenerator = RecordingPdfGenerator()
-        val model = viewModel(api = FakeLoadingApi(), pdfGenerator = pdfGenerator)
-
-        model.sharePdf()
-
-        assertNull(pdfGenerator.lastFileName)
-    }
-}
-
-private class RecordingShareManager(
-    var returns: Boolean = true,
-) : ShareManager {
-    var lastSharedText: String? = null
-    var lastSharedTitle: String? = null
-    var lastSharedPdf: File? = null
-    var lastOpenedLink: String? = null
-
-    override fun openLink(url: String): Boolean {
-        lastOpenedLink = url
-        return returns
-    }
-
-    override fun shareText(text: String, title: String?): Boolean {
-        lastSharedText = text
-        lastSharedTitle = title
-        return returns
-    }
-
-    override fun shareApk(file: File, title: String?): Boolean = returns
-
-    override fun sharePdf(file: File, title: String?): Boolean {
-        lastSharedPdf = file
-        lastSharedTitle = title
-        return returns
-    }
-}
-
-private class RecordingPdfGenerator(
-    var fileToReturn: File = File("/cache/exports/cronograma-2025-01-15.pdf"),
-    var shouldThrow: Boolean = false,
-) : PdfGenerator {
-    var lastText: String? = null
-    var lastFileName: String? = null
-
-    override suspend fun generate(text: String, fileName: String): File {
-        if (shouldThrow) throw RuntimeException("PDF generation failed")
-        lastText = text
-        lastFileName = fileName
-        return fileToReturn
     }
 }
