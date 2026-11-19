@@ -198,7 +198,8 @@
     "erpMovementsSync": "Sincronizar com ERP",
     "erpMovementsSubtitle": "Entradas registradas no ERP para massas e recebimento de insumos",
     "productsUnavailable": "Não foi possível carregar a lista de produtos do servidor. Recarregue a página para tentar de novo.",
-    "shareWhatsAppOpened": "Abrimos o WhatsApp com a mensagem. Envie por lá."
+    "shareWhatsAppOpened": "Abrimos o WhatsApp com a mensagem. Envie por lá.",
+    "photoNumber": "Foto {{count}}"
   },
   "loading": {
     "vehiclesError": "Não foi possível carregar os veículos.",
@@ -1040,7 +1041,8 @@
     "launchShort": "Lançar",
     "erpSync": "Sincronizar com ERP",
     "erpSyncRequested": "Lendo as saídas do ERP…",
-    "erpSyncUnavailable": "O ERP não está configurado neste dispositivo."
+    "erpSyncUnavailable": "O ERP não está configurado neste dispositivo.",
+    "sharePhotoAlt": "Foto {{count}}"
   },
   "stock": {
     "add": "Adicionar",

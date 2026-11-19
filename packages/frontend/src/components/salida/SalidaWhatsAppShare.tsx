@@ -12,6 +12,13 @@ interface SalidaWhatsAppShareProps {
   onOpenWhatsApp: () => void;
   copyNote?: string;
   disabled?: boolean;
+  /**
+   * Las fotos del día o del movimiento, como miniaturas arriba de la prévia.
+   *
+   * Son de solo lectura: esta tarjeta comparte el texto, y las fotos viajan como enlaces dentro de él. La
+   * miniatura dice qué se va a ver, no es un botón.
+   */
+  photos?: readonly { id: number; url?: string | null; publicUrl?: string | null }[];
 }
 
 export function SalidaWhatsAppShare({
@@ -21,6 +28,7 @@ export function SalidaWhatsAppShare({
   onOpenWhatsApp,
   copyNote = '',
   disabled = false,
+  photos = [],
 }: SalidaWhatsAppShareProps) {
   const { t } = useTranslation();
 
@@ -79,6 +87,24 @@ export function SalidaWhatsAppShare({
             <span className="block text-xs font-semibold uppercase text-gray-500">
               {t('salida.previewTitle')}
             </span>
+            {photos.length > 0 && (
+              <div className="flex flex-wrap gap-2" data-testid="salida-share-photos">
+                {photos.map((photo, index) => {
+                  const url = photo.publicUrl || photo.url;
+                  if (!url) return null;
+                  return (
+                    <img
+                      key={photo.id}
+                      src={url}
+                      alt={t('salida.sharePhotoAlt', { count: index + 1 })}
+                      loading="lazy"
+                      className="h-14 w-14 rounded-lg border border-gray-200 object-cover"
+                      data-testid={`salida-share-photo-${photo.id}`}
+                    />
+                  );
+                })}
+              </div>
+            )}
             <div
               className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded-lg border border-gray-200 bg-gray-50 p-4 font-mono text-xs leading-relaxed text-gray-800 sm:text-sm"
               data-testid="salida-preview-message"

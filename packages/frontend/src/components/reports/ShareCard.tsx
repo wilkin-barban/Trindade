@@ -5,6 +5,14 @@ import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
 import { LoadingSpinner } from '../ui/loading-spinner';
 
+/** Una foto del mensaje: la pública si la hay, la del endpoint si no. */
+export interface ShareCardPhoto {
+  id: number;
+  url?: string | null;
+  publicUrl?: string | null;
+  alt?: string;
+}
+
 /**
  * The message the plant will read, with the four decisions that follow it.
  *
@@ -29,6 +37,7 @@ export function ShareCard({
   onEdit,
   onClose,
   footer,
+  photos = [],
   testIdPrefix = 'report',
 }: {
   title: string;
@@ -45,6 +54,13 @@ export function ShareCard({
   onEdit?: () => void;
   onClose: () => void;
   footer?: ReactNode;
+  /**
+   * Las fotos que viajan con el mensaje, como miniaturas arriba del texto.
+   *
+   * Son de solo lectura: la tarjeta comparte, no edita, y la galería de la pantalla es donde se borran. La URL
+   * preferida es la pública, que no necesita sesión.
+   */
+  photos?: readonly ShareCardPhoto[];
   /** `report` by default; another module says its own name so the test ids never collide. */
   testIdPrefix?: string;
 }) {
@@ -78,8 +94,30 @@ export function ShareCard({
           </p>
         )}
 
+        {photos.length > 0 && (
+          <div
+            className="flex flex-wrap gap-2 border-b border-gray-200 p-3"
+            data-testid={`${testIdPrefix}-share-photos`}
+          >
+            {photos.map((photo, index) => {
+              const url = photo.publicUrl || photo.url;
+              if (!url) return null;
+              return (
+                <img
+                  key={photo.id}
+                  src={url}
+                  alt={photo.alt ?? t('reports.photoNumber', { count: index + 1 })}
+                  loading="lazy"
+                  className="h-14 w-14 rounded-lg border border-gray-200 object-cover"
+                  data-testid={`${testIdPrefix}-share-photo-${photo.id}`}
+                />
+              );
+            })}
+          </div>
+        )}
+
         {!loading && !error && (
-          <pre
+        <pre
             className="max-h-[52vh] overflow-auto whitespace-pre-wrap break-words px-4 py-3 text-[13px] leading-relaxed text-gray-800 select-text"
             data-testid={`${testIdPrefix}-share-text`}
           >

@@ -293,6 +293,7 @@ export function ReportViewPage() {
           } — ${t('reports.turnoLabel')} ${turno}`}
           subtitle={`${report.report_date} · ${report.user?.display_name ?? ''}`}
           text={shareText}
+          photos={photos}
           loading={shareLoading}
           error={shareError}
           note={shareNote}

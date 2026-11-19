@@ -27,6 +27,36 @@ function renderCard(overrides: Partial<React.ComponentProps<typeof ShareCard>> =
   return render(<ShareCard {...base} {...overrides} />);
 }
 
+  /**
+   * Las fotos van arriba del texto, como miniaturas, y son de solo lectura: la tarjeta comparte, no edita.
+   */
+  it('shows the photos as thumbnails above the text, with no actions of their own', () => {
+    render(
+      <ShareCard
+        title="Relatório"
+        text="texto del servidor"
+        photos={[
+          { id: 11, publicUrl: 'https://example.test/11.jpg' },
+          { id: 12, url: '/api/reports/photos/12' },
+        ]}
+        onShare={() => {}}
+        onPdf={() => {}}
+        onClose={() => {}}
+      />,
+    );
+
+    const strip = screen.getByTestId('report-share-photos');
+    expect(strip).toBeInTheDocument();
+    expect(screen.getByTestId('report-share-photo-11')).toHaveAttribute('src', 'https://example.test/11.jpg');
+    expect(screen.getByTestId('report-share-photo-12')).toHaveAttribute('src', '/api/reports/photos/12');
+    expect(screen.getByTestId('report-share-photo-11').getAttribute('alt')).toBe('reports.photoNumber');
+
+    // Arriba del texto, y sin botones propios.
+    const text = screen.getByText('texto del servidor');
+    expect(strip.compareDocumentPosition(text) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(strip.querySelectorAll('button')).toHaveLength(0);
+  });
+
 describe('ShareCard', () => {
   it('shows the message the plant will read, verbatim', () => {
     renderCard();

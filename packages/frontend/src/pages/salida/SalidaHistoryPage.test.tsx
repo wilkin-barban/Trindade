@@ -818,6 +818,41 @@ describe('SalidaHistoryPage — T3 per-movement state, relaunch, operator filter
    * toca: sin selector para agregar y sin borrar. El servidor rechaza el intento igual (403 `SALIDA_NOT_OWNER`);
    * esto es la mitad que se ve.
    */
+  /**
+   * Las miniaturas del día acompañan al mensaje, también en el pasado -- donde es lo único que se muestra además
+   * del texto --. Son de solo lectura: no agregan ni borran.
+   */
+  it('shows the photos of the day above the shared message, in the past too', async () => {
+    get.mockImplementation(async (url: string) =>
+      url === '/salida/history'
+        ? {
+            days: [
+              {
+                date: '2026-11-12',
+                total_units: 20,
+                movements: [
+                  movement({
+                    id: 90,
+                    movement_date: '2026-11-12',
+                    photos: [
+                      { id: 901, file_path: 'a.jpg', file_size: 1, mime_type: 'image/jpeg', url: '/api/salida/photos/901', publicUrl: 'https://example.test/901.jpg', created_at: '' },
+                    ],
+                  }),
+                ],
+              },
+            ],
+          }
+        : {},
+    );
+
+    await renderReady('/salida-history?date=2026-11-12');
+
+    const strip = screen.getByTestId('salida-share-photos');
+    expect(strip).toBeInTheDocument();
+    expect(screen.getByTestId('salida-share-photo-901')).toHaveAttribute('src', 'https://example.test/901.jpg');
+    expect(strip.querySelectorAll('button')).toHaveLength(0);
+  });
+
   it('does not offer photo actions on a movement launched by another operator', async () => {
     const foreign = movement({
       id: 70,

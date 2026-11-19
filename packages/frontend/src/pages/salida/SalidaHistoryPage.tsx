@@ -659,6 +659,9 @@ export function SalidaHistoryPage() {
           onOpenWhatsApp={() => void handleOpenWhatsApp()}
           copyNote={copyNote}
           disabled={visibleMovements.length === 0}
+          // Las fotos del día que se está compartiendo, including el pasado: la vista de solo lectura muestra el
+          // mensaje y sus miniaturas, y nada más.
+          photos={visibleMovements.flatMap((movement) => movement.photos ?? [])}
         />
         {visibleMovements.length === 0 && (
           <p className="text-xs text-gray-500" data-testid="salida-share-day-empty">
