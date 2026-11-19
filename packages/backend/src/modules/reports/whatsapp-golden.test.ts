@@ -173,8 +173,8 @@ describe('el mensaje del reporte 80, abreviado', () => {
     // El peso viaja en la línea: el grupo distingue el de un kilo del de dos.
     assert.ok(text.includes('- CASEIRA 1kg: 218 un'));
     assert.ok(text.includes('- QUADRADA 2kg: 217 un'));
-    // 218 + 217 de las masas, más los insumos del día.
-    assert.ok(text.includes('📊 Total: 455 un'));
+    // Sin total de la sección de salidas: cada operario y cada producto dicen lo suyo.
+    assert.equal(text.includes('📊 Total:'), false);
     assert.equal(/[Ă\u0080-\u009f]/.test(text), false, 'ninguna letra rota llega al grupo');
     assert.equal(text.includes('(VIVIANE)'), false, 'el operario no se repite en cada línea');
     assert.equal(text.includes('   - '), false, 'la lista usa el prefijo corto');

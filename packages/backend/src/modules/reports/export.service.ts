@@ -333,6 +333,20 @@ export function generateWhatsAppText(
     }
   }
 
+  /**
+   * El nombre de un producto de Salida con el bloque delante, como lo lee la planta.
+   *
+   * `EMB.` para embalagens y `BOB.` para bobinas; la materia prima va sin prefijo, porque su nombre ya dice lo que
+   * es. La tabla aprobada ya trae nombres con su prefijo (`BOB. LASANHA`, `BOB. DISCO`), y repetirlo daría
+   * `BOB. BOB. LASANHA`: si la abreviatura ya empieza por el suyo, se deja como está.
+   */
+  const salidaProductLabel = (product: { name: string; code: string; block: string }): string => {
+    const name = abbreviateProduct(product.name, product.code);
+    const prefix = product.block === 'embalagens' ? 'EMB.' : product.block === 'bobinas' ? 'BOB.' : null;
+    if (!prefix) return name;
+    return name.startsWith(prefix) ? name : `${prefix} ${name}`;
+  };
+
   // --- Salidas / Baixa ---
   // Same idea as the massas block above: what left the plant belongs in the day's report, grouped by the operator
   // who recorded it, with product names and units only -- never a code, which is traceability and not a message.
@@ -346,13 +360,13 @@ export function generateWhatsAppText(
       lines.push(`👤 ${operator.name}:`);
       for (const product of operator.products) {
         if (product.units > 0) {
-          lines.push(`- ${abbreviateProduct(product.name, product.code)}: ${product.units} un`);
+          lines.push(`- ${salidaProductLabel(product)}: ${product.units} un`);
         }
       }
       lines.push('');
     }
-    lines.push('');
-    lines.push(`📊 Total: ${salidaView.totalUnits} un`);
+    // Sin total de la sección: el grupo suma por operario, y un número suelto al final se leía como el total del
+    // día sin decir de qué. Los totales de las otras secciones no se tocan.
     lines.push('');
   }
 

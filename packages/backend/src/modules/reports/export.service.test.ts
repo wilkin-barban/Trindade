@@ -372,17 +372,25 @@ describe('Export Service (Generador Inteligente)', () => {
       INSERT INTO salida_movement_items (movement_id, product_code, product_name, block, quantity, position)
       VALUES
         (9101, '1356', 'EMBALAG. DISCO 400g', 'embalagens', 6000, 0),
-        (9101, '1900', 'BOBINA ROLO', 'bobinas', 13, 1)
+        (9101, '1900', 'BOBINA ROLO', 'bobinas', 13, 1),
+        (9101, '1898', 'BOBINA DISCO', 'bobinas', 2, 2),
+        (9101, '2500', 'GORDURA', 'materia-prima', 7, 3)
     `);
 
     const text = generateWhatsAppText(db, reportId)!;
 
     assert.ok(text.includes('📤 *SAÍDAS / BAIXA*'));
     assert.ok(text.includes('👤 Test User:'));
-    // The list prefix and the plant's short names, with the quantity exactly as it was recorded.
-    assert.ok(text.includes('- DISCO 400g: 6000 un'));
-    assert.ok(text.includes('- BOBINA ROLO: 13 un'));
-    assert.ok(text.includes('📊 Total: 6013 un'));
+    // El prefijo del bloque delante del nombre corto, y la cantidad exacta.
+    assert.ok(text.includes('- EMB. DISCO 400g: 6000 un'));
+    assert.ok(text.includes('- BOB. BOBINA ROLO: 13 un'));
+    // La tabla ya trae el prefijo en algunos nombres: no se repite.
+    assert.ok(text.includes('- BOB. DISCO: 2 un'));
+    assert.ok(!text.includes('BOB. BOB.'), 'el prefijo se escribe una sola vez');
+    // La materia prima va sin prefijo.
+    assert.ok(text.includes('- GORDURA: 7 un'));
+    // La sección cierra sin un total suelto: la planta suma por operario.
+    assert.ok(!text.includes('📊 Total:'), 'la sección de salidas no lleva total');
     // A code in the message is traceability leaking into a group chat.
     assert.ok(!text.includes('1356'), 'the product code must not travel in the message');
     assert.ok(!text.includes('1900'), 'and neither does the second one');
