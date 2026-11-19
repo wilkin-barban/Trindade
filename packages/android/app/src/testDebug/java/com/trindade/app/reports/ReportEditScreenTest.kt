@@ -14,6 +14,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -375,6 +376,61 @@ class ReportEditScreenTest {
      * Antes sólo montaba la tarjeta de Salidas y sin ninguna acción, así que el día no se podía refrescar al
      * corregir el reporte. El botón es el mismo de la creación, y no toca el formulario ni el guardado.
      */
+    /**
+     * La edición sigue el orden del alta: turno, tareas, ERP, salidas, observaciones, fotos.
+     *
+     * La pantalla tenía todas las opciones, pero en otro orden -- observaciones y fotos arriba, categorías al
+     * final -- y quien edita un reporte lo hace con el mismo recorrido con el que lo creó. El orden se mide, no se
+     * describe: cada bloque tiene que empezar después de que termine el anterior.
+     */
+    @Test
+    fun `the form follows the creation screen's order, measured`() {
+        composeRule.setContent {
+            TrindadeTheme {
+                ReportEditScreen(
+                    state = state(
+                        salidaDay = com.trindade.app.contract.models.SalidaReportDayView(
+                            date = "2026-11-13",
+                            operators = emptyList(),
+                            totalUnits = 0,
+                            movementCount = 0,
+                        ),
+                    ),
+                    onTurnoChange = {},
+                    onNotesChange = {},
+                    onCheckChange = { _, _ -> },
+                    onProductToggle = { _, _, _ -> },
+                    onTemperatureChange = { _, _, _ -> },
+                    onBoxTypeChange = { _, _ -> },
+                    onSubmit = {},
+                    onSyncErp = {},
+                    onBack = {},
+                )
+            }
+        }
+
+        fun bottom(text: String) = composeRule.onNodeWithText(text).performScrollTo()
+            .getUnclippedBoundsInRoot().bottom
+
+        fun top(text: String) = composeRule.onNodeWithText(text).performScrollTo()
+            .getUnclippedBoundsInRoot().top
+
+        // Turno -> tareas -> ERP -> salidas -> observaciones -> fotos.
+        val turno = bottom(copy(R.string.history_turno_tarde))
+        val tareas = top("Higiene")
+        val erp = top(copy(R.string.report_erp_movements_title))
+        val salidas = top(copy(R.string.salida_report_block))
+        val notes = top(copy(R.string.report_notes))
+        val photos = composeRule.onNodeWithTag("report-photo-input").performScrollTo()
+            .getUnclippedBoundsInRoot().top
+
+        assertTrue("turno antes de tareas", turno <= tareas)
+        assertTrue("tareas antes del ERP", tareas <= erp)
+        assertTrue("ERP antes de salidas", erp <= salidas)
+        assertTrue("salidas antes de observaciones", salidas <= notes)
+        assertTrue("observaciones antes de fotos", notes <= photos)
+    }
+
     @Test
     fun `the edit screen shows the three ERP cards and one sync action`() {
         var synced = 0

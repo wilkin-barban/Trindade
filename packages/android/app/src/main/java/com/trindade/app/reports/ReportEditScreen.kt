@@ -119,25 +119,22 @@ fun ReportEditScreen(
             )
         }
 
-        // Several lines because this is where an operator says what happened in prose, and a single line
-        // would hide all but the first clause of it while they type.
-        OutlinedTextField(
-            value = state.notes,
-            onValueChange = onNotesChange,
-            label = { Text(stringResource(R.string.report_notes)) },
-            minLines = 3,
-            enabled = !state.readOnly,
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        // Las fotos que el reporte va a llevar: la edición las pide igual que la creación.
-        if (!state.readOnly) {
-            ReportPhotosSection(
-                pendingCount = state.pendingPhotos.size,
-                onAddPhotos = onAddPhotos,
-                onRemovePhoto = onRemovePendingPhoto,
+        // One form per root category, with its children filtered out of the same list the generator
+        // serves them from: the endpoint sends one level, ordered `COALESCE(parent_category_id, id),
+        // sort_order, id`, so a child belongs to the root whose id it names.
+        state.categories.filter { it.parentCategoryId == null }.forEach { category ->
+            CategoryForm(
+                category = category,
+                children = state.categories.filter { it.parentCategoryId == category.id },
+                form = form,
+                readOnly = state.readOnly,
+                onCheckChange = onCheckChange,
+                onProductToggle = onProductToggle,
+                onTemperatureChange = onTemperatureChange,
+                onBoxTypeChange = onBoxTypeChange,
             )
         }
+
 
         // Las tres lecturas del ERP, con las mismas tarjetas y la misma acción que la creación: el día se declara
         // entero al editar también, y esta pantalla era la única que no dejaba consultarlo ni refrescarlo.
@@ -168,22 +165,25 @@ fun ReportEditScreen(
             )
         }
 
-        // One form per root category, with its children filtered out of the same list the generator
-        // serves them from: the endpoint sends one level, ordered `COALESCE(parent_category_id, id),
-        // sort_order, id`, so a child belongs to the root whose id it names.
-        state.categories.filter { it.parentCategoryId == null }.forEach { category ->
-            CategoryForm(
-                category = category,
-                children = state.categories.filter { it.parentCategoryId == category.id },
-                form = form,
-                readOnly = state.readOnly,
-                onCheckChange = onCheckChange,
-                onProductToggle = onProductToggle,
-                onTemperatureChange = onTemperatureChange,
-                onBoxTypeChange = onBoxTypeChange,
+        // Several lines because this is where an operator says what happened in prose, and a single line
+        // would hide all but the first clause of it while they type.
+        OutlinedTextField(
+            value = state.notes,
+            onValueChange = onNotesChange,
+            label = { Text(stringResource(R.string.report_notes)) },
+            minLines = 3,
+            enabled = !state.readOnly,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        // Las fotos que el reporte va a llevar: la edición las pide igual que la creación.
+        if (!state.readOnly) {
+            ReportPhotosSection(
+                pendingCount = state.pendingPhotos.size,
+                onAddPhotos = onAddPhotos,
+                onRemovePhoto = onRemovePendingPhoto,
             )
         }
-
 
         // D6, rendered: when the server says this report cannot be edited, the save is not drawn at all
         // -- not drawn disabled. A disabled action is still an offer, and it reads as one with a reason
