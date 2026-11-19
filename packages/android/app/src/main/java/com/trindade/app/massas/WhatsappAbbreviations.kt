@@ -85,12 +85,15 @@ class WhatsappAbbreviations private constructor(
  * a message on every keystroke of the phone field.
  */
 @Singleton
-class WhatsappAbbreviationsSource @Inject constructor(
-    @ApplicationContext private val context: Context,
+open class WhatsappAbbreviationsSource @Inject constructor(
+    @ApplicationContext private val context: Context?,
 ) {
-    val table: WhatsappAbbreviations by lazy {
+    open val table: WhatsappAbbreviations by lazy {
+        // Sin contexto no hay asset que leer: es el caso de una prueba, y la tabla vacía deja los mensajes con
+        // el nombre que trajo el servidor.
+        val assets = context?.assets ?: return@lazy WhatsappAbbreviations.EMPTY
         runCatching {
-            context.assets.open(TABLE_ASSET)
+            assets.open(TABLE_ASSET)
                 .bufferedReader()
                 .use { it.readText() }
                 .let(WhatsappAbbreviations::parse)

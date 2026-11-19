@@ -10,6 +10,8 @@
  */
 
 /** One line of the catalogue: what it is called and how many units its box holds. */
+import { abbreviateProduct } from './whatsapp-abbreviations';
+
 export interface AssaiProduct {
   name: string;
   unitsPerBox: number;
@@ -160,7 +162,8 @@ export function assaiMessage(lines: readonly AssaiLine[], day?: string | null): 
     return `${header}\nNenhum produto com quantidade informada.`;
   }
 
-  const rows = ordered.map((line) => `${line.product}: ${line.boxes} caixas`);
+  // Mismo criterio que la contagem: nombre corto de la tabla, y el original cuando no hay fila.
+  const rows = ordered.map((line) => `${abbreviateProduct(line.product)}: ${line.boxes} caixas`);
   return [
     header,
     '',

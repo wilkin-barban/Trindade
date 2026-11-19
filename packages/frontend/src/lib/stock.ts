@@ -7,6 +7,8 @@
  * a day. And only what was counted leaves: a line of zero boxes in a chat that is read at the loading
  * dock is noise that hides the real line.
  */
+import { abbreviateProduct } from './whatsapp-abbreviations';
+
 export interface StockProduct {
   code: string;
   name: string;
@@ -116,7 +118,9 @@ export function stockMessage(day: StockDay): string {
     const emoji = EMOJI_BY_CATEGORY[group.category] ?? '•';
     lines.push(`${emoji} *${group.category}*`);
     for (const product of group.products) {
-      lines.push(`  • ${product.name} — ${product.units} un`);
+      // La tabla aprobada, la misma del Relatório: el grupo lee el nombre corto. Sin fila para el producto,
+      // la función devuelve el nombre que trajo el servidor.
+      lines.push(`  • ${abbreviateProduct(product.name, product.code)} — ${product.units} un`);
     }
     lines.push('');
   }

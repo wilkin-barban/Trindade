@@ -17,7 +17,10 @@ import javax.inject.Inject
  * an order is not persisted until it is sent.
  */
 @HiltViewModel
-class AssaiViewModel @Inject constructor() : ViewModel() {
+class AssaiViewModel @Inject constructor(
+    // La tabla aprobada del WhatsApp, la misma que usan el Relatório, Masas y la contagem.
+    private val abbreviationsSource: com.trindade.app.massas.WhatsappAbbreviationsSource,
+) : ViewModel() {
 
     data class UiState(
         val quantities: Map<String, String> = emptyMap(),
@@ -42,7 +45,7 @@ class AssaiViewModel @Inject constructor() : ViewModel() {
 
     fun hasError(): Boolean = assaiHasError(lines())
 
-    fun message(): String = assaiMessage(lines(), state.value.selectedDay)
+    fun message(): String = assaiMessage(lines(), state.value.selectedDay, abbreviationsSource.table)
 
     /**
      * The chat link for the order, or nothing when there is no usable number.

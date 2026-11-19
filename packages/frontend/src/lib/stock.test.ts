@@ -57,7 +57,7 @@ describe('the message that leaves the plant', () => {
     assert.ok(!message.includes('787'), 'el código ya no viaja: la vista queda limpia');
     assert.ok(message.includes('  • CANUDO — 150 un'), 'la fila lleva el producto y sus unidades');
     assert.ok(!message.includes(' cx'), 'los bultos no viajan en el detalle');
-    assert.ok(message.includes('  • MASSA ROLO 2KG — 12 un'), 'la línea de Massas, también sin código');
+    assert.ok(message.includes('  • ROLO 2kg — 12 un'), 'la línea de Massas con el nombre corto de la tabla, sin código');
     assert.ok(!message.includes('PIZZA BROTINHO'), 'un producto sin contar no ensucia el mensaje');
     assert.ok(!message.includes('MASSA TOKO'), 'ni el otro');
     assert.ok(message.includes('7') && message.includes('162'), 'los totales');
@@ -106,12 +106,12 @@ describe("the day's collective summary", () => {
 describe('the email that leaves the plant', () => {
   it('carries a plain table of what was counted, addressed to the plant', () => {
     const body = stockEmailBody(day);
-    assert.ok(body.includes('CANUDO'), 'el nombre del producto contado');
+    assert.ok(body.includes('CANUDO'), 'el nombre del producto contado (la tabla no tiene fila para 787)');
     assert.ok(!body.includes('MASSA TOKO'), 'solo lo contado');
     assert.ok(body.includes('Categoria') && body.includes('Unidades'), 'las columnas del correo');
     assert.ok(!body.includes('Código'), 'la columna de código se fue del correo');
     assert.ok(!body.includes('787') && !body.includes('1047'), 'y con ella los códigos de cada fila');
-    assert.ok(/CANUDO\s*\|/.test(body) && body.includes('MASSA ROLO 2KG'), 'las filas conservan el nombre');
+    assert.ok(/CANUDO\s*\|/.test(body) && body.includes('MASSA ROLO 2KG'), 'las filas del correo conservan el nombre');
     assert.ok(/^-+\+-+\+-+$/m.test(body), 'una linea separadora entre la cabecera y las filas, con las tres columnas');
     assert.ok(!body.includes('Caixas'), 'el correo ya no lleva la columna de bultos');
     // La alineacion es la propiedad que se pide: las barras caen siempre en la misma columna.

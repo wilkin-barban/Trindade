@@ -17,7 +17,7 @@ class AssaiViewModelTest {
 
     @Test
     fun `typing does not accuse and leaving the field does`() {
-        val vm = AssaiViewModel()
+        val vm = AssaiViewModel(TestAbbreviations())
         vm.onFocus("Nhoque 1kg")
         vm.onQuantityChange("Nhoque 1kg", "20")
 
@@ -30,7 +30,7 @@ class AssaiViewModelTest {
 
     @Test
     fun `coming back into a field clears its warning`() {
-        val vm = AssaiViewModel()
+        val vm = AssaiViewModel(TestAbbreviations())
         vm.onQuantityChange("Disco 200g", "20")
         vm.onBlur("Disco 200g")
         assertEquals(listOf("Disco 200g"), vm.visibleErrors())
@@ -44,7 +44,7 @@ class AssaiViewModelTest {
 
     @Test
     fun `the total counts only the products that can be served`() {
-        val vm = AssaiViewModel()
+        val vm = AssaiViewModel(TestAbbreviations())
         vm.onQuantityChange("Nhoque 1kg", "30")
         vm.onQuantityChange("Rolo 2kg", "20")
         vm.onQuantityChange("Disco 200g", "20")
@@ -53,12 +53,12 @@ class AssaiViewModelTest {
 
     @Test
     fun `an empty order says so instead of travelling empty`() {
-        assertTrue(AssaiViewModel().message().contains("Nenhum produto"))
+        assertTrue(AssaiViewModel(TestAbbreviations()).message().contains("Nenhum produto"))
     }
 
     @Test
     fun `selecting a day updates the message header and toggling it clears it`() {
-        val vm = AssaiViewModel()
+        val vm = AssaiViewModel(TestAbbreviations())
         vm.onQuantityChange("Nhoque 1kg", "30")
         assertTrue(vm.message().startsWith("🛒 Pedido Assaí\n"))
 
@@ -74,7 +74,7 @@ class AssaiViewModelTest {
 
     @Test
     fun `the chat link needs a number that can carry one`() {
-        val vm = AssaiViewModel()
+        val vm = AssaiViewModel(TestAbbreviations())
         vm.onQuantityChange("Nhoque 1kg", "30")
         assertNull("sin número no hay conversación", vm.whatsappLink())
 
@@ -82,4 +82,17 @@ class AssaiViewModelTest {
         val link = vm.whatsappLink()
         assertTrue(link != null && link.startsWith("https://api.whatsapp.com/send?phone=5511999998888"))
     }
+}
+
+/**
+ * La tabla del WhatsApp, sin Android de por medio.
+ *
+ * La fuente real lee un asset del APK; acá se construye desde el mismo JSON que viaja en el proyecto, así el
+ * mensaje de Assaí se prueba con las abreviaturas que la planta va a leer.
+ */
+private class TestAbbreviations : com.trindade.app.massas.WhatsappAbbreviationsSource(null) {
+    override val table: com.trindade.app.massas.WhatsappAbbreviations
+        get() = com.trindade.app.massas.WhatsappAbbreviations.parse(
+            """{"catalogueByCode":{},"catalogueByName":{},"erpByName":{}}""",
+        )
 }
