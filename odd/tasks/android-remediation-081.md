@@ -507,3 +507,18 @@ Test: `LoadingSchedulePage.test.tsx` (clic en la puerta -> `loading-export-modal
   quien no puede). Suite completa Android **verde**.
 - Regenerar el cliente Kotlin necesita Docker (`ghcr.io/cirruslabs/android-sdk:35`); el primer intento fallo por red
   y el reintento funciono. El fake `FakeSystemApi.summary` gano los dos campos con default false.
+
+### F7 — build e instalación (verificación en curso)
+
+- APK **0.8.1 (8004)** compilada con `-PapiBaseUrl=https://trindademasas.duckdns.org/` e instalada en
+  `emulator-5554` (verificado por `dumpsys`: `versionName=0.8.1`, `versionCode=8004`).
+- Arranca sin crashes: `mCurrentFocus=com.trindade.app/.MainActivity`, **0** `FATAL EXCEPTION` en logcat.
+- Densidad del AVD: `Override density: 443` sobre 1080 px = **390 dp**.
+- Capturas en `/tmp/trindade-081/`: dashboard, menú, lanzamiento de Salida e histórico de Salida.
+
+Verificado visualmente hasta acá: **R1** (Histórico de Saídas en el cajón), **R2** (píldora Histórico + Ajuda en el
+header de Salida) y **R14** (ayuda de Salida con textos reales en portugués). El histórico de Salida abre en **Hoje**
+con sus chips.
+
+**Pendiente**: capturas y PASS/FAIL de R3, R4, R5 (fotos/compartir/reenviar), R7, R9, R10, R11, R12, R13, R15; suite
+completa de Android, CI y deploy api+web si corresponde.
