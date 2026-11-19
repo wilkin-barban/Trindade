@@ -447,3 +447,24 @@ como lista de días. Va junto con F3 o en una unidad propia.
 Bloque `SalidaReportSection` en `ReportGeneratorScreen`/`ReportEditScreen` (`salidaDay`/`salidaLoading`/`salidaError`
 en los ViewModels, como ya hace el detalle), nombre + `(username)`, spinner/error/vacío/total y `testTag("report-salida-block")`;
 después el selector de fotos múltiple en creación y edición con compresión y subida tras guardar.
+
+### F2b — cerrada
+`9c951de7` — `MassasOrigin` explicito en `MassasLaunchScreen`: hoy abierto desde el historico muestra operaciones,
+edicion y share; el pasado, lo mismo en solo lectura. Chips `Hoje` + cinco fechas + `Todas as datas`
+(`massas-history-today`, `massas-history-chip-<date>`, `massas-history-all`) con la ventana en funcion pura.
+Test: `MassasHistoryWindowTest`.
+
+### F3 slice 1 — cerrada
+`3bf6d6b2` — `SalidaReportCard` (la del detalle) montada en `ReportGeneratorScreen` y `ReportEditScreen`, con
+`report-salida-block` y `ReportsRepository.salidaDay` por el dia del reporte. Sin dia leido no se dibuja.
+Test: `ReportSalidaBlockTest`.
+
+Suite completa de Android **verde** al cerrar estos dos slices.
+
+### F3 slice 2 — siguiente (no empezado)
+Fotos en creacion y edicion del Reporte:
+- `pendingPhotos` en `ReportGeneratorViewModel` y `ReportEditViewModel` (JPEG ya comprimidos, tope 5 y 5 MB, error visible).
+- `ReportPhotosSection` con `PickMultipleVisualMedia` + camara, compresion por `PhotoCompressor`, previews y borrado
+  (`report-photo-input`, `remove-pending-photo-btn`).
+- Subida con `ReportsApi.attachPhoto` **despues** de crear o actualizar, cuando el `reportId` ya existe.
+- Tests: seleccion multiple, tope de 5, compresion una vez por foto, subida tras guardar, borrado.
