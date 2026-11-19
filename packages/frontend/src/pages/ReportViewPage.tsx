@@ -13,6 +13,7 @@ import { exportReportPdf, fetchReportExportText, reportPhotoFiles, shareReportMe
 import { MassasReportSection } from '../components/reports/MassasReportSection';
 import { SalidaReportSection } from '../components/reports/SalidaReportSection';
 import { ERP_RECEIPT_CATEGORY_ID, usesErpReceipts } from '../lib/receipts';
+import { saoPauloToday } from '../lib/date';
 
 // ---- Types ----
 
@@ -266,6 +267,8 @@ export function ReportViewPage() {
   // view: no Editar, and the way back is the history.
   if (showingShare && report) {
     const turno = report.turno === 'tarde' ? t('reports.turnoTarde') : t('reports.turnoNoite');
+    const today = saoPauloToday();
+    const canEditToday = Boolean(report.canEdit) && report.report_date === today;
     return (
       <div className="mx-auto w-full max-w-2xl space-y-3 p-4">
         {fromHistory && (
@@ -292,7 +295,10 @@ export function ReportViewPage() {
           onShare={() => void handleShareReport()}
           onPdf={() => void handleShareCardPdf()}
           {...(fromHistory
-            ? { onClose: () => navigate('/loading/reports-history') }
+            ? {
+                ...(canEditToday ? { onEdit: () => navigate(`/reports/${report.id}/edit`) } : {}),
+                onClose: () => navigate('/loading/reports-history'),
+              }
             : {
                 onEdit: () => navigate(`/reports/${report.id}/edit`),
                 onClose: () => navigate('/reports'),

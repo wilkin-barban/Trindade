@@ -155,20 +155,37 @@ describe('LoadingHistoryPage', () => {
     await waitFor(() => expect(patch).toHaveBeenCalledWith('/loading/schedules/batch/2026-11-01/activate', {}));
   });
 
-  it('makes the card summary the edit link and keeps the view as a compact icon', async () => {
+  it('makes the card summary and the eye open the ShareCard, never the editor', async () => {
     get.mockImplementation(async (url: string) => {
       if (url.startsWith('/users/options')) return { users: [] };
-      return { items: [batch('2026-11-02')], pagination: { page: 1, pageSize: 30, total: 1, totalPages: 1 } };
+      return { items: [batch('2026-11-02', { canEdit: true })], pagination: { page: 1, pageSize: 30, total: 1, totalPages: 1 } };
     });
     renderPage();
 
-    const edit = await screen.findByRole('link', { name: 'Editar carga del 02/11/2026' });
-    expect(edit).toHaveAttribute('href', '/loading/edit?date=2026-11-02');
-    // El ojo es la vista de solo lectura y ahora es la tarjeta de compartir del día; el resumen de un día abierto
-    // sigue abriendo el editor.
+    // Summary and eye both open the ShareCard, never the editor
+    const summary = await screen.findByTestId('loading-history-summary-2026-11-02');
+    expect(summary).toHaveAttribute('href', '/loading?share=1&date=2026-11-02&from=history&canEdit=1');
+
+    const view = screen.getByTestId('view-loading-batch-2026-11-02');
+    expect(view).toHaveAttribute('href', '/loading?share=1&date=2026-11-02&from=history&canEdit=1');
+    expect(view).toHaveClass('min-h-12', 'min-w-12');
+
+    // Never links directly to /loading/edit
+    expect(screen.queryByRole('link', { name: /Editar carga/ })).toBeNull();
+  });
+
+  it('omits canEdit query param when server reports canEdit false', async () => {
+    get.mockImplementation(async (url: string) => {
+      if (url.startsWith('/users/options')) return { users: [] };
+      return { items: [batch('2026-11-02', { canEdit: false })], pagination: { page: 1, pageSize: 30, total: 1, totalPages: 1 } };
+    });
+    renderPage();
+
+    const summary = await screen.findByTestId('loading-history-summary-2026-11-02');
+    expect(summary).toHaveAttribute('href', '/loading?share=1&date=2026-11-02&from=history');
+
     const view = screen.getByTestId('view-loading-batch-2026-11-02');
     expect(view).toHaveAttribute('href', '/loading?share=1&date=2026-11-02&from=history');
-    expect(view).toHaveClass('min-h-12', 'min-w-12');
   });
 
   it('gives the batch actions a target a thumb can hit', async () => {

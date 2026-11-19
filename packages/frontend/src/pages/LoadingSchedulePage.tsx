@@ -10,7 +10,16 @@ import { ShareCard } from '../components/reports/ShareCard';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { exportLoadingPdf, fetchLoadingExportText, shareLoadingMessage } from '../lib/loading-share';
 import { ModuleHelpModal } from '../components/ui/ModuleHelpModal';
+import { useAuth } from '../contexts/AuthContext';
 import type { ScheduleRow, DriverRow } from '../components/loading/ScheduleGrid';
+
+function useOptionalAuth() {
+  try {
+    return useAuth();
+  } catch {
+    return { user: null };
+  }
+}
 
 
 
@@ -70,6 +79,12 @@ export function LoadingSchedulePage() {
   // pide el historial habla del día que el historial pidió: su texto, su fecha y su PDF.
   const requestedDate = /^\d{4}-\d{2}-\d{2}$/.test(params.get('date') ?? '') ? (params.get('date') as string) : null;
   const shareDate = fromHistory && requestedDate ? requestedDate : date;
+  const authUser = useOptionalAuth().user;
+  const isToday = shareDate === date;
+  const canEditParam = params.get('canEdit') === '1';
+  const userIsAdmin = authUser?.role === 'Administrador';
+  const userCanEditSchedule = schedules.some((s) => s.canEdit === true);
+  const canEditToday = isToday && (userIsAdmin || canEditParam || userCanEditSchedule);
   const [shareText, setShareText] = useState('');
   const [shareLoading, setShareLoading] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
@@ -210,7 +225,10 @@ export function LoadingSchedulePage() {
           onShare={() => void handleShareMessage()}
           onPdf={() => void handleSharePdf()}
           {...(fromHistory
-            ? { onClose: () => navigate('/loading/history') }
+            ? {
+                ...(canEditToday ? { onEdit: () => navigate(`/loading/edit?date=${shareDate}`) } : {}),
+                onClose: () => navigate('/loading/history'),
+              }
             : {
                 onEdit: () => navigate(`/loading/edit?date=${date}`),
                 onClose: () => {

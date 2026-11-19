@@ -172,13 +172,11 @@ export function LoadingHistoryPage() {
           {items.map((batch) => {
             const affordances = historyAffordances(batch);
             const dateLabel = formatDate(batch.batch_date);
-            // El ojo y el resumen de un día cerrado abren la tarjeta de compartir del día, que es su vista de
-            // solo lectura; el resumen de un día abierto sigue abriendo el editor.
-            const shareHref = `/loading?share=1&date=${batch.batch_date}&from=history`;
-            const detailHref = affordances.closedDay ? shareHref : `/loading/edit?date=${batch.batch_date}`;
-            // The summary is the card's main target, like a report card: a closed day opens the read-only
-            // view, an open day opens the editor. The eye repeats the view for a thumb and never changes
-            // what the summary does.
+            // Cada día (hoy o pasado) abre la tarjeta de compartir (ShareCard), nunca el editor directo.
+            // batch.canEdit lo calcula el servidor; se pasa en el query para la presentación de la ShareCard solo en día no cerrado.
+            const canEditParam = batch.canEdit && !affordances.closedDay ? '&canEdit=1' : '';
+            const shareHref = `/loading?share=1&date=${batch.batch_date}&from=history${canEditParam}`;
+            const detailHref = shareHref;
             return (
             <Card key={batch.batch_date} className={`p-4 ${!batch.isActive ? 'opacity-70' : ''}`} data-testid={`loading-history-card-${batch.batch_date}`}>
               <div className="flex flex-col gap-1">
@@ -186,7 +184,8 @@ export function LoadingHistoryPage() {
                   <Link
                     to={detailHref}
                     className="min-w-0 flex-1"
-                    aria-label={t(affordances.closedDay ? 'history.viewLoading' : 'history.editLoading', { date: dateLabel })}
+                    aria-label={t('history.viewLoading', { date: dateLabel })}
+                    data-testid={`loading-history-summary-${batch.batch_date}`}
                   >
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-sm font-semibold">{dateLabel}</span>

@@ -81,6 +81,32 @@ describe('LoadingSchedulePage', () => {
     expect(get.mock.calls.some(([url]) => String(url).includes('date=2026-11-10'))).toBe(false);
   });
 
+  it('shows Editar in fromHistory when the date is today and user can edit', async () => {
+    const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+    render(
+      <MemoryRouter initialEntries={[`/loading?share=1&date=${today}&from=history&canEdit=1`]}>
+        <LoadingSchedulePage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('loading-share-text')).toBeInTheDocument());
+    expect(screen.getByTestId('loading-share-back')).toBeInTheDocument();
+    expect(screen.getByTestId('loading-share-edit')).toBeInTheDocument();
+  });
+
+  it('hides Editar in fromHistory on today for a worker who cannot edit', async () => {
+    const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+    render(
+      <MemoryRouter initialEntries={[`/loading?share=1&date=${today}&from=history`]}>
+        <LoadingSchedulePage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('loading-share-text')).toBeInTheDocument());
+    expect(screen.getByTestId('loading-share-back')).toBeInTheDocument();
+    expect(screen.queryByTestId('loading-share-edit')).toBeNull();
+  });
+
   it('keeps today for the share card the grid opens by itself', async () => {
     render(
       <MemoryRouter initialEntries={['/loading?share=1&date=2026-11-10']}>

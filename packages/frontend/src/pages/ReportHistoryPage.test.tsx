@@ -239,4 +239,104 @@ describe('ReportHistoryPage', () => {
 
     await waitFor(() => expect(historyUrls().some((url) => url.includes('userId=7'))).toBe(true));
   });
+
+  describe('Editar action on today vs past and permissions', () => {
+    const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+
+    it('shows Editar action on today when server allows canEdit', async () => {
+      get.mockImplementation(async (url: string) => {
+        if (url.startsWith('/users/options')) return { users: [] };
+        return {
+          items: [
+            {
+              id: 55,
+              turno: 'tarde',
+              report_date: today,
+              notes: 'Today report',
+              created_at: `${today}T12:00:00.000Z`,
+              isActive: true,
+              isClosedDay: false,
+              readOnly: false,
+              canEdit: true,
+              canDeactivate: true,
+              canActivate: false,
+              canDelete: true,
+              user: { id: 1, display_name: 'Wilkin' },
+            },
+          ],
+          pagination: { page: 1, pageSize: 30, total: 1, totalPages: 1 },
+        };
+      });
+
+      renderPage();
+
+      const editBtn = await screen.findByTestId('edit-report-55');
+      expect(editBtn).toHaveAttribute('href', '/reports/55/edit');
+      expect(editBtn).toHaveTextContent('Editar');
+      expect(editBtn.className).toContain('min-h-12');
+      expect(editBtn.className).toContain('min-w-12');
+    });
+
+    it('hides Editar action on today for a worker without canEdit', async () => {
+      get.mockImplementation(async (url: string) => {
+        if (url.startsWith('/users/options')) return { users: [] };
+        return {
+          items: [
+            {
+              id: 56,
+              turno: 'tarde',
+              report_date: today,
+              notes: 'Someone else report',
+              created_at: `${today}T12:00:00.000Z`,
+              isActive: true,
+              isClosedDay: false,
+              readOnly: false,
+              canEdit: false,
+              canDeactivate: false,
+              canActivate: false,
+              canDelete: false,
+              user: { id: 2, display_name: 'Other' },
+            },
+          ],
+          pagination: { page: 1, pageSize: 30, total: 1, totalPages: 1 },
+        };
+      });
+
+      renderPage();
+
+      await screen.findByTestId('report-card-56');
+      expect(screen.queryByTestId('edit-report-56')).toBeNull();
+    });
+
+    it('hides Editar action on past dates even if canEdit flag is true', async () => {
+      get.mockImplementation(async (url: string) => {
+        if (url.startsWith('/users/options')) return { users: [] };
+        return {
+          items: [
+            {
+              id: 57,
+              turno: 'tarde',
+              report_date: '2026-10-01',
+              notes: 'Past report',
+              created_at: '2026-10-01T12:00:00.000Z',
+              isActive: true,
+              isClosedDay: true,
+              readOnly: true,
+              canEdit: true,
+              canDeactivate: true,
+              canActivate: false,
+              canDelete: false,
+              user: { id: 1, display_name: 'Wilkin' },
+            },
+          ],
+          pagination: { page: 1, pageSize: 30, total: 1, totalPages: 1 },
+        };
+      });
+
+      renderPage();
+
+      await screen.findByTestId('report-card-57');
+      expect(screen.queryByTestId('edit-report-57')).toBeNull();
+    });
+  });
 });

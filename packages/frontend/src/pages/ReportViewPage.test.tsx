@@ -99,7 +99,7 @@ describe('ReportViewPage after a save', () => {
     expect(screen.queryByTestId('export-pdf-btn')).toBeNull();
   });
 
-  it('opens the share card, read-only, for whoever comes from the history', async () => {
+  it('opens the share card, read-only, for whoever comes from the history on a past day', async () => {
     renderAt('/reports/5?share=1');
 
     // El histórico abre el reporte como el mensaje que es: la misma tarjeta, sin Editar y con Volver.
@@ -109,6 +109,42 @@ describe('ReportViewPage after a save', () => {
     expect(screen.queryByTestId('report-share-edit')).toBeNull();
     expect(screen.getByTestId('report-share-close')).toBeTruthy();
     expect(screen.queryByTestId('export-pdf-btn')).toBeNull();
+  });
+
+  it('shows Editar on the share card from history when the report is today and canEdit is true', async () => {
+    const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+    const todayReport = { ...REPORT, id: 99, report_date: today, canEdit: true };
+    get.mockImplementation(async (url: string) => {
+      if (url === '/reports/99') return { report: todayReport };
+      if (url === '/reports/99/photos') return { photos: [] };
+      if (url === '/reports/99/export') return { text: '🌅 *RELATÓRIO — HOJE*' };
+      if (url.startsWith('/reports/categories')) return { categories: [] };
+      return { date: today, operators: [], products: [], launches: [], rows: [], receipts: [], lines: [] };
+    });
+
+    renderAt('/reports/99?share=1');
+
+    await waitFor(() => expect(screen.getByTestId('report-share-card')).toBeTruthy());
+    expect(screen.getByTestId('report-share-back')).toHaveAttribute('href', '/loading/reports-history');
+    expect(screen.getByTestId('report-share-edit')).toBeTruthy();
+  });
+
+  it('hides Editar on the share card from history when the report is today but canEdit is false', async () => {
+    const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+    const todayReport = { ...REPORT, id: 98, report_date: today, canEdit: false };
+    get.mockImplementation(async (url: string) => {
+      if (url === '/reports/98') return { report: todayReport };
+      if (url === '/reports/98/photos') return { photos: [] };
+      if (url === '/reports/98/export') return { text: '🌅 *RELATÓRIO — HOJE*' };
+      if (url.startsWith('/reports/categories')) return { categories: [] };
+      return { date: today, operators: [], products: [], launches: [], rows: [], receipts: [], lines: [] };
+    });
+
+    renderAt('/reports/98?share=1');
+
+    await waitFor(() => expect(screen.getByTestId('report-share-card')).toBeTruthy());
+    expect(screen.getByTestId('report-share-back')).toHaveAttribute('href', '/loading/reports-history');
+    expect(screen.queryByTestId('report-share-edit')).toBeNull();
   });
 
   it('keeps the reading view for whoever opens the report by its own URL', async () => {

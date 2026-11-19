@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { LucideEye, LucideCalendar, LucideTrash2, LucideBan, LucideRotateCcw } from 'lucide-react';
+import { LucideEye, LucideCalendar, LucideTrash2, LucideBan, LucideRotateCcw, LucidePencil } from 'lucide-react';
 import { api } from '../api/client';
 import { saoPauloToday } from '../lib/date';
 import { Button } from '../components/ui/button';
@@ -185,6 +185,18 @@ export function ReportHistoryPage() {
                 >
                   <LucideEye className="h-4 w-4" />
                 </Link>
+                {r.canEdit && r.report_date === today && (
+                  <Link
+                    to={`/reports/${r.id}/edit`}
+                    aria-label={t('reports.editTitle')}
+                    title={t('reports.editTitle')}
+                    className="inline-flex min-h-12 min-w-12 items-center justify-center gap-1.5 rounded px-2 text-sm font-medium text-blue-600 hover:bg-blue-50"
+                    data-testid={`edit-report-${r.id}`}
+                  >
+                    <LucidePencil className="h-4 w-4" />
+                    <span>{t('reports.editTitle')}</span>
+                  </Link>
+                )}
                 {affordances.showReactivate && <button onClick={() => activateReport(r.id)} disabled={busyId === r.id} aria-label={t('history.reactivateReport', { date: formatDate(r.report_date) })} className="inline-flex min-h-12 min-w-12 items-center justify-center rounded text-emerald-600 hover:bg-emerald-50 disabled:opacity-50" data-testid={`activate-report-${r.id}`}><LucideRotateCcw className="h-4 w-4" /></button>}
                 {affordances.showDeactivate && <button onClick={() => deactivateReport(r.id)} disabled={busyId === r.id} aria-label={t('history.deactivateReport', { date: formatDate(r.report_date) })} className="inline-flex min-h-12 min-w-12 items-center justify-center rounded text-amber-600 hover:bg-amber-50 disabled:opacity-50" data-testid={`deactivate-report-${r.id}`}><LucideBan className="h-4 w-4" /></button>}
                 {affordances.showDelete && <button onClick={() => setPendingDelete(r)} disabled={busyId === r.id} aria-label={t('history.deleteReport', { date: formatDate(r.report_date) })} className="inline-flex min-h-12 min-w-12 items-center justify-center rounded text-red-600 hover:bg-red-50 disabled:opacity-50" data-testid={`delete-report-${r.id}`}><LucideTrash2 className="h-4 w-4" /></button>}
