@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -148,12 +149,19 @@ fun SalidaHistoryScreen(
         }
     }
 
-    Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-        // El mismo header que los demás históricos: título, contador y ayuda.
+    // Un solo scroll para el día entero: el encabezado, el estado, las tarjetas de movimientos y, al final, el
+    // bloque de WhatsApp. Antes las tarjetas vivían dentro de su propio `Column(weight)` en un contenedor sin
+    // altura acotada -- la columna se colapsaba y el mensaje quedaba arriba, con el día invisible --.
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+    ) {
+        // El mismo header que los demás históricos, sin contador: el número de días no es lo que el operario viene
+        // a leer, y un contador arriba competía con el total del día que está adentro de cada tarjeta.
         HistoryHeader(
             title = stringResource(R.string.salida_history_title),
-            // Días, no un número suelto: «3» sobre un historial no decía tres qué.
-            subtitle = pluralStringResource(R.plurals.salida_history_days, state.history.size, state.history.size),
             // Sin «Voltar»: la barra superior tiene Lanzamiento al lado y el atrás físico cierra el archivo.
             onHelp = { showHelpDialog = true },
         )
@@ -227,8 +235,7 @@ fun SalidaHistoryScreen(
         // texto, en el idioma de la app.
         val summaryLabels = salidaSummaryLabels()
 
-        val day = days.firstOrNull { it.date == selected }
-        val movements = day?.movements.orEmpty()
+        val movements = days.firstOrNull { it.date == selected }?.movements.orEmpty()
 
         // El filtro por bloque es de la pantalla y no del servidor: los movimientos del día ya están acá.
         var block by remember { mutableStateOf<String?>(null) }
@@ -275,14 +282,9 @@ fun SalidaHistoryScreen(
             Spacer(Modifier.height(8.dp))
         }
 
-        Text(
-            text = stringResource(R.string.salida_units_format, day?.totalUnits ?: 0),
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(bottom = 8.dp).testTag("salida-history-total"),
-        )
-
-        Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+        // Sin total suelto encima de las tarjetas: cada tarjeta ya dice sus unidades y su total, y el número
+        // grande arriba -- «13 un» -- se leía como el total del día sin decir de qué.
+        Column(modifier = Modifier.fillMaxWidth()) {
             movements
                 .filter { movement -> block == null || movement.items.any { it.block.value == block } }
                 .forEach { movement ->

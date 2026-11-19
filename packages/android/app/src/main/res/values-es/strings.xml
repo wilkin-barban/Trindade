@@ -1114,10 +1114,6 @@
         <item quantity="one">%1$d día registrado</item>
         <item quantity="other">%1$d días registrados</item>
     </plurals>
-    <plurals name="salida_history_days">
-        <item quantity="one">%1$d día</item>
-        <item quantity="other">%1$d días</item>
-    </plurals>
     <plurals name="massas_history_boxes">
         <item quantity="one">%1$d caja</item>
         <item quantity="other">%1$d cajas</item>
