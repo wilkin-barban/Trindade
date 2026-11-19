@@ -666,3 +666,12 @@ Todo pendiente al abrir esta sección; se cierra por slices con su commit.
   `docs/paridad-android-web.md` (Horario de Cargamento). Evidencia: `:app:testDebugUnitTest` verde, 159+ pruebas
   del paquete `loading` incluidas las nuevas de la grilla y de la pantalla de compartir.
 - **Pendiente**: P0-2, P1-3, P1-4, P1-5, P1-7.
+
+- **P0-2 · hecho (`6a0a5927`)** — el día que abre el Historial de Massas dejó la barra de la pestaña y trae la
+  suya: **Histórico de Massas**, **Voltar** siempre visible (hoy incluido; antes sólo en el pasado) y las fechas
+  rápidas **Hoje + 5 anteriores + Todas as datas**, con `MassasHistoryDayHeader` fuera del ViewModel para poder
+  probarse. Las cinco anteriores salen del calendario, no del listado: esta superficie abre un día, no el
+  archivo, y un día sin lanzamientos tiene su estado vacío. El día elegido viaja a `MainActivity`
+  (`onSelectDay`), así que sobrevive a salir de la pestaña. La grilla sigue ausente en `MassasOrigin.HISTORY`;
+  producción, filtros, ERP y share quedan como estaban, y el pasado sigue read-only. Evidencia: lane `massas`
+  (139 pruebas, incluida `MassasHistoryDayHeaderTest`) y suite Android completa verdes.
