@@ -51,6 +51,7 @@ const SUMMARY = {
   schedulesTotal: 9,
   latestReportId: 33,
   latestReportCanEdit: true,
+  activeScheduleCanEdit: true,
   higieneDone: 3,
   higieneTotal: 5,
   recepcionDone: 2,
@@ -104,6 +105,27 @@ describe('DashboardPage', () => {
     renderPage();
     await waitFor(() => expect(screen.getByTestId('dashboard-report-share')).toBeInTheDocument());
     expect(screen.queryByTestId('dashboard-report-edit')).toBeNull();
+  });
+
+  it('offers Compartir and Editar on the schedule card, the second only when allowed', async () => {
+    renderPage();
+
+    await waitFor(() => expect(screen.getByTestId('dashboard-share-active-schedule')).toBeInTheDocument());
+    expect(screen.getByTestId('dashboard-share-active-schedule').getAttribute('href')).toBe(
+      '/loading?share=1&date=2026-10-30',
+    );
+    expect(screen.getByTestId('dashboard-active-schedule-edit').getAttribute('href')).toBe(
+      '/loading/edit?date=2026-10-30',
+    );
+
+    cleanup();
+    get.mockImplementation(async (url: string) => {
+      if (url.startsWith('/dashboard/summary')) return { ...SUMMARY, activeScheduleCanEdit: false };
+      return { text: 'horario' };
+    });
+    renderPage();
+    await waitFor(() => expect(screen.getByTestId('dashboard-share-active-schedule')).toBeInTheDocument());
+    expect(screen.queryByTestId('dashboard-active-schedule-edit')).toBeNull();
   });
 
   it('draws the seven cards in the phone order, and not the counting history', async () => {

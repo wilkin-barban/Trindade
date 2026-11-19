@@ -22,6 +22,8 @@ interface DashboardSummary {
   latestReportId: number | null;
   /** Lo decide el servidor: dueño o administrador del reporte de hoy. */
   latestReportCanEdit: boolean;
+  /** Lo mismo para el lote de carga que la tarjeta del cronograma muestra. */
+  activeScheduleCanEdit: boolean;
   higieneDone: number;
   higieneTotal: number;
   recepcionDone: number;
@@ -280,6 +282,28 @@ export function DashboardPage() {
             </div>
           }
           icon="🚛"
+          actions={
+            summary?.activeScheduleBatchDate ? (
+              <>
+                <Link
+                  to={`/loading?share=1&date=${summary.activeScheduleBatchDate}`}
+                  className="text-xs text-green-700 hover:underline"
+                  data-testid="dashboard-share-active-schedule"
+                >
+                  {t('dashboard.shareSchedule')}
+                </Link>
+                {summary.activeScheduleCanEdit && (
+                  <Link
+                    to={`/loading/edit?date=${summary.activeScheduleBatchDate}`}
+                    className="text-xs text-blue-600 hover:underline"
+                    data-testid="dashboard-active-schedule-edit"
+                  >
+                    {t('loading.edit')}
+                  </Link>
+                )}
+              </>
+            ) : null
+          }
         />
         {/* Las masas: la tarjeta no es un enlace porque tiene dos puertas. Envolverla en una y dejar la del
             histórico adentro era un ancla dentro de otra, y el navegador se queda con la de afuera. */}

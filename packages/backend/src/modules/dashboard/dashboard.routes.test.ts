@@ -49,6 +49,7 @@ describe('Dashboard Routes', () => {
     // Sin reporte no hay nada que editar, y el resumen lo dice con un booleano, no con la ausencia del campo.
     assert.strictEqual(typeof body.latestReportCanEdit, 'boolean');
     assert.strictEqual(body.latestReportCanEdit, false);
+    assert.strictEqual(typeof body.activeScheduleCanEdit, 'boolean');
     assert.strictEqual(typeof body.higieneDone, 'number');
     assert.strictEqual(typeof body.higieneTotal, 'number');
     assert.strictEqual(typeof body.recepcionDone, 'number');
@@ -129,6 +130,41 @@ describe('Dashboard Routes', () => {
 
     const asOwner = await summaryAs(fixtures.worker);
     assert.strictEqual(asOwner.latestReportCanEdit, true, 'el dueño del reporte también');
+  });
+
+  it('says who may edit the active loading batch: its author or an administrator', async (t) => {
+    // El lote de carga lo prepara un trabajador y un administrador lo puede corregir; otro trabajador no.
+    t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-09-01T15:00:00.000Z') }); // Tuesday 12:00 in São Paulo
+    t.after(() => t.mock.timers.reset());
+
+    const summaryAs = async (payload: { username: string; password: string }) => {
+      const login = await app.inject({ method: 'POST', url: '/api/auth/login', payload });
+      const { token } = JSON.parse(login.body);
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/dashboard/summary',
+        headers: { authorization: `Bearer ${token}` },
+      });
+      return JSON.parse(response.body) as { activeScheduleCanEdit: boolean; activeScheduleBatchDate: string | null };
+    };
+
+    // Qué día es «el lote activo» depende de la hora de la planta, así que se le pregunta al resumen en vez de
+    // fijarlo en el test: el lote se guarda bajo el día en que se prepara, no bajo el día en que se carga.
+    const beforeBatch = await summaryAs(fixtures.admin);
+    assert.ok(beforeBatch.activeScheduleBatchDate, 'hay un lote en curso a esta hora');
+
+    db.exec('DELETE FROM loading_schedules');
+    // Sin chofer: lo que la tarjeta necesita es el autor del lote, no quién lo carga.
+    db.prepare(
+      `INSERT INTO loading_schedules (schedule_date, time_slot, driver_id, driver_type, user_id, is_active)
+       VALUES (?, '04:00', NULL, 'casa', 2, 1)`,
+    ).run(beforeBatch.activeScheduleBatchDate);
+
+    const asAdmin = await summaryAs(fixtures.admin);
+    assert.strictEqual(asAdmin.activeScheduleCanEdit, true, 'el administrador corrige el lote');
+
+    const asOwner = await summaryAs(fixtures.worker);
+    assert.strictEqual(asOwner.activeScheduleCanEdit, true, 'quien lo preparó también');
   });
 
   it('GET /api/dashboard/summary returns 401 without token', async () => {

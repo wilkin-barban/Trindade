@@ -38,6 +38,8 @@ export const DashboardSummarySchema = z
      * refleja y no lo calcula.
      */
     latestReportCanEdit: z.boolean(),
+    /** Si el actor puede editar el lote de carga que la tarjeta está mostrando: dueño o administrador. */
+    activeScheduleCanEdit: z.boolean(),
     higieneDone: z.number().int(),
     higieneTotal: z.number().int(),
     recepcionDone: z.number().int(),

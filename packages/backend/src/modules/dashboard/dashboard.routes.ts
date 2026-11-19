@@ -59,6 +59,20 @@ export async function dashboardRoutes(fastify: FastifyInstance) {
               )
               .get(activeBatchDate) as CountRow);
 
+      // El dueño del lote activo: la tarjeta ofrece Editar sólo a quien lo preparó o a un administrador.
+      const activeScheduleOwner =
+        activeBatchDate === null
+          ? null
+          : ((db
+              .prepare(
+                `SELECT user_id
+                 FROM loading_schedules
+                 WHERE schedule_date = ? AND is_active = 1
+                 ORDER BY id ASC
+                 LIMIT 1`
+              )
+              .get(activeBatchDate) as { user_id?: number } | undefined)?.user_id ?? null);
+
       const activeUsers = db
         .prepare(
           `SELECT COUNT(*) AS count
@@ -124,6 +138,8 @@ export async function dashboardRoutes(fastify: FastifyInstance) {
       // compararlo otra vez.
       const actor = request.user!;
       const isAdminToday = isAdmin({ sub: actor.sub, role: actor.role });
+      const activeScheduleCanEdit =
+        activeScheduleOwner !== null && (isAdminToday || activeScheduleOwner === actor.sub);
       const latestReportCanEdit =
         latestReport !== undefined &&
         (isAdminToday || (latestReport as { user_id?: number }).user_id === actor.sub);
@@ -139,6 +155,7 @@ export async function dashboardRoutes(fastify: FastifyInstance) {
         schedulesTotal: schedulesTotal.count,
         latestReportId: latestReport?.id || null,
         latestReportCanEdit,
+        activeScheduleCanEdit,
         higieneDone: higieneDone.count,
         higieneTotal: higieneTotal.count,
         recepcionDone: recepcionDone.count,
