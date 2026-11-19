@@ -181,4 +181,24 @@ test.describe('Report Builder — Element Types', () => {
     const submitBtn = page.locator('[data-testid="submit-report-btn"]');
     await expect(submitBtn).toBeVisible();
   });
+
+  test('the save bar is pinned to the bottom of the phone', async ({ page }) => {
+    // El reporte son treinta casillas y cinco temperaturas: el botón que lo cierra tiene que estar siempre en el
+    // pie, como la barra de Salida. Se comprueba la clase y que el botón quede dentro del viewport en 390 px.
+    // La barra es fija sólo en el teléfono: en escritorio vuelve al flujo del formulario a propósito.
+    await page.setViewportSize({ width: 390, height: 844 });
+    const bar = page.locator('[data-testid="report-save-bar"]');
+    await expect(bar).toBeVisible();
+    await expect(bar).toHaveClass(/fixed/);
+    await expect(bar).toHaveClass(/bottom-0/);
+
+    const viewport = page.viewportSize();
+    const box = await bar.boundingBox();
+    expect(box).not.toBeNull();
+    expect(viewport).not.toBeNull();
+    if (box && viewport) {
+      // Su borde inferior no se pasa del alto de la pantalla: el botón se ve sin scrollear.
+      expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 1);
+    }
+  });
 });

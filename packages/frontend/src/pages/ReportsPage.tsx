@@ -605,8 +605,12 @@ export function ReportsPage() {
           </div>
         )}
 
-        {/* Submit */}
-        <div className="flex justify-end">
+        {/* Submit: fijo al pie en el teléfono, como la barra de Salida y la de Masas. Un reporte son treinta
+            casillas y cinco temperaturas; el botón que lo cierra no puede estar al final de la lista. */}
+        <div
+          className="fixed inset-x-0 bottom-0 z-10 flex justify-end border-t border-gray-200 bg-white/95 px-4 py-3 backdrop-blur sm:static sm:mt-4 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none"
+          data-testid="report-save-bar"
+        >
           <Button type="submit" disabled={submitting} size="lg" data-testid="submit-report-btn">
             {submitting ? t('reports.saving') : (createdReportId ? t('reports.retryPhotoUpload') : t('reports.saveReport'))}
           </Button>

@@ -620,7 +620,10 @@ export function ReportEditPage() {
         )}
 
         {!readOnly && (
-          <div className="flex justify-end gap-3 mb-8">
+          <div
+            className="fixed inset-x-0 bottom-0 z-10 flex justify-end gap-3 border-t border-gray-200 bg-white/95 px-4 py-3 backdrop-blur sm:static sm:mb-8 sm:mt-4 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none"
+            data-testid="report-save-bar"
+          >
             <Button type="button" variant="outline" onClick={() => navigate(`/reports/${id}`)}>
               {t('ui.cancel')}
             </Button>
