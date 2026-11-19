@@ -593,6 +593,33 @@ describe('Reports Routes', () => {
     );
   });
 
+  it('PATCH /:id allows admin to edit a worker report of today, and refuses foreign worker with 403', async () => {
+    const today = getSaoPauloDateString();
+    db.prepare(
+      `INSERT INTO reports (id, user_id, turno, report_date, notes, created_at)
+       VALUES (994, ?, 'tarde', ?, 'Worker report today', datetime('now'))`
+    ).run(workerUserId, today);
+
+    // Admin can edit worker's report of today
+    const adminRes = await app.inject({
+      method: 'PATCH',
+      url: '/api/reports/994',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { notes: 'Admin edited worker report' },
+    });
+    assert.strictEqual(adminRes.statusCode, 200);
+
+    // Foreign worker (simulated by setting report owner to admin) cannot edit
+    db.prepare('UPDATE reports SET user_id = ? WHERE id = 994').run(adminUserId);
+    const foreignRes = await app.inject({
+      method: 'PATCH',
+      url: '/api/reports/994',
+      headers: { authorization: `Bearer ${workerToken}` },
+      payload: { notes: 'Foreign worker edit' },
+    });
+    assert.strictEqual(foreignRes.statusCode, 403);
+  });
+
   // ---- Export ----
 
   it('GET /:id/export generates WhatsApp text in Portuguese', async () => {

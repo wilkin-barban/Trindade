@@ -130,9 +130,16 @@ export function projectHistoryPermissions(
 ) {
   const active = row.is_active === undefined || row.is_active === null ? true : Boolean(row.is_active);
   const { isClosedDay, eraseClosed } = closedForErasing(row, now);
+  const todayStr = getSaoPauloDateString(now);
+  const rowDate = row.day_date || row.erase_day_date || (row.created_at ? getSaoPauloDateString(parseSqliteDate(row.created_at)) : null);
+  const isToday = rowDate === todayStr;
+
+  const isOwnerWithinWindow = row.user_id === actor.sub && isWithinEditWindow(window, row.created_at, now);
+  const isAdminToday = isAdmin(actor) && isToday;
+
   // The calendar wins over the clock: a row dated before today is read-only even for its creator
   // inside the edit window, and even for the administrator who could otherwise erase it.
-  const canEdit = !isClosedDay && active && row.user_id === actor.sub && isWithinEditWindow(window, row.created_at, now);
+  const canEdit = !isClosedDay && active && (isOwnerWithinWindow || isAdminToday);
   const canDeactivate = isAdmin(actor) && active;
   // Erasing a row is narrower than retiring it: whoever the actor is, a day that is already past
   // cannot lose content, and an operator erases only what they wrote. A flag that ignored authorship

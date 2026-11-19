@@ -200,4 +200,47 @@ describe('history permissions', () => {
       true
     );
   });
+
+  describe('canEdit authorization on today, past days, and closed days', () => {
+    const todayStr = '2026-08-24';
+    const pastStr = '2026-08-20';
+    const owner = { sub: 10, role: 'Trabalhador' };
+    const admin = { sub: 99, role: 'Administrador' };
+    const foreignWorker = { sub: 20, role: 'Trabalhador' };
+
+    it('loading schedule: owner yes, admin yes on today, foreign worker no, everyone no on past day', () => {
+      const todayLoading = { user_id: 10, created_at: '2026-08-24T11:45:00.000Z', is_active: 1, day_date: todayStr };
+      const pastLoading = { user_id: 10, created_at: '2026-08-20T11:45:00.000Z', is_active: 1, day_date: pastStr };
+
+      // Owner within 1 hour on today: canEdit = true
+      assert.strictEqual(projectHistoryPermissions(owner, todayLoading, 'one-hour', now).canEdit, true);
+      // Admin on today (even if not owner): canEdit = true
+      assert.strictEqual(projectHistoryPermissions(admin, todayLoading, 'one-hour', now).canEdit, true);
+      // Foreign worker on today: canEdit = false
+      assert.strictEqual(projectHistoryPermissions(foreignWorker, todayLoading, 'one-hour', now).canEdit, false);
+
+      // On a past / closed day: everyone no
+      assert.strictEqual(projectHistoryPermissions(owner, pastLoading, 'one-hour', now).canEdit, false);
+      assert.strictEqual(projectHistoryPermissions(admin, pastLoading, 'one-hour', now).canEdit, false);
+      assert.strictEqual(projectHistoryPermissions(foreignWorker, pastLoading, 'one-hour', now).canEdit, false);
+      assert.strictEqual(projectHistoryPermissions(admin, pastLoading, 'one-hour', now).isClosedDay, true);
+    });
+
+    it('reports: owner yes, admin yes on today, foreign worker no, everyone no on past day', () => {
+      const todayReport = { user_id: 10, created_at: '2026-08-24T10:00:00.000Z', is_active: 1, erase_day_date: todayStr };
+      const pastReport = { user_id: 10, created_at: '2026-08-15T10:00:00.000Z', is_active: 1, erase_day_date: pastStr };
+
+      // Owner within window on today: canEdit = true
+      assert.strictEqual(projectHistoryPermissions(owner, todayReport, 'sao-paulo-current-and-previous-day', now).canEdit, true);
+      // Admin on today: canEdit = true
+      assert.strictEqual(projectHistoryPermissions(admin, todayReport, 'sao-paulo-current-and-previous-day', now).canEdit, true);
+      // Foreign worker on today: canEdit = false
+      assert.strictEqual(projectHistoryPermissions(foreignWorker, todayReport, 'sao-paulo-current-and-previous-day', now).canEdit, false);
+
+      // Past day beyond window: everyone no
+      assert.strictEqual(projectHistoryPermissions(owner, pastReport, 'sao-paulo-current-and-previous-day', now).canEdit, false);
+      assert.strictEqual(projectHistoryPermissions(admin, pastReport, 'sao-paulo-current-and-previous-day', now).canEdit, false);
+      assert.strictEqual(projectHistoryPermissions(foreignWorker, pastReport, 'sao-paulo-current-and-previous-day', now).canEdit, false);
+    });
+  });
 });

@@ -378,6 +378,31 @@ describe('Loading Schedule Routes', () => {
     assert.strictEqual(ownRes.statusCode, 204);
   });
 
+  it('allows admin to edit worker schedule today, and denies foreign worker with 403', async () => {
+    const workerToken = await loginAs(app, fixtures.worker.username, fixtures.worker.password);
+    const driverId = seedDriver(db, 'Admin Edit Worker Driver', 'A-WRK-1');
+    db.prepare(`INSERT INTO loading_schedules (id, schedule_date, time_slot, driver_id, driver_type, user_id, created_at) VALUES (9299, ?, '04:00', ?, 'fletero', ?, datetime('now'))`).run(TODAY, driverId, fixtures.worker.id);
+
+    // Admin can edit worker's schedule on today
+    const adminRes = await app.inject({
+      method: 'PATCH',
+      url: '/api/loading/schedules/9299',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { time_slot: '05:00' },
+    });
+    assert.strictEqual(adminRes.statusCode, 200);
+
+    // Another worker (simulated by updating row ownership to admin so worker is foreign) is denied
+    db.prepare('UPDATE loading_schedules SET user_id = ? WHERE id = 9299').run(fixtures.admin.id);
+    const foreignRes = await app.inject({
+      method: 'PATCH',
+      url: '/api/loading/schedules/9299',
+      headers: { authorization: `Bearer ${workerToken}` },
+      payload: { time_slot: '06:00' },
+    });
+    assert.strictEqual(foreignRes.statusCode, 403);
+  });
+
   it('refuses every write dated before today with LOADING_HISTORY_FROZEN', async () => {
     const driverId = seedDriver(db, 'Past Day Driver', 'PST-1');
     db.prepare(`INSERT INTO loading_schedules (id, schedule_date, time_slot, driver_id, driver_type, user_id) VALUES (9204, ?, '04:00', ?, 'fletero', ?)`).run(YESTERDAY, driverId, fixtures.admin.id);
