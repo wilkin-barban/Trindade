@@ -1047,7 +1047,11 @@
     "erpSync": "Sincronizar com ERP",
     "erpSyncRequested": "Lendo as saídas do ERP…",
     "erpSyncUnavailable": "O ERP não está configurado neste dispositivo.",
-    "sharePhotoAlt": "Foto {{count}}"
+    "sharePhotoAlt": "Foto {{count}}",
+    "delete": "Excluir",
+    "deleteDone": "Movimento excluído.",
+    "deleteFailed": "Não foi possível excluir o movimento.",
+    "deleteConfirmTitle": "Excluir saída de {{date}}"
   },
   "stock": {
     "add": "Adicionar",

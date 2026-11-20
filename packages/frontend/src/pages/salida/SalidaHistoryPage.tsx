@@ -10,15 +10,18 @@ import { HistoryDayPanel, type HistoryDay } from '../../components/ui/HistoryDay
 import { ModuleHelpModal, type HelpSection } from '../../components/ui/ModuleHelpModal';
 import { SalidaBlockFilter, SalidaMovementCard } from '../../components/salida/SalidaMovementCard';
 import { SalidaWhatsAppShare } from '../../components/salida/SalidaWhatsAppShare';
+import { MessageDialog } from '../../components/ui/message-dialog';
+import { ConfirmDialog } from '../../components/ui/confirm-dialog';
 import { aeroSettingsReady, type AeroSettings } from '../../lib/aero-integration';
 import { fetchAeroVaultSettings } from '../../lib/aero-vault';
 import { lastSyncLabel, readAeroMovementsSnapshot, triggerAeroMovementsSync } from '../../lib/aero-mirror';
 import { SalidaReportSection, type SalidaReportDay } from '../../components/reports/SalidaReportSection';
+import { salidaOffersDelete } from '../../lib/salida';
 import {
   SalidaSuccessDialog,
   type SalidaErpOutcome,
 } from '../../components/salida/SalidaSuccessDialog';
-import { saoPauloDaysAgo, saoPauloToday } from '../../lib/date';
+import { formatDateLabel, saoPauloDaysAgo, saoPauloToday } from '../../lib/date';
 import {
   aeroBridgeCallbackFor,
   buildAeroBridgeTriggerUrl,
@@ -241,6 +244,32 @@ export function SalidaHistoryPage() {
     const raw = day?.movements ?? [];
     return filterSessionMovements(raw, user?.username);
   }, [day, user?.username]);
+
+  /**
+   * Retirar un borrador que el ERP no confirmó.
+   *
+   * La confirmación es un paso propio y el resultado se dice en su ventana: la lista cambia debajo, y una franja
+   * dentro de ella se lee como parte del día que se está mirando.
+   */
+  const [deleteTarget, setDeleteTarget] = useState<SalidaMovement | null>(null);
+  const [noticeDialog, setNoticeDialog] = useState<{ tone: 'success' | 'error'; message: string } | null>(null);
+
+  const confirmDeleteMovement = useCallback(async () => {
+    const target = deleteTarget;
+    if (!target) return;
+    setDeleteTarget(null);
+    try {
+      await api.del(`/salida/${target.id}`);
+      setNoticeDialog({ tone: 'success', message: t('salida.deleteDone', 'Movimento excluído.') });
+      await load();
+      setErpRefetchKey((key) => key + 1);
+    } catch (error) {
+      setNoticeDialog({
+        tone: 'error',
+        message: error instanceof Error ? error.message : t('salida.deleteFailed', 'Não foi possível excluir o movimento.'),
+      });
+    }
+  }, [deleteTarget, load, t]);
 
   const visibleMovements = useMemo(() => {
     if (block === 'all') return dayMovements;
@@ -566,18 +595,13 @@ export function SalidaHistoryPage() {
         </div>
       </div>
 
-      {notice && (
-        <p
-          role="status"
-          className={`rounded-lg border px-3 py-2 text-sm ${
-            notice.type === 'success'
-              ? 'border-green-200 bg-green-50 text-green-800'
-              : 'border-red-200 bg-red-50 text-red-800'
-          }`}
-        >
-          {notice.message}
-        </p>
-      )}
+      <MessageDialog
+        open={notice !== null}
+        tone={notice?.type === 'success' ? 'success' : 'error'}
+        message={notice?.message ?? ''}
+        onClose={() => setNotice(null)}
+        testId="salida-history-notice"
+      />
 
       <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
         <HistoryDayPanel
@@ -649,6 +673,7 @@ export function SalidaHistoryPage() {
               resending={resendingId === movement.id}
               readOnly={isReadOnly}
               canManagePhotos={movement.username === user?.username}
+              onDelete={salidaOffersDelete(movement, user?.username, Boolean(user?.role === 'Administrador')) ? setDeleteTarget : undefined}
             />
           ))}
         </div>
@@ -677,18 +702,37 @@ export function SalidaHistoryPage() {
               </span>
             </span>
           </div>
-          {erpNote && (
-            <p className="text-xs text-gray-500" data-testid="salida-history-erp-note">
-              {erpNote}
-            </p>
-          )}
+          <MessageDialog
+            open={erpNote !== null}
+            message={erpNote ?? ''}
+            onClose={() => setErpNote(null)}
+            testId="salida-history-erp-note"
+          />
           <SalidaReportSection
             date={date}
             refetchKey={erpRefetchKey}
             onDayLoaded={(day) => setErpDay(day)}
+            onLoadError={(message) => setErpNote(message)}
           />
         </div>
       )}
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => void confirmDeleteMovement()}
+        title={t('salida.deleteConfirmTitle', 'Excluir saída de {{date}}', {
+          date: deleteTarget ? formatDateLabel(deleteTarget.movement_date) : '',
+        })}
+        panelTestId="salida-delete-confirm"
+      />
+      <MessageDialog
+        open={noticeDialog !== null}
+        tone={noticeDialog?.tone ?? 'success'}
+        message={noticeDialog?.message ?? ''}
+        onClose={() => setNoticeDialog(null)}
+        testId="salida-delete-result"
+      />
 
       {/* WhatsApp share block modelled on MassasWhatsAppShare (T3) */}
       <div className="space-y-2">

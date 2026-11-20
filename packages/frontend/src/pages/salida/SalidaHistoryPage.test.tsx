@@ -1008,4 +1008,66 @@ describe('SalidaHistoryPage — T3 per-movement state, relaunch, operator filter
     expect(screen.getByTestId('salida-share-day')).toBeDisabled();
   });
 
+
+  /**
+   * Un borrador se retira con confirmación, y el resultado se lee en una ventana.
+   *
+   * La tarjeta ya no esconde la acción en un menú: el botón aparece sólo cuando el servidor la va a aceptar, la
+   * confirmación dice de qué movimiento se trata y el resultado -- éxito o rechazo -- se cierra a mano. Nada queda
+   * escrito dentro del día, porque la lista cambia debajo.
+   */
+  it('withdraws a draft after confirmation and answers in a dialog', async () => {
+    await renderReady();
+
+    fireEvent.click(screen.getByTestId('salida-delete-2'));
+
+    // La confirmación nombra el movimiento; el borrado no salió antes de confirmarlo.
+    const confirm = await screen.findByTestId('salida-delete-confirm');
+    expect(within(confirm).getByText('Excluir salida del 13/11/2026')).toBeTruthy();
+    expect(del).not.toHaveBeenCalled();
+
+    del.mockResolvedValue({ success: true });
+    fireEvent.click(within(confirm).getByText('Eliminar permanentemente'));
+
+    await waitFor(() => expect(del).toHaveBeenCalledWith('/salida/2'));
+    const result = await screen.findByTestId('salida-delete-result');
+    expect(within(result).getByText('Movimiento excluido.')).toBeTruthy();
+    // Y no hay franja inline con el mismo mensaje.
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('explains a refused delete in the same dialog, with the server sentence', async () => {
+    await renderReady();
+
+    fireEvent.click(screen.getByTestId('salida-delete-2'));
+    const confirm = await screen.findByTestId('salida-delete-confirm');
+    del.mockRejectedValue(new Error('Esta saída já foi confirmada pelo ERP e não pode ser excluída'));
+    fireEvent.click(within(confirm).getByText('Eliminar permanentemente'));
+
+    const result = await screen.findByTestId('salida-delete-result');
+    expect(within(result).getByText('Esta saída já foi confirmada pelo ERP e não pode ser excluída')).toBeTruthy();
+  });
+
+  /**
+   * Un fallo de sync o de red no se dibuja debajo del botón.
+   *
+   * El botón del espejo falla por credenciales, por el Wi-Fi de la planta o porque el ERP rechazó: la frase se lee
+   * en una ventana que el operario cierra, igual que el resto de las respuestas de la app.
+   */
+  it('opens the sync failure in a dialog instead of a note under the button', async () => {
+    get.mockImplementation(async (url: string) => {
+      if (url === '/salida/history') return history();
+      if (url === '/aero/vault/settings') return { configured: false };
+      return {};
+    });
+
+    await renderReady();
+    fireEvent.click(screen.getByTestId('salida-history-erp-sync'));
+
+    const dialog = await screen.findByTestId('salida-history-erp-note');
+    expect(within(dialog).getByText('El ERP no está configurado en este dispositivo.')).toBeTruthy();
+    // La nota ya no vive como un párrafo de la pantalla: el diálogo es su único lugar.
+    expect(screen.queryByText('El ERP no está configurado en este dispositivo.', { selector: 'p.text-xs' })).toBeNull();
+  });
+
 });

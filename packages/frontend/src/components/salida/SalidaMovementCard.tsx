@@ -39,6 +39,11 @@ export function SalidaMovementCard({
   readOnly = false,
   /** Las fotos son de quien lanzó el movimiento: las de otro operario se ven y no se tocan. */
   canManagePhotos = true,
+  /**
+   * Retirar un borrador. La pantalla lo pasa sólo cuando el servidor lo va a aceptar -- el dueño o el
+   * Administrador, y el ERP sin confirmar -- y abre la confirmación.
+   */
+  onDelete,
 }: {
   movement: SalidaMovement;
   timeLabel: string;
@@ -48,6 +53,7 @@ export function SalidaMovementCard({
   resending?: boolean;
   readOnly?: boolean;
   canManagePhotos?: boolean;
+  onDelete?: (movement: SalidaMovement) => void;
 }) {
   const { t } = useTranslation();
   // The retention cleanup deletes the file and its row together, so a card drawn from a cached page can point at
@@ -302,6 +308,24 @@ export function SalidaMovementCard({
                 {resending ? t('salida.resendingErp') : t('salida.resendErp')}
               </Button>
             )}
+          </div>
+        )}
+
+        {/* Retirar el borrador no depende de las fotos ni del share: el servidor acepta al dueño o al
+            Administrador mientras el ERP no confirmó, y la pantalla decide si lo ofrece. */}
+        {!readOnly && onDelete && (
+          <div className="mt-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => onDelete(movement)}
+              className="min-h-[44px] w-full text-red-600 hover:bg-red-50 sm:w-auto"
+              data-testid={`salida-delete-${movement.id}`}
+            >
+              <Trash2 className="h-4 w-4" />
+              {t('salida.delete')}
+            </Button>
           </div>
         )}
       </CardContent>

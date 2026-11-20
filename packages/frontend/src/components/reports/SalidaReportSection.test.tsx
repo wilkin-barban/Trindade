@@ -69,10 +69,13 @@ describe('SalidaReportSection', () => {
 
   it('tells the reader when the day could not be read, without pretending it was empty', async () => {
     get.mockRejectedValue(new Error('offline'));
+    const onLoadError = vi.fn();
 
-    render(<SalidaReportSection date="2026-11-16" />);
+    render(<SalidaReportSection date="2026-11-16" onLoadError={onLoadError} />);
 
-    await waitFor(() => expect(screen.getByTestId('salida-report-error')).toBeTruthy());
+    // El fallo no se dibuja como una franja del día: la sección avisa a la pantalla, que lo explica en su ventana.
+    await waitFor(() => expect(onLoadError).toHaveBeenCalledWith('salida.historyLoadError'));
+    expect(screen.queryByTestId('salida-report-error')).toBeNull();
     expect(screen.queryByTestId('salida-report-empty')).toBeNull();
   });
   it('marks the operator the company recorded on its own, with no launch here', async () => {

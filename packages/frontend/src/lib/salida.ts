@@ -1253,3 +1253,23 @@ export function clearSalidaLastMovement(storage: StorageLike | null = safeStorag
     /* nothing to forget */
   }
 }
+
+/**
+ * Si un borrador se puede retirar.
+ *
+ * La regla es del servidor y la pantalla sólo evita ofrecer lo que va a rechazar: el dueño o el Administrador, y el
+ * ERP sin confirmar. `sent` y `partial` son hechos de la empresa; un movimiento sin veredicto o `failed` es un
+ * borrador local.
+ */
+export function salidaOffersDelete(
+  movement: SalidaMovement,
+  viewerUsername: string | null | undefined,
+  isAdmin: boolean,
+): boolean {
+  const status = movement.erp?.status ?? null;
+  if (status === 'sent' || status === 'partial') return false;
+  if (isAdmin) return true;
+  const username = viewerUsername?.trim();
+  if (!username) return false;
+  return movement.username.localeCompare(username, undefined, { sensitivity: 'accent' }) === 0;
+}

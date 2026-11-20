@@ -47,6 +47,7 @@ export function SalidaReportSection({
   hideRefresh = false,
   refetchKey = 0,
   onDayLoaded,
+  onLoadError,
 }: {
   /** The report's own day: the salidas are read for the same date the report covers. */
   date: string;
@@ -54,11 +55,17 @@ export function SalidaReportSection({
   refetchKey?: number;
   /** El día que la sección leyó, para que quien la monta pueda sumarlo a su mensaje sin volver a pedirlo. */
   onDayLoaded?: (day: SalidaReportDay | null) => void;
+  /** La lectura del día falló: la pantalla lo dice en su ventana, con la frase del catálogo. */
+  onLoadError?: (message: string) => void;
 }) {
   const { t } = useTranslation();
   const [day, setDay] = useState<SalidaReportDay | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+  // El fallo de la lectura es de la pantalla que montó la sección: se explica en una ventana, no en una franja que
+  // parece parte del día.
+  const onLoadErrorRef = useRef(onLoadError);
+  onLoadErrorRef.current = onLoadError;
   const [refreshKey, setRefreshKey] = useState(0);
 
   // El aviso al padre vive en una ref: si dependiera de una función que él recrea, cada lectura cambiaría el
@@ -74,12 +81,14 @@ export function SalidaReportSection({
       setDay(body);
       onDayLoadedRef.current?.(body);
     } catch {
-      // A report is still readable without this block; it says so instead of pretending the day had nothing.
+      // A report is still readable without this block; the failure is told in a dialog instead of pretending the
+      // day had nothing.
       setFailed(true);
+      onLoadErrorRef.current?.(t('salida.historyLoadError'));
     } finally {
       setLoading(false);
     }
-  }, [date]);
+  }, [date, t]);
 
   useEffect(() => {
     void load();
@@ -111,12 +120,6 @@ export function SalidaReportSection({
           <div className="flex justify-center py-6" data-testid="salida-report-loading">
             <LoadingSpinner />
           </div>
-        )}
-
-        {failed && (
-          <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800" data-testid="salida-report-error">
-            {t('salida.historyLoadError')}
-          </p>
         )}
 
         {!loading && !failed && operators.length === 0 && (
