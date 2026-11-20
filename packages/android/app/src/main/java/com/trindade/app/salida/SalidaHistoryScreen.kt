@@ -810,12 +810,14 @@ internal fun SalidaMovementCard(
                         row.forEach { action ->
                             OutlinedButton(
                                 onClick = action.onClick,
+                                // El primario del tema es el rojo de la marca: usarlo acá pintaba de rojo las cuatro
+                                // acciones. Sólo la destructiva es roja; las demás van en el tono neutro de la
+                                // superficie, como los botones de las tarjetas de Masas.
                                 colors = ButtonDefaults.outlinedButtonColors(
-                                    contentColor = if (action.destructive) {
-                                        MaterialTheme.colorScheme.error
-                                    } else {
-                                        MaterialTheme.colorScheme.primary
-                                    },
+                                    contentColor = salidaActionContentColor(
+                                        destructive = action.destructive,
+                                        colors = MaterialTheme.colorScheme,
+                                    ),
                                 ),
                                 contentPadding = PaddingValues(horizontal = 8.dp),
                                 modifier = Modifier
@@ -857,3 +859,14 @@ internal fun SalidaNoticeDialog(
         onDismiss = onDismiss,
     )
 }
+
+/**
+ * El color del texto de una acción de la tarjeta.
+ *
+ * El rojo es del error y de nada más: el color primario de la app también es rojo, así que una acción normal no
+ * puede tomarlo. Las tres acciones normales usan `onSurface`; Excluir, `error`.
+ */
+internal fun salidaActionContentColor(
+    destructive: Boolean,
+    colors: androidx.compose.material3.ColorScheme,
+): androidx.compose.ui.graphics.Color = if (destructive) colors.error else colors.onSurface
