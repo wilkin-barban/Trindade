@@ -650,6 +650,17 @@ el historial: separar las responsabilidades.
   fila propia, 44 px) y el mensaje del día suma los operarios/productos del ERP que trae `SalidaReportSection`
   (`onDayLoaded`), sin duplicar y con el mismo formato.
 
+## 26. Android: ritmo y estado vacío del Histórico de Salidas
+
+- `SalidaHistoryScreen`: un solo ritmo (`verticalArrangement = spacedBy(16.dp)`) entre panel ERP, tarjeta SAÍDAS/BAIXA,
+  estado vacío y share; fuera los `Spacer(8)` y el `padding(top = 24.dp)` ad-hoc.
+- `SalidaHistoryEmpty`: tarjeta `surfaceContainer` con icono de camión en círculo tonal, título `titleMedium`
+  semibold, ayuda `bodySmall` y CTA `Button` full-width de 48 dp con icono (`salida-empty-cta`), sólo en hoy. Los
+  textos de estado perdieron el punto final.
+- `SalidaReportCard(showEmptyText)`: el histórico apaga la frase repetida («Nenhuma saída registrada neste dia.»);
+  el Relatório la conserva. El verde de WhatsApp pasó a la paleta (`BrandWhatsApp`) por la prueba de tokens.
+- Tests: estado vacío de hoy con CTA y ayuda, pasado sin CTA, tarjeta con la frase apagada, y las suites completas.
+
 ## 25. Web: el modal de fleteros de Cargamento, con el mensaje siempre a la vista
 
 - `ScheduleExportView` usa un panel acotado (`panelClassName` con `max-h-[90vh]`, `w-[min(100%-1.5rem,44rem)]`,
