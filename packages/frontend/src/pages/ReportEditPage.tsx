@@ -103,6 +103,7 @@ export function ReportEditPage() {
   const [error, setError] = useState('');
   // Lo que responde el guardado va en una ventana; el error de carga, en la pantalla.
   const [actionMessage, setActionMessage] = useState('');
+  const [actionTitle, setActionTitle] = useState('');
   const [readOnly, setReadOnly] = useState(false);
 
   // Photo state
@@ -337,6 +338,7 @@ export function ReportEditPage() {
     });
 
     if (hasMissingTemp || activeTempTasks.length === 0) {
+      setActionTitle(t('reports.actionSaveFailedReport'));
       setActionMessage(t('reports.temperaturesRequired'));
       setSubmitting(false);
       return;
@@ -367,6 +369,7 @@ export function ReportEditPage() {
       navigate(`/reports/${id}`);
     } catch (err) {
       const message = err instanceof ApiClientError ? err.message : t('reports.updateError');
+      setActionTitle(t('reports.actionSaveFailedReport'));
       setActionMessage(message);
       if (pendingPhotos.length > 0) setPhotoError(message);
     } finally {
@@ -425,8 +428,12 @@ export function ReportEditPage() {
 
       <MessageDialog
         open={actionMessage !== ''}
+        title={actionTitle}
         message={actionMessage}
-        onClose={() => setActionMessage('')}
+        onClose={() => {
+          setActionMessage('');
+          setActionTitle('');
+        }}
         testId="report-edit-action-message"
       />
 

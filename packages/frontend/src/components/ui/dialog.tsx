@@ -27,6 +27,13 @@ interface DialogProps {
   /** Id of a short, neutral sentence explaining what the dialog is for, when one exists. */
   describedBy?: string;
   panelTestId?: string;
+  /**
+   * Clases del panel, para que cada ventana tenga su forma sin copiar el diálogo.
+   *
+   * El foco atrapado, Escape, el overlay y el retorno de foco son de acá y no se repiten en el llamador; lo que
+   * cambia de una ventana a otra es el ancho y el redondeo, y eso se pasa.
+   */
+  panelClassName?: string;
   children: ReactNode;
 }
 
@@ -42,7 +49,7 @@ interface DialogProps {
  * A dialog that only asks a question needs no description; one that explains or warns should pass
  * `describedBy`, so the sentence is announced once as context instead of being read as a name.
  */
-export function Dialog({ open, onClose, labelledBy, describedBy, panelTestId, children }: DialogProps) {
+export function Dialog({ open, onClose, labelledBy, describedBy, panelTestId, panelClassName, children }: DialogProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreRef = useRef<HTMLElement | null>(null);
   // Kept in a ref so the effect does not depend on a callback the caller recreates on every
@@ -97,7 +104,10 @@ export function Dialog({ open, onClose, labelledBy, describedBy, panelTestId, ch
         aria-labelledby={labelledBy}
         aria-describedby={describedBy}
         tabIndex={-1}
-        className="relative bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[85vh] flex flex-col"
+        className={
+          panelClassName ??
+          'relative bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[85vh] flex flex-col'
+        }
         data-testid={panelTestId}
       >
         {children}

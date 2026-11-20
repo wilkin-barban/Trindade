@@ -202,7 +202,9 @@
     "erpMovementsSubtitle": "Entradas registradas en el ERP para masas y recepción de insumos",
     "productsUnavailable": "No se pudo cargar la lista de productos del servidor. Recargá la página para volver a intentarlo.",
     "shareWhatsAppOpened": "Abrimos WhatsApp con el mensaje. Envialo desde ahí.",
-    "photoNumber": "Foto {{count}}"
+    "photoNumber": "Foto {{count}}",
+    "actionSaveFailedReport": "No se pudo guardar el relatório",
+    "actionReportSaved": "Relatório guardado"
   },
   "loading": {
     "vehiclesError": "No se pudieron cargar los vehículos.",

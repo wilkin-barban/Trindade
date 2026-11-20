@@ -245,7 +245,12 @@ describe('ReportsPage — the phone, 390 px', () => {
 
     const dialog = await screen.findByTestId('report-action-message');
     expect(dialog).toBeInTheDocument();
+    expect(dialog.textContent).toContain(i18n.t('reports.actionSaveFailedReport'));
     expect(dialog.textContent).toContain(i18n.t('reports.temperaturesRequired'));
+    // Sin banner inline en la página.
+    expect(document.querySelector('[data-testid="report-action-message"]')?.parentElement?.className).toContain(
+      'fixed',
+    );
 
     fireEvent.click(screen.getByTestId('report-action-message-close'));
     await waitFor(() => expect(screen.queryByTestId('report-action-message')).toBeNull());

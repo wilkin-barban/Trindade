@@ -63,6 +63,7 @@ export function ReportsPage() {
   // Lo que responde una acción -- guardar, sincronizar -- va en una ventana; el error de carga, en la página.
   const [actionMessage, setActionMessage] = useState('');
   const [actionTone, setActionTone] = useState<'error' | 'success'>('error');
+  const [actionTitle, setActionTitle] = useState('');
   const [photoError, setPhotoError] = useState('');
   const [pendingPhotos, setPendingPhotos] = useState<PendingPhoto[]>([]);
   const [createdReportId, setCreatedReportId] = useState<number | null>(null);
@@ -107,6 +108,7 @@ export function ReportsPage() {
       // Sin red no hay ticket que canjear ni app que abrir: se dice en el reporte y no se lanza nada.
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
         setActionTone('error');
+        setActionTitle(t('reports.actionSaveFailedReport'));
         setActionMessage(t('massas.aero.offline'));
         return;
       }
@@ -293,6 +295,7 @@ export function ReportsPage() {
 
     if (hasMissingTemp || activeTempTasks.length === 0) {
       setActionTone('error');
+      setActionTitle(t('reports.actionSaveFailedReport'));
       setActionMessage(t('reports.temperaturesRequired'));
       setSubmitting(false);
       return;
@@ -335,9 +338,11 @@ export function ReportsPage() {
     } catch (err) {
       if (err instanceof ApiClientError) {
         setActionTone('error');
+        setActionTitle(t('reports.actionSaveFailedReport'));
         setActionMessage(err.message === 'reportAlreadyExists' ? t('reports.reportAlreadyExists') : err.message);
       } else {
         setActionTone('error');
+        setActionTitle(t('reports.actionSaveFailedReport'));
         setActionMessage(t('reports.saveError'));
       }
     } finally {
@@ -460,9 +465,13 @@ export function ReportsPage() {
 
       <MessageDialog
         open={actionMessage !== ''}
+        title={actionTitle}
         message={actionMessage}
         tone={actionTone}
-        onClose={() => setActionMessage('')}
+        onClose={() => {
+          setActionMessage('');
+          setActionTitle('');
+        }}
         testId="report-action-message"
       />
 
