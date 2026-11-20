@@ -78,12 +78,30 @@ describe('LoadingSchedulePage', () => {
     // Y la vista es de solo lectura, con su vuelta al historial.
     expect(screen.getByTestId('loading-share-back')).toBeInTheDocument();
     expect(screen.queryByTestId('loading-share-edit')).toBeNull();
-    expect(get.mock.calls.some(([url]) => String(url).includes('date=2026-11-10'))).toBe(false);
+    // El export no se pide para otro día; la lectura del lote sí, porque la puerta de fleteros cuenta ese día.
+    expect(fetchExport).not.toHaveBeenCalledWith(expect.not.stringMatching('2026-11-10'));
+    expect(fetchExport).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the way to the fleteros next to the share card', async () => {
     // La puerta a los fleteros se perdió cuando la ShareCard reemplazó al diálogo: el botón de guardar abría la
-    // tarjeta y no quedaba forma de mandar el día a cada conductor. Vuelve al lado del share general.
+    // tarjeta y no quedaba forma de mandar el día a cada conductor. Vuelve al lado del share general, y sólo
+    // cuando ese día tiene un fletero con teléfono.
+    get.mockImplementation(async (url: string) => {
+      if (url.startsWith('/loading/schedules')) return { schedules: [{ driver_id: 1 }] };
+      if (url.startsWith('/loading/time-slots')) return { timeSlots: ['04:00'] };
+      if (url.startsWith('/loading/vehicles')) return { vehicles: [] };
+      if (url.startsWith('/loading/drivers')) {
+        return {
+          drivers: [
+            { id: 1, name: 'Carlos', phone: '+55 11 98888-7777', driver_type: 'fletero' },
+            { id: 4, name: 'Silvana', phone: null, driver_type: 'fletero' },
+          ],
+        };
+      }
+      return {};
+    });
+
     render(
       <MemoryRouter initialEntries={['/loading?share=1&date=2026-11-10&from=history']}>
         <LoadingSchedulePage />
@@ -99,6 +117,28 @@ describe('LoadingSchedulePage', () => {
     // teléfono, y eso lo cubre el test del propio diálogo.
     await waitFor(() => expect(screen.getByTestId('loading-export-modal')).toBeInTheDocument());
     expect(screen.getByTestId('loading-export-close')).toBeInTheDocument();
+  });
+
+  it('does not offer the fletero door when the day has nobody to reach', async () => {
+    get.mockImplementation(async (url: string) => {
+      if (url.startsWith('/loading/schedules')) return { schedules: [{ driver_id: 1 }] };
+      if (url.startsWith('/loading/time-slots')) return { timeSlots: ['04:00'] };
+      if (url.startsWith('/loading/vehicles')) return { vehicles: [] };
+      if (url.startsWith('/loading/drivers')) {
+        return { drivers: [{ id: 1, name: 'Carlos', phone: '   ', driver_type: 'fletero' }] };
+      }
+      return {};
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/loading?share=1&date=2026-11-10&from=history']}>
+        <LoadingSchedulePage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('loading-share-text')).toBeInTheDocument());
+    // Nadie con teléfono: no hay a quién escribirle, así que la puerta no se dibuja.
+    await waitFor(() => expect(screen.queryByTestId('loading-share-fleteros')).toBeNull());
   });
 
   it('shows Editar in fromHistory when the date is today and user can edit', async () => {

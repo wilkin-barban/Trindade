@@ -6,6 +6,7 @@ import { Button } from '../components/ui/button';
 import { LoadingSpinner } from '../components/ui/loading-spinner';
 import { ScheduleGrid } from '../components/loading/ScheduleGrid';
 import { ScheduleExportView } from '../components/loading/ScheduleExportView';
+import { fleterosWithPhone } from '../lib/loading-fleteros';
 import { ShareCard } from '../components/reports/ShareCard';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { exportLoadingPdf, fetchLoadingExportText, shareLoadingMessage } from '../lib/loading-share';
@@ -85,6 +86,30 @@ export function LoadingSchedulePage() {
   const userIsAdmin = authUser?.role === 'Administrador';
   const userCanEditSchedule = schedules.some((s) => s.canEdit === true);
   const canEditToday = isToday && (userIsAdmin || canEditParam || userCanEditSchedule);
+
+  // Los fleteros alcanzables del día que se está compartiendo: la puerta sólo existe si hay alguno, y una lectura
+  // que falla no promete una acción que después no tiene a quién escribirle.
+  const [shareFleteros, setShareFleteros] = useState(0);
+  useEffect(() => {
+    if (!showingShare) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [schedule, fleet] = await Promise.all([
+          api.get<{ schedules: { driver_id?: number | null }[] }>(`/loading/schedules?date=${shareDate}`),
+          api.get<{ drivers: { id: number; name: string; phone?: string | null; driver_type?: string }[] }>(
+            '/loading/drivers',
+          ),
+        ]);
+        if (!cancelled) setShareFleteros(fleterosWithPhone(schedule.schedules, fleet.drivers).length);
+      } catch {
+        if (!cancelled) setShareFleteros(0);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [showingShare, shareDate]);
   const [shareText, setShareText] = useState('');
   const [shareLoading, setShareLoading] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
@@ -214,15 +239,17 @@ export function LoadingSchedulePage() {
         )}
         {/* La puerta a los fleteros: el día se manda también uno a uno a los conductores con teléfono del
             lote. Se perdió cuando la tarjeta reemplazó al diálogo viejo, y vuelve acá, junto al share general. */}
-        <Button
-          variant="outline"
-          className="mb-3 min-h-11 w-full gap-2"
-          onClick={() => setExportOpen(true)}
-          data-testid="loading-share-fleteros"
-        >
-          <LucideTruck className="h-4 w-4" />
-          {t('loading.sendToFleteros', 'Enviar a fleteros')}
-        </Button>
+        {shareFleteros > 0 && (
+          <Button
+            variant="outline"
+            className="mb-3 min-h-11 w-full gap-2"
+            onClick={() => setExportOpen(true)}
+            data-testid="loading-share-fleteros"
+          >
+            <LucideTruck className="h-4 w-4" />
+            {t('loading.sendToFleteros', 'Enviar a fleteros')}
+          </Button>
+        )}
         {/* El diálogo de fleteros se monta también en esta rama: la vista de compartir retorna antes del
             return principal, y por eso la puerta abría un estado que nadie dibujaba. */}
         <ScheduleExportView date={shareDate} open={exportOpen} onClose={() => setExportOpen(false)} />
@@ -240,11 +267,11 @@ export function LoadingSchedulePage() {
           onPdf={() => void handleSharePdf()}
           {...(fromHistory
             ? {
-                ...(canEditToday ? { onEdit: () => navigate(`/loading/edit?date=${shareDate}`) } : {}),
+                ...(canEditToday ? { onEdit: () => navigate(`/loading?date=${shareDate}`) } : {}),
                 onClose: () => navigate('/loading/history'),
               }
             : {
-                onEdit: () => navigate(`/loading/edit?date=${date}`),
+                onEdit: () => navigate(`/loading?date=${date}`),
                 onClose: () => {
                   const next = { ...Object.fromEntries(params) };
                   delete next.share;

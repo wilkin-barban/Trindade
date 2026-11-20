@@ -706,10 +706,6 @@ export function salidaDaySummaryText(
     merged.set(key, [...(merged.get(key) ?? []), ...extra]);
   }
 
-  if (merged.size === 0) {
-    return '';
-  }
-
   const lines: string[] = [];
   lines.push(`🚛 *${labels.title} — ${formatDateLabel(args.date)}*`);
   lines.push(`${labels.movements}: ${movements.length}`);

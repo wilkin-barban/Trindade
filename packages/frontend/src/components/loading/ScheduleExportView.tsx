@@ -1,17 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  LucideX,
-  LucideCopy,
-  LucideCheck,
-  LucideShare2,
-  LucideMessageCircle,
-} from 'lucide-react';
+import { LucideMessageCircle, LucideX } from 'lucide-react';
 import { api } from '../../api/client';
 import { Button } from '../ui/button';
 import { LoadingSpinner } from '../ui/loading-spinner';
 import { Dialog } from '../ui/dialog';
-import { shareOrCopy, waMeLink } from '../../lib/whatsapp';
+import { waMeLink } from '../../lib/whatsapp';
+import { fleterosWithPhone } from '../../lib/loading-fleteros';
 import type { DriverRow, ScheduleRow } from './ScheduleGrid';
 
 export interface ScheduleExportViewProps {
@@ -25,8 +20,6 @@ export function ScheduleExportView({ date, open, onClose }: ScheduleExportViewPr
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [copied, setCopied] = useState(false);
-  const [shareNote, setShareNote] = useState('');
   const [schedules, setSchedules] = useState<ScheduleRow[]>([]);
   const [drivers, setDrivers] = useState<DriverRow[]>([]);
 
@@ -36,23 +29,14 @@ export function ScheduleExportView({ date, open, onClose }: ScheduleExportViewPr
    * Built from the batch rather than from the whole fleet: sending a day's schedule to a driver who is
    * not on it is a message about a day that does not concern them.
    */
-  const fleterosWithPhone = useMemo(() => {
-    const assigned = new Set(
-      schedules.map((row) => row.driver_id).filter((id): id is number => typeof id === 'number'),
-    );
-    return drivers.filter(
-      (driver) => driver.driver_type === 'fletero' && Boolean(driver.phone?.trim()) && assigned.has(driver.id),
-    );
-  }, [schedules, drivers]);
+  const reachable = useMemo(() => fleterosWithPhone(schedules, drivers), [schedules, drivers]);
 
   useEffect(() => {
     if (!open || !date) return;
 
     let cancelled = false;
     setError('');
-    setShareNote('');
     setLoading(true);
-    setCopied(false);
 
     // The private actions need the batch and the fleet. Neither can hide the text: the text is what the
     // dialog is for, so a fleet read that fails leaves the list empty and the rest of the dialog working.
@@ -91,40 +75,6 @@ export function ScheduleExportView({ date, open, onClose }: ScheduleExportViewPr
       cancelled = true;
     };
   }, [open, date, t]);
-
-  async function handleCopy() {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      const el = document.getElementById('loading-export-text');
-      if (el) {
-        const range = document.createRange();
-        range.selectNodeContents(el);
-        const sel = window.getSelection();
-        sel?.removeAllRanges();
-        sel?.addRange(range);
-      }
-    }
-  }
-
-  /**
-   * The native share, with the copy as its fallback: the outcome tells the operator which one happened,
-   * and a dismissed sheet says nothing rather than pretending the text went somewhere.
-   */
-  async function handleShare() {
-    setShareNote('');
-    const outcome = await shareOrCopy(text);
-    if (outcome === 'copied') {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-      setShareNote(t('loading.shareCopied'));
-    } else if (outcome === 'failed') {
-      setShareNote(t('loading.shareUnavailable'));
-    }
-  }
-
 
   if (!open) return null;
 
@@ -171,19 +121,17 @@ export function ScheduleExportView({ date, open, onClose }: ScheduleExportViewPr
           )}
         </div>
 
-        {/* Footer */}
+        {/* Footer: los fleteros con teléfono, cada uno con su enlace directo, y la salida. */}
         {!loading && !error && (
-          <div className="flex flex-col gap-2 p-4 border-t border-gray-200 shrink-0">
-            {shareNote && (
-              <p className="text-xs text-gray-500" data-testid="loading-export-share-note">
-                {shareNote}
-              </p>
-            )}
-            {fleterosWithPhone.length > 0 && (
-              <div data-testid="loading-export-fleteros">
-                <p className="text-sm font-medium text-gray-700 mb-2">{t('loading.sendToFletero')}</p>
-                <div className="flex flex-wrap gap-2">
-                  {fleterosWithPhone.map((driver) => {
+          <div className="flex flex-col gap-3 border-t border-gray-200 p-4 shrink-0">
+            {reachable.length > 0 && (
+              <div className="space-y-1.5" data-testid="loading-export-fleteros">
+                <p className="text-sm font-medium text-gray-700">{t('loading.sendToFletero')}</p>
+                <p className="text-xs text-gray-500">
+                  {t('loading.sendToFleteroHint', 'Cada enlace abre o WhatsApp com o horário do dia.')}
+                </p>
+                <div className="flex flex-col gap-1.5">
+                  {reachable.map((driver) => {
                     const href = waMeLink(driver.phone ?? '', text);
                     if (!href) return null;
                     return (
@@ -192,37 +140,25 @@ export function ScheduleExportView({ date, open, onClose }: ScheduleExportViewPr
                         href={href}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1 rounded-md border border-green-300 bg-green-50 px-3 py-1.5 text-sm text-green-800 hover:bg-green-100"
+                        className="flex min-h-[44px] w-full items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-left text-sm font-medium text-green-900 transition-colors hover:bg-green-100"
                         data-testid={`loading-export-fletero-${driver.id}`}
                       >
-                        <LucideMessageCircle className="h-4 w-4" />
-                        {driver.name}
+                        <LucideMessageCircle className="h-4 w-4 shrink-0 text-green-700" />
+                        <span className="min-w-0 flex-1 truncate">{driver.name}</span>
+                        {driver.phone && (
+                          <span className="shrink-0 text-xs font-normal tabular-nums text-green-800">
+                            {driver.phone}
+                          </span>
+                        )}
                       </a>
                     );
                   })}
                 </div>
               </div>
             )}
-            <div className="flex items-center justify-end gap-2 flex-wrap">
-              <Button variant="outline" onClick={onClose}>
+            <div className="flex items-center justify-end">
+              <Button variant="outline" onClick={onClose} data-testid="loading-export-dismiss">
                 {t('ui.close')}
-              </Button>
-              <Button variant="outline" onClick={handleShare} data-testid="loading-export-share">
-                <LucideShare2 className="h-4 w-4" />
-                {t('ui.share')}
-              </Button>
-              <Button onClick={handleCopy} disabled={copied} data-testid="loading-export-copy">
-                {copied ? (
-                  <>
-                    <LucideCheck className="h-4 w-4" />
-                    {t('loading.copied')}
-                  </>
-                ) : (
-                  <>
-                    <LucideCopy className="h-4 w-4" />
-                    {t('loading.copy')}
-                  </>
-                )}
               </Button>
             </div>
           </div>
