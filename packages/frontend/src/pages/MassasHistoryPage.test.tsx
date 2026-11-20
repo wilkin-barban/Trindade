@@ -143,10 +143,12 @@ describe('MassasHistoryPage', () => {
     expect(await screen.findByTestId('massas-sync-erp')).toBeInTheDocument();
     unmount();
 
-    // Past day
+    // Past day: sin sync y sin cuerpo, sólo el mensaje.
     renderPage('/massas-history?date=2026-10-26');
-    await screen.findByTestId('massas-individual-launches');
+    await screen.findByTestId('massas-whatsapp-phone');
     expect(screen.queryByTestId('massas-sync-erp')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('massas-individual-launches')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('massas-collective-table')).not.toBeInTheDocument();
   });
 
   it('handles bridge return and opens result modal in history (Item 6)', async () => {
@@ -261,15 +263,15 @@ describe('MassasHistoryPage', () => {
 
     unmount();
 
-    // 2. On Past Day: mutations hidden, read-only notice visible, WhatsApp kept
+    // 2. On Past Day: debajo del selector queda sólo el mensaje; sin nota, sin tabla y sin acciones.
     renderPage('/massas-history?date=2026-10-26');
 
-    expect(await screen.findByTestId('massas-history-readonly')).toBeInTheDocument();
+    expect(await screen.findByTestId('massas-whatsapp-phone')).toBeInTheDocument();
+    expect(screen.queryByTestId('massas-history-readonly')).not.toBeInTheDocument();
     expect(screen.queryByTestId('massas-sync-erp')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('massas-individual-launches')).not.toBeInTheDocument();
     expect(screen.queryByTitle(/Editar|Editar lançamento/i)).not.toBeInTheDocument();
     expect(screen.queryByTestId('massas-unified-send')).not.toBeInTheDocument();
-    // WhatsApp share is still present
-    expect(screen.getByTestId('massas-whatsapp-phone')).toBeInTheDocument();
   });
 
   it('changes the table when another day is clicked, and keeps the day in the URL', async () => {
@@ -294,8 +296,13 @@ describe('MassasHistoryPage', () => {
     await waitFor(() => expect(screen.getByTestId('massas-history-day-2026-10-26')).toBeInTheDocument());
     fireEvent.click(screen.getByTestId('massas-history-day-2026-10-26'));
 
-    expect((await screen.findAllByText('MASSA DE QUEIJO')).length).toBeGreaterThan(0);
+    // El día pasado no dibuja su tabla: muestra su mensaje, con el texto de ese día.
     await waitFor(() => expect(currentUrl).toBe('/massas-history?date=2026-10-26'));
+    // La prévia es la del día elegido y la tabla no se dibuja.
+    await waitFor(() =>
+      expect(screen.getByTestId('massas-preview-message').textContent).toContain('26/10/2026'),
+    );
+    expect(screen.queryByTestId('massas-collective-table')).not.toBeInTheDocument();
   });
 
   it('says the day is empty instead of looking like a failed read', async () => {
@@ -305,7 +312,7 @@ describe('MassasHistoryPage', () => {
       return { date: '2026-10-27', movements: [] };
     });
 
-    renderPage('/massas-history?date=2026-10-27');
+    renderPage(`/massas-history?date=${saoPauloToday()}`);
 
     expect(await screen.findByTestId('massas-history-empty')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();

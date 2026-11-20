@@ -959,7 +959,8 @@ export function MassasHistoryPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-4 pb-12 sm:space-y-6">
-      {aeroAllowed && deviceLimited && <AeroDeviceBanner device={device} />}
+      {/* El pasado no sincroniza: el aviso de dispositivo sólo tiene sentido en el día de hoy. */}
+      {aeroAllowed && deviceLimited && isToday && <AeroDeviceBanner device={device} />}
 
       {/* Header and Cross link back to today's launch */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 bg-white p-4 rounded-xl border border-gray-200 shadow-sm sm:p-6">
@@ -1047,18 +1048,11 @@ export function MassasHistoryPage() {
           </div>
         )}
 
-        {isPastDay && (
-          <p
-            className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600"
-            data-testid="massas-history-readonly"
-          >
-            {t('massas.historyReadOnly', 'Histórico somente leitura: este dia não aceita alterações nem sincronização.')}
-          </p>
-        )}
+        {/* El pasado no lleva nota: debajo del selector queda sólo el mensaje que se comparte, como en Android. */}
       </div>
 
       {/* Fallback confirmation if shortcut never returned */}
-      {aeroAllowed && syncAwaiting && (
+      {isToday && aeroAllowed && syncAwaiting && (
         <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3">
           <div>
             <p className="text-sm font-semibold text-amber-900">{t('massas.aero.syncConfirmTitle')}</p>
@@ -1088,7 +1082,7 @@ export function MassasHistoryPage() {
       )}
 
       {/* Empty day placeholder when there are neither local launches nor ERP seats */}
-      {dayView && dayView.launches.length === 0 && unifiedRows.length === 0 && (
+      {isToday && dayView && dayView.launches.length === 0 && unifiedRows.length === 0 && (
         <div
           data-testid="massas-history-empty"
           className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-600 shadow-sm"
@@ -1098,7 +1092,7 @@ export function MassasHistoryPage() {
       )}
 
       {/* Cards: Produção do dia, Lançamentos Individuais, Resumo Coletivo */}
-      {dayView && (dayView.launches.length > 0 || unifiedRows.length > 0) && (
+      {isToday && dayView && (dayView.launches.length > 0 || unifiedRows.length > 0) && (
         <MassasCollectiveTable
           products={dayView.products}
           launches={dayView.launches}
@@ -1136,7 +1130,8 @@ export function MassasHistoryPage() {
         disabled={!hasShareableData}
       />
 
-      {/* ERP Movements Sync Result Dialog */}
+      {/* ERP Movements Sync Result Dialog: de una acción, y en el pasado no hay acciones. */}
+      {isToday && (
       <AeroResultDialog
         open={syncResult !== null}
         tone={syncResult?.feedback.tone ?? 'ok'}
@@ -1149,6 +1144,7 @@ export function MassasHistoryPage() {
         onClose={() => setSyncResult(null)}
         testId="aero-sync-result-modal"
       />
+      )}
 
       {/* Launch verdict dialog returned from Scriptable to /massas-history (Requirement 6) */}
       {resultModal && (
