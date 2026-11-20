@@ -12,6 +12,18 @@ verificaciones está en [docs/release-android-historial.md](docs/release-android
 
 ## [Unreleased]
 
+### Salida y Masas: respuestas en ventana, acciones que no se parten y borradores que se retiran (2026-11-20)
+
+- **Salida**: los errores de sync/ERP (sin Wi-Fi de la empresa, ERP no configurado, conexión caída) y los avisos de
+  cada acción se leen en la misma ventana de resultado de la app, no como texto debajo de un botón; el histórico
+  pierde el contador de pendientes (cada tarjeta mantiene su reenvío) y sus acciones envuelven sin partir palabras.
+- **Excluir un borrador de Salida**: `DELETE /api/salida/:movementId`, sólo el dueño o el Administrador y sólo
+  mientras el ERP no lo confirmó (`sent`/`partial` responden 409). Web y Android lo ofrecen con confirmación, y el
+  resultado se lee en la ventana; se borran ítems, fotos (filas y archivos) y el movimiento, con auditoría
+  `salida_delete`.
+- **Borrado de Masas en ventana**: web y Android dejan de usar `window.confirm` / avisos inline para el borrado de un
+  lanzamiento; el resultado sale en el diálogo de producto. La regla de no borrar conciliados no cambia.
+
 ### Salida y Masas: el lanzamiento lanza, el histórico gobierna el día (2026-11-16)
 
 - **Salida**: botón con la cuenta de productos (`Lanzar salida (4)`); la vuelta del puente aterriza en
