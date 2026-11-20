@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RefreshCw } from 'lucide-react';
 import { api } from '../../api/client';
@@ -61,20 +61,25 @@ export function SalidaReportSection({
   const [failed, setFailed] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // El aviso al padre vive en una ref: si dependiera de una función que él recrea, cada lectura cambiaría el
+  // callback, el efecto volvería a correr y la sección se leería a sí misma en un bucle -- que es lo que hacía.
+  const onDayLoadedRef = useRef(onDayLoaded);
+  onDayLoadedRef.current = onDayLoaded;
+
   const load = useCallback(async () => {
     setLoading(true);
     setFailed(false);
     try {
       const body = await api.get<SalidaReportDay>(`/reports/day/salidas?date=${date}`);
       setDay(body);
-      onDayLoaded?.(body);
+      onDayLoadedRef.current?.(body);
     } catch {
       // A report is still readable without this block; it says so instead of pretending the day had nothing.
       setFailed(true);
     } finally {
       setLoading(false);
     }
-  }, [date, onDayLoaded]);
+  }, [date]);
 
   useEffect(() => {
     void load();

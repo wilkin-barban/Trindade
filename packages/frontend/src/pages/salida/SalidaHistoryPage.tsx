@@ -12,7 +12,7 @@ import { SalidaBlockFilter, SalidaMovementCard } from '../../components/salida/S
 import { SalidaWhatsAppShare } from '../../components/salida/SalidaWhatsAppShare';
 import { aeroSettingsReady, type AeroSettings } from '../../lib/aero-integration';
 import { fetchAeroVaultSettings } from '../../lib/aero-vault';
-import { triggerAeroMovementsSync } from '../../lib/aero-mirror';
+import { lastSyncLabel, readAeroMovementsSnapshot, triggerAeroMovementsSync } from '../../lib/aero-mirror';
 import { SalidaReportSection, type SalidaReportDay } from '../../components/reports/SalidaReportSection';
 import {
   SalidaSuccessDialog,
@@ -143,6 +143,18 @@ export function SalidaHistoryPage() {
   const [erpRefetchKey, setErpRefetchKey] = useState(0);
   // El día que leyó la sección del ERP, para sumarlo al mensaje sin pedirlo dos veces.
   const [erpDay, setErpDay] = useState<SalidaReportDay | null>(null);
+  // La última lectura del espejo de ese día, como la muestra el Histórico de Masas.
+  const [lastSync, setLastSync] = useState<string | null>(null);
+
+  const loadLastSync = useCallback(async (targetDate: string) => {
+    try {
+      const body = await api.get<unknown>(`/integration/aero/movements?date=${targetDate}`);
+      setLastSync(readAeroMovementsSnapshot(body)?.syncedAt ?? null);
+    } catch {
+      // Sin lectura no hay hora que mostrar: el botón sigue ofreciendo la sincronización.
+      setLastSync(null);
+    }
+  }, []);
 
   const handleSyncErp = useCallback(async () => {
     if (erpSyncing) return;
@@ -176,8 +188,9 @@ export function SalidaHistoryPage() {
     } finally {
       setErpSyncing(false);
       setErpRefetchKey((key) => key + 1);
+      await loadLastSync(date);
     }
-  }, [date, erpSyncing, location.pathname, t]);
+  }, [date, erpSyncing, loadLastSync, location.pathname, t]);
 
   const labels = useMemo<Record<SalidaBlock, string>>(
     () => ({
@@ -455,11 +468,19 @@ export function SalidaHistoryPage() {
     reportShareOutcome(await shareSalida({ text, photos, phone }));
   };
 
+  useEffect(() => {
+    void loadLastSync(date);
+  }, [date, loadLastSync]);
+
+  // Un día puede tener datos sólo del ERP: operarios y productos que Trindade no lanzó pero que el grupo tiene
+  // que leer. "Sem saídas para compartilhar" es para el día sin nada, no para el que el ERP sí registró.
+  const hasShareableData =
+    visibleMovements.length > 0 ||
+    (erpDay?.operators ?? []).some((operator) => operator.products.some((product) => product.units > 0));
+
   const previewMessage = useMemo(() => {
     const erpOperators = erpDay?.operators ?? [];
-    if (visibleMovements.length === 0 && erpOperators.every((operator) => operator.products.every((p) => p.units <= 0))) {
-      return '';
-    }
+    if (!hasShareableData) return '';
     return salidaDaySummaryText(visibleMovements, {
       date,
       erpOperators,
@@ -481,10 +502,10 @@ export function SalidaHistoryPage() {
         },
       },
     });
-  }, [visibleMovements, erpDay, date, t]);
+  }, [visibleMovements, erpDay, hasShareableData, date, t]);
 
   const handleOpenWhatsApp = async () => {
-    if (visibleMovements.length === 0) return;
+    if (!hasShareableData) return;
     setNotice(null);
     setCopyNote('');
     const photos = (await Promise.all(visibleMovements.map((movement) => salidaPhotoFiles(movement.photos)))).flat();
@@ -595,7 +616,7 @@ export function SalidaHistoryPage() {
 
       </div>
 
-      {!isReadOnly && visibleMovements.length === 0 ? (
+      {!isReadOnly && !hasShareableData ? (
         <div
           className="rounded-xl border border-gray-200 bg-white p-6 text-center shadow-sm"
           data-testid="salida-history-empty"
@@ -615,7 +636,7 @@ export function SalidaHistoryPage() {
             {t('salida.launch')}
           </Button>
         </div>
-      ) : !isReadOnly ? (
+      ) : !isReadOnly && visibleMovements.length > 0 ? (
         <div className="space-y-3">
           {visibleMovements.map((movement) => (
             <SalidaMovementCard
@@ -648,6 +669,13 @@ export function SalidaHistoryPage() {
               <RefreshCw className={`h-4 w-4 shrink-0 ${erpSyncing ? 'animate-spin' : ''}`} />
               {t('massas.syncHeader.action', 'Sincronizar com ERP')}
             </button>
+            {/* La hora de la última lectura del espejo: dice si lo que se lee es de esta mañana. */}
+            <span className="text-xs text-gray-500" data-testid="salida-last-sync">
+              {t('massas.syncHeader.lastSync', 'Último sync:')}{' '}
+              <span className="font-semibold tabular-nums text-gray-700">
+                {lastSyncLabel(lastSync)}
+              </span>
+            </span>
           </div>
           {erpNote && (
             <p className="text-xs text-gray-500" data-testid="salida-history-erp-note">
@@ -670,12 +698,12 @@ export function SalidaHistoryPage() {
           previewMessage={previewMessage}
           onOpenWhatsApp={() => void handleOpenWhatsApp()}
           copyNote={copyNote}
-          disabled={visibleMovements.length === 0}
+          disabled={!hasShareableData}
           // Las fotos del día que se está compartiendo, including el pasado: la vista de solo lectura muestra el
           // mensaje y sus miniaturas, y nada más.
           photos={visibleMovements.flatMap((movement) => movement.photos ?? [])}
         />
-        {visibleMovements.length === 0 && (
+        {!hasShareableData && (
           <p className="text-xs text-gray-500" data-testid="salida-share-day-empty">
             {t('salida.shareDayEmpty')}
           </p>

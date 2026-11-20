@@ -951,4 +951,61 @@ describe('SalidaHistoryPage — T3 per-movement state, relaunch, operator filter
     expect(screen.getByTestId('salida-photos-max-60')).toBeInTheDocument();
     expect(screen.queryByTestId('salida-photo-input')).toBeNull();
   });
+
+  /**
+   * Un día con datos sólo del ERP no es un día vacío.
+   *
+   * La tarjeta grande -- «Não há saídas neste dia» y su CTA -- es para el día sin nada; con asientos del ERP a la
+   * vista, la pantalla muestr esas tarjetas y el mensaje se puede compartir.
+   */
+  it('an ERP-only day draws no empty card and can still be shared', async () => {
+    get.mockImplementation(async (url: string) =>
+      url === '/salida/history'
+        ? { days: [] }
+        : url === '/reports/day/salidas?date=2026-11-13'
+          ? {
+              date: '2026-11-13',
+              totalUnits: 7,
+              movementCount: 1,
+              operators: [
+                {
+                  name: 'Vinícius R',
+                  username: 'vinicius',
+                  units: 7,
+                  erpOnly: true,
+                  products: [{ code: '2500', name: 'GORDURA', block: 'materia-prima', units: 7 }],
+                },
+              ],
+            }
+          : {},
+    );
+
+    await renderReady('/salida-history?date=2026-11-13');
+
+    await waitFor(() =>
+      expect(screen.getByTestId('salida-preview-message').textContent).toContain('GORDURA: 7 un'),
+    );
+    expect(screen.queryByTestId('salida-history-empty')).toBeNull();
+    expect(screen.queryByText(i18n.t('salida.historyEmptyTitle'))).toBeNull();
+    expect(screen.getByTestId('salida-share-day')).toBeEnabled();
+    // El bloque del Relatório es el que muestra el día.
+    expect(screen.getByTestId('salida-report-section')).toBeInTheDocument();
+  });
+
+  it('a day with nothing at all keeps the empty card and its launch CTA', async () => {
+    get.mockImplementation(async (url: string) =>
+      url === '/salida/history'
+        ? { days: [] }
+        : url === '/reports/day/salidas?date=2026-11-13'
+          ? { date: '2026-11-13', totalUnits: 0, movementCount: 0, operators: [] }
+          : {},
+    );
+
+    await renderReady('/salida-history?date=2026-11-13');
+
+    expect(screen.getByTestId('salida-history-empty')).toBeInTheDocument();
+    expect(screen.getByTestId('salida-empty-cta')).toBeInTheDocument();
+    expect(screen.getByTestId('salida-share-day')).toBeDisabled();
+  });
+
 });
