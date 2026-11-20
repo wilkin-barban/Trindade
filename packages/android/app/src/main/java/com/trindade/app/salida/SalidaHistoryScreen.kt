@@ -5,10 +5,12 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.Icon
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
@@ -18,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.horizontalScroll
@@ -49,6 +52,7 @@ import com.trindade.app.R
 import com.trindade.app.massas.MassasDayHeader
 import com.trindade.app.ui.historyQuickDays
 import com.trindade.app.ui.components.HelpSection
+import com.trindade.app.ui.components.ActionResultDialog
 import com.trindade.app.ui.components.ModuleHelpDialog
 import androidx.compose.runtime.setValue
 import com.trindade.app.ui.components.HistoryHeader
@@ -183,6 +187,8 @@ fun SalidaHistoryScreen(
      * que vinieron del ERP -- se ven y no se tocan.
      */
     viewerUsername: String = "",
+    /** El Administrador puede retirar el borrador de otro operario, como en Massas. */
+    viewerIsAdmin: Boolean = false,
     onOpenWhatsApp: (String) -> Unit = {},
     /** La vuelta al lanzamiento desde el día vacío de hoy. */
     onLaunch: () -> Unit = {},
@@ -256,7 +262,6 @@ fun SalidaHistoryScreen(
                 isSyncing = state.erpSyncing,
                 onSync = viewModel::syncSalidaDay,
                 day = state.salidaDay,
-                error = state.erpError,
                 date = com.trindade.app.massas.brazilianDate(selected),
                 syncedAt = state.lastSyncedAt?.substringAfter(' ')?.take(5),
                 showEmptyText = false,
@@ -281,38 +286,8 @@ fun SalidaHistoryScreen(
             return@Column
         }
 
-        state.notice?.let { notice ->
-            Text(
-                notice.message,
-                style = MaterialTheme.typography.bodySmall,
-                color = if (notice.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(bottom = 8.dp),
-            )
-        }
-
-        // Los pendientes que esperan viaje al ERP se cuentan en la cabecera del día, no en cada tarjeta: es la
-        // pregunta que el operario hace al abrir el histórico por la mañana.
-        val pending = viewModel.pendingCount()
-        if (pending > 0) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = stringResource(R.string.salida_history_pending, pending),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.testTag("salida-pending-count"),
-                )
-                TextButton(
-                    onClick = viewModel::resendPending,
-                    modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("salida-resend-pending"),
-                ) {
-                    Text(stringResource(R.string.salida_history_resend_pending))
-                }
-            }
-        }
+        // El contador de pendientes ya no se dibuja arriba: la tarjeta de cada movimiento dice su estado y ofrece
+        // reenviarlo, y una cifra suelta encima del día se leía como un estado del día que nadie podía resolver.
 
         if (selected != today) {
             // El pasado no se toca: el histórico muestra lo que se lanzó y su estado, y nada de eso se edita.
@@ -400,6 +375,11 @@ fun SalidaHistoryScreen(
                     },
                     onShare = { onOpenWhatsApp(viewModel.movementShareLink(movement, summaryLabels)) },
                     onResend = if (viewModel.isPending(movement)) viewModel::resendPending else null,
+                    onDelete = if (salidaOffersDelete(movement, viewerUsername, viewerIsAdmin)) {
+                        { viewModel.requestDeleteMovement(movement) }
+                    } else {
+                        null
+                    },
                 )
             }
             }
@@ -436,6 +416,48 @@ fun SalidaHistoryScreen(
             onDismissRequest = { showHelpDialog = false },
         )
     }
+
+    // La confirmación del borrado: una acción que quita una baja se pregunta antes, y la frase dice qué se va.
+    state.deleteCandidate?.let { movement ->
+        AlertDialog(
+            onDismissRequest = viewModel::cancelDeleteMovement,
+            title = { Text(stringResource(R.string.salida_delete_confirm_title)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.salida_delete_confirm_body,
+                        com.trindade.app.massas.brazilianDate(movement.movementDate),
+                        movement.totalUnits,
+                    ),
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = viewModel::confirmDeleteMovement,
+                    modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("salida-delete-confirm"),
+                ) {
+                    Text(stringResource(R.string.salida_delete), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = viewModel::cancelDeleteMovement,
+                    modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("salida-delete-cancel"),
+                ) {
+                    Text(stringResource(R.string.salida_cancel))
+                }
+            },
+        )
+    }
+
+    // Lo que una acción o el espejo respondieron se lee en una ventana con Cerrar: la tabla de abajo ya cambió y un
+    // cartel dentro de ella se lee como parte del estado que se está mirando.
+    if (state.notice != null && state.erpError == null) {
+        SalidaNoticeDialog(state.notice!!.message, state.notice!!.isError, viewModel::dismissNotice)
+    }
+    state.erpError?.let { erpError ->
+        SalidaNoticeDialog(erpError.resolve(), true, viewModel::dismissErpError)
+    }
 }
 
 /**
@@ -455,6 +477,23 @@ fun salidaHistoryVisibleDates(today: String, dates: List<String>, all: Boolean):
  * misma que el servidor guarda como dueño. Un nombre vacío -- una sesión sin nombre, un invitado -- no es dueño de
  * nada, y entonces sólo lee.
  */
+/**
+ * Si la tarjeta ofrece Excluir.
+ *
+ * La regla es del servidor y esto sólo evita ofrecer lo que va a rechazar: el dueño o el Administrador, y el ERP
+ * sin confirmar. Un movimiento `sent` o `partial` es un hecho de la empresa; el resto -- nulo, `failed` -- es un
+ * borrador que se puede retirar.
+ */
+internal fun salidaOffersDelete(
+    movement: com.trindade.app.contract.models.SalidaCreateResponseMovement,
+    viewerUsername: String,
+    viewerIsAdmin: Boolean,
+): Boolean {
+    if (!viewerIsAdmin && !movement.owns(viewerUsername)) return false
+    val status = movement.erp?.status?.value
+    return status != "sent" && status != "partial"
+}
+
 internal fun SalidaCreateResponseMovement.owns(viewerUsername: String): Boolean =
     viewerUsername.isNotBlank() && username.equals(viewerUsername, ignoreCase = true)
 
@@ -477,7 +516,6 @@ internal fun SalidaErpBlock(
     isSyncing: Boolean,
     onSync: () -> Unit,
     day: com.trindade.app.contract.models.SalidaReportDayView?,
-    error: com.trindade.app.ui.UiText?,
     modifier: Modifier = Modifier,
     /** La fecha del día elegido, como la escribe la planta: la línea «Data de Produção» del header. */
     date: String,
@@ -502,13 +540,6 @@ internal fun SalidaErpBlock(
             syncTestTag = SALIDA_HISTORY_ERP_SYNC_TAG,
             syncSpinnerTestTag = SALIDA_HISTORY_ERP_SYNC_SPINNER_TAG,
         )
-        error?.let {
-            Text(
-                text = it.resolve(),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
         SalidaReportCard(
             day = day,
             error = null,
@@ -598,6 +629,11 @@ internal fun SalidaMovementCard(
     onDeletePhoto: ((Int) -> Unit)? = null,
     onShare: (() -> Unit)? = null,
     onResend: (() -> Unit)? = null,
+    /**
+     * Retirar el borrador. La pantalla lo ofrece sólo cuando el servidor lo va a aceptar -- el propio operario o el
+     * Administrador, y el ERP sin confirmar --; el servidor decide igual.
+     */
+    onDelete: (() -> Unit)? = null,
 ) {
     Card(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
         Column(modifier = Modifier.padding(12.dp)) {
@@ -678,7 +714,13 @@ internal fun SalidaMovementCard(
             }
 
             Spacer(Modifier.height(6.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // FlowRow y no Row: tres acciones con nombre no entran en 390 dp y «Reenviar ao ERP» se partía en una
+            // columna de letras. Cada botón conserva sus 48 dp y baja a la línea siguiente cuando no entra.
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 if (onAddPhoto != null) {
                     OutlinedButton(
                         onClick = onAddPhoto,
@@ -703,9 +745,33 @@ internal fun SalidaMovementCard(
                         Text(stringResource(R.string.salida_resend), style = MaterialTheme.typography.labelMedium)
                     }
                 }
+                if (onDelete != null) {
+                    OutlinedButton(
+                        onClick = onDelete,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("salida-delete-${movement.id}"),
+                    ) {
+                        Text(stringResource(R.string.salida_delete), style = MaterialTheme.typography.labelMedium)
+                    }
+                }
             }
         }
     }
 
     
+}
+
+/** El resultado de una acción del histórico, en la ventana que el resto de la app usa. */
+@Composable
+internal fun SalidaNoticeDialog(
+    message: String,
+    isError: Boolean,
+    onDismiss: () -> Unit,
+    title: String? = null,
+) {
+    ActionResultDialog(
+        message = if (title.isNullOrBlank()) message else "$title\n\n$message",
+        isSuccess = !isError,
+        onDismiss = onDismiss,
+    )
 }

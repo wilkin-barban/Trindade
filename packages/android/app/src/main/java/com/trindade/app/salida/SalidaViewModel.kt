@@ -45,6 +45,10 @@ data class SalidaUiState(
     val erpError: com.trindade.app.ui.UiText? = null,
     /** La hora de la última lectura del espejo para el día elegido, como la muestra el archivo de Masas. */
     val lastSyncedAt: String? = null,
+    /** El movimiento que espera la confirmación de borrado, o null cuando no hay nada que confirmar. */
+    val deleteCandidate: SalidaCreateResponseMovement? = null,
+    /** Si la cuenta puede retirar el borrador: el servidor lo vuelve a decidir, esto sólo evita ofrecer lo negado. */
+    val canDeleteMovements: Boolean = false,
 ) {
     /** Lo que la baja va a mandar: sólo los productos de los bloques activos, con una cantidad válida. */
     val selection: SalidaSelection
@@ -358,6 +362,48 @@ class SalidaViewModel @Inject constructor(
     }
 
     /** Reenvía la cola al ERP con el mismo cliente que usa el lanzamiento. */
+    /** Lo que el operario acaba de leer: se cierra solo cuando él lo cierra. */
+    fun dismissNotice() {
+        _state.value = _state.value.copy(notice = null)
+    }
+
+    /** El error del espejo también es una ventana: se explica una vez, no debajo de un botón. */
+    fun dismissErpError() {
+        _state.value = _state.value.copy(erpError = null)
+    }
+
+    /** Pide confirmación para retirar un borrador; el servidor decide si se puede. */
+    fun requestDeleteMovement(movement: SalidaCreateResponseMovement) {
+        _state.value = _state.value.copy(deleteCandidate = movement, notice = null)
+    }
+
+    fun cancelDeleteMovement() {
+        _state.value = _state.value.copy(deleteCandidate = null)
+    }
+
+    /**
+     * Retira el borrador confirmado y vuelve a leer el día.
+     *
+     * La tarjeta se va sola porque el día se recarga; el mensaje -- el del servidor cuando rechaza, el propio
+     * cuando borra -- se dice en una ventana, no en un cartel dentro de la lista.
+     */
+    fun confirmDeleteMovement() {
+        val movement = _state.value.deleteCandidate ?: return
+        _state.value = _state.value.copy(deleteCandidate = null)
+        viewModelScope.launch {
+            when (val outcome = repository.deleteMovement(movement.id)) {
+                is SalidaDeleteOutcome.Deleted -> {
+                    _state.value = _state.value.copy(
+                        notice = SalidaNotice("Movimento excluído.", isError = false),
+                    )
+                    refresh()
+                }
+                is SalidaDeleteOutcome.Failed ->
+                    _state.value = _state.value.copy(notice = SalidaNotice(outcome.message, isError = true))
+            }
+        }
+    }
+
     fun resendPending() {
         viewModelScope.launch {
             val outcome = repository.retryPending()

@@ -31,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import com.trindade.app.R
+import com.trindade.app.ui.components.ActionResultDialog
 import com.trindade.app.ui.components.HelpSection
 import com.trindade.app.ui.components.ModuleHelpButton
 import com.trindade.app.ui.components.ModuleHelpDialog
@@ -175,18 +176,6 @@ fun SalidaLaunchScreen(
 
         Spacer(Modifier.height(12.dp))
 
-        state.notice?.let { notice ->
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = if (notice.isError) MaterialTheme.colorScheme.errorContainer
-                    else MaterialTheme.colorScheme.secondaryContainer,
-                ),
-                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-            ) {
-                Text(notice.message, modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall)
-            }
-        }
-
         Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             SalidaCatalog.blocks.forEach { block ->
                 val active = block in state.activeBlocks
@@ -237,6 +226,16 @@ fun SalidaLaunchScreen(
 
     if (state.confirmOpen) {
         val selection = state.selection
+        // La respuesta de una acción -- guardada y enviada, o rechazada -- se cierra en su ventana: la grilla de
+        // abajo ya cambió y un cartel dentro de ella se lee como parte del estado que se está mirando.
+        state.notice?.let { notice ->
+            ActionResultDialog(
+                message = notice.message,
+                isSuccess = !notice.isError,
+                onDismiss = viewModel::dismissNotice,
+            )
+        }
+
         AlertDialog(
             onDismissRequest = { viewModel.dismissConfirmation() },
             title = { Text(stringResource(R.string.salida_confirm_title)) },

@@ -48,7 +48,6 @@ class SalidaErpBlockTest {
                     isSyncing = false,
                     onSync = { synced++ },
                     day = null,
-                    error = null,
                     date = "19/11/2026",
                     syncedAt = "18:55",
                 )
@@ -66,7 +65,7 @@ class SalidaErpBlockTest {
     }
 
     @Test
-    fun `a sync in flight withholds the action and the error is read underneath`() {
+    fun `a sync in flight withholds the action and no error line is drawn inside the block`() {
         val failure = "Sem conexão com o ERP."
         composeRule.setContent {
             TrindadeTheme {
@@ -74,7 +73,6 @@ class SalidaErpBlockTest {
                     isSyncing = true,
                     onSync = {},
                     day = null,
-                    error = UiText.literal(failure),
                     date = "19/11/2026",
                 )
             }
@@ -84,6 +82,7 @@ class SalidaErpBlockTest {
         composeRule.onNodeWithTag(SALIDA_HISTORY_ERP_SYNC_TAG).assertIsNotEnabled()
         // Sin hora, el panel dice que nunca se sincronizó.
         composeRule.onNodeWithText(copy(R.string.massas_never_synced)).assertIsDisplayed()
-        composeRule.onNodeWithText(failure).assertIsDisplayed()
+        // El error del espejo se explica en la ventana del histórico, no debajo del botón.
+        composeRule.onNodeWithText(failure).assertDoesNotExist()
     }
 }

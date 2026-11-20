@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.trindade.app.contract.models.SalidaCreateResponseMovement
+import com.trindade.app.ui.theme.TrindadeTheme
 import com.trindade.app.contract.models.SalidaMovementItemsInner
 import com.trindade.app.contract.models.SalidaMovementPhotosInner
 import com.trindade.app.contract.models.SalidaMovementReconciliation
@@ -158,5 +159,49 @@ class SalidaMovementCardTest {
         composeRule.onNodeWithTag("salida-photo-picker").assertDoesNotExist()
         composeRule.onNodeWithText("Excluir foto").assertDoesNotExist()
         composeRule.onNodeWithTag("salida-share-7").assertIsDisplayed()
+    }
+
+    /**
+     * Tres acciones con nombre entran en 390 dp sin partir el texto.
+     *
+     * «Reenviar ao ERP» en un `Row` se comprimía hasta una letra por línea. Las acciones ahora envuelven y cada una
+     * conserva su alto de 48 dp; la tarjeta deja lugar para Excluir.
+     */
+    @Test
+    fun `the actions wrap without squeezing their labels and delete has its place`() {
+        var shared = 0
+        var resent = 0
+        var deleted = 0
+        composeRule.setContent {
+            TrindadeTheme {
+                SalidaMovementCard(
+                    movement = movement(emptyList()),
+                    onAddPhoto = {},
+                    onShare = { shared++ },
+                    onResend = { resent++ },
+                    onDelete = { deleted++ },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("salida-photo-picker").assertIsDisplayed()
+        composeRule.onNodeWithTag("salida-share-7").assertIsDisplayed()
+        composeRule.onNodeWithTag("salida-resend-7").assertIsDisplayed()
+        composeRule.onNodeWithTag("salida-delete-7").assertIsDisplayed().performClick()
+        composeRule.waitForIdle()
+        assertEquals(1, deleted)
+        assertEquals(0, shared + resent)
+    }
+
+    /** El que el ERP confirmó no se ofrece: la tarjeta no recibe acción de borrar. */
+    @Test
+    fun `a card without a delete action draws no Excluir`() {
+        composeRule.setContent {
+            TrindadeTheme {
+                SalidaMovementCard(movement = movement(emptyList()), onShare = {})
+            }
+        }
+
+        composeRule.onNodeWithTag("salida-delete-7").assertDoesNotExist()
     }
 }

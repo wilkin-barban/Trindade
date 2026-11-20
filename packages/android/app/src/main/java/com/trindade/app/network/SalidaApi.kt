@@ -68,6 +68,10 @@ interface SalidaApi {
         @Part file: MultipartBody.Part,
     ): Response<SalidaPhotoResponse>
 
+    /** Retira un borrador que el ERP todavía no confirmó. El servidor decide; la pantalla sólo ofrece. */
+    @DELETE("api/salida/{movementId}")
+    suspend fun deleteMovement(@Path("movementId") movementId: Int): Response<Unit>
+
     @DELETE("api/salida/photos/{photoId}")
     suspend fun deletePhoto(@Path("photoId") photoId: Int): Response<Unit>
 }

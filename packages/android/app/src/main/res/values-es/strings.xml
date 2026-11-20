@@ -696,6 +696,9 @@
     <string name="salida_confirm_hint">Revisá los productos y las cantidades antes de confirmar:</string>
     <string name="salida_total">Total</string>
     <string name="salida_confirm">Confirmar</string>
+    <string name="salida_delete">Excluir</string>
+    <string name="salida_delete_confirm_title">Excluir salida</string>
+    <string name="salida_delete_confirm_body">La salida del %1$s, con %2$d un, se quitará de Trindade. Sólo es posible mientras el ERP no la confirmó.</string>
     <string name="salida_cancel">Cancelar</string>
     <string name="salida_last_sync">Último sync: %1$s</string>
     <string name="salida_history_title">Historial de Salidas</string>

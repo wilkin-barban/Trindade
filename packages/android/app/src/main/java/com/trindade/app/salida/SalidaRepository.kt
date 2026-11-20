@@ -20,6 +20,12 @@ import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/** Cómo terminó el retiro de un borrador. La frase del 409 es del servidor, no de la pantalla. */
+sealed interface SalidaDeleteOutcome {
+    data object Deleted : SalidaDeleteOutcome
+    data class Failed(val message: String) : SalidaDeleteOutcome
+}
+
 /** El resultado de mandar una baza al ERP, tal como la pantalla lo cuenta. */
 sealed interface SalidaErpOutcome {
     data class Complete(val documents: Int) : SalidaErpOutcome
@@ -190,6 +196,25 @@ class SalidaRepository @Inject constructor(
         )
         val response = runCatching { api.uploadPhoto(movementId, part) }.getOrNull() ?: return@withContext false
         response.isSuccessful
+    }
+
+    /**
+     * Retira un movimiento que el ERP todavía no confirmó.
+     *
+     * El servidor manda: el dueño o el Administrador, y sólo mientras el veredicto sea nulo, `pending` o `failed`.
+     * Un 409 trae la frase que explica por qué no se puede, y esa frase es la que la ventana muestra.
+     */
+    suspend fun deleteMovement(movementId: Int): SalidaDeleteOutcome = withContext(Dispatchers.IO) {
+        val response = runCatching { api.deleteMovement(movementId) }.getOrNull()
+            ?: return@withContext SalidaDeleteOutcome.Failed("No se pudo conectar con el servidor.")
+        if (response.isSuccessful) return@withContext SalidaDeleteOutcome.Deleted
+        val body = runCatching { response.errorBody()?.string() }.getOrNull()
+        val message = body?.let { raw ->
+            runCatching {
+                org.json.JSONObject(raw).optString("error").takeIf { it.isNotBlank() }
+            }.getOrNull()
+        } ?: "No se pudo excluir el movimiento."
+        SalidaDeleteOutcome.Failed(message)
     }
 
     /** Borra una foto del movimiento. */
