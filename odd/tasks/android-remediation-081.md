@@ -634,6 +634,30 @@ el historial: separar las responsabilidades.
 **Sección 8 cerrada**: 8.1, 8.1-b, 8.2, 8.3, 8.4 y 8.5 en PASS, con la APK `0.8.4 (8007)` instalada en
 `emulator-5554`. Sin release, tag ni asset; la 0.7.5 y `packages/backend/apk` intactos.
 
+## 18. Dashboard: la recepción sale del espejo, ya no del checklist
+
+- Backend: `recepcionDone` = productos distintos recibidos hoy según `dayReceipts(db, today)`; `recepcionSynced` dice
+  si el día se leyó del ERP. Se retiró `recepcionTotal` (el «18» eran tareas de la categoría 4, que ya no existen
+  como lista) y se regeneraron contrato, OpenAPI y cliente Kotlin.
+- Web y Android dicen «N mercadorias» cuando hay sincronización y «sem sincronização com o ERP» cuando no; HIGIENE
+  conserva su checklist y su total. Tests de backend (dos casos) y de las dos UIs.
+
+## 19. Web: el sync del ERP primero y el botón del archivo como el de Masas
+
+- `ReportsPage`: «Sincronizar com ERP» es la primera opción del formulario, encima de Turno, con una sola instancia;
+  el encabezado de las tarjetas conserva el título y las tarjetas su orden.
+- `SalidaHistoryPage`: el botón toma el tratamiento canónico de Masas (ámbar compacto, `RefreshCw` con `animate-spin`,
+  fila propia, 44 px) y el mensaje del día suma los operarios/productos del ERP que trae `SalidaReportSection`
+  (`onDayLoaded`), sin duplicar y con el mismo formato.
+
+## 20. Web: la respuesta de una acción, en ventana
+
+- Nuevo `components/ui/message-dialog.tsx` sobre el `Dialog` accesible existente: título, mensaje, tono error/éxito y
+  botón Cerrar, sin autocierre. `ReportsPage` manda ahí la validación de temperaturas, los rechazos del servidor y la
+  falta de conexión (la carga fallida se queda en la página); `ReportEditPage` hace lo mismo con su guardado.
+- **Pendiente del barrido**: el resto de los módulos web (historiales, Massas, Salida, Loading, Stock, Admin,
+  Dashboard) y la auditoría Android de banners inline, para la próxima pasada; el componente ya es el punto único.
+
 ## 17. Texto del Relatório: prefijo de bloque en Salidas y sin total de sección
 
 - `export.service.ts`: la sección `📤 *SAÍDAS / BAIXA*` antepone **`EMB.`** a embalagens y **`BOB.`** a bobinas, sin
