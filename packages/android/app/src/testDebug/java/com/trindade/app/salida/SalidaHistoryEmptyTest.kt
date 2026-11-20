@@ -35,7 +35,7 @@ class SalidaHistoryEmptyTest {
             }
         }
 
-        composeRule.onNodeWithText("Nenhuma saída registrada hoje.").assertIsDisplayed()
+        composeRule.onNodeWithText("Nenhuma saída registrada hoje").assertIsDisplayed()
         composeRule.onNodeWithTag("salida-empty-cta").assertIsDisplayed().performClick()
         assertEquals(1, launched)
     }
@@ -48,7 +48,7 @@ class SalidaHistoryEmptyTest {
             }
         }
 
-        composeRule.onNodeWithText("Nenhuma saída registrada.").assertIsDisplayed()
+        composeRule.onNodeWithText("Nenhuma saída registrada").assertIsDisplayed()
         composeRule.onNodeWithTag("salida-empty-cta").assertDoesNotExist()
     }
 }

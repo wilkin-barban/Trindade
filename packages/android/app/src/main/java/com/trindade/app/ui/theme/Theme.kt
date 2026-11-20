@@ -15,6 +15,9 @@ import androidx.compose.ui.unit.dp
 // - Warm neutrals: Off-white background/surface #FFF8F6 with warm tint #F4DDDA surfaceVariant
 // - Contrast: onPrimary #FFFFFF provides 6.6:1 WCAG AA contrast over primary #B42025
 val BrandRed = Color(0xFFB42025)
+
+/** El verde de WhatsApp, para la acción de compartir: es una marca, no un rol del tema. */
+val BrandWhatsApp = Color(0xFF16A34A)
 val BrandOnPrimary = Color(0xFFFFFFFF)
 val BrandPrimaryContainer = Color(0xFFFFDAD6)
 val BrandOnPrimaryContainer = Color(0xFF410005)

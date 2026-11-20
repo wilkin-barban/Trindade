@@ -170,10 +170,10 @@ fun ShareCard(
                     enabled = actionsEnabled,
                     shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF16A34A),
-                        contentColor = Color.White,
-                        disabledContainerColor = Color(0xFF16A34A).copy(alpha = 0.4f),
-                        disabledContentColor = Color.White.copy(alpha = 0.8f),
+                        containerColor = com.trindade.app.ui.theme.BrandWhatsApp,
+                        contentColor = com.trindade.app.ui.theme.BrandOnPrimary,
+                        disabledContainerColor = com.trindade.app.ui.theme.BrandWhatsApp.copy(alpha = 0.4f),
+                        disabledContentColor = com.trindade.app.ui.theme.BrandOnPrimary.copy(alpha = 0.8f),
                     ),
                     modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp).testTag("share-card-whatsapp"),
                 ) {

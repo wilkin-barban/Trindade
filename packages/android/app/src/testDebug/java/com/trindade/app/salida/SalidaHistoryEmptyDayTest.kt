@@ -77,6 +77,9 @@ class SalidaHistoryEmptyDayTest {
         }
 
         composeRule.onNodeWithText(copy(R.string.salida_history_empty_today)).assertIsDisplayed()
+        // La tarjeta explica el vacío una sola vez, con su icono y su ayuda.
+        composeRule.onNodeWithTag("salida-history-empty").assertIsDisplayed()
+        composeRule.onNodeWithText(copy(R.string.salida_history_empty_hint)).assertIsDisplayed()
         composeRule.onNodeWithTag("salida-empty-cta").assertIsDisplayed()
 
         // El bloque de compartir está, con su nombre y la prévia vacía, como en la web.
@@ -95,6 +98,8 @@ class SalidaHistoryEmptyDayTest {
         render(isToday = false)
 
         composeRule.onNodeWithText(copy(R.string.salida_history_empty_past)).assertIsDisplayed()
+        composeRule.onNodeWithTag("salida-history-empty").assertIsDisplayed()
+        composeRule.onNodeWithText(copy(R.string.salida_history_empty_hint)).assertIsDisplayed()
         composeRule.onNodeWithTag("salida-empty-cta").assertDoesNotExist()
         composeRule.onNodeWithTag("salida-whatsapp-share-card").assertExists()
         composeRule.onNodeWithTag("salida-share-day").assertIsNotEnabled()

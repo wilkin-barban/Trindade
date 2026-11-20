@@ -701,8 +701,9 @@
     <string name="salida_cancel">Cancelar</string>
     <string name="salida_last_sync">Último sync: %1$s</string>
     <string name="salida_history_title">Histórico de Saídas</string>
-    <string name="salida_history_empty_today">Nenhuma saída registrada hoje.</string>
-    <string name="salida_history_empty_past">Nenhuma saída registrada.</string>
+    <string name="salida_history_empty_today">Nenhuma saída registrada hoje</string>
+    <string name="salida_history_empty_past">Nenhuma saída registrada</string>
+    <string name="salida_history_empty_hint">Quando você lançar uma saída, ela aparece aqui com o estado de conciliação com o ERP.</string>
     <string name="salida_history_launch">Lançar saída</string>
     <string name="salida_history_pending">%1$d pendentes</string>
     <string name="salida_history_resend_pending">Reenviar pendentes</string>

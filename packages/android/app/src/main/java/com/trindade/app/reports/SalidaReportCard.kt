@@ -33,6 +33,13 @@ fun SalidaReportCard(
     day: SalidaReportDayView?,
     error: String?,
     modifier: Modifier = Modifier,
+    /**
+     * Si el día vacío se explica acá.
+     *
+     * La tarjeta lo dice por su cuenta cuando se monta sola; una pantalla que ya tiene su propia tarjeta de estado
+     * vacío -- el histórico -- lo apaga, para no contar lo mismo dos veces con una acción al lado.
+     */
+    showEmptyText: Boolean = true,
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
@@ -64,7 +71,7 @@ fun SalidaReportCard(
 
                 day == null -> Text("Lendo as saídas do dia…", style = MaterialTheme.typography.bodySmall)
 
-                day.operators.isEmpty() -> Text(
+                day.operators.isEmpty() -> if (showEmptyText) Text(
                     stringResource(R.string.salida_none_this_day),
                     style = MaterialTheme.typography.bodySmall,
                 )

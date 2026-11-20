@@ -1,6 +1,13 @@
 package com.trindade.app.salida
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.res.painterResource
+import androidx.compose.material3.Icon
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Button
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -112,19 +119,57 @@ internal fun SalidaHistoryEmpty(
     onLaunch: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier) {
-        Text(
-            if (isToday) stringResource(R.string.salida_history_empty_today) else stringResource(R.string.salida_history_empty_past),
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(top = 24.dp).testTag("salida-history-empty"),
-        )
-        if (isToday) {
-            Spacer(Modifier.height(12.dp))
-            OutlinedButton(
-                onClick = onLaunch,
-                modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("salida-empty-cta"),
+    // Una tarjeta de estado vacío, no una frase suelta: icono en su círculo tonal, el título, la explicación y -- en
+    // hoy -- la acción de lanzar, con el mismo alto que el resto de los botones.
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        modifier = modifier.fillMaxWidth().testTag("salida-history-empty"),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                contentAlignment = Alignment.Center,
             ) {
-                Text(stringResource(R.string.salida_history_launch))
+                Icon(
+                    painter = painterResource(R.drawable.ic_truck),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+            Text(
+                text = stringResource(
+                    if (isToday) R.string.salida_history_empty_today else R.string.salida_history_empty_past,
+                ),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = stringResource(R.string.salida_history_empty_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (isToday) {
+                Button(
+                    onClick = onLaunch,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .defaultMinSize(minHeight = 48.dp)
+                        .testTag("salida-empty-cta"),
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_package_minus),
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.salida_history_launch), style = MaterialTheme.typography.labelLarge)
+                }
             }
         }
     }
@@ -173,6 +218,9 @@ fun SalidaHistoryScreen(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
+        // El mismo ritmo del histórico de Masas: cada bloque respira 16 dp, sin separadores ad-hoc entre unos y
+        // otros. Antes el panel ERP, la tarjeta de salidas y el vacío se tocaban.
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         // El mismo header que los demás históricos, sin contador: el número de días no es lo que el operario viene
         // a leer, y un contador arriba competía con el total del día que está adentro de cada tarjeta.
@@ -181,8 +229,6 @@ fun SalidaHistoryScreen(
             // Sin «Voltar»: la barra superior tiene Lanzamiento al lado y el atrás físico cierra el archivo.
             onHelp = { showHelpDialog = true },
         )
-
-        Spacer(Modifier.height(12.dp))
 
         // El día que el operario viene a mirar. Los chips son la única navegación que queda arriba, y en el
         // pasado lo único que se muestra debajo es el bloque de WhatsApp: el resto es información de un día que
@@ -213,6 +259,7 @@ fun SalidaHistoryScreen(
                 error = state.erpError,
                 date = com.trindade.app.massas.brazilianDate(selected),
                 syncedAt = state.lastSyncedAt?.substringAfter(' ')?.take(5),
+                showEmptyText = false,
             )
             LaunchedEffect(selected) { viewModel.loadSalidaDay(selected) }
         }
@@ -266,8 +313,6 @@ fun SalidaHistoryScreen(
                 }
             }
         }
-
-        Spacer(Modifier.height(8.dp))
 
         if (selected != today) {
             // El pasado no se toca: el histórico muestra lo que se lanzó y su estado, y nada de eso se edita.
@@ -357,8 +402,7 @@ fun SalidaHistoryScreen(
                     onResend = if (viewModel.isPending(movement)) viewModel::resendPending else null,
                 )
             }
-            Spacer(Modifier.height(12.dp))
-        }
+            }
         }
 
         // El compartir es del día entero y vive donde el día se lee: con el mensaje armado desde la tabla
@@ -439,6 +483,11 @@ internal fun SalidaErpBlock(
     date: String,
     /** La hora de la última lectura del espejo, o null cuando nunca se leyó. */
     syncedAt: String? = null,
+    /**
+     * Si la tarjeta del ERP explica el día vacío. El histórico lo apaga: su propia tarjeta de estado vacío ya lo
+     * dice, con la acción al lado.
+     */
+    showEmptyText: Boolean = true,
 ) {
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         // El mismo panel del archivo de Masas -- fecha, última lectura y la píldora tonal -- en vez de un botón
@@ -460,7 +509,12 @@ internal fun SalidaErpBlock(
                 color = MaterialTheme.colorScheme.error,
             )
         }
-        SalidaReportCard(day = day, error = null, modifier = Modifier.testTag("salida-history-erp-block"))
+        SalidaReportCard(
+            day = day,
+            error = null,
+            showEmptyText = showEmptyText,
+            modifier = Modifier.testTag("salida-history-erp-block"),
+        )
     }
 }
 
