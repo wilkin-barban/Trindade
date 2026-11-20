@@ -663,26 +663,82 @@ function productsOf(items: SalidaDayShareMovement['items'], labels: Record<Salid
  */
 export function salidaDaySummaryText(
   movements: readonly SalidaDayShareMovement[],
-  args: { date: string; labels: SalidaDaySummaryLabels },
+  args: {
+    date: string;
+    labels: SalidaDaySummaryLabels;
+    /**
+     * Los operarios del día que devuelve el bloque de Salidas del Relatório.
+     *
+     * El histórico arma su texto con los movimientos que hay en Trindade; el ERP puede tener asientos de otros
+     * operarios -- o productos de un operario que sí está -- que el grupo también espera leer. Se suman con el
+     * mismo formato y la misma tabla, sin repetir a nadie.
+     */
+    erpOperators?: readonly SalidaErpOperator[];
+  },
 ): string {
   const { labels } = args;
+
+  // Una línea del mensaje, venga de Trindade o del ERP: el nombre que se imprime se resuelve igual en los dos.
+  type Line = { code: string; name: string; block: SalidaBlock; units: number };
+  const merged = new Map<string, Line[]>();
+
+  for (const movement of movements) {
+    const key = String(movement.username ?? '').toUpperCase();
+    const lines = merged.get(key) ?? [];
+    for (const item of movement.items) {
+      lines.push({ code: item.product_code, name: item.product_name, block: item.block, units: salidaQuantity(item.quantity) });
+    }
+    merged.set(key, lines);
+  }
+
+  for (const operator of args.erpOperators ?? []) {
+    const key = String(operator.username ?? '').toUpperCase();
+    const known = new Set((merged.get(key) ?? []).map((line) => line.code));
+    const extra = operator.products
+      .filter((product) => product.units > 0 && !known.has(product.code))
+      .map<Line>((product) => ({
+        code: product.code,
+        name: product.name,
+        block: product.block as SalidaBlock,
+        units: product.units,
+      }));
+    if (extra.length === 0) continue;
+    merged.set(key, [...(merged.get(key) ?? []), ...extra]);
+  }
+
+  if (merged.size === 0) {
+    return '';
+  }
+
   const lines: string[] = [];
   lines.push(`🚛 *${labels.title} — ${formatDateLabel(args.date)}*`);
   lines.push(`${labels.movements}: ${movements.length}`);
-
-  if (movements.length === 0) {
-    return lines.join('\n');
-  }
-
   lines.push('');
 
-  movements.forEach((movement, index) => {
+  let index = 0;
+  for (const [operator, entries] of merged) {
     if (index > 0) lines.push('');
-    lines.push(`👤 ${String(movement.username ?? '').toUpperCase()}:`);
-    lines.push(...productsOf(movement.items, labels.blocks));
-  });
+    index += 1;
+    lines.push(`👤 ${operator}:`);
+    for (const block of SALIDA_BLOCKS) {
+      const items = entries.filter((entry) => entry.block === block);
+      if (items.length === 0) continue;
+      lines.push(`*${SALIDA_BLOCK_EMOJIS[block]} ${labels.blocks[block]}*`);
+      for (const item of items) {
+        lines.push(`- ${abbreviateProduct(item.name, item.code)}: ${item.units} un`);
+      }
+    }
+  }
 
   return lines.join('\n').trimEnd();
+}
+
+/** Un operario del día tal como lo devuelve `/reports/day/salidas`. */
+export interface SalidaErpOperator {
+  username: string;
+  name?: string;
+  erpOnly?: boolean;
+  products: readonly { code: string; name: string; block: string; units: number }[];
 }
 
 /** A photo the record keeps, in the two links the module already serves. */

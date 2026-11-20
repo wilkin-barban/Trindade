@@ -853,6 +853,60 @@ describe('SalidaHistoryPage — T3 per-movement state, relaunch, operator filter
     expect(strip.querySelectorAll('button')).toHaveLength(0);
   });
 
+  /**
+   * El mensaje incluye lo que el ERP registró de otros operarios, sin repetir lo local.
+   *
+   * La sección del Relatório trae a quien sólo existe en la empresa; el texto del día tiene que decirlo, porque es
+   * lo que el grupo va a leer.
+   */
+  it('merges the ERP-only operators into the day message', async () => {
+    get.mockImplementation(async (url: string) =>
+      url === '/salida/history'
+        ? { days: [{ date: '2026-11-13', total_units: 20, movements: [PENDING_BOBINA] }] }
+        : url === '/reports/day/salidas?date=2026-11-13'
+          ? {
+              date: '2026-11-13',
+              totalUnits: 7,
+              movementCount: 1,
+              operators: [
+                {
+                  name: 'Vinícius R',
+                  username: 'vinicius',
+                  units: 7,
+                  erpOnly: true,
+                  products: [{ code: '2500', name: 'GORDURA', block: 'materia-prima', units: 7 }],
+                },
+              ],
+            }
+          : {},
+    );
+
+    await renderReady('/salida-history?date=2026-11-13');
+
+    await waitFor(() =>
+      expect(screen.getByTestId('salida-preview-message').textContent).toContain('VINICIUS:'),
+    );
+    expect(screen.getByTestId('salida-preview-message').textContent).toContain('GORDURA: 7 un');
+    // El operario local sigue estando una sola vez.
+    expect(screen.getByTestId('salida-preview-message').textContent).toContain('WILKIN:');
+  });
+
+  it('the ERP sync button is the amber compact one, in its own row', async () => {
+    get.mockImplementation(async (url: string) =>
+      url === '/salida/history'
+        ? { days: [{ date: '2026-11-13', total_units: 20, movements: [PENDING_BOBINA] }] }
+        : {},
+    );
+
+    await renderReady('/salida-history?date=2026-11-13');
+
+    const sync = screen.getByTestId('salida-history-erp-sync');
+    expect(sync.className).toContain('bg-amber-600');
+    expect(sync.className).toContain('min-h-[44px]');
+    expect(sync.textContent).toContain(i18n.t('massas.syncHeader.action'));
+    expect(sync.closest('[data-testid="salida-history-erp-sync-row"]')).not.toBeNull();
+  });
+
   it('does not offer photo actions on a movement launched by another operator', async () => {
     const foreign = movement({
       id: 70,

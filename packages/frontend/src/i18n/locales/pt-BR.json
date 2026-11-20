@@ -54,13 +54,14 @@
     "higieneLabel": "Hig. & Org.",
     "recepcionLabel": "Recepção",
     "taskProgress": "{{done}}/{{total}} tarefas",
-    "goodsProgress": "{{done}}/{{total}} mercadorias",
+    "goodsProgress": "{{done}} mercadorias",
     "shareApp": "Compartilhar App",
     "shareAppHint": "Envie o aplicativo e os acessos para o próximo celular",
     "massasLaunchNow": "Lançar agora",
     "salidaHint": "Registrar saída de produto",
     "salidaNow": "Lançar agora",
-    "salidaHistory": "Ver Histórico"
+    "salidaHistory": "Ver Histórico",
+    "recepcionNotSynced": "Sem sincronização com o ERP"
   },
   "nav": {
     "adminPanel": "Painel Admin",

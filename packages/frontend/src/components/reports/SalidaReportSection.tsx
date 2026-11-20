@@ -35,7 +35,7 @@ export interface SalidaReportOperator {
   erpOnly?: boolean;
 }
 
-interface SalidaReportDay {
+export interface SalidaReportDay {
   date: string;
   operators: SalidaReportOperator[];
   totalUnits: number;
@@ -46,11 +46,14 @@ export function SalidaReportSection({
   date,
   hideRefresh = false,
   refetchKey = 0,
+  onDayLoaded,
 }: {
   /** The report's own day: the salidas are read for the same date the report covers. */
   date: string;
   hideRefresh?: boolean;
   refetchKey?: number;
+  /** El día que la sección leyó, para que quien la monta pueda sumarlo a su mensaje sin volver a pedirlo. */
+  onDayLoaded?: (day: SalidaReportDay | null) => void;
 }) {
   const { t } = useTranslation();
   const [day, setDay] = useState<SalidaReportDay | null>(null);
@@ -64,13 +67,14 @@ export function SalidaReportSection({
     try {
       const body = await api.get<SalidaReportDay>(`/reports/day/salidas?date=${date}`);
       setDay(body);
+      onDayLoaded?.(body);
     } catch {
       // A report is still readable without this block; it says so instead of pretending the day had nothing.
       setFailed(true);
     } finally {
       setLoading(false);
     }
-  }, [date]);
+  }, [date, onDayLoaded]);
 
   useEffect(() => {
     void load();

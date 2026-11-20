@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, ClipboardX } from 'lucide-react';
+import { ArrowLeft, ClipboardX, RefreshCw } from 'lucide-react';
 import { api } from '../../api/client';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../../components/ui/button';
@@ -13,7 +13,7 @@ import { SalidaWhatsAppShare } from '../../components/salida/SalidaWhatsAppShare
 import { aeroSettingsReady, type AeroSettings } from '../../lib/aero-integration';
 import { fetchAeroVaultSettings } from '../../lib/aero-vault';
 import { triggerAeroMovementsSync } from '../../lib/aero-mirror';
-import { SalidaReportSection } from '../../components/reports/SalidaReportSection';
+import { SalidaReportSection, type SalidaReportDay } from '../../components/reports/SalidaReportSection';
 import {
   SalidaSuccessDialog,
   type SalidaErpOutcome,
@@ -141,6 +141,8 @@ export function SalidaHistoryPage() {
   const [erpSyncing, setErpSyncing] = useState(false);
   const [erpNote, setErpNote] = useState<string | null>(null);
   const [erpRefetchKey, setErpRefetchKey] = useState(0);
+  // El día que leyó la sección del ERP, para sumarlo al mensaje sin pedirlo dos veces.
+  const [erpDay, setErpDay] = useState<SalidaReportDay | null>(null);
 
   const handleSyncErp = useCallback(async () => {
     if (erpSyncing) return;
@@ -454,9 +456,13 @@ export function SalidaHistoryPage() {
   };
 
   const previewMessage = useMemo(() => {
-    if (visibleMovements.length === 0) return '';
+    const erpOperators = erpDay?.operators ?? [];
+    if (visibleMovements.length === 0 && erpOperators.every((operator) => operator.products.every((p) => p.units <= 0))) {
+      return '';
+    }
     return salidaDaySummaryText(visibleMovements, {
       date,
+      erpOperators,
       labels: {
         title: t('salida.dayShareTitle'),
         movements: t('salida.dayShareMovements'),
@@ -475,7 +481,7 @@ export function SalidaHistoryPage() {
         },
       },
     });
-  }, [visibleMovements, date, t]);
+  }, [visibleMovements, erpDay, date, t]);
 
   const handleOpenWhatsApp = async () => {
     if (visibleMovements.length === 0) return;
@@ -630,23 +636,29 @@ export function SalidaHistoryPage() {
       {/* El sync del espejo y el bloque del Relatório: sólo en el día de hoy. */}
       {!isReadOnly && (
         <div className="space-y-2" data-testid="salida-history-erp">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => void handleSyncErp()}
-            disabled={erpSyncing}
-            className="min-h-[44px] w-full"
-            data-testid="salida-history-erp-sync"
-          >
-            {erpSyncing ? <LoadingSpinner /> : null}
-            {t('salida.erpSync')}
-          </Button>
+          {/* El mismo botón que el Histórico de Masas: ámbar, compacto y en su fila, no un outline a todo el ancho. */}
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100" data-testid="salida-history-erp-sync-row">
+            <button
+              type="button"
+              onClick={() => void handleSyncErp()}
+              disabled={erpSyncing}
+              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg bg-amber-600 px-3 text-xs font-semibold text-white transition-colors hover:bg-amber-700 disabled:opacity-50"
+              data-testid="salida-history-erp-sync"
+            >
+              <RefreshCw className={`h-4 w-4 shrink-0 ${erpSyncing ? 'animate-spin' : ''}`} />
+              {t('massas.syncHeader.action', 'Sincronizar com ERP')}
+            </button>
+          </div>
           {erpNote && (
             <p className="text-xs text-gray-500" data-testid="salida-history-erp-note">
               {erpNote}
             </p>
           )}
-          <SalidaReportSection date={date} refetchKey={erpRefetchKey} />
+          <SalidaReportSection
+            date={date}
+            refetchKey={erpRefetchKey}
+            onDayLoaded={(day) => setErpDay(day)}
+          />
         </div>
       )}
 
