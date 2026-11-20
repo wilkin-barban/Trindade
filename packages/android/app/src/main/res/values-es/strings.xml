@@ -1015,6 +1015,8 @@
     <string name="massas_error_create_refused">El servidor rechazó el lanzamiento (código %1$d).</string>
     <string name="massas_error_update">No se pudo modificar este lanzamiento.</string>
     <string name="massas_error_delete">No se pudo eliminar este lanzamiento.</string>
+    <string name="massas_aero_erp_timeout">El ERP no respondió a tiempo. El lanzamiento quedó registrado y pendiente en la tabla.</string>
+    <string name="salida_erp_timeout">El ERP no respondió a tiempo. La salida quedó registrada en Trindade y pendiente para reenvío.</string>
     <string name="massas_error_offline">Sin conexión con el servidor. Intente de nuevo.</string>
     <string name="massas_notice_updated">¡Lanzamiento modificado con éxito!</string>
     <string name="massas_notice_deleted">¡Lanzamiento eliminado con éxito!</string>

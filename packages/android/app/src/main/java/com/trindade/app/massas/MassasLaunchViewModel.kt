@@ -4,6 +4,7 @@ import androidx.annotation.StringRes
 import com.trindade.app.R
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trindade.app.aero.withErpTimeout
 import com.trindade.app.aero.AERO_CLOSED_DAY_CODE
 import com.trindade.app.aero.AERO_QUEUE_EXPIRED_CODE
 import com.trindade.app.aero.AERO_QUEUE_MALFORMED_CODE
@@ -468,8 +469,29 @@ class MassasLaunchViewModel @Inject constructor(
                     )
                     // El estado dura hasta que el lote termina de viajar: liberarlo con la escritura local
                     // hecha dejaba la pantalla aceptando un segundo toque con las mismas cajas en vuelo.
+                    // El viaje tiene tiempo máximo: un host colgado sin cerrar la conexión dejaba el botón
+                    // deshabilitado para siempre y el lanzamiento sin veredicto. El `finally` de afuera libera la
+                    // pantalla pase lo que pase, y el pendiente ya quedó en la cola antes de salir.
                     try {
-                        erpDispatchMutex.withLock { dispatchToErp(result.created, items) }
+                        erpDispatchMutex.withLock {
+                            when (withErpTimeout { dispatchToErp(result.created, items) }) {
+                                is com.trindade.app.aero.ErpTrip.Done -> Unit
+                                com.trindade.app.aero.ErpTrip.TimedOut -> {
+                                    refreshQueuedCount()
+                                    _state.value = _state.value.copy(
+                                        resultDialogMessage = UiText.of(R.string.massas_aero_erp_timeout),
+                                        resultDialogIsSuccess = false,
+                                    )
+                                }
+                                is com.trindade.app.aero.ErpTrip.Failed -> {
+                                    refreshQueuedCount()
+                                    _state.value = _state.value.copy(
+                                        resultDialogMessage = UiText.of(R.string.massas_error_offline),
+                                        resultDialogIsSuccess = false,
+                                    )
+                                }
+                            }
+                        }
                     } finally {
                         _state.value = _state.value.copy(isSubmitting = false)
                     }

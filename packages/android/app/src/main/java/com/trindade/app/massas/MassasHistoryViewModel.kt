@@ -42,7 +42,9 @@ class MassasHistoryViewModel @Inject constructor(
             _state.update {
                 it.copy(
                     isLoading = false,
-                    days = result ?: emptyList(),
+                    // Un fallo de lectura conserva los días que ya se veían: borrarlos convertía un timeout en un
+                    // archivo vacío, y el lanzamiento de la web parecía no existir.
+                    days = result ?: it.days,
                     errorMessage = if (result == null) UiText.of(R.string.massas_history_error_load) else null,
                 )
             }

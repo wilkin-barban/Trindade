@@ -198,6 +198,17 @@ fun SalidaHistoryScreen(
 ) {
     val state by viewModel.state.collectAsState()
     var showHelpDialog by remember { mutableStateOf(false) }
+    // Al entrar y al volver a la app se relee el archivo: lo que la web creó mientras esta pantalla estaba en el
+    // fondo tiene que aparecer sin reiniciar la app.
+    LaunchedEffect(Unit) { viewModel.refreshHistoryFromServer() }
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) viewModel.refreshHistoryFromServer()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     // La foto se elige del carrete y se sube comprimida al movimiento que la pidió: la cámara del teléfono ya
     // deja el archivo en el carrete de la planta, así que una sola puerta alcanza para las dos.
     var pendingPhotoMovement by remember { mutableStateOf<Int?>(null) }

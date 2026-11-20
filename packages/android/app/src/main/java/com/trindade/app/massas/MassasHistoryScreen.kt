@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -70,6 +71,17 @@ fun MassasHistoryScreen(
 ) {
     val state by viewModel.state.collectAsState()
     var showAll by remember { mutableStateOf(false) }
+    // La lista de días se relee al entrar y al volver a la app: una lectura de la apertura dejaba el archivo
+    // congelado y el lanzamiento hecho en la web no aparecía.
+    LaunchedEffect(Unit) { viewModel.loadHistory() }
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) viewModel.loadHistory()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     val helpSections = listOf(
         HelpSection(

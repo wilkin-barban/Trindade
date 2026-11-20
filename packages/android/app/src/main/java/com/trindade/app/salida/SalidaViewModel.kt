@@ -156,14 +156,41 @@ class SalidaViewModel @Inject constructor(
                 return@launch
             }
 
-            val outcome = repository.sendToErp(movement, username)
-            _state.value = _state.value.copy(
-                submitting = false,
-                quantities = emptyMap(),
-                day = runCatching { repository.day(_state.value.date) }.getOrDefault(_state.value.day),
-                history = runCatching { repository.history() }.getOrDefault(_state.value.history),
-                notice = SalidaNotice(outcome.message(), isError = outcome is SalidaErpOutcome.Failed),
-            )
+            // El viaje al ERP tiene tiempo máximo y la pantalla se libera siempre: el movimiento ya está en
+            // Trindade, así que lo que se pierde es el viaje, no la baja.
+            try {
+                when (val trip = com.trindade.app.aero.withErpTimeout { repository.sendToErp(movement, username) }) {
+                    is com.trindade.app.aero.ErpTrip.Done -> {
+                        val outcome = trip.value
+                        _state.value = _state.value.copy(
+                            quantities = emptyMap(),
+                            notice = SalidaNotice(outcome.message(), isError = outcome is SalidaErpOutcome.Failed),
+                        )
+                    }
+                    com.trindade.app.aero.ErpTrip.TimedOut ->
+                        _state.value = _state.value.copy(
+                            quantities = emptyMap(),
+                            notice = SalidaNotice(
+                                "El ERP no respondió a tiempo. La salida quedó registrada en Trindade y pendiente para reenvío.",
+                                isError = true,
+                            ),
+                        )
+                    is com.trindade.app.aero.ErpTrip.Failed ->
+                        _state.value = _state.value.copy(
+                            quantities = emptyMap(),
+                            notice = SalidaNotice(
+                                "El ERP no respondió a tiempo. La salida quedó registrada en Trindade y pendiente para reenvío.",
+                                isError = true,
+                            ),
+                        )
+                }
+            } finally {
+                _state.value = _state.value.copy(
+                    submitting = false,
+                    day = runCatching { repository.day(_state.value.date) }.getOrDefault(_state.value.day),
+                    history = runCatching { repository.history() }.getOrDefault(_state.value.history),
+                )
+            }
         }
     }
 
@@ -433,9 +460,25 @@ class SalidaViewModel @Inject constructor(
             ?: ""
     }
 
-    /** Elige el día que el histórico muestra; null es hoy. */
+    /**
+     * Elige el día que el histórico muestra; null es hoy.
+     *
+     * Cambiar de día relee el archivo en vez de confiar en la copia en memoria: lo que la web (u otro teléfono)
+     * lanzó mientras esta pantalla estaba abierta tiene que aparecer al elegir la fecha.
+     */
     fun selectHistoryDate(date: String?) {
         _state.value = _state.value.copy(historyDate = date)
+        refreshHistoryFromServer()
+    }
+
+    /**
+     * Relee el archivo del servidor, conservando lo que ya se ve si la lectura falla.
+     *
+     * Al entrar al histórico y al volver a la app: una lectura de la apertura dejaba el archivo congelado y una
+     * salida creada desde la web sólo aparecía tras reiniciar la app.
+     */
+    fun refreshHistoryFromServer() {
+        viewModelScope.launch { refreshHistory() }
     }
 
     /** Pasa de «hoy más cinco» a todas las fechas, y vuelve. */

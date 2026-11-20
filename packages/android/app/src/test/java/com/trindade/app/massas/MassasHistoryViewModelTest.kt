@@ -1,5 +1,6 @@
 package com.trindade.app.massas
 
+import com.trindade.app.R
 import com.trindade.app.network.MassaHistoryDay
 import com.trindade.app.network.MassasApi
 import kotlinx.coroutines.CompletableDeferred
@@ -104,5 +105,40 @@ class MassasHistoryViewModelTest {
         assertTrue(viewModel.state.value.showHelpDialog)
         viewModel.toggleHelpDialog(false)
         assertFalse(viewModel.state.value.showHelpDialog)
+    }
+
+    /**
+     * Una lectura fallida conserva los días que ya se veían.
+     *
+     * Borrar la lista ante un timeout convertía el archivo en una pantalla vacía: el lanzamiento que la web acababa
+     * de crear parecía no existir. Y `loadHistory` se puede volver a llamar -- al entrar y al volver a la app -- sin
+     * perder lo leído.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `a failed read keeps the days it already had`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val entered = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val gated = GatedRepository(retrofit.create(MassasApi::class.java), entered, release)
+            val viewModel = MassasHistoryViewModel(gated)
+            entered.await()
+            release.complete(Unit)
+            advanceUntilIdle()
+            assertEquals(1, viewModel.state.value.days.size)
+
+            // La segunda lectura falla: el archivo no se vacía.
+            val failing = object : MassasRepository(retrofit.create(MassasApi::class.java)) {
+                override suspend fun history(): List<MassaHistoryDay>? = null
+            }
+            val refreshed = MassasHistoryViewModel(failing)
+            refreshed.loadHistory()
+            advanceUntilIdle()
+            assertEquals(R.string.massas_history_error_load, refreshed.state.value.errorMessage?.resId)
+            assertTrue(refreshed.state.value.days.isEmpty())
+        } finally {
+            Dispatchers.resetMain()
+        }
     }
 }
