@@ -134,6 +134,8 @@ beforeEach(async () => {
 
   get.mockImplementation(async (url: string) => {
     if (url === '/salida/catalog') return { products: [...SALIDA_FALLBACK_PRODUCTS] };
+    // El día confirma que el movimiento del outbox existe y sigue pendiente: es lo que valida el aviso.
+    if (url.startsWith('/salida?date=')) return { movements: [MOVEMENT] };
     return {};
   });
 
@@ -310,7 +312,8 @@ describe('SalidaLaunchPage', () => {
     // The movement is not lost: the dialog says the ERP has not answered and the outbox offers a resend.
     expect(screen.getByTestId('salida-erp-answer').textContent).toContain('Todavía no hay respuesta del ERP');
     expect(screen.getByTestId('salida-success-total').textContent).toContain('25');
-    expect(screen.getByTestId('salida-outbox')).toBeInTheDocument();
+    // El aviso se dibuja cuando el día confirma que el movimiento sigue pendiente.
+    expect(await screen.findByTestId('salida-outbox')).toBeInTheDocument();
     // And the form is empty, so the same quantities cannot be filed twice.
     expect((screen.getByTestId('salida-quantity-1357') as HTMLInputElement).value).toBe('');
   });
@@ -488,5 +491,59 @@ describe('SalidaLaunchPage — iPhone header', () => {
     expect(within(dialog).getByTestId('salida-success-total').textContent).toContain('25');
     // Y el formulario quedó vacío: no se puede enviar dos veces.
     expect((screen.getByTestId('salida-quantity-1357') as HTMLInputElement).value).toBe('');
+  });
+
+  /**
+   * Un outbox cuyo movimiento ya no está no se anuncia en la pantalla de lanzamiento.
+   *
+   * La cola queda en el teléfono después de borrar una salida: leerla sin preguntar dejaba el banner "Saída
+   * pendente" sobre un movimiento que no existe. Se valida contra el día y, si no está, se limpia.
+   */
+  it('hides and clears an outbox whose movement the day does not have', async () => {
+    const { SALIDA_OUTBOX_KEY } = await import('../../lib/salida');
+    localStorage.setItem(
+      SALIDA_OUTBOX_KEY,
+      JSON.stringify({
+        movementId: 404,
+        date: saoPauloToday(),
+        trips: [{ action: 'saida', payloads: [{ PRO_COD: '1357', PRO_QTD: 2000 }] }],
+        startedAt: new Date().toISOString(),
+      }),
+    );
+    get.mockImplementation(async (url: string) => {
+      if (url === '/salida/catalog') return { products: [...SALIDA_FALLBACK_PRODUCTS] };
+      if (url.startsWith('/salida?date=')) return { movements: [] };
+      return {};
+    });
+
+    await renderReady();
+
+    await waitFor(() => expect(screen.queryByTestId('salida-outbox')).toBeNull());
+    await waitFor(() => expect(localStorage.getItem(SALIDA_OUTBOX_KEY)).toBeNull());
+  });
+
+  /** Si el día no se puede leer, tampoco se inventa un pendiente. */
+  it('does not invent a pending outbox when the day cannot be read', async () => {
+    const { SALIDA_OUTBOX_KEY } = await import('../../lib/salida');
+    localStorage.setItem(
+      SALIDA_OUTBOX_KEY,
+      JSON.stringify({
+        movementId: 12,
+        date: saoPauloToday(),
+        trips: [{ action: 'saida', payloads: [{ PRO_COD: '1357', PRO_QTD: 2000 }] }],
+        startedAt: new Date().toISOString(),
+      }),
+    );
+    get.mockImplementation(async (url: string) => {
+      if (url === '/salida/catalog') return { products: [...SALIDA_FALLBACK_PRODUCTS] };
+      if (url.startsWith('/salida?date=')) throw new Error('offline');
+      return {};
+    });
+
+    await renderReady();
+
+    await waitFor(() => expect(screen.queryByTestId('salida-outbox')).toBeNull());
+    // La cola no se destruye por una lectura fallida: sólo se deja de mostrar.
+    expect(localStorage.getItem(SALIDA_OUTBOX_KEY)).not.toBeNull();
   });
 });

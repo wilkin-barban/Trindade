@@ -30,6 +30,9 @@ import {
   buildSalidaTrips,
   clearSalidaOutbox,
   readSalidaOutbox,
+  clearSalidaLastMovement,
+  readSalidaLastMovement,
+  salidaOutboxIsOwed,
   salidaActionableErrorMessage,
   salidaDateLine,
   salidaItemsFromQuantities,
@@ -112,6 +115,41 @@ export function SalidaLaunchPage() {
   useEffect(() => {
     setOutbox(readSalidaOutbox());
   }, []);
+
+  /**
+   * El outbox se cree sólo si el movimiento que nombra sigue existiendo y pendiente.
+   *
+   * Vive en el teléfono y sobrevive al borrado: leerlo sin preguntar dejaba el banner "Saída pendente" sobre un
+   * movimiento que ya no estaba. Se consulta el día del outbox -- una lectura, no la pantalla -- y si el movimiento
+   * no está, o el ERP ya lo confirmó, la cola se limpia en lugar de anunciarse.
+   */
+  const [outboxOwed, setOutboxOwed] = useState(false);
+  useEffect(() => {
+    if (!outbox) {
+      setOutboxOwed(false);
+      return;
+    }
+    let active = true;
+    void (async () => {
+      try {
+        const body = await api.get<{ movements?: SalidaMovement[] }>(`/salida?date=${outbox.date}`);
+        if (!active) return;
+        const owed = salidaOutboxIsOwed(outbox, body.movements ?? []);
+        setOutboxOwed(owed);
+        if (!owed) {
+          clearSalidaOutbox();
+          setOutbox(null);
+          if (readSalidaLastMovement()?.id === outbox.movementId) clearSalidaLastMovement();
+        }
+      } catch {
+        // Sin poder validar no se inventa un pendiente: el aviso no bloquea la pantalla.
+        if (active) setOutboxOwed(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [outbox]);
 
   const groups = useMemo(
     () => (catalog ? salidaProductsByBlock(catalog) : null),
@@ -329,7 +367,7 @@ export function SalidaLaunchPage() {
         </p>
       )}
 
-      {outbox && (
+      {outbox && outboxOwed && (
         <div
           role="status"
           className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"

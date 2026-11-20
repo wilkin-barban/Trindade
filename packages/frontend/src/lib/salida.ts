@@ -1185,6 +1185,26 @@ export function clearSalidaOutbox(storage: StorageLike | null = safeStorage()): 
 }
 
 /** The next trip and what is left after it, so the caller can arm one and store the rest. */
+/**
+ * Si el outbox sigue debiendo un viaje por un movimiento que existe y está pendiente.
+ *
+ * El outbox vive en el teléfono y sobrevive a la pantalla, al día y al borrado: un movimiento retirado o que el ERP
+ * ya confirmó no debe seguir anunciándose como "pendiente de envío". La regla no inventa: sin el día leído no hay
+ * forma de afirmar que se debe algo, así que la respuesta es que no.
+ */
+export function salidaOutboxIsOwed(
+  outbox: SalidaOutbox | null | undefined,
+  movements: readonly SalidaMovement[],
+): boolean {
+  if (!outbox || outbox.trips.length === 0) return false;
+  const movement = movements.find((row) => row.id === outbox.movementId);
+  if (!movement) return false;
+  const status = movement.erp?.status ?? null;
+  if (status === 'sent' || status === 'partial') return false;
+  if (movement.reconciliation?.status === 'reconciled') return false;
+  return true;
+}
+
 export function takeSalidaTrip(outbox: SalidaOutbox | null): {
   trip: SalidaTrip | null;
   rest: SalidaOutbox | null;

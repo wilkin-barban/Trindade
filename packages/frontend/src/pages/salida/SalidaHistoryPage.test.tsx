@@ -1220,4 +1220,76 @@ describe('SalidaHistoryPage — T3 per-movement state, relaunch, operator filter
     expect(label?.className).toContain('truncate');
     expect(label?.className).toContain('sm:overflow-visible');
   });
+
+  /**
+   * Un outbox huérfano no se anuncia: ni banner, ni `salida-history-outbox`.
+   *
+   * La cola vive en localStorage y sobrevive al borrado del movimiento. Si el día leído no la contiene -- o el ERP
+   * ya lo confirmó -- el aviso no se dibuja y la cola se limpia.
+   */
+  it('never announces an outbox whose movement is gone', async () => {
+    const { SALIDA_OUTBOX_KEY } = await import('../../lib/salida');
+    localStorage.setItem(
+      SALIDA_OUTBOX_KEY,
+      JSON.stringify({
+        movementId: 999,
+        date: '2026-11-13',
+        trips: [{ action: 'saida', payloads: [{ PRO_COD: '1357', PRO_QTD: 2000 }] }],
+        startedAt: new Date().toISOString(),
+      }),
+    );
+
+    await renderReady();
+
+    await waitFor(() => expect(screen.queryByTestId('salida-history-outbox')).toBeNull());
+    expect(screen.queryByText(/pendente de envio/i)).toBeNull();
+    // Y la cola se retiró del teléfono en vez de reaparecer en la próxima visita.
+    await waitFor(() => expect(localStorage.getItem(SALIDA_OUTBOX_KEY)).toBeNull());
+  });
+
+  /** Con el movimiento real pendiente, el aviso sí está. */
+  it('announces a pending outbox when the movement exists and is still pending', async () => {
+    const { SALIDA_OUTBOX_KEY } = await import('../../lib/salida');
+    localStorage.setItem(
+      SALIDA_OUTBOX_KEY,
+      JSON.stringify({
+        movementId: 2,
+        date: '2026-11-13',
+        trips: [{ action: 'saida', payloads: [{ PRO_COD: '1357', PRO_QTD: 2000 }] }],
+        startedAt: new Date().toISOString(),
+      }),
+    );
+
+    await renderReady();
+
+    expect(await screen.findByTestId('salida-history-outbox')).toBeInTheDocument();
+  });
+
+  /** Borrar la tarjeta se lleva también lo que el teléfono debía por ella. */
+  it('clears the outbox and the last movement when the draft is deleted', async () => {
+    const { SALIDA_OUTBOX_KEY, SALIDA_LAST_MOVEMENT_KEY, writeSalidaLastMovement } = await import('../../lib/salida');
+    localStorage.setItem(
+      SALIDA_OUTBOX_KEY,
+      JSON.stringify({
+        movementId: 2,
+        date: '2026-11-13',
+        trips: [{ action: 'saida', payloads: [{ PRO_COD: '1357', PRO_QTD: 2000 }] }],
+        startedAt: new Date().toISOString(),
+      }),
+    );
+    writeSalidaLastMovement({ ...PENDING_BOBINA });
+
+    await renderReady();
+    expect(await screen.findByTestId('salida-history-outbox')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('salida-delete-2'));
+    const confirm = await screen.findByTestId('salida-delete-confirm');
+    del.mockResolvedValue({ success: true });
+    fireEvent.click(within(confirm).getByText('Eliminar permanentemente'));
+
+    await waitFor(() => expect(del).toHaveBeenCalledWith('/salida/2'));
+    await waitFor(() => expect(localStorage.getItem(SALIDA_OUTBOX_KEY)).toBeNull());
+    expect(localStorage.getItem(SALIDA_LAST_MOVEMENT_KEY)).toBeNull();
+    expect(screen.queryByTestId('salida-history-outbox')).toBeNull();
+  });
 });

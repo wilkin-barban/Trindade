@@ -16,7 +16,7 @@ import { aeroSettingsReady, type AeroSettings } from '../../lib/aero-integration
 import { fetchAeroVaultSettings } from '../../lib/aero-vault';
 import { lastSyncLabel, readAeroMovementsSnapshot, triggerAeroMovementsSync } from '../../lib/aero-mirror';
 import { SalidaReportSection, type SalidaReportDay } from '../../components/reports/SalidaReportSection';
-import { salidaOffersDelete } from '../../lib/salida';
+import { salidaOffersDelete, salidaOutboxIsOwed } from '../../lib/salida';
 import {
   SalidaSuccessDialog,
   type SalidaErpOutcome,
@@ -261,6 +261,13 @@ export function SalidaHistoryPage() {
     setDeleteTarget(null);
     try {
       await api.del(`/salida/${target.id}`);
+      // Lo que el teléfono debía por ese movimiento se retira con él: si el outbox quedaba, la pantalla seguía
+      // anunciando un pendiente de envío que ya no existe.
+      if (readSalidaOutbox()?.movementId === target.id) {
+        clearSalidaOutbox();
+        setOutbox(null);
+      }
+      if (readSalidaLastMovement()?.id === target.id) clearSalidaLastMovement();
       setNoticeDialog({ tone: 'success', message: t('salida.deleteDone', 'Movimento excluído.') });
       await load();
       setErpRefetchKey((key) => key + 1);
@@ -271,6 +278,16 @@ export function SalidaHistoryPage() {
       });
     }
   }, [deleteTarget, load, t]);
+
+  // Un outbox huérfano no se dibuja ni se queda: si el día ya se leyó y el movimiento no existe -- o el ERP lo
+  // confirmó -- la cola local se limpia. Sin día leído no se afirma nada y no se muestra el pendiente.
+  useEffect(() => {
+    if (!outbox || days.loading) return;
+    if (salidaOutboxIsOwed(outbox, dayMovements)) return;
+    clearSalidaOutbox();
+    setOutbox(null);
+    if (readSalidaLastMovement()?.id === outbox.movementId) clearSalidaLastMovement();
+  }, [outbox, days.loading, dayMovements]);
 
   const visibleMovements = useMemo(() => {
     if (block === 'all') return dayMovements;
@@ -760,7 +777,7 @@ export function SalidaHistoryPage() {
         )}
       </div>
 
-      {outbox && (
+      {outbox && salidaOutboxIsOwed(outbox, dayMovements) && (
         <p className="text-xs text-amber-800" data-testid="salida-history-outbox">
           {t('salida.pendingTitle')} · {outbox.trips.length}
         </p>
