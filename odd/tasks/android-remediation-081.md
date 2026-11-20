@@ -650,6 +650,19 @@ el historial: separar las responsabilidades.
   fila propia, 44 px) y el mensaje del día suma los operarios/productos del ERP que trae `SalidaReportSection`
   (`onDayLoaded`), sin duplicar y con el mismo formato.
 
+## 22. Web: Histórico de Saídas, último sync, día ERP-only y el error automático
+
+- **Último sync**: la fila del botón ámbar lee el espejo de la fecha (`/integration/aero/movements?date=`) con
+  `readAeroMovementsSnapshot`/`lastSyncLabel` y muestra `<span data-testid="salida-last-sync">Último sync: 18:55</span>`,
+  actualizado tras sincronizar; envuelve sin desbordar a 390 px.
+- **`hasShareableData`** = movimientos locales **o** productos del ERP con unidades: habilita el envío, genera el
+  texto y decide el vacío. La tarjeta «Não há saídas neste dia» y su CTA quedan sólo para el día sin nada; la lista
+  local sólo se dibuja si hay movimientos locales; con sólo ERP, manda el bloque del Relatório.
+- **Causa raíz del «Não foi possível carregar…» automático**: `SalidaReportSection` dependía del callback del padre
+  en el `useCallback` de su lectura; el padre lo recreaba en cada render, la lectura actualizaba al padre y la
+  sección se releía en bucle (el backend registraba una ráfaga de peticiones idénticas). El callback vive en una ref
+  y el efecto depende sólo de la fecha: una lectura por fecha, sin bucle y sin banner espurio.
+
 ## 21. Web: la ventana de respuesta, con forma de producto
 
 - `Dialog` acepta `panelClassName` (foco atrapado, Escape, overlay y retorno de foco siguen siendo suyos).
