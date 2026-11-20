@@ -14,7 +14,11 @@ vi.mock('../../api/client', () => ({
 }));
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'es' } }),
+  useTranslation: () => ({
+    t: (key: string, _fallback?: string, options?: { count?: number }) =>
+      options?.count !== undefined ? `${options.count} fleteros` : key,
+    i18n: { language: 'es' },
+  }),
 }));
 
 const { ScheduleExportView } = await import('./ScheduleExportView');
@@ -61,4 +65,39 @@ describe('ScheduleExportView', () => {
     fireEvent.click(screen.getByTestId('loading-export-dismiss'));
     expect(onClose).toHaveBeenCalled();
   });
+
+  /**
+   * Veinte fleteros no empujan el mensaje fuera de la vista.
+   *
+   * La lista vive en su propia área con scroll y un contador; la prévia tiene su banda fija arriba y el cierre su
+   * pie. Lo que se afirma es la estructura: el mensaje sigue en el panel, la lista es la que se desplaza y el botón
+   * de cerrar está.
+   */
+  it('keeps the message visible and the close reachable with twenty fleteros', async () => {
+    const many = Array.from({ length: 20 }, (_, index) => ({
+      id: index + 1,
+      name: `Fletero ${index + 1}`,
+      phone: `+55 11 98888-${String(1000 + index)}`,
+      driver_type: 'fletero',
+    }));
+    get.mockImplementation(async (url: string) => {
+      if (url.startsWith('/loading/export')) return { text: 'CRONOGRAMA DEL DÍA' };
+      if (url.startsWith('/loading/schedules')) return { schedules: many.map((driver) => ({ driver_id: driver.id })) };
+      if (url.startsWith('/loading/drivers')) return { drivers: many };
+      return {};
+    });
+
+    render(<ScheduleExportView date="2026-11-10" open onClose={() => {}} />);
+
+    await waitFor(() => expect(screen.getByTestId('loading-export-text')).toBeInTheDocument());
+    // La prévia y el cierre están, y la lista es la que scrollea.
+    expect(screen.getByTestId('loading-export-text').textContent).toBe('CRONOGRAMA DEL DÍA');
+    const list = screen.getByTestId('loading-export-fleteros');
+    expect(list.className).toContain('overflow-y-auto');
+    expect(screen.getByTestId('loading-export-fleteros-count').textContent).toContain('20');
+    expect(screen.getByTestId('loading-export-dismiss')).toBeInTheDocument();
+    // El panel es de altura acotada: la lista nunca empuja el mensaje ni el pie.
+    expect(screen.getByTestId('loading-export-modal').className).toContain('max-h-[90vh]');
+  });
+
 });
