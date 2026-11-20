@@ -697,6 +697,7 @@
     <string name="salida_total">Total</string>
     <string name="salida_confirm">Confirmar</string>
     <string name="salida_cancel">Cancelar</string>
+    <string name="salida_last_sync">Último sync: %1$s</string>
     <string name="salida_history_title">Historial de Salidas</string>
     <string name="salida_history_empty_today">Ninguna salida registrada hoy.</string>
     <string name="salida_history_empty_past">Ninguna salida registrada.</string>

@@ -43,6 +43,8 @@ data class SalidaUiState(
     val erpSyncing: Boolean = false,
     /** Lo que dijo el ERP o la falta de credenciales, para leerlo debajo del botón. */
     val erpError: com.trindade.app.ui.UiText? = null,
+    /** La hora de la última lectura del espejo para el día elegido, como la muestra el archivo de Masas. */
+    val lastSyncedAt: String? = null,
 ) {
     /** Lo que la baja va a mandar: sólo los productos de los bloques activos, con una cantidad válida. */
     val selection: SalidaSelection
@@ -266,8 +268,15 @@ class SalidaViewModel @Inject constructor(
         viewModelScope.launch {
             val day = runCatching { reports.salidaDay(date) }.getOrNull()
             _state.value = _state.value.copy(
+                // Una lectura que falla no borra el día que ya estaba en pantalla, y no reclama un error si hay
+                // datos válidos: el operario sigue leyendo lo que tenía y el fallo es de la última lectura.
                 salidaDay = day ?: _state.value.salidaDay,
-                erpError = if (day == null) com.trindade.app.ui.UiText.of(com.trindade.app.R.string.report_salida_read_error) else null,
+                erpError = if (day == null && _state.value.salidaDay == null) {
+                    com.trindade.app.ui.UiText.of(com.trindade.app.R.string.report_salida_read_error)
+                } else {
+                    null
+                },
+                lastSyncedAt = aeroSettingsStore?.syncedAt(date) ?: _state.value.lastSyncedAt,
             )
         }
     }
@@ -302,6 +311,7 @@ class SalidaViewModel @Inject constructor(
                     val day = runCatching { reports.salidaDay(date) }.getOrNull()
                     _state.value = _state.value.copy(
                         erpSyncing = false,
+                        lastSyncedAt = store.syncedAt(date),
                         salidaDay = day ?: _state.value.salidaDay,
                         erpError = if (day == null) {
                             com.trindade.app.ui.UiText.of(com.trindade.app.R.string.report_salida_read_error)

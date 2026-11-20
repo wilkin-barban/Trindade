@@ -55,6 +55,14 @@ fun MassasDayHeader(
      * action that would end in a 409: there is nothing to sync into a record.
      */
     readOnly: Boolean = false,
+    /**
+     * El tag del botón, para que otra pantalla que monte este header conserve el suyo.
+     *
+     * El estilo es uno solo -- el de Masas -- y el tag es lo que cada superficie usa para encontrarlo en sus tests.
+     */
+    syncTestTag: String = MASSAS_SYNC_TAG,
+    /** El tag del spinner, por la misma razón. */
+    syncSpinnerTestTag: String = MASSAS_SYNC_SPINNER_TAG,
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
@@ -87,13 +95,13 @@ fun MassasDayHeader(
                     enabled = !isSyncing,
                     modifier = Modifier
                         .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-                        .testTag(MASSAS_SYNC_TAG),
+                        .testTag(syncTestTag),
                 ) {
                     if (isSyncing) {
                         CircularProgressIndicator(
                             modifier = Modifier
                                 .size(16.dp)
-                                .testTag(MASSAS_SYNC_SPINNER_TAG),
+                                .testTag(syncSpinnerTestTag),
                             strokeWidth = 2.dp,
                         )
                     } else {

@@ -39,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
 import com.trindade.app.R
+import com.trindade.app.massas.MassasDayHeader
 import com.trindade.app.ui.historyQuickDays
 import com.trindade.app.ui.components.HelpSection
 import com.trindade.app.ui.components.ModuleHelpDialog
@@ -210,6 +211,8 @@ fun SalidaHistoryScreen(
                 onSync = viewModel::syncSalidaDay,
                 day = state.salidaDay,
                 error = state.erpError,
+                date = com.trindade.app.massas.brazilianDate(selected),
+                syncedAt = state.lastSyncedAt?.substringAfter(' ')?.take(5),
             )
             LaunchedEffect(selected) { viewModel.loadSalidaDay(selected) }
         }
@@ -283,10 +286,13 @@ fun SalidaHistoryScreen(
         // El filtro por bloque es de la pantalla y no del servidor: los movimientos del día ya están acá.
         var block by remember { mutableStateOf<String?>(null) }
 
+        // El día puede tener datos sólo del ERP: el mensaje se arma con los dos, y el vacío es para el día sin nada.
+        val hasShareableData = salidaHasShareableData(movements.size, state.salidaDay?.operators.orEmpty())
+
         // El día vacío se dibuja como en la web: su estado -- con la puerta al lanzamiento si es hoy -- y,
         // debajo, el bloque de compartir con la prévia vacía y el envío deshabilitado. Ocultarlo dejaba al
         // operario sin saber si el día no tenía nada o si la pantalla no había cargado.
-        if (movements.isEmpty()) {
+        if (!hasShareableData) {
             SalidaHistoryEmptyDay(
                 isToday = selected == today,
                 onLaunch = onLaunch,
@@ -358,7 +364,7 @@ fun SalidaHistoryScreen(
         // El compartir es del día entero y vive donde el día se lee: con el mensaje armado desde la tabla
         // de abreviaturas, la prévia a la vista y una sola acción. El día vacío monta su propio bloque, con la
         // prévia vacía y el envío deshabilitado, junto al estado que lo explica.
-        if (movements.isNotEmpty()) {
+        if (hasShareableData) {
             SalidaWhatsAppShare(
                 text = viewModel.dayShareText(summaryLabels),
                 // Las fotos del día acompañan al mensaje: la miniatura dice qué viaja con el texto.
@@ -411,6 +417,9 @@ internal fun SalidaCreateResponseMovement.owns(viewerUsername: String): Boolean 
 /** El tag con el que un test encuentra la sincronización del espejo en este histórico. */
 const val SALIDA_HISTORY_ERP_SYNC_TAG: String = "salida-history-erp-sync"
 
+/** El spinner del botón, para que un test distinga «sincronizando» de «no pasó nada». */
+const val SALIDA_HISTORY_ERP_SYNC_SPINNER_TAG: String = "salida-history-erp-sync-progress"
+
 /**
  * Las salidas del ERP del día, con la acción que las trae. Sólo se dibuja en el día de hoy.
  *
@@ -426,26 +435,24 @@ internal fun SalidaErpBlock(
     day: com.trindade.app.contract.models.SalidaReportDayView?,
     error: com.trindade.app.ui.UiText?,
     modifier: Modifier = Modifier,
+    /** La fecha del día elegido, como la escribe la planta: la línea «Data de Produção» del header. */
+    date: String,
+    /** La hora de la última lectura del espejo, o null cuando nunca se leyó. */
+    syncedAt: String? = null,
 ) {
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        FilledTonalButton(
-            onClick = onSync,
-            enabled = !isSyncing,
-            modifier = Modifier
-                .fillMaxWidth()
-                .defaultMinSize(minHeight = 48.dp)
-                .testTag(SALIDA_HISTORY_ERP_SYNC_TAG),
-        ) {
-            if (isSyncing) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(18.dp),
-                    strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                )
-                Spacer(Modifier.width(8.dp))
-            }
-            Text(stringResource(R.string.report_erp_sync), style = MaterialTheme.typography.labelLarge)
-        }
+        // El mismo panel del archivo de Masas -- fecha, última lectura y la píldora tonal -- en vez de un botón
+        // ámbar propio: una sola forma de sincronizar el espejo en toda la app. El tag se conserva para esta
+        // pantalla a través del header.
+        MassasDayHeader(
+            date = date,
+            syncedAt = syncedAt,
+            isSyncing = isSyncing,
+            onSync = onSync,
+            readOnly = false,
+            syncTestTag = SALIDA_HISTORY_ERP_SYNC_TAG,
+            syncSpinnerTestTag = SALIDA_HISTORY_ERP_SYNC_SPINNER_TAG,
+        )
         error?.let {
             Text(
                 text = it.resolve(),
@@ -456,6 +463,17 @@ internal fun SalidaErpBlock(
         SalidaReportCard(day = day, error = null, modifier = Modifier.testTag("salida-history-erp-block"))
     }
 }
+
+/**
+ * Si el día tiene algo que compartir: movimientos de Trindade o productos del ERP con unidades.
+ *
+ * Es la regla de la web, y la que decide si se dibuja la tarjeta del día vacío: un día con asientos del ERP a la
+ * vista no está vacío, y su mensaje se arma con las dos fuentes.
+ */
+internal fun salidaHasShareableData(
+    movements: Int,
+    erpOperators: List<com.trindade.app.contract.models.SalidaReportDayViewOperatorsInner>,
+): Boolean = movements > 0 || erpOperators.any { operator -> operator.products.any { it.units > 0 } }
 
 /**
  * Si esta fecha muestra el día completo o sólo el bloque de WhatsApp.

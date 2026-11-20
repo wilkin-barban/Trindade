@@ -37,7 +37,7 @@ class SalidaErpBlockTest {
     private val context: Context
         get() = ApplicationProvider.getApplicationContext()
 
-    private fun copy(id: Int): String = context.getString(id)
+    private fun copy(id: Int, vararg args: Any): String = context.getString(id, *args)
 
     @Test
     fun `the block offers the sync and the report's own card`() {
@@ -49,12 +49,17 @@ class SalidaErpBlockTest {
                     onSync = { synced++ },
                     day = null,
                     error = null,
+                    date = "19/11/2026",
+                    syncedAt = "18:55",
                 )
             }
         }
 
+        // El panel del archivo de Masas: la fecha de producción y la última lectura, con la píldora a la derecha.
+        composeRule.onNodeWithText(copy(R.string.massas_production_date, "19/11/2026")).assertIsDisplayed()
+        composeRule.onNodeWithText(copy(R.string.massas_synced_at, "18:55")).assertIsDisplayed()
         composeRule.onNodeWithTag(SALIDA_HISTORY_ERP_SYNC_TAG).assertIsDisplayed()
-        composeRule.onNodeWithText(copy(R.string.report_erp_sync)).assertIsDisplayed().performClick()
+        composeRule.onNodeWithText(copy(R.string.massas_sync_erp)).assertIsDisplayed().performClick()
         composeRule.waitForIdle()
         assertEquals(1, synced)
         composeRule.onNodeWithTag("salida-history-erp-block").assertIsDisplayed()
@@ -70,11 +75,15 @@ class SalidaErpBlockTest {
                     onSync = {},
                     day = null,
                     error = UiText.literal(failure),
+                    date = "19/11/2026",
                 )
             }
         }
 
+        composeRule.onNodeWithTag(SALIDA_HISTORY_ERP_SYNC_SPINNER_TAG).assertIsDisplayed()
         composeRule.onNodeWithTag(SALIDA_HISTORY_ERP_SYNC_TAG).assertIsNotEnabled()
+        // Sin hora, el panel dice que nunca se sincronizó.
+        composeRule.onNodeWithText(copy(R.string.massas_never_synced)).assertIsDisplayed()
         composeRule.onNodeWithText(failure).assertIsDisplayed()
     }
 }
