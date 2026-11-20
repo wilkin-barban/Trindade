@@ -6,6 +6,7 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
@@ -296,13 +297,63 @@ class LoadingShareScreenTest {
 
         composeRule.onNodeWithText(copy(R.string.export_send_to_fletero)).assertIsDisplayed()
         composeRule.onNodeWithText("CRONOGRAMA DE CARREGAMENTO").assertIsDisplayed()
-        composeRule.onNodeWithText("Ana").assertIsDisplayed().performClick()
+        // La fila dice quién y a qué número, no sólo el nombre.
+        composeRule.onNodeWithText("Ana").assertIsDisplayed()
+        composeRule.onNodeWithText("+55 (11) 98888-7777").assertIsDisplayed()
+        composeRule.onNodeWithTag(loadingFleteroRowTag(7)).performClick()
         composeRule.waitForIdle()
 
         assertEquals(listOf(7), opened)
     }
 
     /** Un día sin fleteros con número no dibuja la sección: el lugar vacío no es un fallo. */
+
+    /**
+     * Con muchos fleteros, la sección no se come la pantalla.
+     *
+     * La lista tiene su propio scroll y alto acotado: el mensaje -- lo que se manda -- y la vuelta siguen a la
+     * vista. Y la vuelta es de la pantalla, no una píldora al lado del título de la tarjeta.
+     */
+    @Test
+    fun `twenty fleteros scroll inside their section and leave the message and the back in place`() {
+        val drivers = (1..20).map { index ->
+            DriversResponseDriversInner(
+                id = index,
+                name = "Fletero $index",
+                licensePlate = null,
+                phone = "+55 11 98888-${1000 + index}",
+                driverType = DriversResponseDriversInner.DriverType.fletero,
+            )
+        }
+        val state = LoadingShareViewModel.UiState(
+            date = "2026-11-18",
+            loading = false,
+            exportText = "CRONOGRAMA DE CARREGAMENTO",
+            message = null,
+            fleteros = drivers,
+        )
+
+        composeRule.setContent {
+            TrindadeTheme {
+                LoadingShareScreen(
+                    date = "2026-11-18",
+                    state = state,
+                    onShare = {},
+                    onPdf = {},
+                    onBack = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("loading-fleteros-section").assertIsDisplayed()
+        composeRule.onNodeWithText("Fletero 1").assertIsDisplayed()
+        composeRule.onNodeWithText("+55 11 98888-1001").assertIsDisplayed()
+        composeRule.onNodeWithText("CRONOGRAMA DE CARREGAMENTO").assertIsDisplayed()
+        // La vuelta vive en la barra de la pantalla; la tarjeta no dibuja otra.
+        composeRule.onNodeWithTag("loading-share-back").assertIsDisplayed()
+        composeRule.onNodeWithTag("share-card-back").assertDoesNotExist()
+    }
+
     @Test
     fun `a day with no fleteros who can be reached draws no fletero section`() {
         val state = LoadingShareViewModel.UiState(
@@ -324,7 +375,10 @@ class LoadingShareScreenTest {
             }
         }
 
+        composeRule.onNodeWithTag("loading-fleteros-section").assertDoesNotExist()
         composeRule.onNodeWithText(copy(R.string.export_send_to_fletero)).assertDoesNotExist()
-        composeRule.onNodeWithText("Volver").assertIsDisplayed()
+        // Sin la sección no queda un hueco: la tarjeta sube y su vuelta sigue en la barra.
+        composeRule.onNodeWithTag("loading-share-back").assertIsDisplayed()
+        composeRule.onNodeWithText("CRONOGRAMA DE CARREGAMENTO").assertIsDisplayed()
     }
 }

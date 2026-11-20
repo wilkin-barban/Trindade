@@ -1140,6 +1140,7 @@
     <string name="share_card_export_pdf">Exportar PDF</string>
     <string name="share_card_edit">Editar</string>
     <string name="share_card_close">Cerrar</string>
+    <string name="loading_fleteros_helper">Cada uno abre WhatsApp con el texto del día.</string>
     <string name="share_card_back">Volver</string>
     <string name="dashboard_salida_hint">Registrar salida de producto</string>
     <string name="massas_share_empty">Sin lanzamientos para compartir</string>

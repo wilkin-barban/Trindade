@@ -78,6 +78,13 @@ fun ShareCard(
      * librería de imágenes, así que la miniatura se decodifica con las APIs del sistema desde la URL pública.
      */
     photos: List<String> = emptyList(),
+    /**
+     * Si la tarjeta dibuja la vuelta de un histórico en su cabecera.
+     *
+     * Una pantalla que ya puso la suya arriba -- el día del horario -- lo apaga: dos píldoras con la misma salida,
+     * una al lado del título, era la queja. Un día recién guardado no la dibuja nunca: su salida es «Cerrar», abajo.
+     */
+    showHeaderBack: Boolean = true,
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -97,7 +104,7 @@ fun ShareCard(
             ) {
                 // La vuelta va arriba a la izquierda, como en todos los módulos. Abajo quedaba al lado de
                 // Compartir y del PDF, donde se lee como una cuarta acción del mensaje y no como la salida.
-                if (mode != ShareCardMode.SAVED) {
+                if (mode != ShareCardMode.SAVED && showHeaderBack) {
                     NavigationActionButton(
                         onClick = onClose,
                         text = stringResource(R.string.share_card_back),

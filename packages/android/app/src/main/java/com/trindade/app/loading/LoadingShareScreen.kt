@@ -13,6 +13,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -203,38 +204,27 @@ fun LoadingShareScreen(
         modifier = modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        // Los fleteros con teléfono del día van con el share general, y no en la grilla: es la misma lista
-        // -- el texto que sale al grupo, uno a uno a quien lo carga -- y su lugar es la pantalla del día
-        // ya cerrado, donde el envío es lo único que queda por hacer. Una lista vacía es un día sin
-        // fleteros con número, no un fallo, y por eso no ocupa lugar. `FlowRow` y no una columna: los
-        // nombres vienen del plantel y no de una lista fija, y dos fleteros tienen que poder distinguirse
-        // sin robarse la línea.
-        if (state.fleteros.isNotEmpty()) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = stringResource(R.string.export_send_to_fletero),
-                    style = MaterialTheme.typography.labelLarge,
-                )
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    state.fleteros.forEach { driver ->
-                        NavigationActionButton(
-                            onClick = { onOpenWhatsApp(driver) },
-                            text = driver.name,
-                        )
-                    }
-                }
-                state.shareNote?.let { note ->
-                    Text(
-                        text = note.resolve(),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-            }
+        // La vuelta es una barra de la pantalla, no una píldora dentro de la tarjeta: el título y la fecha del
+        // mensaje quedan solos en su cabecera. El día recién guardado no la tiene: su salida es «Cerrar».
+        if (mode != ShareCardMode.SAVED) {
+            NavigationActionButton(
+                onClick = onBack,
+                text = stringResource(R.string.share_card_back),
+                modifier = Modifier.testTag("loading-share-back"),
+            )
         }
+
+        // Los fleteros con teléfono, en su propia sección acotada: el mensaje y sus acciones siguen a la vista.
+        LoadingFleterosSection(fleteros = state.fleteros, onOpenWhatsApp = onOpenWhatsApp)
+
+        state.shareNote?.let { note ->
+            Text(
+                text = note.resolve(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+
         ShareCard(
             title = stringResource(R.string.loading_title),
             // El día que anuncia el texto, no el del lote: el export se pide por la fecha del lote y su primera
@@ -250,6 +240,8 @@ fun LoadingShareScreen(
             // sigue activo. Lo decide el ViewModel porque es un hecho del día, no de la tarjeta.
             onEdit = if (mode == ShareCardMode.SAVED || state.canEdit) onEdit else null,
             onClose = onBack,
+            // La vuelta ya está arriba, en la barra de la pantalla.
+            showHeaderBack = false,
             modifier = Modifier.fillMaxWidth().weight(1f, fill = false),
         )
     }
