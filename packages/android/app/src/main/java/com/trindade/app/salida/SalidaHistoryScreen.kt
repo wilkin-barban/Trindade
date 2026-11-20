@@ -10,7 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
@@ -636,6 +636,14 @@ private fun statusLabel(status: com.trindade.app.contract.models.SalidaMovementE
     else -> stringResource(R.string.salida_status_pending)
 }
 
+/** Una acción de la grilla 2×2 de la tarjeta: su etiqueta, su tag y si es destructiva. */
+private data class SalidaCardAction(
+    val testTag: String,
+    val label: String,
+    val onClick: () -> Unit,
+    val destructive: Boolean = false,
+)
+
 @Composable
 internal fun SalidaMovementCard(
     movement: SalidaCreateResponseMovement,
@@ -751,42 +759,81 @@ internal fun SalidaMovementCard(
             Spacer(Modifier.height(6.dp))
             // FlowRow y no Row: tres acciones con nombre no entran en 390 dp y «Reenviar ao ERP» se partía en una
             // columna de letras. Cada botón conserva sus 48 dp y baja a la línea siguiente cuando no entra.
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+            // Cuatro acciones en una grilla 2×2 de columnas iguales: dos filas con `weight(1f)`, no un FlowRow
+            // de anchos intrínsecos, que dejaba "Adicionar foto"/"Reenviar ao ERP" más anchos que el resto. Orden:
+            // foto | compartilhar, reenviar | excluir. Cada botón mide lo mismo: 48 dp y la misma tipografía.
+            val actionRows = listOf(
+                listOfNotNull(
+                    onAddPhoto?.let { photo ->
+                        SalidaCardAction(
+                            testTag = "salida-photo-picker",
+                            label = stringResource(R.string.salida_photo_add),
+                            onClick = photo,
+                        )
+                    },
+                    onShare?.let { share ->
+                        SalidaCardAction(
+                            testTag = "salida-share-${movement.id}",
+                            label = stringResource(R.string.salida_share),
+                            onClick = share,
+                        )
+                    },
+                ),
+                listOfNotNull(
+                    onResend?.let { resend ->
+                        SalidaCardAction(
+                            testTag = "salida-resend-${movement.id}",
+                            label = stringResource(R.string.salida_resend_short),
+                            onClick = resend,
+                        )
+                    },
+                    onDelete?.let { delete ->
+                        SalidaCardAction(
+                            testTag = "salida-delete-${movement.id}",
+                            label = stringResource(R.string.salida_delete),
+                            onClick = delete,
+                            destructive = true,
+                        )
+                    },
+                ),
+            ).filter { it.isNotEmpty() }
+
+            Column(
                 modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                if (onAddPhoto != null) {
-                    OutlinedButton(
-                        onClick = onAddPhoto,
-                        modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("salida-photo-picker"),
+                actionRows.forEach { row ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Text(stringResource(R.string.salida_photo_add), style = MaterialTheme.typography.labelMedium)
-                    }
-                }
-                if (onShare != null) {
-                    OutlinedButton(
-                        onClick = onShare,
-                        modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("salida-share-${movement.id}"),
-                    ) {
-                        Text(stringResource(R.string.salida_share), style = MaterialTheme.typography.labelMedium)
-                    }
-                }
-                if (onResend != null) {
-                    OutlinedButton(
-                        onClick = onResend,
-                        modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("salida-resend-${movement.id}"),
-                    ) {
-                        Text(stringResource(R.string.salida_resend), style = MaterialTheme.typography.labelMedium)
-                    }
-                }
-                if (onDelete != null) {
-                    OutlinedButton(
-                        onClick = onDelete,
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                        modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("salida-delete-${movement.id}"),
-                    ) {
-                        Text(stringResource(R.string.salida_delete), style = MaterialTheme.typography.labelMedium)
+                        row.forEach { action ->
+                            OutlinedButton(
+                                onClick = action.onClick,
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = if (action.destructive) {
+                                        MaterialTheme.colorScheme.error
+                                    } else {
+                                        MaterialTheme.colorScheme.primary
+                                    },
+                                ),
+                                contentPadding = PaddingValues(horizontal = 8.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth()
+                                    .defaultMinSize(minHeight = 48.dp)
+                                    .testTag(action.testTag),
+                            ) {
+                                Text(
+                                    text = action.label,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+                        // Una fila con un solo botón conserva el medio ancho de la grilla: el par no se estira
+                        // cuando falta la otra acción (un día de solo lectura, por ejemplo).
+                        if (row.size == 1) Spacer(Modifier.weight(1f))
                     }
                 }
             }

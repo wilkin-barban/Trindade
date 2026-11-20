@@ -97,8 +97,8 @@ class SalidaViewModel @Inject constructor(
         viewModelScope.launch {
             _state.value = _state.value.copy(loading = true)
             val products = repository.catalog()
-            val day = runCatching { repository.day(_state.value.date) }.getOrDefault(emptyList())
-            val history = runCatching { repository.history() }.getOrDefault(emptyList())
+            val day = runCatching { repository.day(_state.value.date) }.getOrDefault(_state.value.day)
+            val history = runCatching { repository.history() }.getOrDefault(_state.value.history)
             _state.value = _state.value.copy(
                 products = products,
                 day = day,
@@ -420,7 +420,10 @@ class SalidaViewModel @Inject constructor(
         viewModelScope.launch {
             when (val outcome = repository.deleteMovement(movement.id)) {
                 is SalidaDeleteOutcome.Deleted -> {
-                    _state.value = _state.value.copy(
+                    // La baja es optimista: la tarjeta sale del estado antes de la recarga, para que el modal de
+                    // éxito se lea sobre la lista que ya no la tiene. Si la recarga falla, la eliminación se
+                    // conserva (refresh ya no reemplaza con una lista vacía).
+                    _state.value = _state.value.withoutMovement(movement.id).copy(
                         notice = SalidaNotice("Movimento excluído.", isError = false),
                     )
                     refresh()
@@ -486,3 +489,9 @@ class SalidaViewModel @Inject constructor(
         _state.value = _state.value.copy(historyAll = !_state.value.historyAll)
     }
 }
+
+/** Sin el movimiento en ningún día: lo que la pantalla dibuja después de una baja confirmada. */
+internal fun SalidaUiState.withoutMovement(movementId: Int): SalidaUiState = copy(
+    day = day.filterNot { it.id == movementId },
+    history = history.map { day -> day.copy(movements = day.movements.filterNot { it.id == movementId }) },
+)

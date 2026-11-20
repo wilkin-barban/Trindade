@@ -719,6 +719,7 @@
     <string name="salida_photo_delete">Excluir foto</string>
     <string name="salida_photo_add">Adicionar foto</string>
     <string name="salida_share">Compartilhar</string>
+    <string name="salida_resend_short">Reenviar</string>
     <string name="salida_resend">Reenviar ao ERP</string>
     <string name="report_photos_pending_count">Fotos (%1$d/%2$d)</string>
     <string name="report_photos_add">Adicionar fotos</string>

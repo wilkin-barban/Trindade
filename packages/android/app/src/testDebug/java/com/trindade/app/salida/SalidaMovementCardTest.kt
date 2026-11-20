@@ -254,4 +254,42 @@ class SalidaMovementCardTest {
         composeRule.onNodeWithTag("salida-photo-picker").assertDoesNotExist()
         composeRule.onNodeWithTag("salida-resend-7").assertDoesNotExist()
     }
+
+    /**
+     * Las cuatro acciones forman una grilla 2×2 de columnas iguales.
+     *
+     * En un FlowRow de anchos intrínsecos "Adicionar foto" y "Reenviar ao ERP" salían más anchos que sus pares y el
+     * conjunto se veía desalineado. Ahora son dos filas con dos botones de peso igual, con el mismo alto.
+     */
+    @Test
+    fun `the actions are a two by two grid with equal columns`() {
+        composeRule.setContent {
+            TrindadeTheme {
+                SalidaMovementCard(
+                    movement = movement(emptyList()),
+                    onAddPhoto = {},
+                    onShare = {},
+                    onResend = {},
+                    onDelete = {},
+                )
+            }
+        }
+
+        val photo = composeRule.onNodeWithTag("salida-photo-picker").fetchSemanticsNode().boundsInRoot
+        val share = composeRule.onNodeWithTag("salida-share-7").fetchSemanticsNode().boundsInRoot
+        val resend = composeRule.onNodeWithTag("salida-resend-7").fetchSemanticsNode().boundsInRoot
+        val delete = composeRule.onNodeWithTag("salida-delete-7").fetchSemanticsNode().boundsInRoot
+
+        // Misma fila y mismo ancho por par.
+        assertEquals(photo.top, share.top, 0.5f)
+        assertEquals(photo.width, share.width, 0.5f)
+        assertEquals(resend.top, delete.top, 0.5f)
+        assertEquals(resend.width, delete.width, 0.5f)
+        // La segunda fila va debajo de la primera, y ambas empiezan en el mismo borde.
+        assertEquals(true, resend.top > photo.bottom)
+        assertEquals(photo.left, resend.left, 0.5f)
+        // Mismo alto mínimo en los cuatro.
+        assertEquals(48f * composeRule.density.density, photo.height, 2f)
+        assertEquals(photo.height, delete.height, 2f)
+    }
 }

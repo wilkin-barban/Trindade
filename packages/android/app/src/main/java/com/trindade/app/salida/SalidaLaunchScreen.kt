@@ -224,18 +224,13 @@ fun SalidaLaunchScreen(
         )
     }
 
+    // La respuesta de un lanzamiento -- guardado y enviado, pendiente o rechazado -- se lee en su ventana. Vive
+    // fuera de la confirmación: confirmar la cierra, y antes el aviso quedaba adentro de un bloque que ya no se
+    // dibujaba. Sobrevive al cambio de día y a la recarga del histórico.
+    SalidaLaunchActionResults(notice = state.notice, onDismiss = viewModel::dismissNotice)
+
     if (state.confirmOpen) {
         val selection = state.selection
-        // La respuesta de una acción -- guardada y enviada, o rechazada -- se cierra en su ventana: la grilla de
-        // abajo ya cambió y un cartel dentro de ella se lee como parte del estado que se está mirando.
-        state.notice?.let { notice ->
-            ActionResultDialog(
-                message = notice.message,
-                isSuccess = !notice.isError,
-                onDismiss = viewModel::dismissNotice,
-            )
-        }
-
         AlertDialog(
             onDismissRequest = { viewModel.dismissConfirmation() },
             title = { Text(stringResource(R.string.salida_confirm_title)) },
@@ -281,6 +276,23 @@ fun SalidaLaunchScreen(
                 ),
             ),
             onDismissRequest = { showHelpDialog = false },
+        )
+    }
+}
+
+/**
+ * Lo que un lanzamiento respondió, en la ventana de resultado de la app.
+ *
+ * Separado de [SalidaLaunchScreen] para poder afirmar que se dibuja con la confirmación cerrada -- que era el
+ * defecto: el aviso vivía dentro de `confirmOpen` y `confirmLaunch` lo cierra antes de escribir la respuesta.
+ */
+@Composable
+internal fun SalidaLaunchActionResults(notice: SalidaNotice?, onDismiss: () -> Unit) {
+    notice?.let {
+        ActionResultDialog(
+            message = it.message,
+            isSuccess = !it.isError,
+            onDismiss = onDismiss,
         )
     }
 }
