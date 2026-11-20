@@ -6,6 +6,7 @@ import { api, ApiClientError } from '../api/client';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { LoadingSpinner } from '../components/ui/loading-spinner';
+import { MessageDialog } from '../components/ui/message-dialog';
 import { ModuleHelpModal } from '../components/ui/ModuleHelpModal';
 import {
   BoxTypeList,
@@ -59,6 +60,9 @@ export function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  // Lo que responde una acción -- guardar, sincronizar -- va en una ventana; el error de carga, en la página.
+  const [actionMessage, setActionMessage] = useState('');
+  const [actionTone, setActionTone] = useState<'error' | 'success'>('error');
   const [photoError, setPhotoError] = useState('');
   const [pendingPhotos, setPendingPhotos] = useState<PendingPhoto[]>([]);
   const [createdReportId, setCreatedReportId] = useState<number | null>(null);
@@ -102,7 +106,8 @@ export function ReportsPage() {
     void (async () => {
       // Sin red no hay ticket que canjear ni app que abrir: se dice en el reporte y no se lanza nada.
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-        setError(t('massas.aero.offline'));
+        setActionTone('error');
+        setActionMessage(t('massas.aero.offline'));
         return;
       }
       const fired = await triggerAeroMovementsSync(aeroSettings, {
@@ -287,7 +292,8 @@ export function ReportsPage() {
     });
 
     if (hasMissingTemp || activeTempTasks.length === 0) {
-      setError(t('reports.temperaturesRequired'));
+      setActionTone('error');
+      setActionMessage(t('reports.temperaturesRequired'));
       setSubmitting(false);
       return;
     }
@@ -328,9 +334,11 @@ export function ReportsPage() {
       navigate(`/reports/${reportId}?saved=1`);
     } catch (err) {
       if (err instanceof ApiClientError) {
-        setError(err.message === 'reportAlreadyExists' ? t('reports.reportAlreadyExists') : err.message);
+        setActionTone('error');
+        setActionMessage(err.message === 'reportAlreadyExists' ? t('reports.reportAlreadyExists') : err.message);
       } else {
-        setError(t('reports.saveError'));
+        setActionTone('error');
+        setActionMessage(t('reports.saveError'));
       }
     } finally {
       setSubmitting(false);
@@ -449,6 +457,14 @@ export function ReportsPage() {
         />
       </div>
       <p className="text-sm text-gray-500 mb-6">{t('reports.newReportDesc')}</p>
+
+      <MessageDialog
+        open={actionMessage !== ''}
+        message={actionMessage}
+        tone={actionTone}
+        onClose={() => setActionMessage('')}
+        testId="report-action-message"
+      />
 
       <form onSubmit={handleSubmit} data-testid="report-builder-form">
         {/* Sincronizar com ERP: la primera opción visible, antes del turno. */}
@@ -608,12 +624,8 @@ export function ReportsPage() {
           </CardContent>
         </Card>
 
-        {/* Error */}
-        {error && (
-          <div className="mb-4 p-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md">
-            {error}
-          </div>
-        )}
+        {/* La carga falla antes del formulario: esa frase se queda en la página. Lo que responde una acción
+            -- guardar sin temperaturas, un rechazo del servidor, sin conexión -- se dice en la ventana. */}
 
         {/* Submit: fijo al pie en el teléfono, como la barra de Salida y la de Masas. Un reporte son treinta
             casillas y cinco temperaturas; el botón que lo cierra no puede estar al final de la lista. */}

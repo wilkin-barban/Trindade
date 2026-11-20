@@ -99,7 +99,9 @@
     "share": "Compartir",
     "help": "Ayuda",
     "understand": "Entendido",
-    "error": "Ocurrió un error inesperado."
+    "error": "Ocurrió un error inesperado.",
+    "actionDone": "Acción completada",
+    "actionFailed": "No se pudo completar la acción."
   },
   "reports": {
     "newReport": "Nuevo Reporte",

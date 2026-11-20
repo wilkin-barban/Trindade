@@ -232,4 +232,25 @@ describe('ReportsPage — the phone, 390 px', () => {
   });
 
 
+
+  /**
+   * Las temperaturas faltantes se responden en una ventana, no en un banner.
+   *
+   * El botón de guardar dice por qué no guardó, el operario lo lee y lo cierra; el formulario queda como estaba.
+   */
+  it('opens a dialog when saving without temperatures, and leaves no inline banner', async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByTestId('submit-report-btn')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('submit-report-btn'));
+
+    const dialog = await screen.findByTestId('report-action-message');
+    expect(dialog).toBeInTheDocument();
+    expect(dialog.textContent).toContain(i18n.t('reports.temperaturesRequired'));
+
+    fireEvent.click(screen.getByTestId('report-action-message-close'));
+    await waitFor(() => expect(screen.queryByTestId('report-action-message')).toBeNull());
+    // Nada quedó escrito en la página.
+    expect(document.body.textContent).not.toContain(i18n.t('reports.temperaturesRequired'));
+  });
+
 });

@@ -18,6 +18,7 @@ import { readReportProducts, type ReportProducts } from '../lib/report-products'
 import { visibleReportCategories } from '../lib/report-categories';
 import { ReceiptsSection } from '../components/reports/ReceiptsSection';
 import { ERP_RECEIPT_CATEGORY_ID, usesErpReceipts } from '../lib/receipts';
+import { MessageDialog } from '../components/ui/message-dialog';
 
 interface ReportDetail {
   id: number;
@@ -100,6 +101,8 @@ export function ReportEditPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  // Lo que responde el guardado va en una ventana; el error de carga, en la pantalla.
+  const [actionMessage, setActionMessage] = useState('');
   const [readOnly, setReadOnly] = useState(false);
 
   // Photo state
@@ -334,7 +337,7 @@ export function ReportEditPage() {
     });
 
     if (hasMissingTemp || activeTempTasks.length === 0) {
-      setError(t('reports.temperaturesRequired'));
+      setActionMessage(t('reports.temperaturesRequired'));
       setSubmitting(false);
       return;
     }
@@ -364,7 +367,7 @@ export function ReportEditPage() {
       navigate(`/reports/${id}`);
     } catch (err) {
       const message = err instanceof ApiClientError ? err.message : t('reports.updateError');
-      setError(message);
+      setActionMessage(message);
       if (pendingPhotos.length > 0) setPhotoError(message);
     } finally {
       setSubmitting(false);
@@ -419,6 +422,13 @@ export function ReportEditPage() {
           {t('reports.editWindowExpired')}
         </div>
       )}
+
+      <MessageDialog
+        open={actionMessage !== ''}
+        message={actionMessage}
+        onClose={() => setActionMessage('')}
+        testId="report-edit-action-message"
+      />
 
       <form onSubmit={handleSubmit} data-testid="report-edit-form">
         {/* Turno selector */}
