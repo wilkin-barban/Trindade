@@ -3,6 +3,8 @@ package com.trindade.app.ui.components
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -17,6 +19,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Button
 import com.trindade.app.ui.components.NavigationActionButton
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -153,12 +163,32 @@ fun ShareCard(
             ) {
                 val actionsEnabled = !loading && error == null && !text.isNullOrBlank()
 
-                AdminPrimaryButton(
+                // El mismo tratamiento que la web: verde de WhatsApp con su icono, a todo el ancho y 48 dp. Es la
+                // acción primaria de la tarjeta, y el color la distingue de PDF y de las secundarias.
+                Button(
                     onClick = onShare,
-                    text = stringResource(R.string.share_card_share_whatsapp),
                     enabled = actionsEnabled,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF16A34A),
+                        contentColor = Color.White,
+                        disabledContainerColor = Color(0xFF16A34A).copy(alpha = 0.4f),
+                        disabledContentColor = Color.White.copy(alpha = 0.8f),
+                    ),
+                    modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp).testTag("share-card-whatsapp"),
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_chat),
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = stringResource(R.string.share_card_share_whatsapp),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
 
                 AdminSecondaryButton(
                     onClick = onPdf,

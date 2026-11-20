@@ -1,6 +1,8 @@
 package com.trindade.app.di
 
 import com.trindade.app.reports.AndroidPhotoCompressor
+import com.trindade.app.reports.HttpReportPhotoFiles
+import com.trindade.app.reports.ReportPhotoFiles
 import com.trindade.app.reports.PhotoCompressor
 import dagger.Binds
 import dagger.Module
@@ -19,4 +21,8 @@ abstract class ReportsModule {
     @Binds
     @Singleton
     abstract fun bindPhotoCompressor(compressor: AndroidPhotoCompressor): PhotoCompressor
+
+    /** Las fotos del reporte que viajan con el texto: la descarga vive en Android, la costura no. */
+    @Binds
+    abstract fun bindReportPhotoFiles(files: HttpReportPhotoFiles): ReportPhotoFiles
 }

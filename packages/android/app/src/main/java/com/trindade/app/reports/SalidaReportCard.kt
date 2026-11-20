@@ -49,7 +49,9 @@ fun SalidaReportCard(
             ) {
                 Text("SAÍDAS / BAIXA", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 day?.let {
-                    Text("📊 ${it.totalUnits} un", style = MaterialTheme.typography.labelLarge)
+                    // El total de la tarjeta, no el del mensaje: el texto dejó de llevar "Total" y acá se nombra, sin el
+                    // emoji que el grupo leía en el mensaje.
+                    Text("Total: ${it.totalUnits} un", style = MaterialTheme.typography.labelLarge)
                 }
             }
 

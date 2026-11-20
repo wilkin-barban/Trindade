@@ -50,6 +50,8 @@ class ReportDetailViewModel @Inject constructor(
     private val massasRepository: MassasDaySource? = null,
     private val aeroDispatcher: AeroDispatcher? = null,
     private val aeroSettingsStore: AeroSettingsPort? = null,
+    // Las fotos del reporte, para que viajen con el texto: sin esta costura no se bajan y el mensaje sale solo.
+    private val photoFiles: ReportPhotoFiles? = null,
 ) : ViewModel() {
 
     data class UiState(
@@ -296,9 +298,23 @@ class ReportDetailViewModel @Inject constructor(
      * Offered beside that text rather than before it: a share fired with nothing loaded would put an empty
      * message in front of the operator and call it the report.
      */
+    /**
+     * Comparte el texto del servidor tal cual, con las fotos del reporte cuando se pueden bajar.
+     *
+     * Es el mismo camino de la web: el mensaje es el del servidor y las fotos viajan como archivos en la hoja
+     * nativa. Una foto que falla no retiene el texto: si no queda ninguna, se comparte el texto solo.
+     */
     fun shareExport() {
         val text = state.value.exportText ?: return
-        shareManager.shareText(text)
+        val urls = state.value.photos.mapNotNull { it.publicUrl }
+        if (urls.isEmpty() || photoFiles == null) {
+            shareManager.shareText(text)
+            return
+        }
+        viewModelScope.launch {
+            val files = photoFiles.download(urls)
+            if (files.isEmpty()) shareManager.shareText(text) else shareManager.shareTextWithPhotos(text, files)
+        }
     }
 
     /**

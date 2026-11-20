@@ -10,6 +10,7 @@ import com.trindade.app.contract.models.ReportResponseReport
 import com.trindade.app.export.ShareManager
 import com.trindade.app.network.ReportsApi
 import java.io.File
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -101,6 +102,62 @@ class ReportDetailViewModelTest {
         // The action is offered beside the text it would send, so a share before that text arrives would
         // put nothing in front of the operator and call it a message.
         assertNull(shareManager.lastSharedText)
+    }
+
+    /**
+     * Las fotos del reporte viajan con el texto cuando se pueden bajar.
+     *
+     * Es el camino de la web: el mensaje es el del servidor y las fotos van como archivos en la hoja nativa. Una
+     * foto que falla no retiene el texto: si no queda ninguna, se comparte solo el mensaje.
+     */
+    @Test
+    fun `shareExport sends the photos with the server text`() = runTest {
+        val fakeApi = FakeReportsApi(
+          photosToReturn = listOf(
+            com.trindade.app.contract.models.PhotosResponsePhotosInner(
+                id = 41,
+                reportId = REPORT_ID,
+                filePath = "a.jpg",
+                fileSize = 10,
+                mimeType = "image/jpeg",
+                publicToken = "token-41",
+                createdAt = "2026-11-19T10:00:00Z",
+                publicUrl = "https://example.test/p/a.jpg",
+            ),
+            com.trindade.app.contract.models.PhotosResponsePhotosInner(
+                id = 42,
+                reportId = REPORT_ID,
+                filePath = "b.jpg",
+                fileSize = 10,
+                mimeType = "image/jpeg",
+                publicToken = "token-42",
+                createdAt = "2026-11-19T10:00:00Z",
+                publicUrl = "https://example.test/p/b.jpg",
+            ),
+        ),
+        )
+        val files = listOf(java.io.File("/tmp/a.jpg"), java.io.File("/tmp/b.jpg"))
+        val downloader = object : ReportPhotoFiles {
+            override suspend fun download(urls: List<String>): List<java.io.File> {
+                assertEquals(listOf("https://example.test/p/a.jpg", "https://example.test/p/b.jpg"), urls)
+                return files
+            }
+        }
+        val shareManager = RecordingShareManager()
+        val model = ReportDetailViewModel(
+            ReportsRepository(fakeApi),
+            FakePhotoCompressor(),
+            shareManager,
+            photoFiles = downloader,
+        )
+        model.load(REPORT_ID)
+        model.loadExport()
+
+        model.shareExport()
+
+        // El texto es el que el servidor rindió para este reporte, tal cual.
+        assertEquals("CRONOGRAMA DE CARREGAMENTO", shareManager.lastSharedText)
+        assertEquals(files, shareManager.sharedPhotos)
     }
 
     @Test
@@ -498,6 +555,14 @@ private class RecordingShareManager : ShareManager {
 
     override fun sharePdf(file: File, title: String?): Boolean {
         lastSharedPdfFile = file
+        return true
+    }
+
+    var sharedPhotos: List<File> = emptyList()
+
+    override fun shareTextWithPhotos(text: String, photos: List<File>, title: String?): Boolean {
+        lastSharedText = text
+        sharedPhotos = photos
         return true
     }
 
