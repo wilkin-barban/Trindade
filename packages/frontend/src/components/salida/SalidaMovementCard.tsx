@@ -322,8 +322,10 @@ export function SalidaMovementCard({
               className="min-h-[44px] w-full justify-center bg-green-600 text-white hover:bg-green-700 sm:w-auto"
               data-testid={`salida-share-${movement.id}`}
             >
-              <MessageCircle className="h-4 w-4" />
-              {t('salida.shareWhatsApp')}
+              <MessageCircle className="h-4 w-4 shrink-0" />
+              {/* «Compartilhar», no la frase entera: en la celda de 390 px el nombre largo se cortaba con
+                  puntos suspensivos. El icono sigue diciendo de qué red se trata. */}
+              <span className="truncate sm:overflow-visible">{t('salida.share')}</span>
             </Button>
             {canRelaunchSalida(movement) && onResend && (
               <Button

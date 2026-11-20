@@ -611,7 +611,8 @@ describe('SalidaHistoryPage — iPhone share and layout', () => {
 
     await renderReady('/salida-history?date=2026-11-13');
     const button = screen.getByTestId('salida-share-7');
-    expect(button.textContent).toContain(i18n.t('salida.shareWhatsApp'));
+    // La etiqueta es la corta; el envío sigue siendo el mismo WhatsApp con las fotos del movimiento.
+    expect(button.textContent).toContain(i18n.t('salida.share'));
     fireEvent.click(button);
 
     await waitFor(() => expect(shareSalidaMock).toHaveBeenCalledTimes(1));
@@ -1205,5 +1206,18 @@ describe('SalidaHistoryPage — T3 per-movement state, relaunch, operator filter
     // Cerrar devuelve la pantalla.
     fireEvent.click(within(dialog).getByText('Cerrar'));
     await waitFor(() => expect(screen.queryByTestId('salida-history-erp-note')).toBeNull());
+  });
+
+  /** En la celda de 390 px el botón verde dice «Compartilhar», no una frase que se corta con puntos. */
+  it('labels the share button short enough for a two-column grid', async () => {
+    await renderReady();
+
+    const share = screen.getByTestId('salida-share-2');
+    expect(share.textContent).toBe(i18n.t('salida.share'));
+    expect(share.textContent).not.toBe(i18n.t('salida.shareWhatsApp'));
+    // El texto no se recorta: el tramo que puede encogerse no lleva la clase de truncado en escritorio.
+    const label = share.querySelector('span');
+    expect(label?.className).toContain('truncate');
+    expect(label?.className).toContain('sm:overflow-visible');
   });
 });
