@@ -307,6 +307,14 @@ export function MassasLaunchPage() {
       setQuantities({});
       await load(date);
 
+      // La ventana se abre ANTES de armar el viaje: con la integración lista, la cola se despacha y la función
+      // retornaba sin decir nada -- el formulario se vaciaba y el operario no sabía si su lanzamiento existía.
+      // Lo que se afirma es lo único seguro: quedó registrado en Trindade.
+      setResultModal({
+        type: 'success',
+        message: t('massas.launchSuccess', 'Lançamento registrado com sucesso!'),
+      });
+
       if (syncable) {
         const queue: AeroQueue = { createdAt: new Date().toISOString(), date, items: requested, inFlight: [] };
         writeAeroQueue(queue);
@@ -315,7 +323,11 @@ export function MassasLaunchPage() {
       }
 
       if (aeroAllowed) {
-        setNotice({ type: 'error', message: erpNotReadyMessage(t, aeroSettings) });
+        // Guardado, pero la planta no lo recibió: se dice en la misma ventana, sin prometer que el ERP lo tiene.
+        setResultModal({
+          type: 'warn',
+          message: erpNotReadyMessage(t, aeroSettings),
+        });
         void postAeroAuditEvent({
           event: 'launch_sync',
           phase: 'requested',
@@ -325,11 +337,6 @@ export function MassasLaunchPage() {
           note: `${requested.length} not sent`,
         });
       }
-
-      setResultModal({
-        type: 'success',
-        message: t('massas.launchSuccess', 'Lançamento registrado com sucesso!'),
-      });
     } catch (err) {
       setResultModal({
         type: 'error',

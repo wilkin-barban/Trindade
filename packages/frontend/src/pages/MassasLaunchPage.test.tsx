@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen , within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import i18n from '../i18n/config';
@@ -146,5 +146,73 @@ describe('MassasLaunchPage — requirements 1, 3, 4, 5', () => {
     await screen.findByTestId('massas-product-1045');
     expect(screen.queryByTestId('massas-sync-erp')).not.toBeInTheDocument();
     expect(screen.queryByTestId('massas-sync-header')).not.toBeInTheDocument();
+  });
+
+  /**
+   * Crear un lanzamiento abre su ventana de resultado, también con el ERP listo.
+   *
+   * Con la integración configurada el viaje se encola y la función retornaba antes de `setResultModal`: el
+   * formulario se vaciaba y no aparecía ni `massa-result-modal` ni ningún aviso. Lo único que se afirma es lo
+   * seguro -- quedó registrado en Trindade -- y la ventana se cierra a mano.
+   */
+  it('confirms a created launch in the result dialog even when the ERP trip is queued', async () => {
+    await i18n.changeLanguage('es');
+    const { saveAeroSettings } = await import('../lib/aero-integration');
+    saveAeroSettings({
+      wsUrl: 'http://192.168.25.250:1453/api',
+      username: 'APL',
+      syncEnabled: true,
+      hasPassword: true,
+      lastSyncAt: null,
+    });
+    get.mockImplementation(async (url: string) => {
+      if (url.startsWith('/massas-launch?')) return sampleDayView();
+      if (url.startsWith('/integration/aero/movements')) return { date: '2026-10-30', movements: [] };
+      if (url.startsWith('/integration/aero/settings')) {
+        return { configured: true, wsUrl: 'http://192.168.25.250:1453/api', username: 'APL', hasPassword: true };
+      }
+      return {};
+    });
+    post.mockImplementation(async (path: string) => {
+      if (path === '/massas-launch') {
+        return {
+          created: [
+            {
+              id: 900,
+              launch_date: '2026-10-30',
+              product_code: '1045',
+              product_name: 'MASSA CASEIRA',
+              boxes: 1,
+              units: 10,
+              user_id: 1,
+              username: 'wilkin',
+              display_name: 'Wilkin',
+              created_at: '2026-10-30T10:00:00.000Z',
+              updated_at: '2026-10-30T10:00:00.000Z',
+            },
+          ],
+        };
+      }
+      if (path.includes('bridge-tickets') || path === '/integration/aero/log') return { ticket: 't', ticketUrl: 'https://example.test/t' };
+      return {};
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/massas-launch']}>
+        <MassasLaunchPage />
+      </MemoryRouter>,
+    );
+
+    const input = await screen.findByLabelText('MASSA CASEIRA');
+    fireEvent.change(input, { target: { value: '1' } });
+    fireEvent.click(await screen.findByTestId('massas-launch'));
+
+    // La confirmación de la página, y después la ventana del resultado.
+    const confirmButton = await screen.findByText(i18n.t('massas.confirmAction', 'Confirmar'));
+    fireEvent.click(confirmButton);
+
+    const modal = await screen.findByTestId('massa-result-modal');
+    expect(within(modal).getByTestId('massa-result-message').textContent).toBeTruthy();
+    expect(within(modal).getByTestId('massa-result-close')).toBeTruthy();
   });
 });
