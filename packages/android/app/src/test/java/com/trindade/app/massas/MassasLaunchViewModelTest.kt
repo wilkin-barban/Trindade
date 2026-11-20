@@ -1169,8 +1169,9 @@ class MassasLaunchViewModelTest {
         assertEquals("ni una petición para un asiento que el ERP ya tiene", 0, erpPort.payloads.size)
         assertEquals(
             UiText.of(com.trindade.app.R.string.massas_error_reconciled),
-            testVm.state.value.errorMessage,
+            testVm.state.value.resultDialogMessage,
         )
+        assertNull("el rechazo del envío no deja banner en línea", testVm.state.value.errorMessage)
     }
 
     /**
@@ -1330,6 +1331,49 @@ class MassasLaunchViewModelTest {
         assertEquals(30.0, queuePort.stored!!.items.single().quantity, 0.0)
         // Quien firmó la fila, no el usuario configurado del teléfono: la cola conserva al operario del asiento.
         assertEquals("Wilkin", queuePort.stored!!.items.single().operatorName)
+    }
+
+    /**
+     * El envío de una fila pendiente responde en una ventana, no en un banner.
+     *
+     * Cuando el ERP rechaza el viaje (o no hay credenciales, o el lanzamiento ya no está en el día) la tabla de
+     * abajo ya cambió: el mensaje se cierra en el diálogo de resultado que el resto de la app usa, y el botón de la
+     * fila sigue disponible porque el pendiente quedó en la cola.
+     */
+    @Test
+    fun `a refused single-row send answers in the result dialog and leaves no inline banner`() = runTest {
+        val repo = DayRepository(massasApi, dayWith(launch(77, boxes = 33, units = 330)))
+        val testVm = newViewModel(repo)
+        testVm.refresh()
+        advanceUntilIdle()
+
+        // La fila apunta a un lanzamiento que ya no está en el día: el envío se rechaza sin salir a la red.
+        testVm.sendPendingLaunch(
+            MassasUnifiedRow(
+                key = "launch-999",
+                state = MassasRowState.PENDING_ERP,
+                operatorName = "Wilkin",
+                operatorKey = "wilkin",
+                productCode = "1045",
+                productName = "MASSA CASEIRA",
+                boxes = 33,
+                units = 330,
+                launchIds = listOf(999),
+                entLans = emptyList(),
+                importable = false,
+                tabletAcked = false,
+                ownerUserId = 1,
+            ),
+        )
+        advanceUntilIdle()
+
+        assertEquals(
+            UiText.of(com.trindade.app.R.string.massas_aero_launch_missing),
+            testVm.state.value.resultDialogMessage,
+        )
+        assertFalse(testVm.state.value.resultDialogIsSuccess)
+        assertNull("nada queda escrito debajo de la tabla", testVm.state.value.errorMessage)
+        assertNull(testVm.state.value.noticeMessage)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -2069,7 +2113,10 @@ class MassasLaunchViewModelTest {
         assertEquals(1, erpPort.payloads.size)
         assertEquals(1, erpPort.readDates.size)
         assertEquals(1, mirrorPort.snapshots.size)
-        assertEquals(R.string.massas_aero_sent, testVm.state.value.noticeMessage?.resId)
+        // El envío de la fila responde en el diálogo de resultado, con su tono de éxito.
+        assertEquals(R.string.massas_aero_sent, testVm.state.value.resultDialogMessage?.resId)
+        assertTrue(testVm.state.value.resultDialogIsSuccess)
+        assertNull(testVm.state.value.noticeMessage)
     }
 
     /**

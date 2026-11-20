@@ -204,4 +204,54 @@ class SalidaMovementCardTest {
 
         composeRule.onNodeWithTag("salida-delete-7").assertDoesNotExist()
     }
+
+    /**
+     * Los cuatro botones de la ficha están cableados a su acción.
+     *
+     * Una tarjeta con "Adicionar foto", "Compartilhar", "Reenviar ao ERP" y "Excluir" que no dispara nada es peor que
+     * una sin botones: el operario toca y no pasa nada. Cada uno reporta una vez, y cada testTag es el de la
+     * pantalla que lo monta.
+     */
+    @Test
+    fun `every action of the card is wired to its callback`() {
+        var photo = 0
+        var share = 0
+        var resend = 0
+        var delete = 0
+        composeRule.setContent {
+            TrindadeTheme {
+                SalidaMovementCard(
+                    movement = movement(emptyList()),
+                    onAddPhoto = { photo++ },
+                    onShare = { share++ },
+                    onResend = { resend++ },
+                    onDelete = { delete++ },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("salida-photo-picker").performClick()
+        composeRule.onNodeWithTag("salida-share-7").performClick()
+        composeRule.onNodeWithTag("salida-resend-7").performClick()
+        composeRule.onNodeWithTag("salida-delete-7").performClick()
+        composeRule.waitForIdle()
+
+        assertEquals(1, photo)
+        assertEquals(1, share)
+        assertEquals(1, resend)
+        assertEquals(1, delete)
+    }
+
+    /** Sin acción de foto (otro operario o día pasado) el selector no se dibuja. */
+    @Test
+    fun `a read-only card draws no photo picker and no resend`() {
+        composeRule.setContent {
+            TrindadeTheme {
+                SalidaMovementCard(movement = movement(emptyList()), onShare = {})
+            }
+        }
+
+        composeRule.onNodeWithTag("salida-photo-picker").assertDoesNotExist()
+        composeRule.onNodeWithTag("salida-resend-7").assertDoesNotExist()
+    }
 }

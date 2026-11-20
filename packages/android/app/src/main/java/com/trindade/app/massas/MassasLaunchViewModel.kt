@@ -697,19 +697,28 @@ class MassasLaunchViewModel @Inject constructor(
     fun sendPendingLaunch(row: MassasUnifiedRow) {
         val settings = state.value.aeroSettings
         if (!settings.ready) {
-            _state.value = _state.value.copy(errorMessage = UiText.of(R.string.massas_aero_not_configured))
+            _state.value = _state.value.copy(
+                resultDialogMessage = UiText.of(R.string.massas_aero_not_configured),
+                resultDialogIsSuccess = false,
+            )
             return
         }
         val launch = state.value.dayView?.launches?.firstOrNull { it.id in row.launchIds }
         if (launch == null) {
-            _state.value = _state.value.copy(errorMessage = UiText.of(R.string.massas_aero_launch_missing))
+            _state.value = _state.value.copy(
+                resultDialogMessage = UiText.of(R.string.massas_aero_launch_missing),
+                resultDialogIsSuccess = false,
+            )
             return
         }
         // La planta ya tiene este asiento. Volver a mandarlo es la forma más fácil de duplicar una caja, y la
         // fila no debería haber ofrecido el botón: si llegó acá es porque el espejo cambió entre el toque y la
         // respuesta, y lo que se contesta es que ya está, no un error de red.
         if (launch.id in settledLaunchIds()) {
-            _state.value = _state.value.copy(errorMessage = UiText.of(R.string.massas_error_reconciled))
+            _state.value = _state.value.copy(
+                resultDialogMessage = UiText.of(R.string.massas_error_reconciled),
+                resultDialogIsSuccess = false,
+            )
             return
         }
 
@@ -733,7 +742,10 @@ class MassasLaunchViewModel @Inject constructor(
         // La fila se revalida dentro del turno: entre el toque y este punto pudo terminar el envío que
         // estaba en vuelo, y repetirlo es exactamente la caja duplicada que esta salida serializada evita.
         if (launch.id in settledLaunchIds()) {
-            _state.value = _state.value.copy(errorMessage = UiText.of(R.string.massas_error_reconciled))
+            _state.value = _state.value.copy(
+                resultDialogMessage = UiText.of(R.string.massas_error_reconciled),
+                resultDialogIsSuccess = false,
+            )
             return
         }
         val request = AeroDispatchRequest(
@@ -761,11 +773,15 @@ class MassasLaunchViewModel @Inject constructor(
                 // fila deja de estar pendiente sin que el operario toque «Sincronizar con ERP».
                 val failure = readAeroDayAfterLaunch(state.value.date)
                 _state.value = _state.value.copy(
-                    noticeMessage = failure?.describe() ?: UiText.of(R.string.massas_aero_sent),
+                    resultDialogMessage = failure?.describe() ?: UiText.of(R.string.massas_aero_sent),
+                    resultDialogIsSuccess = failure == null,
                 )
             }
             is AeroDispatchOutcome.Failed ->
-                _state.value = _state.value.copy(errorMessage = outcome.failure.describe())
+                _state.value = _state.value.copy(
+                    resultDialogMessage = outcome.failure.describe(),
+                    resultDialogIsSuccess = false,
+                )
         }
         refreshQueuedCount()
     }

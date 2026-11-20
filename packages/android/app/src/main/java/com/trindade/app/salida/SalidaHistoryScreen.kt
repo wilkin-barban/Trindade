@@ -22,6 +22,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Surface
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material3.FilterChip
@@ -635,27 +638,48 @@ internal fun SalidaMovementCard(
      */
     onDelete: (() -> Unit)? = null,
 ) {
-    Card(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
-        Column(modifier = Modifier.padding(12.dp)) {
+    // La misma ficha que el histórico de Masas: superficie tonal, esquinas del tema, 16 dp por dentro y la
+    // jerarquía fecha/operador/estado arriba, productos en el medio, total al pie. No es una caja blanca con
+    // renglones: es la tarjeta de producto de la app.
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+                verticalAlignment = Alignment.Top,
             ) {
-                Column {
-                    Text(movement.movementDate, fontWeight = FontWeight.SemiBold)
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        movement.username,
+                        text = com.trindade.app.massas.brazilianDate(movement.movementDate) +
+                            " · " + movement.createdAt.substringAfter('T').take(5),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = movement.displayName?.takeIf { it.isNotBlank() } ?: movement.username.uppercase(),
                         style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Text(
-                    statusLabel(movement.erp?.status),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                )
+                Surface(
+                    shape = RoundedCornerShape(999.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                ) {
+                    Text(
+                        text = statusLabel(movement.erp?.status),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                    )
+                }
             }
-            Spacer(Modifier.height(6.dp))
             movement.items.forEach { item ->
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(item.productName, style = MaterialTheme.typography.bodySmall)
