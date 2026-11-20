@@ -27,6 +27,7 @@ const post = vi.fn();
 const upload = vi.fn();
 const del = vi.fn();
 const ticket = vi.fn();
+const vault = vi.fn();
 
 /** Every audit line this page posted, in order. */
 let audit: Array<Record<string, unknown>> = [];
@@ -44,6 +45,9 @@ vi.mock('../../api/client', () => ({
 
 vi.mock('../../lib/aero-vault', () => ({
   requestAeroBridgeTicket: (...args: unknown[]) => ticket(...args),
+  // El ajuste del ERP se lee por el mismo módulo: sin él la pantalla no tiene con qué decidir y cae en el error
+  // de acceso, que es justo lo que estos tests distinguen de "no configurado".
+  fetchAeroVaultSettings: (...args: unknown[]) => vault(...args),
 }));
 
 vi.mock('../../contexts/AuthContext', () => ({
@@ -148,6 +152,8 @@ beforeEach(async () => {
   get.mockReset();
   post.mockReset();
   ticket.mockReset();
+  vault.mockReset();
+  vault.mockResolvedValue({ configured: false, wsUrl: null, username: null, hasPassword: false, updatedAt: null });
   localStorage.clear();
   audit = [];
 
@@ -1071,7 +1077,6 @@ describe('SalidaHistoryPage — T3 per-movement state, relaunch, operator filter
   it('opens the sync failure in a dialog instead of a note under the button', async () => {
     get.mockImplementation(async (url: string) => {
       if (url === '/salida/history') return history();
-      if (url === '/aero/vault/settings') return { configured: false };
       return {};
     });
 
@@ -1126,5 +1131,79 @@ describe('SalidaHistoryPage — T3 per-movement state, relaunch, operator filter
     expect(within(actions).getByTestId('salida-resend-2')).toBeInTheDocument();
     // Ningún botón full-width apilado en la ficha.
     expect(within(card).getByTestId('salida-share-2').className).toContain('min-h-[44px]');
+  });
+
+  /**
+   * Un sync que arranca no abre un modal rojo.
+   *
+   * El progreso ("Leyendo las salidas del ERP…") acompaña al botón mientras el pedido viaja; el modal queda para lo
+   * que de verdad falló. Antes, disparar el viaje abría un diálogo de error con la frase de progreso.
+   */
+  it('shows the sync progress beside the button, not as an error dialog', async () => {
+    get.mockImplementation(async (url: string) => {
+      if (url === '/salida/history') return history();
+      return {};
+    });
+    // El viaje queda en vuelo el tiempo justo para leer el estado de progreso.
+    let release: (value: boolean) => void = () => {};
+    const pending = new Promise<boolean>((resolve) => {
+      release = resolve;
+    });
+    const { triggerAeroMovementsSync } = await import('../../lib/aero-mirror');
+    const spy = vi.spyOn({ triggerAeroMovementsSync }, 'triggerAeroMovementsSync');
+    void spy;
+    vault.mockResolvedValue({
+      configured: true,
+      wsUrl: 'http://192.168.25.250:1453/api',
+      username: 'WILKIN',
+      hasPassword: true,
+      updatedAt: null,
+    });
+    ticket.mockReturnValue(pending);
+
+    await renderReady();
+    fireEvent.click(screen.getByTestId('salida-history-erp-sync'));
+
+    await waitFor(() => expect(screen.getByTestId('salida-history-erp-progress')).toBeTruthy());
+    // No hay modal: ni el de error del sync ni el de la nota.
+    expect(screen.queryByTestId('salida-history-erp-note')).toBeNull();
+    expect(screen.queryByText('Leyendo las salidas del ERP…', { selector: '[role="alertdialog"] *' })).toBeNull();
+
+    release(true);
+    await waitFor(() => expect(screen.queryByTestId('salida-history-erp-progress')).toBeNull());
+    expect(screen.queryByTestId('salida-history-erp-note')).toBeNull();
+  });
+
+  /**
+   * Si el viaje no sale, el modal dice el fallo de acceso, con Cerrar.
+   *
+   * El texto de error es el del ERP inaccesible/configurado mal, no la frase de progreso que antes se colaba.
+   */
+  it('explains a sync that could not start with the access error and closes it', async () => {
+    get.mockImplementation(async (url: string) => {
+      if (url === '/salida/history') return history();
+      if (url === '/aero/vault/settings') {
+        return { configured: true, wsUrl: 'http://192.168.25.250:1453/api', username: 'WILKIN', hasPassword: true };
+      }
+      return {};
+    });
+    vault.mockResolvedValue({
+      configured: true,
+      wsUrl: 'http://192.168.25.250:1453/api',
+      username: 'WILKIN',
+      hasPassword: true,
+      updatedAt: null,
+    });
+    ticket.mockRejectedValue(new Error('offline'));
+
+    await renderReady();
+    fireEvent.click(screen.getByTestId('salida-history-erp-sync'));
+
+    const dialog = await screen.findByTestId('salida-history-erp-note');
+    expect(within(dialog).getByText('No se pudo consultar el ERP. Revisá el acceso configurado y volvé a intentarlo.')).toBeTruthy();
+    expect(within(dialog).queryByText('Leyendo las salidas del ERP…')).toBeNull();
+    // Cerrar devuelve la pantalla.
+    fireEvent.click(within(dialog).getByText('Cerrar'));
+    await waitFor(() => expect(screen.queryByTestId('salida-history-erp-note')).toBeNull());
   });
 });

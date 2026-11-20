@@ -184,9 +184,11 @@ export function SalidaHistoryPage() {
         callbackPath: location.pathname,
         includeExits: true,
       });
-      setErpNote(t(fired ? 'salida.erpSyncRequested' : 'salida.erpSyncUnavailable'));
+      // Un pedido en camino no es un error: la pantalla no se secuestra con un modal rojo que dice "Leyendo".
+      // Si el viaje no salió, lo que se explica es el fallo de acceso al ERP, no el progreso.
+      if (!fired) setErpNote(t('salida.erpCheckError'));
     } catch {
-      setErpNote(t('salida.erpSyncUnavailable'));
+      setErpNote(t('salida.erpCheckError'));
     } finally {
       setErpSyncing(false);
       setErpRefetchKey((key) => key + 1);
@@ -639,6 +641,15 @@ export function SalidaHistoryPage() {
                   <RefreshCw className={`h-4 w-4 shrink-0 ${erpSyncing ? 'animate-spin' : ''}`} />
                   {t('massas.syncHeader.action', 'Sincronizar com ERP')}
                 </button>
+                {erpSyncing && (
+                  <span
+                    role="status"
+                    className="text-[11px] text-gray-500"
+                    data-testid="salida-history-erp-progress"
+                  >
+                    {t('salida.erpSyncRequested')}
+                  </span>
+                )}
                 {/* La hora de la última lectura del espejo: dice si lo que se lee es de esta mañana. */}
                 <span className="text-xs text-gray-500" data-testid="salida-last-sync">
                   {t('massas.syncHeader.lastSync', 'Último sync:')}{' '}
