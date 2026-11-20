@@ -650,6 +650,16 @@ el historial: separar las responsabilidades.
   fila propia, 44 px) y el mensaje del día suma los operarios/productos del ERP que trae `SalidaReportSection`
   (`onDayLoaded`), sin duplicar y con el mismo formato.
 
+## 24. Web: el día pasado del archivo de Masas es sólo su mensaje
+
+- `MassasHistoryPage` con `isPastDay` conserva la cabecera, el selector de fecha/chips y `MassasWhatsAppShare`; oculta
+  `massas-history-readonly`, la tarjeta vacía, `MassasCollectiveTable`, el aviso de dispositivo, `syncAwaiting` y los
+  diálogos de resultado/sync. La prévia y `hasShareableData` se siguen calculando con `dayView` + `unifiedRows`, así
+  que el pasado comparte su mensaje real y el día vacío deja la prévia vacía con el envío deshabilitado. Hoy no
+  cambia.
+- Tests: pasado con lanzamientos (share visible; sin tabla, vacío ni nota; sin sync/import), pasado vacío (envío
+  deshabilitado, sin tarjeta vacía), hoy (tabla y opciones), y el chip de una fecha pasada abre el mensaje de ese día.
+
 ## 23. Relatório → Salida: fotos que viajan, WhatsApp verde y el archivo de Cargamento
 
 - **Backend desplegado** (`docker compose up -d api`, commit `fe1259e1`): el export de un reporte real (82) ya
