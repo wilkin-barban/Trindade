@@ -1084,4 +1084,20 @@ describe('SalidaHistoryPage — T3 per-movement state, relaunch, operator filter
     expect(screen.queryByText('El ERP no está configurado en este dispositivo.', { selector: 'p.text-xs' })).toBeNull();
   });
 
+
+  /**
+   * El conteo de pendientes ya no vive arriba del día.
+   *
+   * Cada tarjeta dice su estado y ofrece su reenvío o su exclusión: una cifra suelta en la tarjeta de la fecha se
+   * leía como un estado del día que nadie podía resolver desde ahí.
+   */
+  it('draws no pending count above the day', async () => {
+    await renderReady();
+
+    expect(screen.queryByTestId('salida-pending-count')).toBeNull();
+    expect(screen.queryByText(/Pendente: \d+/)).toBeNull();
+    // El estado de cada movimiento y su acción siguen.
+    expect(screen.getByTestId('salida-badge-2')).toBeInTheDocument();
+    expect(screen.getByTestId('salida-resend-2')).toBeInTheDocument();
+  });
 });

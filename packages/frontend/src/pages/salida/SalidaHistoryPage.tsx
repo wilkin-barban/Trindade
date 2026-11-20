@@ -48,7 +48,6 @@ import {
   salidaBatchToErpStatus,
   salidaDaySummaryText,
   salidaPhotoFiles,
-  salidaPrimaryStatus,
   salidaSummaryText,
   salidaSyncRequestedEvent,
   salidaSyncResultEvent,
@@ -548,10 +547,6 @@ export function SalidaHistoryPage() {
     }
   };
 
-  const pendingCount = visibleMovements.filter(
-    (movement) => salidaPrimaryStatus(movement) === 'pending',
-  ).length;
-
   if (days.loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -654,11 +649,6 @@ export function SalidaHistoryPage() {
               </div>
             </div>
 
-            {pendingCount > 0 && (
-              <p className="text-xs text-amber-800" data-testid="salida-pending-count">
-                {t('salida.erpPending')}: {pendingCount}
-              </p>
-            )}
           </>
         )}
 
