@@ -217,10 +217,14 @@ describe('ReportsPage — the phone, 390 px', () => {
       if (block) expect(block.contains(salidaCard)).toBe(false);
     }
     expect(screen.getByTestId('report-massas-card')).toBeTruthy();
-    // The button that refreshes the day sits above all three cards, not inside any of them.
+    // El botón que refresca el día es la primera opción del formulario: arriba del turno y fuera de las tarjetas.
     const sync = screen.getByTestId('erp-movements-sync');
-    const header = screen.getByTestId('erp-movements-header');
-    expect(header.contains(sync)).toBe(true);
+    const form = screen.getByTestId('report-builder-form');
+    expect(form.contains(sync)).toBe(true);
+    expect(screen.getByTestId('erp-movements-sync-block')).toContainElement(sync);
+    // Una sola instancia, y el encabezado de las tarjetas ya no lo repite.
+    expect(screen.getAllByTestId('erp-movements-sync')).toHaveLength(1);
+    expect(screen.getByTestId('erp-movements-header').contains(sync)).toBe(false);
     for (const card of ['report-massas-card', 'report-receipts-card', 'salida-report-section']) {
       const element = screen.queryByTestId(card);
       if (element) expect(element.contains(sync)).toBe(false);

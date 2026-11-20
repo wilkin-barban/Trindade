@@ -351,15 +351,14 @@ export function ReportsPage() {
    * that already had two, and the card grew until the reading order broke. The sync button stays above all three
    * because it is one action over one day, not a property of any of the cards.
    */
-  const erpMovementsHeader = (
-    <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" data-testid="erp-movements-header">
-      <h2 className="text-base font-bold leading-snug text-gray-900 sm:text-lg">
-        {t('reports.erpMovementsTitle', 'Movimentações do ERP')}
-      </h2>
+  // La sincronización del ERP es la primera opción del formulario: se aprieta antes de escribir nada. El
+  // encabezado de las tarjetas conserva sólo su título, para que el botón no aparezca dos veces.
+  const erpSyncAction = (
+    <div className="mb-4" data-testid="erp-movements-sync-block">
       <Button
         type="button"
         onClick={handleSyncErpMovements}
-        className="min-h-[44px] w-full shrink-0 gap-2 text-xs font-semibold sm:w-auto"
+        className="min-h-[44px] w-full gap-2 text-xs font-semibold"
         data-testid="erp-movements-sync"
         aria-label={
           canSyncErp ? t('massas.syncHeader.action', 'Sincronizar com ERP') : t('reports.receiptsRefresh', 'Atualizar')
@@ -368,6 +367,14 @@ export function ReportsPage() {
         <RefreshCw className="h-4 w-4" />
         {canSyncErp ? t('massas.syncHeader.action', 'Sincronizar com ERP') : t('reports.receiptsRefresh', 'Atualizar')}
       </Button>
+    </div>
+  );
+
+  const erpMovementsHeader = (
+    <div className="mb-3" data-testid="erp-movements-header">
+      <h2 className="text-base font-bold leading-snug text-gray-900 sm:text-lg">
+        {t('reports.erpMovementsTitle', 'Movimentações do ERP')}
+      </h2>
     </div>
   );
 
@@ -444,6 +451,9 @@ export function ReportsPage() {
       <p className="text-sm text-gray-500 mb-6">{t('reports.newReportDesc')}</p>
 
       <form onSubmit={handleSubmit} data-testid="report-builder-form">
+        {/* Sincronizar com ERP: la primera opción visible, antes del turno. */}
+        {erpSyncAction}
+
         {/* Turno selector */}
         <Card className="mb-6">
           <CardHeader className="pb-3">
