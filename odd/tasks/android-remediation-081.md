@@ -650,6 +650,21 @@ el historial: separar las responsabilidades.
   fila propia, 44 px) y el mensaje del día suma los operarios/productos del ERP que trae `SalidaReportSection`
   (`onDayLoaded`), sin duplicar y con el mismo formato.
 
+## 23. Relatório → Salida: fotos que viajan, WhatsApp verde y el archivo de Cargamento
+
+- **Backend desplegado** (`docker compose up -d api`, commit `fe1259e1`): el export de un reporte real (82) ya
+  devuelve el formato aprobado — `👤 VICTOR:`, `*📦 Embalagens*`, productos sin prefijo, `*🧵 Bobinas*`, sin
+  `📊 Total` — y Android comparte ese texto tal cual (`state.exportText`). Test del ViewModel con el texto del
+  servidor y las fotos.
+- **Android: fotos en el share** (`ee896bce`): `ReportPhotoFiles` (interfaz + implementación en `cacheDir`, IO) y
+  `shareExport()` con `shareTextWithPhotos`, con caída a `shareText` si no baja ninguna. `ShareCard` pinta la acción
+  como WhatsApp (verde, icono de chat, 48 dp, full-width) y `SalidaReportCard` nombra su total.
+- **Web: Cargamento** (`34e64206`): la puerta «Enviar a fleteros» usa la misma regla que el diálogo
+  (`lib/loading-fleteros.ts`) y sólo aparece si hay fleteros asignados con teléfono; el diálogo perdió Compartir y
+  Copiar (y sus handlers/estado) y cada fletero es una fila verde con nombre, número e icono, con Cerrar al pie;
+  «Editar» desde el archivo vuelve a la **grilla del día**, no a la lista de filas, y los días cerrados siguen sin
+  edición.
+
 ## 22. Web: Histórico de Saídas, último sync, día ERP-only y el error automático
 
 - **Último sync**: la fila del botón ámbar lee el espejo de la fecha (`/integration/aero/movements?date=`) con
