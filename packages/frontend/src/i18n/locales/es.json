@@ -765,7 +765,8 @@
     "historyDaysUnavailable": "No se pudieron leer los días con lanzamientos; podés abrir ayer.",
     "historyEmptyDay": "No hay lanzamientos registrados en ese día.",
     "erpOnlyReadOnly": "Solo lectura (ERP)",
-    "shareDayEmpty": "Sin lanzamientos para compartir"
+    "shareDayEmpty": "Sin lanzamientos para compartir",
+    "deleteLaunchTitle": "¿Excluir el lanzamiento de {{what}}?"
   },
   "moduleHelp": {
     "dashboard": {

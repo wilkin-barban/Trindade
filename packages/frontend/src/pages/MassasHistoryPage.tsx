@@ -5,6 +5,8 @@ import { api, ApiClientError } from '../api/client';
 import { resolveApiErrorKey } from '../lib/api-error-normalizer';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/button';
+import { ConfirmDialog } from '../components/ui/confirm-dialog';
+import { MessageDialog } from '../components/ui/message-dialog';
 import { Dialog } from '../components/ui/dialog';
 import { HistoryDayPanel, type HistoryDay } from '../components/ui/HistoryDayPanel';
 import { LoadingSpinner } from '../components/ui/loading-spinner';
@@ -159,6 +161,14 @@ export function MassasHistoryPage() {
   const [editingBoxes, setEditingBoxes] = useState('');
   const [editingBusy, setEditingBusy] = useState(false);
   const [deletingLaunchId, setDeletingLaunchId] = useState<number | null>(null);
+  /**
+   * El lanzamiento que espera confirmación y la respuesta del borrado.
+   *
+   * Ni `window.confirm` ni un cartel dentro de la tabla: el borrado pregunta en el diálogo de producto y responde
+   * en una ventana que el operario cierra, porque la tabla de abajo ya cambió.
+   */
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; label: string } | null>(null);
+  const [deleteResult, setDeleteResult] = useState<{ tone: 'success' | 'error'; message: string } | null>(null);
 
   // WhatsApp state
   const [phone, setPhone] = useState('');
@@ -639,17 +649,31 @@ export function MassasHistoryPage() {
     }
   };
 
-  const handleDeleteLaunch = async (launchId: number) => {
+  /** Pide confirmación; el borrado corre recién en el diálogo. */
+  const handleDeleteLaunch = (launchId: number) => {
     if (!isToday) return;
-    if (!window.confirm(t('massas.deleteConfirm'))) return;
-    setDeletingLaunchId(launchId);
-    setNotice(null);
+    const launch = dayView?.launches.find((row) => row.id === launchId);
+    setDeleteTarget({
+      id: launchId,
+      label: launch ? `${launch.product_name} · ${launch.boxes}` : formatDateLabel(date),
+    });
+  };
+
+  /** Confirmado: borra, recarga el día y responde en su ventana. */
+  const confirmDeleteLaunch = async () => {
+    const target = deleteTarget;
+    if (!target) return;
+    setDeleteTarget(null);
+    setDeletingLaunchId(target.id);
     try {
-      await api.del(`/massas-launch/${launchId}`);
-      setNotice({ type: 'success', message: t('massas.deleteSuccess') });
+      await api.del(`/massas-launch/${target.id}`);
+      setDeleteResult({ tone: 'success', message: t('massas.deleteSuccess') });
       await loadDay(date);
     } catch (err) {
-      setNotice({ type: 'error', message: err instanceof Error ? err.message : t('massas.deleteError') });
+      setDeleteResult({
+        tone: 'error',
+        message: err instanceof Error ? err.message : t('massas.deleteError'),
+      });
     } finally {
       setDeletingLaunchId(null);
     }
@@ -1009,6 +1033,23 @@ export function MassasHistoryPage() {
           {notice.message}
         </div>
       )}
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => void confirmDeleteLaunch()}
+        title={t('massas.deleteLaunchTitle', 'Excluir o lançamento de {{what}}?', {
+          what: deleteTarget?.label ?? '',
+        })}
+        panelTestId="massas-delete-confirm"
+      />
+      <MessageDialog
+        open={deleteResult !== null}
+        tone={deleteResult?.tone ?? 'success'}
+        message={deleteResult?.message ?? ''}
+        onClose={() => setDeleteResult(null)}
+        testId="massas-delete-result"
+      />
 
       {/* History Day Panel: accepts up to today */}
       <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">

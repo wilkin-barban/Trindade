@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import i18n from '../i18n/config';
@@ -335,5 +335,39 @@ describe('MassasHistoryPage', () => {
 
     expect(await screen.findByTestId('massas-share-day')).toBeEnabled();
     expect(screen.getByTestId('massas-preview-message').textContent).not.toBe('Sin lanzamientos para compartir');
+  });
+
+  /**
+   * El borrado de un lanzamiento pregunta y responde en ventanas, no en la tabla.
+   *
+   * El `window.confirm` del navegador y el cartel inline se fueron: la confirmación nombra el lanzamiento y el
+   * resultado — éxito o rechazo — se cierra a mano. La tabla se recarga después de borrar.
+   */
+  it('asks before deleting a launch and answers in a dialog', async () => {
+    const today = saoPauloToday();
+    const { container } = renderPage(`/massas-history?date=${today}`);
+
+    await screen.findByTestId('massas-individual-launches');
+    const buttons = screen.getAllByTitle(/Excluir|Eliminar|Borrar/i);
+    expect(buttons.length).toBeGreaterThan(0);
+    fireEvent.click(buttons[0]!);
+
+    const confirm = await screen.findByTestId('massas-delete-confirm');
+    expect(within(confirm).getByText(/Excluir o lançamento de|¿Excluir el lanzamiento de/)).toBeTruthy();
+    // El borrado no salió antes de confirmarlo, y no hay confirmación nativa.
+    expect(del).not.toHaveBeenCalled();
+    const confirmSpy = vi.spyOn(window, 'confirm');
+    expect(confirmSpy).not.toHaveBeenCalled();
+
+    del.mockResolvedValue({ ok: true });
+    fireEvent.click(within(confirm).getByText(/Eliminar permanentemente|Excluir permanentemente/));
+
+    await waitFor(() => expect(del).toHaveBeenCalled());
+    const result = await screen.findByTestId('massas-delete-result');
+    const message = within(result).getByText(/Lanzamiento borrado|Lanzamento excluído|Lançamento borrado/i);
+    expect(message).toBeTruthy();
+    // El mensaje vive en la ventana y en ningún otro lugar de la página.
+    expect(screen.queryAllByText(message.textContent ?? '').length).toBe(1);
+    expect(container.querySelector('[data-testid="massas-delete-result"]')).toBeTruthy();
   });
 });
