@@ -318,6 +318,36 @@ class MassasLaunchViewModelTest {
         assertNull(viewModel.state.value.deleteConfirmLaunchId)
     }
 
+    /**
+     * El resultado del borrado se lee en una ventana, no en un cartel dentro de la tabla.
+     *
+     * La tabla ya cambió cuando el servidor responde; un aviso en línea al lado se lee como parte del día. El éxito
+     * y el rechazo van al mismo diálogo que el resto de las acciones de datos.
+     */
+    @Test
+    fun `deleting a launch answers in the result dialog`() = runTest {
+        val today = MassasLaunchViewModel.saopauloToday()
+        val stored = launch(7)
+        val repo = DayRepository(massasApi, dayWith(stored))
+        val testVm = newViewModel(repo)
+        testVm.refresh()
+        advanceUntilIdle()
+
+        testVm.promptDelete(7)
+        testVm.deleteLaunch()
+        advanceUntilIdle()
+
+        assertEquals(R.string.massas_notice_deleted, testVm.state.value.resultDialogMessage?.resId)
+        assertTrue(testVm.state.value.resultDialogIsSuccess)
+        assertNull("el borrado no deja un aviso en línea", testVm.state.value.noticeMessage)
+        assertNull("ni un error en línea", testVm.state.value.errorMessage)
+
+        testVm.dismissResultDialog()
+        assertNull(testVm.state.value.resultDialogMessage)
+        // La fecha del día no cambió: se recargó la misma.
+        assertEquals(today, testVm.state.value.date)
+    }
+
     @Test
     fun toggleHelpDialog_updatesState() {
         assertFalse(viewModel.state.value.showHelpDialog)
@@ -990,7 +1020,13 @@ class MassasLaunchViewModelTest {
         var lastCreate: com.trindade.app.network.CreateMassasLaunchRequest? = null
         var createResult: MassasWriteResult? = null
 
+        /** Lo que responde un borrado; por defecto, el día tal como está. */
+        var deleteResult: MassasWriteResult? = null
+
         override suspend fun day(date: String): MassasLaunchDayView? = view
+
+        override suspend fun deleteLaunch(id: Int, date: String?): MassasWriteResult =
+            deleteResult ?: MassasWriteResult.Saved(view = view ?: MassasLaunchDayView(date = date.orEmpty()))
 
         override suspend fun storedAeroMovements(
             date: String,

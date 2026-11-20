@@ -1254,19 +1254,22 @@ class MassasLaunchViewModel @Inject constructor(
                     _state.value = _state.value.copy(
                         isSubmitting = false,
                         dayView = result.view,
-                        noticeMessage = UiText.of(R.string.massas_notice_deleted),
+                        resultDialogMessage = UiText.of(R.string.massas_notice_deleted),
+                        resultDialogIsSuccess = true,
                     )
                 }
                 is MassasWriteResult.Refused -> {
                     _state.value = _state.value.copy(
                         isSubmitting = false,
-                        errorMessage = refusalMessage(result, R.string.massas_error_delete),
+                        resultDialogMessage = refusalMessage(result, R.string.massas_error_delete),
+                        resultDialogIsSuccess = false,
                     )
                 }
                 is MassasWriteResult.Unreachable -> {
                     _state.value = _state.value.copy(
                         isSubmitting = false,
-                        errorMessage = UiText.of(R.string.massas_error_offline),
+                        resultDialogMessage = UiText.of(R.string.massas_error_offline),
+                        resultDialogIsSuccess = false,
                     )
                 }
             }
