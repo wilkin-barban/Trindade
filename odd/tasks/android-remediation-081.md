@@ -650,6 +650,17 @@ el historial: separar las responsabilidades.
   fila propia, 44 px) y el mensaje del día suma los operarios/productos del ERP que trae `SalidaReportSection`
   (`onDayLoaded`), sin duplicar y con el mismo formato.
 
+## 25. Web: el modal de fleteros de Cargamento, con el mensaje siempre a la vista
+
+- `ScheduleExportView` usa un panel acotado (`panelClassName` con `max-h-[90vh]`, `w-[min(100%-1.5rem,44rem)]`,
+  `rounded-2xl`, `overflow-hidden`), cabecera `shrink-0`, la prévia en su banda fija con `max-h-[28vh]`
+  `overflow-y-auto` (`sm:max-h-[34vh]`), la lista de fleteros en `flex-1 min-h-0 overflow-y-auto` con contador
+  «N fleteros» y ayuda, y el pie con Cerrar `shrink-0`. Con 20 fleteros el mensaje y el cierre no se mueven; cada
+  fila sigue siendo el enlace `wa.me` verde de 44 px.
+- Sin Compartir ni Copiar; la accesibilidad (foco, Escape, overlay) sigue siendo de `Dialog`.
+- Tests: 20 fleteros → `loading-export-text` presente, lista con scroll, contador y Cerrar; el test de nodo del
+  archivo de Masas se alineó a la regla del pasado sin cuerpo.
+
 ## 24. Web: el día pasado del archivo de Masas es sólo su mensaje
 
 - `MassasHistoryPage` con `isPastDay` conserva la cabecera, el selector de fecha/chips y `MassasWhatsAppShare`; oculta
