@@ -27,7 +27,7 @@ interface DashboardSummary {
   higieneDone: number;
   higieneTotal: number;
   recepcionDone: number;
-  recepcionTotal: number;
+  recepcionSynced: boolean;
 }
 
 interface SummaryCardProps {
@@ -422,12 +422,15 @@ export function DashboardPage() {
             value={t('dashboard.taskProgress', { done: summary?.higieneDone ?? 0, total: summary?.higieneTotal ?? 0 })}
             testId="dashboard-summary-higiene"
           />
+          {/* La recepción se cuenta por mercadería distinta del espejo del ERP; sin sincronización se dice eso,
+              porque un 0 se lee como «no llegó nada» cuando en realidad nadie miró. */}
           <SummaryRow
             label={t('dashboard.recepcionLabel')}
-            value={t('dashboard.goodsProgress', {
-              done: summary?.recepcionDone ?? 0,
-              total: summary?.recepcionTotal ?? 0,
-            })}
+            value={
+              summary?.recepcionSynced
+                ? t('dashboard.goodsProgress', { done: summary.recepcionDone })
+                : t('dashboard.recepcionNotSynced')
+            }
             testId="dashboard-summary-recepcion"
           />
         </CardContent>

@@ -69,7 +69,9 @@ class FakeSystemApi(
         const val HIGIENE_DONE = 3
         const val HIGIENE_TOTAL = 6
         const val RECEPCION_DONE = 4
-        const val RECEPCION_TOTAL = 8
+        const val RECEPCION_SYNCED = true
+
+        const val RECEPCION_TOTAL_UNUSED = 8
         const val LATEST_REPORT_ID = 99
 
         /**
@@ -97,7 +99,7 @@ class FakeSystemApi(
             higieneDone = HIGIENE_DONE,
             higieneTotal = HIGIENE_TOTAL,
             recepcionDone = RECEPCION_DONE,
-            recepcionTotal = RECEPCION_TOTAL,
+            recepcionSynced = RECEPCION_SYNCED,
             latestReportCanEdit = latestReportCanEdit,
             activeScheduleCanEdit = activeScheduleCanEdit,
         )

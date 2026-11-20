@@ -45,7 +45,7 @@ import kotlinx.serialization.Contextual
  * @param higieneDone 
  * @param higieneTotal 
  * @param recepcionDone 
- * @param recepcionTotal 
+ * @param recepcionSynced 
  */
 @Serializable
 
@@ -93,8 +93,8 @@ data class DashboardSummary (
     @SerialName(value = "recepcionDone")
     val recepcionDone: kotlin.Int,
 
-    @SerialName(value = "recepcionTotal")
-    val recepcionTotal: kotlin.Int
+    @SerialName(value = "recepcionSynced")
+    val recepcionSynced: kotlin.Boolean
 
 ) {
 

@@ -3,6 +3,7 @@ import { getSaoPauloDateString } from '../../utils/date.js';
 import { activeScheduleBatchDate, activeScheduleDate } from './active-schedule.js';
 import { GUEST_USERNAME } from '../../guest-user.js';
 import { isAdmin } from '../history-permissions.js';
+import { dayReceipts } from '../reports/receipts.service.js';
 
 interface CountRow {
   count: number;
@@ -115,23 +116,12 @@ export async function dashboardRoutes(fastify: FastifyInstance) {
         )
         .get() as CountRow;
 
-      const recepcionDone = db
-        .prepare(
-          `SELECT COUNT(DISTINCT ri.task_id) AS count
-           FROM report_items ri
-           JOIN reports r ON ri.report_id = r.id
-           JOIN report_tasks rt ON ri.task_id = rt.id
-           WHERE r.report_date = ? AND r.is_active = 1 AND rt.category_id = 4 AND ri.checked = 1`
-        )
-        .get(today) as CountRow;
-
-      const recepcionTotal = db
-        .prepare(
-          `SELECT COUNT(*) AS count
-           FROM report_tasks
-           WHERE category_id = 4 AND is_active = 1`
-        )
-        .get() as CountRow;
+      // La recepción ya no es la lista de tareas de una categoría: es lo que el ERP registró, contado por producto
+      // distinto -- el grupo pregunta cuántas mercaderías llegaron, no cuántas líneas tiene el espejo.
+      // `recepcionSynced` separa "no llegó nada" de "nadie miró": un cero sin sincronización no dice nada.
+      const receipts = dayReceipts(db, today);
+      const recepcionDone = new Set(receipts.receipts.map((receipt) => receipt.productCode)).size;
+      const recepcionSynced = receipts.migrated && receipts.syncedAt !== null;
 
       // Editar es del dueño o del administrador **hoy**, y sólo hoy: el pasado es inmutable. Lo decide el
       // servidor y la UI sólo lo refleja; el resumen es de hoy por definición, así que el día no hay que
@@ -158,8 +148,8 @@ export async function dashboardRoutes(fastify: FastifyInstance) {
         activeScheduleCanEdit,
         higieneDone: higieneDone.count,
         higieneTotal: higieneTotal.count,
-        recepcionDone: recepcionDone.count,
-        recepcionTotal: recepcionTotal.count,
+        recepcionDone,
+        recepcionSynced,
       });
     }
   );

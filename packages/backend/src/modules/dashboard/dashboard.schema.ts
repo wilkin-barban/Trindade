@@ -17,8 +17,11 @@ import { z } from 'zod';
  * tomorrow's date, which under the convention above is tomorrow's batch, loaded the day after.
  * `latestReportId` is the newest active report for today, or null when there is none.
  *
- * `higieneDone`/`higieneTotal` and `recepcionDone`/`recepcionTotal` are progress pairs for two
- * fixed categories, so a client can render a fraction without knowing which category is which.
+ * `higieneDone`/`higieneTotal` is the checklist of the day: how many of its tasks are checked. `recepcionDone`
+ * is the number of **distinct products** the ERP's mirror says were received today -- the reception is a fishing
+ * list of goods, not a checklist of tasks, and the old `recepcionTotal` was the count of a category's tasks, a
+ * denominator that no longer existed. `recepcionSynced` says whether the day was read from the ERP at all, because
+ * "nothing arrived" and "nobody looked" are different sentences and a zero cannot tell them apart.
  */
 export const DashboardSummarySchema = z
   .object({
@@ -42,8 +45,10 @@ export const DashboardSummarySchema = z
     activeScheduleCanEdit: z.boolean(),
     higieneDone: z.number().int(),
     higieneTotal: z.number().int(),
+    /** Productos distintos recibidos hoy según el espejo del ERP; 0 cuando el día no se sincronizó. */
     recepcionDone: z.number().int(),
-    recepcionTotal: z.number().int(),
+    /** Si el día se leyó del ERP. Sin esto, un 0 se lee como «no llegó nada» cuando nadie miró. */
+    recepcionSynced: z.boolean(),
   })
   .strict();
 

@@ -176,7 +176,13 @@ fun DashboardScreen(
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                         Text(
-                            text = stringResource(R.string.dashboard_recepcion_count, summary.recepcionDone),
+                            // Lo que el ERP registró, contado por mercadería distinta. Sin sincronización se dice
+                            // eso: un cero se lee como «no llegó nada» cuando en realidad nadie miró.
+                            text = if (summary.recepcionSynced) {
+                                stringResource(R.string.dashboard_recepcion_count, summary.recepcionDone)
+                            } else {
+                                stringResource(R.string.dashboard_recepcion_not_synced)
+                            },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurface,
                         )
@@ -393,11 +399,11 @@ fun DashboardScreen(
                         )
                         SummaryRow(
                             label = stringResource(R.string.dashboard_recepcion_label),
-                            value = stringResource(
-                                R.string.dashboard_goods_progress,
-                                summary.recepcionDone,
-                                summary.recepcionTotal,
-                            ),
+                            value = if (summary.recepcionSynced) {
+                                stringResource(R.string.dashboard_goods_progress, summary.recepcionDone)
+                            } else {
+                                stringResource(R.string.dashboard_recepcion_not_synced)
+                            },
                         )
                     }
                 }

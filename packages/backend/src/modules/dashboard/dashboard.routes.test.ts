@@ -53,7 +53,7 @@ describe('Dashboard Routes', () => {
     assert.strictEqual(typeof body.higieneDone, 'number');
     assert.strictEqual(typeof body.higieneTotal, 'number');
     assert.strictEqual(typeof body.recepcionDone, 'number');
-    assert.strictEqual(typeof body.recepcionTotal, 'number');
+    assert.strictEqual(typeof body.recepcionSynced, 'boolean');
 
     // The test app creates one administrator and one worker.
     assert.strictEqual(body.activeUsers, 2);
@@ -66,9 +66,51 @@ describe('Dashboard Routes', () => {
     assert.strictEqual(body.higieneDone, 0);
     const higieneTotal = (db.prepare(`SELECT COUNT(*) AS count FROM report_tasks rt JOIN report_categories rc ON rc.id = rt.category_id WHERE rc.name_pt = 'Higiene e Organização' AND rt.is_active = 1`).get() as { count: number }).count;
     assert.strictEqual(body.higieneTotal, higieneTotal);
+    // Sin espejo sincronizado no hay recepción que contar, y el resumen lo dice en vez de un cero mudo.
     assert.strictEqual(body.recepcionDone, 0);
-    const recepcionTotal = (db.prepare(`SELECT COUNT(*) AS count FROM report_tasks rt JOIN report_categories rc ON rc.id = rt.category_id WHERE rc.id = 4 AND rt.is_active = 1`).get() as { count: number }).count;
-    assert.strictEqual(body.recepcionTotal, recepcionTotal);
+    assert.strictEqual(body.recepcionSynced, false);
+  });
+
+  /**
+   * La recepción sale del espejo del ERP, contada por producto distinto.
+   *
+   * El día que el ERP registró mercadería tiene que decir cuántas mercaderías distintas llegaron, y un día leído
+   * sin mercadería dice cero **sincronizado**: "no llegó nada" y "nadie miró" no son la misma frase.
+   */
+  it('counts the reception from the ERP mirror, by distinct product', async (t) => {
+    t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-09-01T15:00:00.000Z') });
+    t.after(() => t.mock.timers.reset());
+
+    db.exec('DELETE FROM aero_movements');
+    const insert = db.prepare(
+      `INSERT INTO aero_movements (movement_date, ent_lan, product_code, product_desc, quantity, entry_date, operator_name, movement_type, synced_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+    // Dos líneas del mismo producto y una de otro: dos mercaderías distintas.
+    insert.run('2026-09-01', 901, '2500', 'GORDURA', 10, '2026-09-01', 'VINICIUS R', 'E', '2026-09-01 07:10');
+    insert.run('2026-09-01', 902, '2500', 'GORDURA', 5, '2026-09-01', 'VINICIUS R', 'E', '2026-09-01 07:10');
+    insert.run('2026-09-01', 903, '1356', 'EMBALAG. DISCO 400g', 2, '2026-09-01', 'VICTOR', 'E', '2026-09-01 07:10');
+
+    const body = await summaryWith([]);
+
+    assert.strictEqual(body.recepcionDone, 2);
+    assert.strictEqual(body.recepcionSynced, true);
+  });
+
+  /**
+   * Un día sin filas del espejo no se puede distinguir de un día que nadie miró: el resumen dice cero **sin
+   * sincronización**, que es la verdad que el servidor puede sostener. La marca de "sincronicé" vive en el
+   * dispositivo; lo que el servidor sabe es si hay espejo de ese día.
+   */
+  it('a day with no mirror rows says zero and unsynced', async (t) => {
+    t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-09-01T15:00:00.000Z') });
+    t.after(() => t.mock.timers.reset());
+
+    db.exec('DELETE FROM aero_movements');
+    const body = await summaryWith([]);
+
+    assert.strictEqual(body.recepcionDone, 0);
+    assert.strictEqual(body.recepcionSynced, false);
   });
 
   /**

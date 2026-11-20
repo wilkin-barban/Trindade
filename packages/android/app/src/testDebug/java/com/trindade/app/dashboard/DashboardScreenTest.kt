@@ -178,13 +178,12 @@ class DashboardScreenTest {
         displayed(FakeSystemApi.REPORTS_TOTAL.toString())
         displayed(FakeSystemApi.ACTIVE_USERS.toString())
         displayed(copy(R.string.dashboard_task_progress, FakeSystemApi.HIGIENE_DONE, FakeSystemApi.HIGIENE_TOTAL))
-        displayed(copy(R.string.dashboard_goods_progress, FakeSystemApi.RECEPCION_DONE, FakeSystemApi.RECEPCION_TOTAL))
+        // La recepción se cuenta por mercadería del espejo, sin denominador: el 18 eran tareas de un checklist
+        // que ya no existe.
+        displayed(copy(R.string.dashboard_goods_progress, FakeSystemApi.RECEPCION_DONE))
         composeRule.onAllNodesWithText(copy(R.string.dashboard_reports_today)).assertCountEquals(1)
 
-        // The totals reach a pixel now, which is what the pair is for: `done` alone cannot say how much is
-        // left, and `higieneTotal`/`recepcionTotal` were the fields no screen read.
-        assertTrue(FakeSystemApi.HIGIENE_TOTAL > 0)
-        assertTrue(FakeSystemApi.RECEPCION_TOTAL > 0)
+        assertTrue("la higiene sigue siendo un checklist con total", FakeSystemApi.HIGIENE_TOTAL > 0)
     }
 
     /**

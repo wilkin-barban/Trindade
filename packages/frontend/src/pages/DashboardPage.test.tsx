@@ -55,7 +55,7 @@ const SUMMARY = {
   higieneDone: 3,
   higieneTotal: 5,
   recepcionDone: 2,
-  recepcionTotal: 4,
+  recepcionSynced: true,
 };
 
 function renderPage() {
@@ -194,7 +194,7 @@ describe('DashboardPage', () => {
     expect(within(panel).getByTestId('dashboard-summary-reports')).toHaveTextContent('12');
     expect(within(panel).getByTestId('dashboard-summary-users')).toHaveTextContent('4');
     expect(within(panel).getByTestId('dashboard-summary-higiene')).toHaveTextContent('3/5 tareas');
-    expect(within(panel).getByTestId('dashboard-summary-recepcion')).toHaveTextContent('2/4 mercaderías');
+    expect(within(panel).getByTestId('dashboard-summary-recepcion')).toHaveTextContent('2 mercaderías');
   });
 
   it('says the same words in Spanish as in Portuguese, and they are Spanish', async () => {

@@ -173,9 +173,10 @@
     <string name="dashboard_recepcion_count">Recepción -> %1$d Mercaderías</string>
     <string name="dashboard_summary_title">Resumen</string>
     <string name="dashboard_higiene_label">Hig. y Org.</string>
+    <string name="dashboard_recepcion_not_synced">Sin sincronización con el ERP</string>
     <string name="dashboard_recepcion_label">Recepción</string>
     <string name="dashboard_task_progress">%1$d/%2$d tareas</string>
-    <string name="dashboard_goods_progress">%1$d/%2$d mercancías</string>
+    <string name="dashboard_goods_progress">%1$d mercaderías</string>
     <!-- The one string here the web does not have, and it says what it says on purpose. It names no
          cause, because a timeout, a refused connection and a reply nobody could read are not
          distinguishable from this screen, and it is not the web's own "Erro ao carregar dashboard"

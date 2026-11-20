@@ -1225,8 +1225,8 @@
           "recepcionDone": {
             "type": "integer"
           },
-          "recepcionTotal": {
-            "type": "integer"
+          "recepcionSynced": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -1244,7 +1244,7 @@
           "higieneDone",
           "higieneTotal",
           "recepcionDone",
-          "recepcionTotal"
+          "recepcionSynced"
         ],
         "additionalProperties": false
       },
