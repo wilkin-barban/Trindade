@@ -622,12 +622,36 @@ export function SalidaHistoryPage() {
             estos controles son del día de hoy, que es el que se lanza y se corrige. */}
         {!isReadOnly && (
           <>
-            {/* El filtro, y nada más: este histórico muestra lo que el operario lanzó. */}
+            {/* Filtros y sync en la misma fila de la tarjeta del día: el espejo es parte de la fecha que se
+                está mirando, no un bloque aparte debajo de las tarjetas. En 390 px la fila se apila. */}
             <div
               data-testid="salida-history-actions"
-              className="grid grid-cols-1 gap-2 border-t border-gray-100 pt-3 sm:flex sm:items-center sm:justify-between"
+              className="flex flex-col gap-2 border-t border-gray-100 pt-3 sm:flex-row sm:items-center sm:justify-between"
             >
               <SalidaBlockFilter value={block} onChange={setBlock} />
+              {/* El mismo botón que el Histórico de Masas: ámbar, compacto y en su fila. */}
+              <div
+                className="flex flex-wrap items-center gap-2"
+                data-testid="salida-history-erp-sync-row"
+              >
+                <button
+                  type="button"
+                  onClick={() => void handleSyncErp()}
+                  disabled={erpSyncing}
+                  className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg bg-amber-600 px-3 text-xs font-semibold text-white transition-colors hover:bg-amber-700 disabled:opacity-50"
+                  data-testid="salida-history-erp-sync"
+                >
+                  <RefreshCw className={`h-4 w-4 shrink-0 ${erpSyncing ? 'animate-spin' : ''}`} />
+                  {t('massas.syncHeader.action', 'Sincronizar com ERP')}
+                </button>
+                {/* La hora de la última lectura del espejo: dice si lo que se lee es de esta mañana. */}
+                <span className="text-xs text-gray-500" data-testid="salida-last-sync">
+                  {t('massas.syncHeader.lastSync', 'Último sync:')}{' '}
+                  <span className="font-semibold tabular-nums text-gray-700">
+                    {lastSyncLabel(lastSync)}
+                  </span>
+                </span>
+              </div>
             </div>
 
             {pendingCount > 0 && (
@@ -679,29 +703,10 @@ export function SalidaHistoryPage() {
         </div>
       ) : null}
 
-      {/* El sync del espejo y el bloque del Relatório: sólo en el día de hoy. */}
+      {/* Las salidas del ERP: sólo en el día de hoy, y sin el botón ni la hora, que viven en la tarjeta de la
+          fecha. */}
       {!isReadOnly && (
         <div className="space-y-2" data-testid="salida-history-erp">
-          {/* El mismo botón que el Histórico de Masas: ámbar, compacto y en su fila, no un outline a todo el ancho. */}
-          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100" data-testid="salida-history-erp-sync-row">
-            <button
-              type="button"
-              onClick={() => void handleSyncErp()}
-              disabled={erpSyncing}
-              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg bg-amber-600 px-3 text-xs font-semibold text-white transition-colors hover:bg-amber-700 disabled:opacity-50"
-              data-testid="salida-history-erp-sync"
-            >
-              <RefreshCw className={`h-4 w-4 shrink-0 ${erpSyncing ? 'animate-spin' : ''}`} />
-              {t('massas.syncHeader.action', 'Sincronizar com ERP')}
-            </button>
-            {/* La hora de la última lectura del espejo: dice si lo que se lee es de esta mañana. */}
-            <span className="text-xs text-gray-500" data-testid="salida-last-sync">
-              {t('massas.syncHeader.lastSync', 'Último sync:')}{' '}
-              <span className="font-semibold tabular-nums text-gray-700">
-                {lastSyncLabel(lastSync)}
-              </span>
-            </span>
-          </div>
           <MessageDialog
             open={erpNote !== null}
             message={erpNote ?? ''}

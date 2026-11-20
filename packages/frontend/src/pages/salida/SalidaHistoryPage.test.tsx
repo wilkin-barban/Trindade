@@ -635,8 +635,8 @@ describe('SalidaHistoryPage — iPhone share and layout', () => {
     expect(screen.getByTestId('salida-history-header').className).toContain('sm:flex-row');
     expect(screen.getByTestId('salida-block-filter').className).toContain('grid-cols-2');
     expect(screen.getByTestId('salida-block-filter').className).toContain('sm:flex');
-    expect(screen.getByTestId('salida-history-actions').className).toContain('grid');
-    expect(screen.getByTestId('salida-history-actions').className).toContain('sm:flex');
+    expect(screen.getByTestId('salida-history-actions').className).toContain('flex-col');
+    expect(screen.getByTestId('salida-history-actions').className).toContain('sm:flex-row');
   });
 
   it('keeps the help button in the title row and a compact launch link in its own row', async () => {
@@ -904,7 +904,21 @@ describe('SalidaHistoryPage — T3 per-movement state, relaunch, operator filter
     expect(sync.className).toContain('bg-amber-600');
     expect(sync.className).toContain('min-h-[44px]');
     expect(sync.textContent).toContain(i18n.t('massas.syncHeader.action'));
-    expect(sync.closest('[data-testid="salida-history-erp-sync-row"]')).not.toBeNull();
+    // El sync vive en la tarjeta de la fecha y los filtros, y la hora lo acompaña; no hay una segunda instancia.
+    const actions = screen.getByTestId('salida-history-actions');
+    expect(actions.contains(sync)).toBe(true);
+    // La tarjeta es la misma que monta la fecha y los chips.
+    expect(actions.parentElement?.contains(screen.getByTestId('salida-history-date'))).toBe(true);
+    // En 390 px la fila se apila; en desktop, filtros a la izquierda y sync a la derecha.
+    expect(actions.className).toContain('flex-col');
+    expect(actions.className).toContain('sm:flex-row');
+    expect(actions.className).toContain('sm:justify-between');
+    expect(screen.getAllByTestId('salida-history-erp-sync')).toHaveLength(1);
+    expect(screen.getAllByTestId('salida-last-sync')).toHaveLength(1);
+    // El bloque del ERP ya no repite el botón: sólo muestra las salidas del espejo.
+    expect(
+      screen.getByTestId('salida-history-erp').querySelector('[data-testid="salida-history-erp-sync"]'),
+    ).toBeNull();
   });
 
   it('does not offer photo actions on a movement launched by another operator', async () => {
