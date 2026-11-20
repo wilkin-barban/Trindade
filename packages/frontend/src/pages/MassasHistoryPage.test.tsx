@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
+import { MassasManualSyncResult } from './MassasHistoryPage';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import i18n from '../i18n/config';
 import type { MassasLaunchDayView } from '../lib/massas';
@@ -369,5 +370,34 @@ describe('MassasHistoryPage', () => {
     // El mensaje vive en la ventana y en ningún otro lugar de la página.
     expect(screen.queryAllByText(message.textContent ?? '').length).toBe(1);
     expect(container.querySelector('[data-testid="massas-delete-result"]')).toBeTruthy();
+  });
+
+  /**
+   * El veredicto del envío manual al ERP se lee en una ventana, no en un banner, en sus dos tonos.
+   *
+   * Es la pieza que la página monta con el resultado de la confirmación: éxito y fallo abren el mismo diálogo y no
+   * dejan ningún aviso `role="status"` en la página.
+   */
+  it('answers the manual ERP confirmation in a dialog, success or failure', async () => {
+    const success = render(
+      <MassasManualSyncResult
+        result={{ tone: 'success', message: 'Resultado registrado no servidor' }}
+        onClose={() => {}}
+      />,
+    );
+    const dialog = await screen.findByTestId('massas-sync-manual-result');
+    expect(within(dialog).getByText('Resultado registrado no servidor')).toBeInTheDocument();
+    expect(document.querySelector('[role="status"]')).toBeNull();
+    success.unmount();
+
+    render(
+      <MassasManualSyncResult
+        result={{ tone: 'error', message: 'No se pudo registrar o resultado no servidor' }}
+        onClose={() => {}}
+      />,
+    );
+    const failed = await screen.findByTestId('massas-sync-manual-result');
+    expect(within(failed).getByText('No se pudo registrar o resultado no servidor')).toBeInTheDocument();
+    expect(document.querySelector('[role="status"]')).toBeNull();
   });
 });

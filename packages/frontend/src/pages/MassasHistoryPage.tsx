@@ -128,6 +128,30 @@ function useOptionalAuth() {
  * Shows the day structured as cards: day header, Produção do dia, Lançamentos Individuais,
  * Resumo Coletivo do Dia, and WhatsApp share.
  */
+/**
+ * El veredicto del envío manual al ERP, en la ventana de producto.
+ *
+ * La confirmación de la página es una pregunta y puede quedarse mientras espera; esta pieza es la respuesta, y se
+ * cierra a mano. Se exporta para poder probar sus dos tonos sin montar todo el histórico.
+ */
+export function MassasManualSyncResult({
+  result,
+  onClose,
+}: {
+  result: { tone: 'success' | 'error'; message: string } | null;
+  onClose: () => void;
+}) {
+  return (
+    <MessageDialog
+      open={result !== null}
+      tone={result?.tone ?? 'success'}
+      message={result?.message ?? ''}
+      onClose={onClose}
+      testId="massas-sync-manual-result"
+    />
+  );
+}
+
 export function MassasHistoryPage() {
   const { t } = useTranslation();
   const { user } = useOptionalAuth();
@@ -169,6 +193,13 @@ export function MassasHistoryPage() {
    */
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; label: string } | null>(null);
   const [deleteResult, setDeleteResult] = useState<{ tone: 'success' | 'error'; message: string } | null>(null);
+  /**
+   * El veredicto del envío manual al ERP, en su ventana.
+   *
+   * La confirmación puede seguir en la página mientras espera, porque es una pregunta; lo que la acción respondió se
+   * cierra en un modal, como el resto de los resultados de datos.
+   */
+  const [manualResult, setManualResult] = useState<{ tone: 'success' | 'error'; message: string } | null>(null);
 
   // WhatsApp state
   const [phone, setPhone] = useState('');
@@ -615,7 +646,7 @@ export function MassasHistoryPage() {
     });
     clearAeroQueue();
     setSyncAwaiting(null);
-    setNotice({ type: ok ? 'success' : 'error', message: t('massas.aero.syncRecorded') });
+    setManualResult({ tone: ok ? 'success' : 'error', message: t('massas.aero.syncRecorded') });
   };
 
   // Editing handlers for today
@@ -1043,6 +1074,7 @@ export function MassasHistoryPage() {
         })}
         panelTestId="massas-delete-confirm"
       />
+      <MassasManualSyncResult result={manualResult} onClose={() => setManualResult(null)} />
       <MessageDialog
         open={deleteResult !== null}
         tone={deleteResult?.tone ?? 'success'}

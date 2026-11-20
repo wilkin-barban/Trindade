@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import i18n from '../../i18n/config';
@@ -464,4 +464,29 @@ describe('SalidaLaunchPage — iPhone header', () => {
     await waitFor(() => expect(ticket).toHaveBeenCalledTimes(1));
   });
 
+
+  /**
+   * Con el ERP contestando, la ventana de éxito NO se saltea.
+   *
+   * Antes, un viaje aceptado por la planta retornaba antes de abrir el diálogo: el formulario se vaciaba y el
+   * operario no sabía si la baja existía. La ventana dice que quedó en Trindade y que el ERP la aceptó.
+   */
+  it('confirms the launch in a dialog even when the ERP accepted it', async () => {
+    post.mockResolvedValue({ movement: MOVEMENT });
+    ticket.mockResolvedValue({ ticket: 't-1', ticketUrl: 'https://example.test/ticket' });
+    Object.defineProperty(window.navigator, 'onLine', { configurable: true, value: true });
+
+    await renderReady();
+    fireEvent.change(screen.getByTestId('salida-quantity-1357'), { target: { value: '20' } });
+    confirmLaunch();
+
+    const dialog = await screen.findByTestId('salida-success-dialog');
+    expect(dialog).toBeInTheDocument();
+    expect(within(dialog).getByTestId('salida-erp-answer').textContent).toContain(
+      i18n.t('salida.erpAccepted'),
+    );
+    expect(within(dialog).getByTestId('salida-success-total').textContent).toContain('25');
+    // Y el formulario quedó vacío: no se puede enviar dos veces.
+    expect((screen.getByTestId('salida-quantity-1357') as HTMLInputElement).value).toBe('');
+  });
 });

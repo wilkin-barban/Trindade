@@ -272,11 +272,10 @@ export function SalidaLaunchPage() {
     // The movement is in Trindade: the form empties so the same quantities cannot be filed twice.
     setQuantities({});
 
-    if (outcome.erp === 'sent') return;
-
-    // The ERP never heard about it, or the trip never started: the movement is still the operator's, and the
-    // dialog says exactly that instead of pretending the launch failed.
-    setSuccess({ movement: outcome.movement, erp: 'pending', message: null });
+    // La baja quedó en Trindade: la ventana lo confirma siempre. Si el ERP también la aceptó, lo dice como 'ok'; si
+    // no llegó, lo dice como pendiente. Retornar sin ventana cuando el ERP contestaba dejaba el formulario vacío y
+    // al operario sin saber si su lanzamiento existió.
+    setSuccess({ movement: outcome.movement, erp: outcome.erp === 'sent' ? 'ok' : 'pending', message: null });
     setOutbox(readSalidaOutbox());
   };
 
