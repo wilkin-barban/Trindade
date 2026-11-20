@@ -5,9 +5,9 @@ import { describe, it } from 'node:test';
 /**
  * Today is manageable, earlier days are read-only (S9 / T8).
  *
- * For the plant's today: keep sharing, individual edit/delete, relaunching, sync.
- * For earlier days: hide every mutation (edit, delete, relaunch, sync) and keep WhatsApp share,
- * with one visible read-only line instead of silently disabled controls.
+ * Para el día de planta: compartir, editar/borrar lanzamientos, relanzar y sincronizar.
+ * Para las fechas pasadas: no se dibuja el cuerpo -- ni tabla, ni nota de solo lectura, ni sync --; debajo del
+ * selector de fecha queda sólo el bloque de WhatsApp, que es el registro que se comparte.
  */
 const historyPage = readFileSync(new URL('../MassasHistoryPage.tsx', import.meta.url), 'utf8');
 
@@ -27,10 +27,15 @@ describe('massas history is read-only on past days, manageable today (S9)', () =
     assert.ok(historyPage.includes('unifiedDate={date}'));
   });
 
-  it('guards editing, deleting, syncing and relaunching behind isToday, and shows read-only notice on past days', () => {
+  it('guards the whole body behind isToday, and leaves only the message on past days', () => {
     assert.ok(historyPage.includes('onStartEdit={isToday ? startEditing : undefined}'));
     assert.ok(historyPage.includes('onDelete={isToday ? handleDeleteLaunch : undefined}'));
     assert.ok(historyPage.includes('onSendToErp={isToday ? handleSendPendingLaunch : undefined}'));
-    assert.ok(historyPage.includes('data-testid="massas-history-readonly"'));
+    // El cuerpo -- tabla, tarjeta vacía, sync, resultados -- es del día que se opera.
+    assert.ok(historyPage.includes('{isToday && dayView && (dayView.launches.length > 0 || unifiedRows.length > 0) && ('));
+    assert.ok(historyPage.includes('{isToday && dayView && dayView.launches.length === 0 && unifiedRows.length === 0 && ('));
+    assert.ok(historyPage.includes('{isToday && aeroAllowed && syncAwaiting && ('));
+    // Y el pasado no lleva ni nota ni tarjeta vacía: sólo el share.
+    assert.equal(historyPage.includes('data-testid="massas-history-readonly"'), false);
   });
 });
