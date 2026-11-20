@@ -46,7 +46,7 @@ export interface AeroLogEntry {
  *
  * The spelling is fixed here and in `AeroLogEventSchema`; the two lists are what the contract test pins.
  */
-export const AERO_LOCAL_EVENTS = ['salida_create', 'salida_photo', 'report_create', 'report_photo'] as const;
+export const AERO_LOCAL_EVENTS = ['salida_create', 'salida_photo', 'salida_delete', 'report_create', 'report_photo'] as const;
 
 export type AeroLocalEvent = (typeof AERO_LOCAL_EVENTS)[number];
 

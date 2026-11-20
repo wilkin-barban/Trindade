@@ -403,6 +403,56 @@ export function getSalidaPhotoByPublicToken(db: Database.Database, token: string
 }
 
 /** Remove the row and answer what it described, so the caller can delete the file as best it can. */
+/**
+ * Borra un movimiento que el ERP todavía no confirmó.
+ *
+ * El asiento del ERP manda sobre lo que Trindade registró: cuando la empresa ya lo recibió -- `sent`, `partial` o
+ * conciliado -- el movimiento es de sólo lectura y borrarlo dejaría dos libros contando cosas distintas. Mientras
+ * el veredicto sea nulo, `pending` o `failed`, en cambio, es un borrador local y su dueño puede retirarlo.
+ *
+ * Devuelve los archivos de foto que quedaron sin fila para que la ruta los borre. En este repo no hay cola local de
+ * envíos: si el día la agrega, se limpia acá.
+ */
+export function deleteSalidaMovement(
+  db: Database.Database,
+  params: { id: number; userId: number; userRole?: string },
+): { photos: string[] } {
+  const row = db
+    .prepare('SELECT id, user_id AS owner, erp_status FROM salida_movements WHERE id = ?')
+    .get(params.id) as { id: number; owner: number; erp_status: string | null } | undefined;
+
+  if (!row) {
+    const err = new Error('Movimento não encontrado');
+    (err as unknown as { code: string }).code = 'NOT_FOUND';
+    throw err;
+  }
+
+  const isAdmin = params.userRole === 'Administrador';
+  if (Number(row.owner) !== params.userId && !isAdmin) {
+    const err = new Error('Este movimento pertence a outro operário');
+    (err as unknown as { code: string }).code = 'NOT_OWNER';
+    throw err;
+  }
+
+  if (row.erp_status === 'sent' || row.erp_status === 'partial') {
+    const err = new Error('Esta saída já foi confirmada pelo ERP e não pode ser excluída');
+    (err as unknown as { code: string }).code = 'ERP_CONFIRMED';
+    throw err;
+  }
+
+  const photos = (db.prepare('SELECT file_path FROM salida_photos WHERE movement_id = ?').all(params.id) as
+    | { file_path: string }[]
+    | []).map((photo) => photo.file_path);
+
+  db.transaction(() => {
+    db.prepare('DELETE FROM salida_photos WHERE movement_id = ?').run(params.id);
+    db.prepare('DELETE FROM salida_movement_items WHERE movement_id = ?').run(params.id);
+    db.prepare('DELETE FROM salida_movements WHERE id = ?').run(params.id);
+  })();
+
+  return { photos };
+}
+
 export function deleteSalidaPhoto(db: Database.Database, photoId: number): SalidaPhotoRow | null {
   const row = readPhotoRow(db, 'id', photoId);
   if (!row) return null;

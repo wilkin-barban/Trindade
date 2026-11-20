@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { buildTestApp, type TestFixtures } from '../../test-helper.js';
+import * as service from './salida.service.js';
 import { REFERENCE_DATASET } from '../../db/reference-data.js';
 import { GUEST_USERNAME } from '../../guest-user.js';
 import { getSaoPauloDateString } from '../../utils/date.js';
@@ -269,6 +270,87 @@ describe('salida routes', () => {
         assert.equal(JSON.parse(response.body).code, 'SALIDA_INVALID_ITEMS');
       });
     }
+  });
+
+  /**
+   * Borrar un borrador: sólo el dueño -- o el Administrador -- y sólo mientras el ERP no lo confirmó.
+   *
+   * El asiento del ERP manda sobre lo que Trindade registró. Un movimiento `sent` o `partial` es un hecho de la
+   * empresa: borrarlo dejaría dos libros contando cosas distintas, así que la respuesta es 409 y la tarjeta no
+   * ofrece la acción.
+   */
+  describe('deleting a movement the ERP has not confirmed', () => {
+    it('deletes the movement, its items and its photo files for its owner', async () => {
+      const movementId = await launchOne('1357', 10);
+      const uploaded = await uploadPhoto(movementId);
+      assert.equal(uploaded.statusCode, 201, uploaded.body);
+      const photo = JSON.parse(uploaded.body).photo as { id: number; file_path: string };
+      const filePath = join(photosDir, photo.file_path);
+      assert.ok(existsSync(filePath));
+
+      const response = await app.inject({ method: 'DELETE', url: `/api/salida/${movementId}`, headers: wilkin() });
+      assert.equal(response.statusCode, 200, response.body);
+      assert.deepEqual(JSON.parse(response.body), { success: true });
+
+      const day = await app.inject({ method: 'GET', url: '/api/salida', headers: wilkin() });
+      assert.equal(day.statusCode, 200, day.body);
+      const ids = (JSON.parse(day.body).movements as { id: number }[]).map((row) => row.id);
+      assert.equal(ids.includes(movementId), false);
+      assert.equal(existsSync(filePath), false);
+    });
+
+    it('refuses another operator with 403 and keeps the movement', async () => {
+      const movementId = await launchOne('1357', 10);
+      const response = await app.inject({ method: 'DELETE', url: `/api/salida/${movementId}`, headers: auth(workerToken) });
+      assert.equal(response.statusCode, 403, response.body);
+      assert.equal(JSON.parse(response.body).code, 'SALIDA_NOT_OWNER');
+      assert.ok(service.salidaMovementExists(db, movementId));
+    });
+
+    it('lets the Administrador delete a movement of another operator', async () => {
+      const created = await launch([{ code: '1357', quantity: 10 }], workerToken);
+      assert.equal(created.statusCode, 201, created.body);
+      const movementId = JSON.parse(created.body).movement.id as number;
+      const response = await app.inject({ method: 'DELETE', url: `/api/salida/${movementId}`, headers: wilkin() });
+      assert.equal(response.statusCode, 200, response.body);
+      assert.equal(service.salidaMovementExists(db, movementId), false);
+    });
+
+    it('refuses a movement the ERP already confirmed with 409 and a clear message', async () => {
+      const movementId = await launchOne('1357', 10);
+      db.prepare("UPDATE salida_movements SET erp_status = 'sent' WHERE id = ?").run(movementId);
+
+      const response = await app.inject({ method: 'DELETE', url: `/api/salida/${movementId}`, headers: wilkin() });
+      assert.equal(response.statusCode, 409, response.body);
+      const body = JSON.parse(response.body);
+      assert.equal(body.code, 'SALIDA_ERP_CONFIRMED');
+      assert.match(body.error, /confirmada pelo ERP/);
+      assert.ok(service.salidaMovementExists(db, movementId));
+    });
+
+    it('accepts a movement the ERP tried and failed to send', async () => {
+      const movementId = await launchOne('1357', 10);
+      db.prepare("UPDATE salida_movements SET erp_status = 'failed', erp_message = 'timeout' WHERE id = ?").run(movementId);
+      const response = await app.inject({ method: 'DELETE', url: `/api/salida/${movementId}`, headers: wilkin() });
+      assert.equal(response.statusCode, 200, response.body);
+    });
+
+    it('answers 404 for a movement that does not exist and 400 for a bad id', async () => {
+      const missing = await app.inject({ method: 'DELETE', url: '/api/salida/99999', headers: wilkin() });
+      assert.equal(missing.statusCode, 404, missing.body);
+      assert.equal(JSON.parse(missing.body).code, 'SALIDA_NOT_FOUND');
+
+      const bad = await app.inject({ method: 'DELETE', url: '/api/salida/abc', headers: wilkin() });
+      assert.equal(bad.statusCode, 400, bad.body);
+      assert.equal(JSON.parse(bad.body).code, 'SALIDA_INVALID_ID');
+    });
+
+    it('answers 401 without a session', async () => {
+      const movementId = await launchOne('1357', 10);
+      const response = await app.inject({ method: 'DELETE', url: `/api/salida/${movementId}` });
+      assert.equal(response.statusCode, 401, response.body);
+      assert.ok(service.salidaMovementExists(db, movementId));
+    });
   });
 
   describe('reading the day and the history', () => {

@@ -452,6 +452,66 @@ export async function salidaRoutes(fastify: FastifyInstance, options: SalidaRout
   });
 
   /**
+   * DELETE /:movementId
+   *
+   * Retira un borrador local. El movimiento conciliado o ya enviado al ERP no se toca: la respuesta 409 explica
+   * por qué y la tarjeta no ofrece la acción. Las fotos se borran después de sus filas, igual que en la ruta de
+   * una foto: un archivo sin fila es basura, una fila sin archivo es una tarjeta rota.
+   */
+  fastify.delete('/:movementId', { preHandler: signedIn }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const movementId = parseId((request.params as { movementId: string }).movementId);
+    if (movementId === null) return invalidId(reply);
+
+    try {
+      const { photos } = service.deleteSalidaMovement(fastify.db, {
+        id: movementId,
+        userId: request.user!.sub,
+        userRole: request.user?.role,
+      });
+
+      for (const filePath of photos) {
+        try {
+          if (existsSync(join(photosDir, filePath))) await unlink(join(photosDir, filePath));
+        } catch {
+          fastify.log.warn(`Failed to delete salida photo file: ${filePath}`);
+        }
+      }
+
+      try {
+        appendLocalAeroLog({
+          event: 'salida_delete',
+          user: request.user!.username,
+          role: request.user!.role,
+          destinationUrl: 'local://salida',
+          payload: { movementId, photoCount: photos.length },
+          note: 'local=salida · action=delete',
+        });
+      } catch (error) {
+        request.log.warn(`Failed to append the salida_delete audit line: ${String(error)}`);
+      }
+
+      return reply.send({ success: true });
+    } catch (error) {
+      const code = (error as unknown as { code?: string })?.code;
+      if (code === 'NOT_FOUND') {
+        return reply.status(404).send(apiError('Movimento não encontrado', SALIDA_ERROR_CODES.NOT_FOUND));
+      }
+      if (code === 'NOT_OWNER') {
+        return reply
+          .status(403)
+          .send(apiError('Este movimento pertence a outro operário', SALIDA_ERROR_CODES.NOT_OWNER));
+      }
+      if (code === 'ERP_CONFIRMED') {
+        return reply
+          .status(409)
+          .send(apiError('Esta saída já foi confirmada pelo ERP e não pode ser excluída', SALIDA_ERROR_CODES.ERP_CONFIRMED));
+      }
+      fastify.log.error(error);
+      return reply.status(400).send(apiError('Não foi possível excluir o movimento', SALIDA_ERROR_CODES.DELETE_FAILED));
+    }
+  });
+
+  /**
    * GET /photos/public/:token
    *
    * The one route without a session, and the token is the credential: it is what a share sheet hands to

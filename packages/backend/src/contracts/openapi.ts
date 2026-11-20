@@ -297,6 +297,7 @@ const BATCH_DATE_PARAMS = z.object({ date: z.string() });
 const SCHEDULE_ID_PARAMS = z.object({ id: z.string() });
 const REPORT_ID_PARAMS = z.object({ id: z.string() });
 const SALIDA_ID_PARAMS = z.object({ id: z.string() });
+const SALIDA_MOVEMENT_ID_PARAMS = z.object({ movementId: z.string() });
 const SALIDA_PHOTO_ID_PARAMS = z.object({ photoId: z.string() });
 const SALIDA_TOKEN_PARAMS = z.object({ token: z.string() });
 const PHOTO_ID_PARAMS = z.object({ photoId: z.string() });
@@ -1840,6 +1841,26 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
       409: errorResponse('The movement already carries three photos (`SALIDA_PHOTO_LIMIT`)'),
       413: errorResponse('The file exceeds the 5 MB limit'),
       415: errorResponse('The file is not JPEG, PNG, WebP, HEIC or HEIF, or its content does not match the declared type'),
+    },
+  });
+
+  registry.registerPath({
+    method: 'delete',
+    path: '/api/salida/{movementId}',
+    summary: 'Delete a salida the ERP has not confirmed',
+    description:
+      `${SALIDA_AUTH_ONLY} Only its owner -- or the Administrador -- may withdraw it, and only while the ERP ` +
+      'has not confirmed it: a movement in `sent`, `partial` or reconciled state is a fact of the company and ' +
+      'answers 409. The items, the photos (rows and files) and the movement are removed together.',
+    tags: ['salida'],
+    request: { params: SALIDA_MOVEMENT_ID_PARAMS },
+    responses: {
+      200: jsonResponse('The movement was deleted', SuccessResponseSchema),
+      400: errorResponse('The identifier is not a number (`SALIDA_INVALID_ID`)'),
+      401: UNAUTHORIZED,
+      403: errorResponse('The movement belongs to another operator (`SALIDA_NOT_OWNER`)'),
+      404: errorResponse('No such movement (`SALIDA_NOT_FOUND`)'),
+      409: errorResponse('The ERP already confirmed the movement (`SALIDA_ERP_CONFIRMED`)'),
     },
   });
 

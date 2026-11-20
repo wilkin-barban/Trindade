@@ -11516,6 +11516,87 @@
         }
       }
     },
+    "/api/salida/{movementId}": {
+      "delete": {
+        "summary": "Delete a salida the ERP has not confirmed",
+        "description": "Requires an authenticated account: a missing or invalid token answers 401. Every role of this API (Administrador and Trabalhador) is admitted; the read-only guest may read but not write. Only its owner -- or the Administrador -- may withdraw it, and only while the ERP has not confirmed it: a movement in `sent`, `partial` or reconciled state is a fact of the company and answers 409. The items, the photos (rows and files) and the movement are removed together.",
+        "tags": [
+          "salida"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "movementId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The movement was deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The identifier is not a number (`SALIDA_INVALID_ID`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, or expired credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The movement belongs to another operator (`SALIDA_NOT_OWNER`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such movement (`SALIDA_NOT_FOUND`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The ERP already confirmed the movement (`SALIDA_ERP_CONFIRMED`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/salida/photos/{photoId}": {
       "get": {
         "summary": "Serve one photo to a signed-in client",
