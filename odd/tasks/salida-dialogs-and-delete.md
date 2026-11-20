@@ -4,6 +4,13 @@ Remediación pedida en wB:p3, misma sesión, web y Android. El usuario reportó 
 que parte el texto y falta de una salida para borrar lo que el ERP no confirmó. Verificado: el backend ya borra un
 lanzamiento de Massas (`DELETE /api/massas/:id`).
 
+## Specs (segunda pasada: tarjetas y envío por fila)
+
+- **S9.** Web `SalidaMovementCard`: composición compacta tipo producto — cabecera en dos niveles, ítems y total densos, fotos como miniaturas o una fila «Sem fotos» con ayuda en 11 px, y acciones en grilla 2×2 de 44 px (`Adicionar foto | Compartilhar`, `Reenviar ao ERP | Excluir`), sin botones full-width apilados.
+- **S10.** En 390 px el label del botón verde no se recorta: dice «Compartilhar» con su icono.
+- **S11.** Android `SalidaMovementCard` con el lenguaje de las tarjetas de Masas (`surfaceContainer`, 16 dp, fecha/estado, operador, productos, total) conservando las cuatro acciones y el estado, con tests de que cada una dispara su callback.
+- **S12.** Android Massas: el resultado de `sendPendingLaunch`/`sendPendingRow` sale en `resultDialogMessage`/`resultDialogIsSuccess`, no en `errorMessage`/`noticeMessage`.
+
 ## Specs
 
 - **S1.** Android `SalidaLaunchScreen` (`state.notice`) y `SalidaHistoryScreen` (`state.notice`, `SalidaErpBlock(error=state.erpError)`) no dibujan errores como texto: «Reutilizá el patrón de `MassasLaunchScreen`/`ActionResultDialog` para TODO error/éxito de acción y sync (incluido “sin Wi-Fi de la empresa”, “ERP no configurado”, fallo de conexión): diálogo con título, mensaje, botón Cerrar; sacá `erpError`/notices inline de `SalidaErpBlock` y de la pantalla. El texto debe explicar el error; no lo ocultes.»
@@ -31,6 +38,12 @@ lanzamiento de Massas (`DELETE /api/massas/:id`).
 - `807fabd0` · T3 · Web Salida (MessageDialog, Excluir).
 - `afe15eb9` · T4 · Web Massas (ConfirmDialog + MessageDialog).
 - `3524a845` · T5 · Android Massas (resultado en ActionResultDialog).
+- `8b3085ab` · sync dentro de la tarjeta del día.
+- `ba118c36` · sin contador de pendientes arriba.
+- `af889b9b` · tarjeta web compacta.
+- `0d166a10` · progreso del sync fuera del modal de error.
+- `d64a5f4d` · label corto de Compartilhar.
+- `0fb2da44` · tarjeta Android estilo Masas + wiring + envío por fila en diálogo.
 
 ## Log
 
