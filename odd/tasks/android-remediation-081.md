@@ -650,6 +650,17 @@ el historial: separar las responsabilidades.
   fila propia, 44 px) y el mensaje del día suma los operarios/productos del ERP que trae `SalidaReportSection`
   (`onDayLoaded`), sin duplicar y con el mismo formato.
 
+## 21. Web: la ventana de respuesta, con forma de producto
+
+- `Dialog` acepta `panelClassName` (foco atrapado, Escape, overlay y retorno de foco siguen siendo suyos).
+- `MessageDialog`: panel `max-w-[26rem]`, `rounded-2xl`, `overflow-hidden`, sombra y ring; cabecera tonal
+  (`bg-red-50`/`bg-emerald-50`) con icono en badge de 40 px, título de 18 px y X de 44 px con `aria-label`; cuerpo
+  `text-[15px] leading-6` con `max-h-[40vh]` y scroll; pie `border-t` con «Cerrar» full-width en móvil y alineado a la
+  derecha en escritorio. Sin autocierre y sin usar el color como única señal.
+- Títulos por acción desde `ReportsPage`/`ReportEditPage` (`reports.actionSaveFailedReport`/`actionReportSaved`,
+  PT/ES). Tests del componente (forma, tonos, dos puertas de cierre, mensaje largo) y del caso de temperaturas con
+  título.
+
 ## 20. Web: la respuesta de una acción, en ventana
 
 - Nuevo `components/ui/message-dialog.tsx` sobre el `Dialog` accesible existente: título, mensaje, tono error/éxito y
