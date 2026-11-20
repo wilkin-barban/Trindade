@@ -84,6 +84,10 @@ class SalidaViewModel @Inject constructor(
     private val abbreviationsSource: com.trindade.app.massas.WhatsappAbbreviationsSource? = null,
     // La compresión es la misma del Relatório: una foto de cámara no viaja a tamaño completo por la red de planta.
     private val compressor: com.trindade.app.reports.PhotoCompressor? = null,
+    // El share general lleva las fotos: la hoja del sistema puede adjuntarlas, y la web ya lo hace. Sin esta
+    // costura no se bajan y el mensaje sale solo, como antes.
+    private val shareManager: com.trindade.app.export.ShareManager? = null,
+    private val photoFiles: com.trindade.app.reports.ReportPhotoFiles? = null,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SalidaUiState(date = saoPauloDate()))
@@ -164,7 +168,7 @@ class SalidaViewModel @Inject constructor(
                         val outcome = trip.value
                         _state.value = _state.value.copy(
                             quantities = emptyMap(),
-                            notice = SalidaNotice(outcome.message(), isError = outcome is SalidaErpOutcome.Failed),
+                            notice = SalidaNotice(outcome.message(), isError = !salidaErpOutcomeSucceeded(outcome)),
                         )
                     }
                     com.trindade.app.aero.ErpTrip.TimedOut ->
@@ -199,7 +203,7 @@ class SalidaViewModel @Inject constructor(
             val outcome = repository.retryPending()
             _state.value = _state.value.copy(
                 history = runCatching { repository.history() }.getOrDefault(_state.value.history),
-                notice = SalidaNotice(outcome.message(), isError = outcome is SalidaErpOutcome.Failed),
+                notice = SalidaNotice(outcome.message(), isError = !salidaErpOutcomeSucceeded(outcome)),
             )
         }
     }
@@ -447,6 +451,27 @@ class SalidaViewModel @Inject constructor(
         }
     }
 
+    /** Las fotos del día elegido, con la misma regla que la miniatura: `publicUrl` y si no `url`. */
+    fun daySharePhotoUrls(): List<String> {
+        val chosen = _state.value.historyDate ?: _state.value.date
+        return salidaSharePhotoUrls(_state.value.history.firstOrNull { it.date == chosen })
+    }
+
+    /**
+     * Comparte el día con sus fotos en la hoja del sistema.
+     *
+     * Devuelve false cuando no hay fotos o no hay con qué bajarlas: la pantalla cae entonces al enlace de siempre.
+     */
+    fun shareDayWithPhotos(labels: SalidaSummaryLabels = SalidaSummaryLabels()): Boolean {
+        val text = dayShareText(labels)
+        val urls = daySharePhotoUrls()
+        val manager = shareManager ?: return false
+        val downloader = photoFiles ?: return false
+        if (text.isBlank() || urls.isEmpty()) return false
+        viewModelScope.launch { shareSalidaWithPhotos(text, urls, manager, downloader) }
+        return true
+    }
+
     /** El enlace de WhatsApp de un movimiento suelto: su texto, con o sin teléfono. */
     fun movementShareLink(
         movement: com.trindade.app.contract.models.SalidaCreateResponseMovement,
@@ -495,3 +520,43 @@ internal fun SalidaUiState.withoutMovement(movementId: Int): SalidaUiState = cop
     day = day.filterNot { it.id == movementId },
     history = history.map { day -> day.copy(movements = day.movements.filterNot { it.id == movementId }) },
 )
+
+/**
+ * Si el viaje al ERP terminó bien.
+ *
+ * Sólo `Complete` lo es. Que la baja se haya guardado en Trindade no convierte en éxito un envío que no ocurrió:
+ * `NotConfigured` y `Skipped` son un pendiente -- el ERP nunca lo recibió -- y `Partial` dejó productos afuera. El
+ * tono de la ventana cuenta lo que pasó con la planta, no lo que pasó con el teléfono.
+ */
+internal fun salidaErpOutcomeSucceeded(outcome: SalidaErpOutcome): Boolean = outcome is SalidaErpOutcome.Complete
+
+/** Las fotos que acompañan al mensaje del día, con la regla de la miniatura: `publicUrl` y si no `url`. */
+internal fun salidaSharePhotoUrls(
+    day: com.trindade.app.contract.models.SalidaHistoryResponseDaysInner?,
+): List<String> = day?.movements.orEmpty()
+    .flatMap { movement -> movement.photos }
+    .mapNotNull { photo -> photo.publicUrl ?: photo.url }
+    .filter { it.isNotBlank() }
+
+/**
+ * Baja las fotos y abre la hoja del sistema con el texto.
+ *
+ * Si ninguna llegó, el mensaje sale solo: la acción no se pierde por una foto que el servidor no entregó. Devuelve
+ * true cuando la hoja recibió archivos.
+ */
+internal suspend fun shareSalidaWithPhotos(
+    text: String,
+    urls: List<String>,
+    shareManager: com.trindade.app.export.ShareManager,
+    photoFiles: com.trindade.app.reports.ReportPhotoFiles,
+): Boolean {
+    if (text.isBlank() || urls.isEmpty()) return false
+    val files = photoFiles.download(urls)
+    return if (files.isEmpty()) {
+        shareManager.shareText(text)
+        false
+    } else {
+        shareManager.shareTextWithPhotos(text, files)
+        true
+    }
+}

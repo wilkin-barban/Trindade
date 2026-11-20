@@ -294,7 +294,8 @@ fun SalidaHistoryScreen(
                 onPhoneChange = viewModel::onHistoryPhoneChange,
                 walletLink = viewModel.historyWhatsAppLink(summaryLabels),
                 onOpenWhatsApp = {
-                    viewModel.historyWhatsAppLink(summaryLabels)?.let { onOpenWhatsApp(it) }
+                    val sharedWithPhotos = viewModel.shareDayWithPhotos(summaryLabels)
+                    if (!sharedWithPhotos) viewModel.historyWhatsAppLink(summaryLabels)?.let { onOpenWhatsApp(it) }
                 },
             )
             return@Column
@@ -411,7 +412,10 @@ fun SalidaHistoryScreen(
                 onPhoneChange = viewModel::onHistoryPhoneChange,
                 walletLink = viewModel.historyWhatsAppLink(summaryLabels),
                 onOpenWhatsApp = {
-                    viewModel.historyWhatsAppLink(summaryLabels)?.let { onOpenWhatsApp(it) }
+                    // El general del día va con sus fotos en la hoja del sistema; si no hay fotos -- o no hay con
+                    // qué bajarlas -- se abre el chat de siempre.
+                    val sharedWithPhotos = viewModel.shareDayWithPhotos(summaryLabels)
+                    if (!sharedWithPhotos) viewModel.historyWhatsAppLink(summaryLabels)?.let { onOpenWhatsApp(it) }
                 },
             )
         }

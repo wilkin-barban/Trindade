@@ -306,7 +306,9 @@ class ReportDetailViewModel @Inject constructor(
      */
     fun shareExport() {
         val text = state.value.exportText ?: return
-        val urls = state.value.photos.mapNotNull { it.publicUrl }
+        // La miniatura usa `publicUrl ?: url`: el share tiene que mirar las mismas fotos. Un reporte viejo
+        // puede no tener token público y sus archivos igual existen.
+        val urls = state.value.photos.mapNotNull { it.publicUrl ?: it.url }.filter { it.isNotBlank() }
         if (urls.isEmpty() || photoFiles == null) {
             shareManager.shareText(text)
             return

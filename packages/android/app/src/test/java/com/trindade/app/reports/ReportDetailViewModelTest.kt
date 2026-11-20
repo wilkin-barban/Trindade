@@ -160,6 +160,64 @@ class ReportDetailViewModelTest {
         assertEquals(files, shareManager.sharedPhotos)
     }
 
+    /**
+     * Una foto sin token público igual viaja.
+     *
+     * La miniatura usa `publicUrl ?: url`; el share tomaba sólo `publicUrl` y esa foto se quedaba en el teléfono.
+     * Un reporte viejo puede no tener token y su archivo sigue existiendo.
+     */
+    @Test
+    fun `shareExport downloads a photo that only has the authenticated url`() = runTest {
+        val fakeApi = FakeReportsApi(
+            photosToReturn = listOf(
+                com.trindade.app.contract.models.PhotosResponsePhotosInner(
+                    id = 51,
+                    reportId = REPORT_ID,
+                    filePath = "a.jpg",
+                    fileSize = 10,
+                    mimeType = "image/jpeg",
+                    publicToken = "token-51",
+                    createdAt = "2026-11-19T10:00:00Z",
+                    publicUrl = "https://example.test/p/a.jpg",
+                ),
+                com.trindade.app.contract.models.PhotosResponsePhotosInner(
+                    id = 52,
+                    reportId = REPORT_ID,
+                    filePath = "b.jpg",
+                    fileSize = 10,
+                    mimeType = "image/jpeg",
+                    publicToken = "token-52",
+                    createdAt = "2026-11-19T10:00:00Z",
+                    url = "https://api.test/reports/photos/52",
+                ),
+            ),
+        )
+        val requested = mutableListOf<List<String>>()
+        val downloader = object : ReportPhotoFiles {
+            override suspend fun download(urls: List<String>): List<java.io.File> {
+                requested += urls
+                return listOf(java.io.File("/tmp/b.jpg"))
+            }
+        }
+        val shareManager = RecordingShareManager()
+        val model = ReportDetailViewModel(
+            ReportsRepository(fakeApi),
+            FakePhotoCompressor(),
+            shareManager,
+            photoFiles = downloader,
+        )
+        model.load(REPORT_ID)
+        model.loadExport()
+
+        model.shareExport()
+
+        assertEquals(
+            listOf("https://example.test/p/a.jpg", "https://api.test/reports/photos/52"),
+            requested.single(),
+        )
+        assertEquals(listOf(java.io.File("/tmp/b.jpg")), shareManager.sharedPhotos)
+    }
+
     @Test
     fun `sharePdf generates relatorio-id pdf and launches shareManager`() {
         val shareManager = RecordingShareManager()
