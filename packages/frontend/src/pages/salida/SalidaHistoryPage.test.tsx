@@ -1100,4 +1100,31 @@ describe('SalidaHistoryPage — T3 per-movement state, relaunch, operator filter
     expect(screen.getByTestId('salida-badge-2')).toBeInTheDocument();
     expect(screen.getByTestId('salida-resend-2')).toBeInTheDocument();
   });
+
+  /**
+   * La tarjeta se lee como un producto, no como una pila de botones.
+   *
+   * En 390 px el selector de fotos era un botón enorme y cada acción ocupaba su propio renglón a todo el ancho: la
+   * ficha quedaba más alta que los datos que trae. Ahora la evidencia es una fila (o miniaturas), la ayuda vive en
+   * 11 px y las acciones van de a dos por fila.
+   */
+  it('lays the movement card out like a product card on a phone', async () => {
+    await renderReady();
+
+    const card = screen.getByTestId('salida-movement-2');
+    // Un solo selector de fotos, compacto, y sin el mensaje de máximo todavía.
+    expect(within(card).getAllByTestId('salida-photo-input')).toHaveLength(1);
+    expect(screen.getByTestId('salida-photo-picker-2').className).toContain('min-h-[44px]');
+    // Sin fotos, una fila que lo dice y la ayuda de formatos, no media tarjeta.
+    expect(within(card).getByTestId('salida-no-photos-2').textContent).toBeTruthy();
+    expect(within(card).getAllByText(/0 de|de 3/i).some((node) => node.className.includes('text-[11px]'))).toBe(true);
+    // Las acciones se dibujan en una grilla de dos columnas que en escritorio pasa a línea.
+    const actions = within(card).getByTestId('salida-share-2').parentElement!;
+    expect(actions.className).toContain('grid-cols-2');
+    expect(actions.className).toContain('sm:flex');
+    expect(within(actions).getByTestId('salida-delete-2')).toBeInTheDocument();
+    expect(within(actions).getByTestId('salida-resend-2')).toBeInTheDocument();
+    // Ningún botón full-width apilado en la ficha.
+    expect(within(card).getByTestId('salida-share-2').className).toContain('min-h-[44px]');
+  });
 });

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ImageOff, MessageCircle, RefreshCw, Trash2 } from 'lucide-react';
+import { Camera, ImageOff, MessageCircle, RefreshCw, Trash2 } from 'lucide-react';
 import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import { formatDateLabel } from '../../lib/date';
@@ -18,7 +18,6 @@ import {
   type SalidaBlock,
   type SalidaMovement,
 } from '../../lib/salida';
-import { SalidaPhotoPicker } from './SalidaPhotoPicker';
 import { api } from '../../api/client';
 
 /**
@@ -127,36 +126,41 @@ export function SalidaMovementCard({
           ? 'border-amber-200 bg-amber-50 text-amber-800'
           : 'border-gray-300 bg-gray-100 text-gray-700';
 
+  const full = movement.photos.length >= SALIDA_MAX_PHOTOS;
+  const canAddPhoto = !readOnly && canManagePhotos && !full;
+  const help = t('salida.photoHelp', { count: movement.photos.length, max: SALIDA_MAX_PHOTOS });
+
   return (
     <Card className="border-gray-200 shadow-sm" data-testid={`salida-movement-${movement.id}`}>
-      <CardContent className="p-4 sm:p-5">
-        <div className="flex flex-wrap items-start justify-between gap-2">
+      <CardContent className="p-4">
+        {/* Cabecera en dos niveles: la fecha y su estado arriba, el operador y los bloques como línea de
+            contexto. Antes el badge competía con la fecha y el operador caía en un tercer renglón. */}
+        <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-gray-900">
               {formatDateLabel(movement.movement_date)} · {timeLabel}
             </p>
-            <p className="text-xs text-gray-500">
-              {t('salida.operatorLabel')}:{' '}
+            <p className="mt-0.5 truncate text-xs text-gray-500">
               <span className="font-medium text-gray-700">
                 {movement.display_name?.trim() || String(movement.username ?? '').toUpperCase()}
               </span>
               {blocks.length > 0 && (
                 <>
                   {' · '}
-                  {t('salida.blocksLabel')}: {blocks.map((block) => label(block)).join(', ')}
+                  {blocks.map((block) => label(block)).join(' · ')}
                 </>
               )}
             </p>
           </div>
           <span
-            className={`inline-flex shrink-0 items-center rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${badgeToneClass}`}
+            className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${badgeToneClass}`}
             data-testid={`salida-badge-${movement.id}`}
           >
             {t(salidaPrimaryStatusLabelKey(status))}
           </span>
         </div>
 
-        <ul className="mt-3 space-y-1">
+        <ul className="mt-2.5 space-y-1">
           {movement.items.map((item) => (
             <li
               key={item.id}
@@ -179,7 +183,7 @@ export function SalidaMovementCard({
           ))}
         </ul>
 
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-2">
+        <div className="mt-2.5 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-t border-gray-100 pt-2">
           <p className="text-sm font-bold text-gray-900">
             {t('salida.totalUnits')}:{' '}
             <span className="tabular-nums" data-testid={`salida-total-${movement.id}`}>
@@ -193,8 +197,10 @@ export function SalidaMovementCard({
           )}
         </div>
 
+        {/* La evidencia, con la densidad de un producto: miniaturas o una fila que dice que no hay, y la ayuda
+            de formatos en 11 px. El selector gigante se fue a la grilla de acciones, del tamaño de los demás. */}
         {movement.photos.length > 0 ? (
-          <div className="mt-3 space-y-2">
+          <div className="mt-2.5 space-y-1.5">
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
               {movement.photos.map((photo) =>
                 unavailablePhotos.has(photo.id) ? (
@@ -258,37 +264,62 @@ export function SalidaMovementCard({
                 {t('salida.photoUnavailableBody')}
               </p>
             )}
+            <p className="text-[11px] text-gray-500">{help}</p>
           </div>
         ) : (
-          <p className="mt-3 text-xs text-gray-400">{t('salida.noPhotos')}</p>
-        )}
-
-        {!readOnly && canManagePhotos && (
-          movement.photos.length >= SALIDA_MAX_PHOTOS ? (
-            <p className="mt-2 text-xs font-medium text-gray-500" data-testid={`salida-photos-max-${movement.id}`}>
-              {t('salida.photosMaxReached')}
+          <div className="mt-2.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <p className="text-xs text-gray-400" data-testid={`salida-no-photos-${movement.id}`}>
+              {t('salida.noPhotos')}
             </p>
-          ) : (
-            <div className="mt-2">
-              <SalidaPhotoPicker
-                photos={[]}
-                onAdd={(files) => void handleAddPhoto(files)}
-                error={photoError}
-                disabled={uploading}
-                compact
-                existingCount={movement.photos.length}
-              />
-            </div>
-          )
+            <p className="text-[11px] text-gray-500">· {help}</p>
+          </div>
         )}
 
+        {photoError && (
+          <p role="alert" className="mt-1 text-xs text-red-600" data-testid="salida-photo-error">
+            {photoError}
+          </p>
+        )}
+
+        {!readOnly && canManagePhotos && full && (
+          <p className="mt-1 text-[11px] font-medium text-gray-500" data-testid={`salida-photos-max-${movement.id}`}>
+            {t('salida.photosMaxReached')}
+          </p>
+        )}
+
+        {/* Dos por fila en el teléfono, en línea en escritorio. Ningún botón a todo el ancho: la tarjeta se lee
+            como una ficha, no como cuatro barras. */}
         {!readOnly && canManagePhotos && (
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+            {canAddPhoto && (
+              <label
+                className={`inline-flex min-h-[44px] w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 sm:w-auto ${
+                  uploading ? 'pointer-events-none opacity-50' : ''
+                }`}
+                data-testid={`salida-photo-picker-${movement.id}`}
+              >
+                <Camera className="h-4 w-4 shrink-0" />
+                {t('salida.photoAdd')}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+                  capture="environment"
+                  multiple
+                  className="sr-only"
+                  disabled={uploading}
+                  onChange={(event) => {
+                    void handleAddPhoto(event.target.files);
+                    event.target.value = '';
+                  }}
+                  data-testid="salida-photo-input"
+                />
+              </label>
+            )}
             <Button
               type="button"
               size="sm"
               onClick={() => onShare(movement)}
-              className="min-h-[44px] w-full bg-green-600 text-white hover:bg-green-700 sm:w-auto"
+              className="min-h-[44px] w-full justify-center bg-green-600 text-white hover:bg-green-700 sm:w-auto"
               data-testid={`salida-share-${movement.id}`}
             >
               <MessageCircle className="h-4 w-4" />
@@ -301,31 +332,26 @@ export function SalidaMovementCard({
                 size="sm"
                 onClick={() => onResend(movement)}
                 disabled={resending}
-                className="min-h-[44px]"
+                className="min-h-[44px] w-full justify-center px-2 text-xs sm:w-auto"
                 data-testid={`salida-resend-${movement.id}`}
               >
                 <RefreshCw className={`h-4 w-4 ${resending ? 'animate-spin' : ''}`} />
                 {resending ? t('salida.resendingErp') : t('salida.resendErp')}
               </Button>
             )}
-          </div>
-        )}
-
-        {/* Retirar el borrador no depende de las fotos ni del share: el servidor acepta al dueño o al
-            Administrador mientras el ERP no confirmó, y la pantalla decide si lo ofrece. */}
-        {!readOnly && onDelete && (
-          <div className="mt-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => onDelete(movement)}
-              className="min-h-[44px] w-full text-red-600 hover:bg-red-50 sm:w-auto"
-              data-testid={`salida-delete-${movement.id}`}
-            >
-              <Trash2 className="h-4 w-4" />
-              {t('salida.delete')}
-            </Button>
+            {onDelete && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => onDelete(movement)}
+                className="min-h-[44px] w-full justify-center px-2 text-xs text-red-600 hover:bg-red-50 sm:w-auto"
+                data-testid={`salida-delete-${movement.id}`}
+              >
+                <Trash2 className="h-4 w-4" />
+                {t('salida.delete')}
+              </Button>
+            )}
           </div>
         )}
       </CardContent>
