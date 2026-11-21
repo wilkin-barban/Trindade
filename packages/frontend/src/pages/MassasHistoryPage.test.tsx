@@ -107,6 +107,19 @@ beforeEach(async () => {
 });
 
 describe('MassasHistoryPage', () => {
+  it('shows a failed day read in a dismissible dialog', async () => {
+    get.mockImplementation(async (url: string) => {
+      if (url.startsWith('/massas-launch?')) throw new Error('Read refused');
+      return { days: [] };
+    });
+    renderPage();
+    const dialog = await screen.findByRole('dialog', { name: i18n.t('ui.actionFailed') });
+    expect(dialog).toHaveTextContent('Read refused');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByTestId('massas-history-feedback-dismiss'));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
   it('offers the day through the panel up to today, with chips (Item 2 & 7)', async () => {
     renderPage();
 

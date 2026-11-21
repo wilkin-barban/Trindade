@@ -1046,24 +1046,16 @@ export function MassasHistoryPage() {
         </div>
       </div>
 
-      {/* Global Notices */}
-      {error && (
-        <div role="alert" className="p-4 text-red-700 bg-red-50 border border-red-200 rounded-lg">
-          {error}
-        </div>
-      )}
-      {notice && (
-        <div
-          role="status"
-          className={`p-4 rounded-lg border text-sm font-medium ${
-            notice.type === 'success'
-              ? 'bg-green-50 border-green-200 text-green-800'
-              : 'bg-red-50 border-red-200 text-red-800'
-          }`}
-        >
-          {notice.message}
-        </div>
-      )}
+      <MessageDialog
+        open={Boolean(notice || error) && !deleteTarget && !manualResult && !deleteResult && !resultModal}
+        tone={notice?.type ?? 'error'}
+        message={notice?.message ?? error}
+        onClose={() => {
+          if (notice) setNotice(null);
+          else setError('');
+        }}
+        testId="massas-history-feedback"
+      />
 
       <ConfirmDialog
         open={deleteTarget !== null}
