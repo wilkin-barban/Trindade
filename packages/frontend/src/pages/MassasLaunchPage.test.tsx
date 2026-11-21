@@ -70,6 +70,19 @@ describe('MassasLaunchPage — requirements 1, 3, 4, 5', () => {
     });
   });
 
+  it('explains a failed day read in a dismissible dialog', async () => {
+    get.mockImplementation(async (url: string) => {
+      if (url.startsWith('/massas-launch?')) throw new Error('Day unavailable');
+      return {};
+    });
+    render(<MemoryRouter><MassasLaunchPage /></MemoryRouter>);
+    const dialog = await screen.findByRole('dialog', { name: i18n.t('ui.actionFailed') });
+    expect(dialog).toHaveTextContent('Day unavailable');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByTestId('massas-launch-feedback-dismiss'));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
   it('renders DaySessionHeader (date, operator, history nav) and removes date field and 4 sections (Change 1)', async () => {
     render(
       <MemoryRouter initialEntries={['/massas-launch']}>

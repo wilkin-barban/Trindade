@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/button';
+import { MessageDialog } from '../components/ui/message-dialog';
 import { LoadingSpinner } from '../components/ui/loading-spinner';
 import { Dialog } from '../components/ui/dialog';
 import { ModuleHelpModal } from '../components/ui/ModuleHelpModal';
@@ -425,24 +426,16 @@ export function MassasLaunchPage() {
         }
       />
 
-      {/* Global Notices */}
-      {error && (
-        <div role="alert" className="p-4 text-red-700 bg-red-50 border border-red-200 rounded-lg">
-          {error}
-        </div>
-      )}
-      {notice && (
-        <div
-          role="status"
-          className={`p-4 rounded-lg border ${
-            notice.type === 'success'
-              ? 'bg-green-50 text-green-800 border-green-200'
-              : 'bg-red-50 text-red-800 border-red-200'
-          }`}
-        >
-          {notice.message}
-        </div>
-      )}
+      <MessageDialog
+        open={Boolean(notice || error) && !resultModal && !isConfirmOpen}
+        tone={notice?.type ?? 'error'}
+        message={notice?.message ?? error}
+        onClose={() => {
+          if (notice) setNotice(null);
+          else setError('');
+        }}
+        testId="massas-launch-feedback"
+      />
 
       {/* When ERP is not configured, show plain message with link instead of toggle switch */}
       {aeroAllowed && !aeroSettingsReady(aeroSettings) && (
