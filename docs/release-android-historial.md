@@ -5,6 +5,16 @@ hash. Es la referencia para responder "¿qué build tiene este teléfono?" y par
 
 La guía de firma y publicación está en [release-android.md](release-android.md).
 
+## Aceptación parcial de 0.8.6 en emulador
+
+La APK de prueba instalada en `emulator-5554` coincide con el SHA-256
+`8efc23c90b26d0ad5ceb3ea52506d2dbe7dc94fe4679f14aac86ec92bb9084a6` y su certificado coincide con la huella oficial.
+No se publicó como release. El usuario informó que la web de producción abrió y cerró correctamente el diálogo de
+confirmación de Salida y mostró el aviso de conexión de Aero32 en Massas; también informó que el histórico Android
+muestra la fecha de WhatsApp en formato `DD/MM/YYYY` y conserva los nombres del ERP. Estas observaciones del usuario
+no sustituyen una comprobación independiente de todos los flujos. Siguen pendientes la aceptación de adjuntos y
+miniaturas, la invalidación de Cargamento y el resultado modal de error ERP en el emulador; no se contactó al ERP real.
+
 ## 1. Builds
 
 | Versión | Build | Fecha | Estado | Cambios principales | SHA-256 del APK |
