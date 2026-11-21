@@ -54,11 +54,11 @@ test.describe('ERP movements card', () => {
     const card = page.locator('[data-testid="report-massas-card"]');
     await expect(card).toBeVisible();
 
-    // The heading names the day and holds the only button that asks the company for it.
+    // The heading names the day; the separate sync block holds its only button.
     const header = page.locator('[data-testid="erp-movements-header"]');
     await expect(header).toBeVisible();
     await expect(header).toContainText('Movimentações do ERP');
-    await expect(header.locator('[data-testid="erp-movements-sync"]')).toHaveCount(1);
+    await expect(page.locator('[data-testid="erp-movements-sync-block"] [data-testid="erp-movements-sync"]')).toHaveCount(1);
     await expect(page.locator('[data-testid="erp-movements-sync"]')).toHaveCount(1);
 
     // Three records of one day, three cards: massas, receipts and the plant's exits. The exits card is the

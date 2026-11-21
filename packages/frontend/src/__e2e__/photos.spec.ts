@@ -178,6 +178,8 @@ test.describe('Photo Gallery UI (Phase 3)', () => {
     await expect(page.locator('[data-testid="notes-textarea"]')).toHaveValue('Retry keeps this note');
     await expect(page.locator('[data-testid="remove-pending-photo-btn"]')).toHaveCount(1);
 
+    await page.getByRole('dialog').getByTestId('report-action-message-close').click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
     await page.unroute(uploadPattern);
 
     await Promise.all([

@@ -13,7 +13,7 @@ Plataforma operativa de **Trindade Massas** para registrar la producción de mas
 
 | Dato | Valor |
 | --- | --- |
-| Última versión publicada | `v0.7.5` (GitHub Release `v0.7.5`); `/api/app/latest-release` la anuncia al desplegarse la API |
+| Versión de este código | `v0.8.6` preparada para publicación; consultá [GitHub Releases](https://github.com/wilkin-barban/Trindade/releases) para la última versión publicada |
 | Aplicación Android | APK firmado, `com.trindade.app`, Android 8.0 o superior |
 | Base de datos | SQLite, esquema **revisión 10** (20 tablas) |
 | Producción web | <https://trindademasas.duckdns.org> |
@@ -148,7 +148,7 @@ critical en el árbol que se despliega se trata como un fallo, no como un aviso.
 
 ## Distribución Android
 
-La instancia de producción sirve el APK firmado en `GET /api/app/download-apk` y publica la versión vigente en `GET /api/app/latest-release`; la app consulta ese endpoint y compara `versionName` y `buildNumber`. La release de GitHub `v0.7.5` publica el mismo binario que sirve la instancia, con el mismo sha256; `v0.7.4`, `v0.7.0` y `v0.7.1` conservan su asset histórico. El procedimiento de publicación está en [la guía de agentes](docs/agents/trindade-development.md).
+La API sirve el APK firmado en `GET /api/app/download-apk` y anuncia la versión en `GET /api/app/latest-release`; la app compara esos datos con la versión instalada. Este código prepara `v0.8.6`; la versión disponible en producción depende del despliegue. Verificá la release y el hash descargado siguiendo [la guía de agentes](docs/agents/trindade-development.md).
 
 ## Licencia
 

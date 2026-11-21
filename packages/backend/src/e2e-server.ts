@@ -17,7 +17,7 @@ const port = parseInt(process.env.PORT || '3099', 10);
 const host = process.env.HOST || '0.0.0.0';
 
 const { app } = await buildTestApp({
-  authAdmissionLimiter: new AuthAdmissionLimiter({ maxUsernameLogin: 200, maxGlobalLogin: 400 }),
+  authAdmissionLimiter: new AuthAdmissionLimiter({ maxUsernameLogin: 5000, maxGlobalLogin: 10000 }),
 });
 
 try {

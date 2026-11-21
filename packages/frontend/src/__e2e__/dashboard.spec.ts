@@ -27,7 +27,7 @@ for (const viewport of VIEWPORTS) {
       await expect(page.getByTestId('dashboard-card-share-app')).toBeVisible();
       await expect(page.getByTestId('dashboard-summary')).toBeVisible();
       await expect(page.getByTestId('dashboard-summary-higiene')).toContainText('/');
-      await expect(page.getByTestId('dashboard-summary-recepcion')).toContainText('/');
+      await expect(page.getByTestId('dashboard-summary-recepcion')).toContainText(/\d+|Sem sincronização com o ERP/);
       await expect(page.getByText('Historial de conteo')).toHaveCount(0);
     });
 

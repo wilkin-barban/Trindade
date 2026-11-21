@@ -18,6 +18,7 @@ no sustituyen una comprobación independiente de todos los flujos. El usuario in
 
 | Versión | Build | Fecha | Estado | Cambios principales | SHA-256 del APK |
 | --- | ---: | --- | --- | --- | --- |
+| 0.8.6 | — | 2026-11-21 | Preparada | APK firmado verificado e instalado en emulador; publicación pendiente | `8efc23c90b26d0ad5ceb3ea52506d2dbe7dc94fe4679f14aac86ec92bb9084a6` |
 | 0.4.0 | 400 | 2026-10-14 | No publicada | Teléfono del conductor, compartir nativo, envío directo y tarjeta de cronograma activo | `11d219393ae457e6776c0c675b9fed634f6850043e8c283658c214a18ecfc273` |
 | 0.5.0 | 501 | 2026-10-20 | Publicada | Calculadoras de Assaí, stock e historial | `32ab931c338dd94700cfd79f91e7abb7d349c09b84d8ea0c811f77a18388adf1` |
 | 0.5.1 | 506 | 2026-10-21 | Publicada | Base de 0.5.1: i18n automática y modo lectura en masas | `0d0912a9162c654154956916d50bccfc8ad3c9625ee51f34c896d2774c3a670b` |

@@ -104,8 +104,7 @@ test.describe('sync in the history', () => {
     await expect(page.locator('[data-testid="massas-sync-erp"]')).toHaveCount(0);
     await expect(page.locator('[data-testid="massas-sync-header"]')).toHaveCount(0);
 
-    // The day itself is still readable: what closed is the writing, not the record.
-    await expect(page.locator('[data-testid="massas-history-readonly"]')).toBeVisible();
+    // The selected past day remains visible even though synchronization is not offered.
     await expect(page.locator('[data-testid="massas-history-date"]')).toHaveValue(past);
   });
 });

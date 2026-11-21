@@ -55,7 +55,8 @@ test.describe('Massas history days', () => {
       // A day in the URL is the day that opens.
       await goToProtected(page, `/massas-history?date=${older}`);
       await expect(todayChip).toHaveAttribute('aria-pressed', 'false');
-      await expect(page.getByTestId('massas-history-empty')).toBeVisible();
+      await expect(field).toHaveValue(older);
+      await expect(page.getByTestId('massas-history-empty')).toHaveCount(0);
       await expect(page.getByRole('alert')).toHaveCount(0);
 
       // Pressing today moves the page back to today and leaves the URL without a day: today is the default, and
