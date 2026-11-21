@@ -420,7 +420,17 @@ class MainActivity : ComponentActivity() {
                     val onBackReportDetail = { openReportTarget = null }
                     val onBackProfile = { profileOpen = false }
                     val onBackReportsHistory = { historyOpen = false }
+                    val onOpenLoadingHistory = {
+                        // The history can delete or deactivate today's batch while this grid is off-screen.
+                        loadingStale = true
+                        loadingHistoryOpen = true
+                    }
                     val onBackLoadingHistory = { loadingHistoryOpen = false }
+                    val onSaveLoadingDay: (String) -> Unit = { day ->
+                        // Rows are already persisted; Save opens the saved-day share view.
+                        loadingShareSaved = true
+                        loadingShareDay = day
+                    }
                     val onBackLoadingDay = {
                         loadingDay = null
                         if (loadingDayFromHistory) {
@@ -633,15 +643,9 @@ class MainActivity : ComponentActivity() {
                                 onOpenHistory = {
                                     loadingDay = null
                                     loadingDayFromHistory = false
-                                    loadingHistoryOpen = true
+                                    onOpenLoadingHistory()
                                 },
-                                // Salvar Horario abre la vista de compartir del día, que es donde viven Compartir,
-                                // el PDF, Editar y los fleteros. El día ya está guardado fila por fila: esta acción
-                                // no escribe, y por eso no hay aquí una llamada de escritura que pueda fallar.
-                                onSaveDay = { day ->
-                                    loadingShareSaved = true
-                                    loadingShareDay = day
-                                },
+                                onSaveDay = onSaveLoadingDay,
                                 onEditEntry = { id, day ->
                                     editingScheduleId = id
                                     editingScheduleDay = day
@@ -848,7 +852,8 @@ class MainActivity : ComponentActivity() {
                                     BackHandler(enabled = !drawerState.isOpen, onBack = onBackLoadingTab)
                                     LoadingRoute(
                                         onBack = onBackLoadingTab,
-                                        onOpenHistory = { loadingHistoryOpen = true },
+                                        onOpenHistory = onOpenLoadingHistory,
+                                        onSaveDay = onSaveLoadingDay,
                                         onEditEntry = { id, day ->
                                             editingScheduleId = id
                                             editingScheduleDay = day
