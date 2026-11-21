@@ -291,7 +291,16 @@ fun StockCalculatorScreen(
         }
 
         state.note?.let { note ->
-            Text(note.resolve(), style = MaterialTheme.typography.bodySmall)
+            com.trindade.app.ui.components.ActionResultDialog(
+                message = note.resolve(),
+                isSuccess = note.resId in setOf(
+                    R.string.stock_note_boxes_added,
+                    R.string.stock_note_reset_done,
+                    R.string.stock_whatsapp_opening,
+                    R.string.stock_email_opening,
+                ),
+                onDismiss = viewModel::dismissNote,
+            )
         }
 
         if (showHelpDialog) {

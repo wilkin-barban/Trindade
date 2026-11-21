@@ -129,6 +129,10 @@ class StockViewModel @Inject constructor(
         _state.value = _state.value.copy(note = UiText.of(resId, *args))
     }
 
+    fun dismissNote() {
+        _state.value = _state.value.copy(note = null)
+    }
+
     fun load() {
         viewModelScope.launch {
             _state.value = _state.value.copy(loading = true, failed = false)

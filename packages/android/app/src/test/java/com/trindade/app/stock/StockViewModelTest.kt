@@ -153,6 +153,9 @@ class StockViewModelTest {
 
         viewModel.resetProduct(canudo)
         assertEquals(R.string.stock_note_not_admin, viewModel.state.value.note?.resId)
+        viewModel.dismissNote()
+        assertNull(viewModel.state.value.note)
+        assertEquals(0, server.requestCount)
 
         viewModel.onRoleKnown("Administrador")
         assertEquals(true, viewModel.canEdit())
