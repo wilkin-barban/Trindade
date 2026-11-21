@@ -317,6 +317,10 @@ class ReportEditViewModel @Inject constructor(
      * the operator made and expects to have landed.
      */
     /** Cierra la ventana de respuesta: el servidor y la validación comparten salida. */
+    fun dismissErpError() {
+        _state.update { it.copy(erpError = null) }
+    }
+
     fun dismissMessage() {
         _state.update { it.copy(message = null, validation = null) }
     }

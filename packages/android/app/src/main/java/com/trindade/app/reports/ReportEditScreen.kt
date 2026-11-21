@@ -67,6 +67,7 @@ fun ReportEditScreen(
     onRemovePendingPhoto: (Int) -> Unit = {},
     onBack: () -> Unit,
     onDismissResult: () -> Unit = {},
+    onDismissErpError: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     // Built once, outside the category loop, for the reason the generator's own copy gives: the form
@@ -144,13 +145,6 @@ fun ReportEditScreen(
             isSyncing = state.isSyncingErp,
             onSync = onSyncErp,
         )
-        state.erpError?.let { error ->
-            Text(
-                text = error.resolve(),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
 
         // Las salidas del día del reporte, con la misma tarjeta que el alta y el detalle.
         if (state.salidaDay != null) Column(modifier = Modifier.fillMaxWidth()) {
@@ -217,6 +211,14 @@ fun ReportEditScreen(
                 isSuccess = false,
                 onDismiss = onDismissResult,
             )
+        } else {
+            state.erpError?.let { error ->
+                ActionResultDialog(
+                    message = error.resolve(),
+                    isSuccess = false,
+                    onDismiss = onDismissErpError,
+                )
+            }
         }
     }
 }
@@ -274,6 +276,7 @@ fun ReportEditRoute(
         onSubmit = viewModel::submit,
         onSyncErp = viewModel::syncErp,
         onDismissResult = viewModel::dismissMessage,
+        onDismissErpError = viewModel::dismissErpError,
         onAddPhotos = {
             pickPhotos.launch(
                 androidx.activity.result.PickVisualMediaRequest(

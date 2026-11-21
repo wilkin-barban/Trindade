@@ -11,6 +11,8 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnySibling
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -200,6 +202,7 @@ class ReportEditScreenTest {
     private fun render(
         state: ReportEditViewModel.UiState,
         onSubmit: () -> Unit = {},
+        onDismissErpError: () -> Unit = {},
     ) {
         composeRule.setContent {
             TrindadeTheme {
@@ -212,6 +215,7 @@ class ReportEditScreenTest {
                     onTemperatureChange = { _, _, _ -> },
                     onBoxTypeChange = { _, _ -> },
                     onSubmit = onSubmit,
+                    onDismissErpError = onDismissErpError,
                     onBack = {},
                 )
             }
@@ -226,6 +230,15 @@ class ReportEditScreenTest {
     /** The one check box, found by the row it is drawn in rather than by being the only toggleable node. */
     private fun checkBox() =
         composeRule.onNode(isToggleable() and hasAnySibling(hasText(checkTask.namePt)))
+
+    @Test
+    fun `ERP error is presented in a dismissible dialog`() {
+        var dismisses = 0
+        render(state().copy(erpError = UiText.of(R.string.report_erp_not_configured)), onDismissErpError = { dismisses++ })
+        composeRule.onNode(hasText(copy(R.string.report_erp_not_configured)) and hasAnyAncestor(isDialog())).assertIsDisplayed()
+        composeRule.onNode(hasText(copy(R.string.action_result_close)) and hasAnyAncestor(isDialog())).performClick()
+        assertEquals(1, dismisses)
+    }
 
     // ---- The tests ----
 
