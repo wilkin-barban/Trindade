@@ -9,7 +9,7 @@ import {
   type SalidaMovement,
 } from '../../lib/salida';
 import {
-  AERO_PENDING_ATTEMPT_STORAGE_KEY,
+  SALIDA_PENDING_ATTEMPT_STORAGE_KEY,
   saveAeroPendingAttempt,
 } from '../../lib/aero-pending-attempt';
 
@@ -389,7 +389,7 @@ describe('SalidaHistoryPage', () => {
     // One product is one payload, not a list of one: the log reads the same shape a single trip sends.
     expect(requested.payload).toEqual(expect.objectContaining({ PRO_COD: '001900', PRO_QTD: 300 }));
 
-    const stored = JSON.parse(localStorage.getItem(AERO_PENDING_ATTEMPT_STORAGE_KEY) ?? 'null') as {
+    const stored = JSON.parse(localStorage.getItem(SALIDA_PENDING_ATTEMPT_STORAGE_KEY) ?? 'null') as {
       action: string;
       attemptId: string;
     } | null;
@@ -406,7 +406,7 @@ describe('SalidaHistoryPage', () => {
 
     await waitFor(() => expect(audit.length).toBeGreaterThan(0));
     const requested = lineOf('requested', 'salida_sync');
-    const stored = JSON.parse(localStorage.getItem(AERO_PENDING_ATTEMPT_STORAGE_KEY) ?? 'null') as {
+    const stored = JSON.parse(localStorage.getItem(SALIDA_PENDING_ATTEMPT_STORAGE_KEY) ?? 'null') as {
       action: string;
       attemptId: string;
     } | null;
@@ -417,7 +417,7 @@ describe('SalidaHistoryPage', () => {
 
     first.unmount();
     const data = encodeURIComponent(JSON.stringify({ success: true, message: 'Saida enviada' }));
-    await renderReady(`/salida-history?date=2026-11-13&aero_action=saida&aero_data=${data}`);
+    await renderReady(`/salida-history?date=2026-11-13&saida_attempt=${requested.attemptId}&aero_action=saida&aero_data=${data}`);
 
     await waitFor(() => expect(lineOf('result', 'salida_sync').attemptId).toBe(requested.attemptId));
     const result = lineOf('result', 'salida_sync');
@@ -436,7 +436,7 @@ describe('SalidaHistoryPage', () => {
     });
     const data = encodeURIComponent(JSON.stringify({ success: true, message: 'Saida enviada' }));
 
-    await renderReady(`/salida-history?date=2026-11-13&aero_action=saida&aero_data=${data}`);
+    await renderReady(`/salida-history?date=2026-11-13&saida_attempt=attempt-resend-1&aero_action=saida&aero_data=${data}`);
 
     await waitFor(() => expect(audit.length).toBeGreaterThan(0));
     const result = lineOf('result', 'salida_sync');
@@ -445,7 +445,7 @@ describe('SalidaHistoryPage', () => {
     expect(result.attemptId).toBe('attempt-resend-1');
     expect(result.httpStatus).toBe(200);
     expect(result.response).toBe('Saida enviada');
-    expect(localStorage.getItem(AERO_PENDING_ATTEMPT_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(SALIDA_PENDING_ATTEMPT_STORAGE_KEY)).toBeNull();
 
     // The operator reads the same dialog the launch screen shows, and the day is read again.
     await waitFor(() => expect(screen.getByTestId('salida-erp-answer')).toBeInTheDocument());
@@ -464,7 +464,7 @@ describe('SalidaHistoryPage', () => {
     });
     const data = encodeURIComponent(JSON.stringify({ success: true, message: 'Saida gravada com sucesso' }));
 
-    await renderReady(`/salida-history?aero_action=saida&aero_data=${data}`);
+    await renderReady(`/salida-history?saida_attempt=attempt-launch-s2&aero_action=saida&aero_data=${data}`);
 
     await waitFor(() => expect(screen.getByTestId('salida-erp-answer')).toBeInTheDocument());
     expect(screen.getByTestId('salida-erp-answer').textContent).toContain('Saida gravada com sucesso');
@@ -479,7 +479,7 @@ describe('SalidaHistoryPage', () => {
     expect(result.attemptId).toBe('attempt-launch-s2');
     expect(result.httpStatus).toBe(200);
     expect(result.response).toBe('Saida gravada com sucesso');
-    expect(localStorage.getItem(AERO_PENDING_ATTEMPT_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(SALIDA_PENDING_ATTEMPT_STORAGE_KEY)).toBeNull();
   });
 
   it('correctly reads a multi-product batch response on return in SalidaHistoryPage (S2)', async () => {
@@ -490,7 +490,8 @@ describe('SalidaHistoryPage', () => {
     ];
     const data = encodeURIComponent(JSON.stringify(batchAnswer));
 
-    await renderReady(`/salida-history?aero_action=saida&aero_data=${data}`);
+    saveAeroPendingAttempt({ action: 'saida', attemptId: 'batch', startedAt: Date.now() });
+    await renderReady(`/salida-history?saida_attempt=batch&aero_action=saida&aero_data=${data}`);
 
     const answer = await screen.findByTestId('salida-erp-answer');
     expect(answer.textContent).toContain(i18n.t('salida.erpAccepted'));
@@ -505,7 +506,8 @@ describe('SalidaHistoryPage', () => {
     writeSalidaLastMovement({ ...PENDING_BOBINA, expectedPayloads: 2 });
     const data = encodeURIComponent('corrupted-batch-data');
 
-    await renderReady(`/salida-history?aero_action=saida&aero_data=${data}`);
+    saveAeroPendingAttempt({ action: 'saida', attemptId: 'unreadable', startedAt: Date.now() });
+    await renderReady(`/salida-history?saida_attempt=unreadable&aero_action=saida&aero_data=${data}`);
 
     const answer = await screen.findByTestId('salida-erp-answer');
     expect(answer.textContent).toContain(i18n.t('salida.erpUnreadable'));
@@ -1266,6 +1268,111 @@ describe('SalidaHistoryPage — T3 per-movement state, relaunch, operator filter
   });
 
   /** Borrar la tarjeta se lleva también lo que el teléfono debía por ella. */
+  it.each(['another date', 'a failed read'] as const)('keeps a real pending trip after %s', async (scenario) => {
+    localStorage.setItem(SALIDA_OUTBOX_KEY, JSON.stringify({
+      movementId: 2,
+      date: '2026-11-13',
+      trips: [{ action: 'saida', payloads: [{ PRO_COD: '1357', PRO_QTD: 2000 }] }],
+      startedAt: new Date().toISOString(),
+    }));
+    if (scenario === 'a failed read') {
+      get.mockImplementation(async (path: string) => {
+        if (path === '/salida/history') throw new Error('History unavailable');
+        return {};
+      });
+    }
+    const view = await renderReady(scenario === 'another date' ? '/salida-history?date=2026-11-12' : '/salida-history');
+    expect(screen.queryByTestId('salida-history-outbox')).not.toBeInTheDocument();
+    view.unmount();
+    get.mockImplementation(async (path: string) => path === '/salida/history' ? history() : {});
+    await renderReady();
+    expect(await screen.findByTestId('salida-history-outbox')).toBeInTheDocument();
+  });
+
+  it.each(['sent', 'partial', 'missing date'] as const)('does not discard retry trips after %s', async (scenario) => {
+    const { SALIDA_OUTBOX_KEY } = await import('../../lib/salida');
+    const saved = JSON.stringify({
+      movementId: 2,
+      date: '2026-11-13',
+      trips: [{ action: 'saida', payloads: [{ PRO_COD: '1357', PRO_QTD: 2000 }] }],
+      startedAt: new Date().toISOString(),
+    });
+    localStorage.setItem(SALIDA_OUTBOX_KEY, saved);
+    const movement: SalidaMovement = {
+      ...PENDING_BOBINA,
+      erp: { status: scenario === 'partial' ? 'partial' : 'sent', message: null, sentAt: new Date().toISOString() },
+    };
+    get.mockImplementation(async (path: string) => path === '/salida/history' ? {
+      days: scenario === 'missing date' ? [] : [{ date: '2026-11-13', total_units: 3, movements: [movement] }],
+    } : {});
+    await renderReady();
+    expect(screen.queryByTestId('salida-history-outbox')).not.toBeInTheDocument();
+    expect(localStorage.getItem(SALIDA_OUTBOX_KEY)).toBe(saved);
+  });
+
+  it.each(['ready', 'review'] as const)('only sends the stored head when the retry is %s', async (retryState) => {
+    const payloads = [{ PRO_COD: '000999', PRO_QTD: 100 }];
+    localStorage.setItem(SALIDA_OUTBOX_KEY, JSON.stringify({
+      movementId: 2,
+      date: '2026-11-13',
+      trips: [{ action: 'saida', payloads }],
+      retryState,
+      startedAt: new Date().toISOString(),
+    }));
+    const pending = { ...PENDING_BOBINA, erp: { status: 'sent', message: null, sentAt: '2026-11-13' } };
+    get.mockImplementation(async (path: string) => path === '/salida/history' ? {
+      days: [{ date: '2026-11-13', total_units: 3, movements: [pending] }],
+    } : {});
+    await renderReady();
+    if (retryState === 'review') {
+      expect(screen.queryByTestId('salida-resend-2')).not.toBeInTheDocument();
+      expect(ticket).not.toHaveBeenCalled();
+    } else {
+      fireEvent.click(await screen.findByTestId('salida-resend-2'));
+      await waitFor(() => expect(ticket).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ payloads })));
+    }
+  });
+
+  it('ignores a delayed return from an earlier attempt without consuming the current trip', async () => {
+    const queue = JSON.stringify({
+      movementId: 2,
+      date: '2026-11-13',
+      trips: [{ action: 'saida', payloads: [{ PRO_COD: '000999', PRO_QTD: 100 }] }],
+      startedAt: '2026-11-13T11:00:00Z',
+      retryState: 'ready',
+      currentTripPayloads: 1,
+    });
+    localStorage.setItem(SALIDA_OUTBOX_KEY, queue);
+    writeSalidaLastMovement({ ...PENDING_BOBINA, expectedPayloads: 1 });
+    saveAeroPendingAttempt({ action: 'saida', attemptId: 'current', startedAt: Date.now(), date: '2026-11-13' });
+    const data = encodeURIComponent(JSON.stringify([{ success: true }]));
+    await renderReady(`/salida-history?saida_attempt=earlier&aero_action=saida&aero_data=${data}`);
+    expect(post).not.toHaveBeenCalledWith('/salida/2/erp-result', expect.anything());
+    expect(screen.queryByTestId('salida-erp-answer')).not.toBeInTheDocument();
+    expect(localStorage.getItem(SALIDA_OUTBOX_KEY)).toBe(queue);
+    expect(localStorage.getItem(SALIDA_PENDING_ATTEMPT_STORAGE_KEY)).toContain('current');
+  });
+
+  it('allows a different movement to dispatch after an abandoned reservation expires', async () => {
+    saveAeroPendingAttempt({ action: 'saida', attemptId: 'abandoned', startedAt: Date.now() - 60 * 60 * 1000 });
+    ticket.mockRejectedValue(new Error('offline'));
+    await renderReady();
+    fireEvent.click(await screen.findByTestId('salida-resend-2'));
+    await waitFor(() => expect(ticket).toHaveBeenCalledTimes(1));
+  });
+
+  it('does not request a second ticket while the first ticket is unresolved', async () => {
+    get.mockImplementation(async (path: string) => path === '/salida/history' ? {
+      days: [{ date: '2026-11-13', total_units: 6, movements: [PENDING_BOBINA, { ...PENDING_BOBINA, id: 4 }] }],
+    } : {});
+    ticket.mockImplementation(() => new Promise(() => {}));
+    await renderReady();
+    fireEvent.click(await screen.findByTestId('salida-resend-2'));
+    await waitFor(() => expect(ticket).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByTestId('salida-resend-4'));
+    expect(ticket).toHaveBeenCalledTimes(1);
+  });
+
   it('clears the outbox and the last movement when the draft is deleted', async () => {
     const { SALIDA_OUTBOX_KEY, SALIDA_LAST_MOVEMENT_KEY, writeSalidaLastMovement } = await import('../../lib/salida');
     localStorage.setItem(

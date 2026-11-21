@@ -471,6 +471,38 @@ describe('the trips that must survive leaving the page', () => {
     assert.equal(readSalidaOutbox(storage), null);
   });
 
+  it('keeps a legacy movement when adding another and clears only the specified movement', () => {
+    const storage = memoryStorage();
+    const trips = buildSalidaTrips(buildSalidaPayloads(
+      [{ code: SALIDA_FALLBACK_PRODUCTS[0]!.code, quantity: 1 }],
+      { date: '2026-11-13', username: 'operator', products: CATALOG },
+    ));
+    const first = { movementId: 12, date: '2026-11-13', trips, startedAt: '2026-11-13T11:00:00Z' };
+    const second = { ...first, movementId: 13 };
+    storage.setItem('trindade.salida.outbox.v1', JSON.stringify(first));
+
+    writeSalidaOutbox(second, storage);
+    assert.deepEqual(readSalidaOutbox(storage, 12), first);
+    assert.deepEqual(readSalidaOutbox(storage, 13), second);
+
+    clearSalidaOutbox(storage, 13);
+    assert.equal(readSalidaOutbox(storage, 13), null);
+    assert.deepEqual(readSalidaOutbox(storage), first);
+  });
+
+  it('keeps an explicit ready or review state across a reload', () => {
+    const storage = memoryStorage();
+    const trips = buildSalidaTrips(buildSalidaPayloads(
+      [{ code: SALIDA_FALLBACK_PRODUCTS[0]!.code, quantity: 1 }],
+      { date: '2026-11-13', username: 'operator', products: CATALOG },
+    ));
+    for (const retryState of ['ready', 'review'] as const) {
+      const queue = { movementId: 12, date: '2026-11-13', trips, startedAt: '2026-11-13T11:00:00Z', retryState };
+      writeSalidaOutbox(queue, storage);
+      assert.deepEqual(readSalidaOutbox(storage, 12), queue);
+    }
+  });
+
   it('refuses an outbox it cannot trust', () => {
     const storage = memoryStorage();
     storage.setItem('trindade.salida.outbox.v1', '{not json');

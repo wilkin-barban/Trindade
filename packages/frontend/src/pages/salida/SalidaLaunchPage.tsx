@@ -19,7 +19,7 @@ import {
   buildAeroBridgeTriggerUrl,
 } from '../../lib/aero-integration';
 import { markAeroBridgePending } from '../../lib/aero-watchdog';
-import { saveAeroPendingAttempt } from '../../lib/aero-pending-attempt';
+import { clearAeroPendingAttempt, loadAeroPendingAttempt, reserveSalidaAttempt } from '../../lib/aero-pending-attempt';
 import { newAeroAttempt, postAeroAuditEvent } from '../../lib/aero-audit';
 import { requestAeroBridgeTicket } from '../../lib/aero-vault';
 import {
@@ -123,27 +123,33 @@ export function SalidaLaunchPage() {
    * movimiento que ya no estaba. Se consulta el día del outbox -- una lectura, no la pantalla -- y si el movimiento
    * no está, o el ERP ya lo confirmó, la cola se limpia en lugar de anunciarse.
    */
-  const [outboxOwed, setOutboxOwed] = useState(false);
+  const [retryMovement, setRetryMovement] = useState<SalidaMovement | null>(null);
   useEffect(() => {
-    if (!outbox) {
-      setOutboxOwed(false);
-      return;
-    }
+    setRetryMovement(null);
+    if (!outbox) return;
     let active = true;
     void (async () => {
       try {
         const body = await api.get<{ movements?: SalidaMovement[] }>(`/salida?date=${outbox.date}`);
         if (!active) return;
-        const owed = salidaOutboxIsOwed(outbox, body.movements ?? []);
-        setOutboxOwed(owed);
-        if (!owed) {
-          clearSalidaOutbox();
-          setOutbox(null);
+        if (!Array.isArray(body?.movements)) {
+          setRetryMovement(null);
+          return;
+        }
+        const movement = body.movements.find((entry) => entry.id === outbox.movementId);
+        if (movement && salidaOutboxIsOwed(outbox, [movement])) setRetryMovement(movement);
+        // A status can describe one trip, not the entire queue. Only a valid day response
+        // that no longer contains the movement proves this queue has no target.
+        if (!body.movements.some((movement) => movement.id === outbox.movementId)) {
+          const stored = readSalidaOutbox(undefined, outbox.movementId);
+          if (stored?.startedAt !== outbox.startedAt) return;
+          clearSalidaOutbox(undefined, outbox.movementId);
+          setOutbox(readSalidaOutbox());
           if (readSalidaLastMovement()?.id === outbox.movementId) clearSalidaLastMovement();
         }
       } catch {
         // Sin poder validar no se inventa un pendiente: el aviso no bloquea la pantalla.
-        if (active) setOutboxOwed(false);
+        if (active) setRetryMovement(null);
       }
     })();
     return () => {
@@ -169,26 +175,30 @@ export function SalidaLaunchPage() {
    * written before the navigation, and the first trip of a movement that had more than eight products waits in
    * the outbox for the operator to press `Reenviar ao ERP` when the phone comes back.
    */
-  const sendNextTrip = useCallback(async (): Promise<boolean> => {
-    const queued = readSalidaOutbox();
+  const sendNextTrip = useCallback(async (movement?: SalidaMovement): Promise<boolean> => {
+    if (!movement) return false;
+    const queued = readSalidaOutbox(undefined, movement.id);
+    if (!salidaOutboxIsOwed(queued, [movement])) return false;
     const { trip } = takeSalidaTrip(queued);
     if (!trip) {
-      clearSalidaOutbox();
-      setOutbox(null);
-      return true;
+      return false;
     }
 
     // Which of the trips this one is, for the log: the head of what is still owed.
     const tripRef = { index: 1, total: queued?.trips.length ?? 1 };
 
+    const attempt = newAeroAttempt();
+    const tripDate = queued?.date ?? date;
+    if (!await reserveSalidaAttempt({ action: 'saida', ...attempt, date: tripDate })) return false;
     let ticket: { ticket: string; ticketUrl: string };
     try {
       ticket = await requestAeroBridgeTicket({
         action: 'saida',
         payloads: trip.payloads,
-        callbackPath: aeroBridgeCallbackFor('saida', '/salida-history'),
+        callbackPath: aeroBridgeCallbackFor('saida', `/salida-history?saida_attempt=${encodeURIComponent(attempt.attemptId)}`),
       });
     } catch (err) {
+      if (loadAeroPendingAttempt('saida')?.attemptId === attempt.attemptId) clearAeroPendingAttempt(undefined, 'saida');
       // Nothing left the page: the movement stays pending, the queue stays where it was, and the log says the
       // vault refused to arm the trip instead of leaving a silence where a launch should be.
       setOutbox(readSalidaOutbox());
@@ -207,6 +217,7 @@ export function SalidaLaunchPage() {
       return false;
     }
 
+    if (loadAeroPendingAttempt('saida')?.attemptId !== attempt.attemptId) return false;
     // Record how many payloads this trip carries so the batch verdict can verify the exact batch size on return.
     // The outbox is NOT cleared before leaving; it clears only on complete.
     if (queued) {
@@ -218,11 +229,10 @@ export function SalidaLaunchPage() {
 
     // The attempt is written down before leaving: the shortcut comes back to a fresh document, and the
     // identifier that pairs this line with the answer has to survive the trip.
-    const attempt = newAeroAttempt();
-    saveAeroPendingAttempt({ action: 'saida', ...attempt, date });
+    writeSalidaLastMovement({ ...movement, expectedPayloads: trip.payloads.length });
     void postAeroAuditEvent(salidaSyncRequestedEvent({ payloads: trip.payloads, trip: tripRef, attempt }));
 
-    markAeroBridgePending({ action: 'saida', date });
+    markAeroBridgePending({ action: 'saida', date: tripDate });
     window.location.href = buildAeroBridgeTriggerUrl({ ticket: ticket.ticket, ticketUrl: ticket.ticketUrl });
     return true;
   }, [date, t]);
@@ -231,18 +241,9 @@ export function SalidaLaunchPage() {
     async (movement: SalidaMovement, payloads: ReturnType<typeof buildSalidaPayloads>): Promise<boolean> => {
       const trips = buildSalidaTrips(payloads);
       if (trips.length === 0) return false;
-      // The movement travels with the session: the shortcut leaves the page, and the dialog the operator sees on
-      // return needs the record it is confirming.
-      writeSalidaLastMovement({ ...movement, expectedPayloads: trips[0]?.payloads.length });
-      writeSalidaOutbox({
-        movementId: movement.id,
-        date,
-        trips,
-        startedAt: new Date().toISOString(),
-        currentTripPayloads: trips[0]?.payloads.length,
-      });
+      writeSalidaOutbox({ movementId: movement.id, date, trips, startedAt: new Date().toISOString() });
       setOutbox(readSalidaOutbox());
-      return sendNextTrip();
+      return sendNextTrip(movement);
     },
     [date, sendNextTrip],
   );
@@ -310,17 +311,15 @@ export function SalidaLaunchPage() {
     // The movement is in Trindade: the form empties so the same quantities cannot be filed twice.
     setQuantities({});
 
-    // La baja quedó en Trindade: la ventana lo confirma siempre. Si el ERP también la aceptó, lo dice como 'ok'; si
-    // no llegó, lo dice como pendiente. Retornar sin ventana cuando el ERP contestaba dejaba el formulario vacío y
-    // al operario sin saber si su lanzamiento existió.
-    setSuccess({ movement: outcome.movement, erp: outcome.erp === 'sent' ? 'ok' : 'pending', message: null });
+    // Opening Scriptable is not an ERP verdict. The history can confirm acceptance after the callback.
+    setSuccess({ movement: outcome.movement, erp: 'pending', message: null });
     setOutbox(readSalidaOutbox());
   };
 
   const handleResend = async () => {
     setErpSending(true);
     setNotice(null);
-    const sent = await sendNextTrip();
+    const sent = await sendNextTrip(retryMovement ?? undefined);
     setErpSending(false);
     if (!sent) {
       setNotice({
@@ -367,7 +366,7 @@ export function SalidaLaunchPage() {
         </p>
       )}
 
-      {outbox && outboxOwed && (
+      {outbox && retryMovement?.id === outbox.movementId && (
         <div
           role="status"
           className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"

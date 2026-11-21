@@ -1102,6 +1102,7 @@ export interface SalidaOutbox {
   trips: SalidaTrip[];
   startedAt: string;
   currentTripPayloads?: number;
+  retryState?: 'ready' | 'review';
 }
 
 function safeStorage(): StorageLike | null {
@@ -1118,22 +1119,31 @@ function isTrip(value: unknown): value is SalidaTrip {
   return record.action === 'saida' && Array.isArray(record.payloads) && record.payloads.length > 0;
 }
 
-export function readSalidaOutbox(storage: StorageLike | null = safeStorage()): SalidaOutbox | null {
-  if (!storage) return null;
-  let raw: string | null = null;
+/** Accept the legacy single movement as well as the collection used when movements coexist. */
+export function readSalidaOutboxes(storage: StorageLike | null = safeStorage()): SalidaOutbox[] {
+  if (!storage) return [];
   try {
-    raw = storage.getItem(SALIDA_OUTBOX_KEY);
+    const raw = storage.getItem(SALIDA_OUTBOX_KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    return (Array.isArray(parsed) ? parsed : [parsed]).flatMap((entry: unknown) => {
+      const decoded = decodeSalidaOutbox(entry);
+      return decoded ? [decoded] : [];
+    });
   } catch {
-    return null;
+    return [];
   }
-  if (!raw) return null;
+}
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return null;
-  }
+export function readSalidaOutbox(
+  storage: StorageLike | null = safeStorage(),
+  movementId?: number,
+): SalidaOutbox | null {
+  const outboxes = readSalidaOutboxes(storage);
+  return (movementId === undefined ? outboxes[0] : outboxes.find((entry) => entry.movementId === movementId)) ?? null;
+}
+
+function decodeSalidaOutbox(parsed: unknown): SalidaOutbox | null {
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
 
   const record = parsed as Record<string, unknown>;
@@ -1160,6 +1170,7 @@ export function readSalidaOutbox(storage: StorageLike | null = safeStorage()): S
     trips: kept,
     startedAt: typeof record.startedAt === 'string' ? record.startedAt : new Date().toISOString(),
     ...(currentTripPayloads !== undefined ? { currentTripPayloads } : {}),
+    ...(record.retryState === 'ready' || record.retryState === 'review' ? { retryState: record.retryState } : {}),
   };
 }
 
@@ -1169,22 +1180,32 @@ export function writeSalidaOutbox(
 ): void {
   if (!storage) return;
   try {
-    storage.setItem(SALIDA_OUTBOX_KEY, JSON.stringify(outbox));
+    const entries = readSalidaOutboxes(storage);
+    const index = entries.findIndex((entry) => entry.movementId === outbox.movementId);
+    if (index < 0) entries.push(outbox);
+    else entries[index] = outbox;
+    persistSalidaOutboxes(storage, entries);
   } catch {
     /* a phone in private mode cannot keep the queue; the movement is already in Trindade */
   }
 }
 
-export function clearSalidaOutbox(storage: StorageLike | null = safeStorage()): void {
+export function clearSalidaOutbox(storage: StorageLike | null = safeStorage(), movementId?: number): void {
   if (!storage) return;
   try {
-    storage.removeItem(SALIDA_OUTBOX_KEY);
+    const entries = readSalidaOutboxes(storage);
+    const target = movementId ?? entries[0]?.movementId;
+    if (target !== undefined) persistSalidaOutboxes(storage, entries.filter((entry) => entry.movementId !== target));
   } catch {
     /* nothing to forget */
   }
 }
 
-/** The next trip and what is left after it, so the caller can arm one and store the rest. */
+function persistSalidaOutboxes(storage: StorageLike, entries: SalidaOutbox[]): void {
+  if (entries.length === 0) storage.removeItem(SALIDA_OUTBOX_KEY);
+  else storage.setItem(SALIDA_OUTBOX_KEY, JSON.stringify(entries.length === 1 ? entries[0] : entries));
+}
+
 /**
  * Si el outbox sigue debiendo un viaje por un movimiento que existe y está pendiente.
  *
@@ -1199,10 +1220,10 @@ export function salidaOutboxIsOwed(
   if (!outbox || outbox.trips.length === 0) return false;
   const movement = movements.find((row) => row.id === outbox.movementId);
   if (!movement) return false;
-  const status = movement.erp?.status ?? null;
-  if (status === 'sent' || status === 'partial') return false;
+  if (outbox.currentTripPayloads !== undefined || outbox.retryState === 'review') return false;
   if (movement.reconciliation?.status === 'reconciled') return false;
-  return true;
+  // A ready head is the untouched remainder after an individually confirmed trip.
+  return outbox.retryState === 'ready' || canRelaunchSalida(movement);
 }
 
 export function takeSalidaTrip(outbox: SalidaOutbox | null): {

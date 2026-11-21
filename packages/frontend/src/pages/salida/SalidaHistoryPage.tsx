@@ -29,7 +29,7 @@ import {
 } from '../../lib/aero-integration';
 import { readAeroBatchResult } from '../../lib/aero-feedback';
 import { markAeroBridgePending } from '../../lib/aero-watchdog';
-import { clearAeroPendingAttempt, loadAeroPendingAttempt, saveAeroPendingAttempt } from '../../lib/aero-pending-attempt';
+import { clearAeroPendingAttempt, loadAeroPendingAttempt, reserveSalidaAttempt } from '../../lib/aero-pending-attempt';
 import { newAeroAttempt, postAeroAuditEvent } from '../../lib/aero-audit';
 import { requestAeroBridgeTicket } from '../../lib/aero-vault';
 import {
@@ -208,7 +208,8 @@ export function SalidaHistoryPage() {
   const load = useCallback(async () => {
     try {
       const body = await api.get<{ days?: SalidaHistoryDay[] }>('/salida/history');
-      const list = Array.isArray(body?.days) ? body.days : [];
+      if (!Array.isArray(body?.days)) throw new Error(t('salida.historyLoadError'));
+      const list = body.days;
       setDays({ loading: false, failed: false, list });
     } catch (error) {
       // A day list that could not be read is said once; the screen keeps whatever it already had instead of
@@ -263,10 +264,8 @@ export function SalidaHistoryPage() {
       await api.del(`/salida/${target.id}`);
       // Lo que el teléfono debía por ese movimiento se retira con él: si el outbox quedaba, la pantalla seguía
       // anunciando un pendiente de envío que ya no existe.
-      if (readSalidaOutbox()?.movementId === target.id) {
-        clearSalidaOutbox();
-        setOutbox(null);
-      }
+      clearSalidaOutbox(undefined, target.id);
+      setOutbox(readSalidaOutbox());
       if (readSalidaLastMovement()?.id === target.id) clearSalidaLastMovement();
       setNoticeDialog({ tone: 'success', message: t('salida.deleteDone', 'Movimento excluído.') });
       await load();
@@ -279,15 +278,20 @@ export function SalidaHistoryPage() {
     }
   }, [deleteTarget, load, t]);
 
-  // Un outbox huérfano no se dibuja ni se queda: si el día ya se leyó y el movimiento no existe -- o el ERP lo
-  // confirmó -- la cola local se limpia. Sin día leído no se afirma nada y no se muestra el pendiente.
+  // Only a successful, unfiltered read of the queued date can settle the local queue.
   useEffect(() => {
-    if (!outbox || days.loading) return;
-    if (salidaOutboxIsOwed(outbox, dayMovements)) return;
-    clearSalidaOutbox();
-    setOutbox(null);
+    if (!outbox || days.loading || days.failed) return;
+    const queuedDay = days.list.find((entry) => entry.date === outbox.date);
+    // A missing date in the aggregate is not a day-specific answer. A movement-level ERP verdict
+    // also cannot settle individual trips still recorded in the queue.
+    if (!queuedDay || !Array.isArray(queuedDay.movements)) return;
+    if (queuedDay.movements.some((movement) => movement.id === outbox.movementId)) return;
+    const stored = readSalidaOutbox(undefined, outbox.movementId);
+    if (stored?.startedAt !== outbox.startedAt) return;
+    clearSalidaOutbox(undefined, outbox.movementId);
+    setOutbox(readSalidaOutbox());
     if (readSalidaLastMovement()?.id === outbox.movementId) clearSalidaLastMovement();
-  }, [outbox, days.loading, dayMovements]);
+  }, [outbox, days]);
 
   const visibleMovements = useMemo(() => {
     if (block === 'all') return dayMovements;
@@ -306,16 +310,21 @@ export function SalidaHistoryPage() {
       const callback = await resolveAeroCallback(location.search);
       if (!callback || cancelled) return;
 
-      const answered = new URLSearchParams(location.search).get('date');
+      const params = new URLSearchParams(location.search);
+      const answered = params.get('date');
       const answeredDate = answered && /^\d{4}-\d{2}-\d{2}$/.test(answered) ? answered : date;
 
       if (callback.kind === 'bridge' && callback.action === 'saida') {
         // A resend comes back here, not to the launch screen: same dialog, same trail, same attempt.
         const attempt = loadAeroPendingAttempt('saida');
-        if (attempt) clearAeroPendingAttempt();
+        if (!attempt || params.get('saida_attempt') !== attempt.attemptId) {
+          setParams({ date: answeredDate }, { replace: true });
+          return;
+        }
+        clearAeroPendingAttempt(undefined, 'saida');
 
-        const queued = readSalidaOutbox();
         const lastMovement = readSalidaLastMovement();
+        const queued = lastMovement ? readSalidaOutbox(undefined, lastMovement.id) : null;
         const expectedTripPayloads =
           queued?.currentTripPayloads ??
           queued?.trips[0]?.payloads.length ??
@@ -362,17 +371,17 @@ export function SalidaHistoryPage() {
         if (isComplete) {
           if (queued && queued.trips.length > 1) {
             const remainingTrips = queued.trips.slice(1);
-            writeSalidaOutbox({ ...queued, trips: remainingTrips, currentTripPayloads: undefined });
+            writeSalidaOutbox({ ...queued, trips: remainingTrips, currentTripPayloads: undefined, retryState: 'ready' });
             setOutbox(readSalidaOutbox());
           } else {
-            clearSalidaOutbox();
+            if (queued) clearSalidaOutbox(undefined, queued.movementId);
             clearSalidaLastMovement();
-            setOutbox(null);
+            setOutbox(readSalidaOutbox());
           }
         } else {
           // The movement is still owed: the outbox and the card keep saying pending.
           if (queued) {
-            writeSalidaOutbox({ ...queued, currentTripPayloads: undefined });
+            writeSalidaOutbox({ ...queued, currentTripPayloads: undefined, retryState: 'review' });
           }
           setOutbox(readSalidaOutbox());
         }
@@ -381,12 +390,10 @@ export function SalidaHistoryPage() {
         // The phone came back without the plant. Only a resend can be owed an answer now: reading the day's exits
         // is the report's job, not this history's.
         const syncAttempt = loadAeroPendingAttempt('saida');
-        if (syncAttempt) clearAeroPendingAttempt();
-
-        if (syncAttempt) {
+        if (syncAttempt && params.get('saida_attempt') === syncAttempt.attemptId) {
+          clearAeroPendingAttempt(undefined, 'saida');
           const lastMovement = readSalidaLastMovement();
-          const queued = readSalidaOutbox();
-          const movementId = lastMovement?.id ?? queued?.movementId;
+          const movementId = lastMovement?.id;
           if (movementId) {
             void recordSalidaErpResult(
               movementId,
@@ -435,7 +442,9 @@ export function SalidaHistoryPage() {
         movement.items.map((item) => ({ code: item.product_code, quantity: item.quantity })),
         { date: movement.movement_date, username: movement.username, products },
       );
-      const trips = buildSalidaTrips(payloads);
+      const saved = readSalidaOutbox(undefined, movement.id);
+      if (saved && !salidaOutboxIsOwed(saved, [movement])) return;
+      const trips = saved?.trips ?? buildSalidaTrips(payloads);
       if (trips.length === 0) {
         setNotice({ type: 'error', message: t('salida.erpCheckError') });
         return;
@@ -443,25 +452,28 @@ export function SalidaHistoryPage() {
 
       // The trips are written down first: if the vault refuses to arm the first one, what is owed is still
       // there for the next press instead of being forgotten by a failed attempt.
-      writeSalidaOutbox({
+      const queue = saved ?? {
         movementId: movement.id,
         date: movement.movement_date,
         trips,
         startedAt: new Date().toISOString(),
-        currentTripPayloads: trips[0]?.payloads.length,
-      });
+      };
+      writeSalidaOutbox(queue);
       setOutbox(readSalidaOutbox());
 
       const trip = trips[0]!;
       const tripRef = { index: 1, total: trips.length };
+      const attempt = newAeroAttempt();
+      if (!await reserveSalidaAttempt({ action: 'saida', ...attempt, date: movement.movement_date })) return;
       let ticket: { ticket: string; ticketUrl: string } | null = null;
       try {
         ticket = await requestAeroBridgeTicket({
           action: 'saida',
           payloads: trip.payloads,
-          callbackPath: aeroBridgeCallbackFor('saida', `/salida-history?date=${date}`),
+          callbackPath: aeroBridgeCallbackFor('saida', `/salida-history?date=${date}&saida_attempt=${encodeURIComponent(attempt.attemptId)}`),
         });
       } catch (err) {
+        if (loadAeroPendingAttempt('saida')?.attemptId === attempt.attemptId) clearAeroPendingAttempt(undefined, 'saida');
         // Nothing left the page and nothing is owed a result: one requested line carries the refusal.
         void postAeroAuditEvent(
           salidaSyncRequestedEvent({
@@ -480,10 +492,11 @@ export function SalidaHistoryPage() {
 
       // Same shape as a launch: the attempt is stored before leaving, so the answer can be paired with the
       // request it belongs to when the shortcut comes back to a fresh document.
-      const attempt = newAeroAttempt();
-      saveAeroPendingAttempt({ action: 'saida', ...attempt, date: movement.movement_date });
+      if (loadAeroPendingAttempt('saida')?.attemptId !== attempt.attemptId) return;
       void postAeroAuditEvent(salidaSyncRequestedEvent({ payloads: trip.payloads, trip: tripRef, attempt }));
 
+      writeSalidaOutbox({ ...queue, currentTripPayloads: trip.payloads.length });
+      setOutbox(readSalidaOutbox());
       // The movement travels with the session: the dialog the return shows is drawn from it.
       writeSalidaLastMovement({ ...movement, expectedPayloads: trip.payloads.length });
       markAeroBridgePending({ action: 'saida', date: movement.movement_date });
@@ -710,6 +723,7 @@ export function SalidaHistoryPage() {
               movement={movement}
               timeLabel={salidaTimeLabel(movement.created_at)}
               onShare={(target) => void shareMovement(target)}
+              queuedRetry={readSalidaOutbox(undefined, movement.id) ?? undefined}
               onResend={(target) => void resendToErp(target)}
               onRefresh={() => void load()}
               resending={resendingId === movement.id}
@@ -777,7 +791,7 @@ export function SalidaHistoryPage() {
         )}
       </div>
 
-      {outbox && salidaOutboxIsOwed(outbox, dayMovements) && (
+      {!days.failed && outbox?.date === date && salidaOutboxIsOwed(outbox, dayMovements) && (
         <p className="text-xs text-amber-800" data-testid="salida-history-outbox">
           {t('salida.pendingTitle')} · {outbox.trips.length}
         </p>

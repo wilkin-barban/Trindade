@@ -10,7 +10,7 @@ import {
   type SalidaMovement,
 } from '../../lib/salida';
 import {
-  AERO_PENDING_ATTEMPT_STORAGE_KEY,
+  SALIDA_PENDING_ATTEMPT_STORAGE_KEY,
   saveAeroPendingAttempt,
 } from '../../lib/aero-pending-attempt';
 import { saoPauloToday } from '../../lib/date';
@@ -338,7 +338,7 @@ describe('SalidaLaunchPage', () => {
     expect(String(refused.note ?? '')).toMatch(/not sent/);
     expect(refused.destinationUrl).toBe(SALIDA_AUDIT_DESTINATION);
     // Nothing was armed: no attempt survives to be paired with a callback that will never come.
-    expect(localStorage.getItem(AERO_PENDING_ATTEMPT_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(SALIDA_PENDING_ATTEMPT_STORAGE_KEY)).toBeNull();
     expectNoCredential(audit);
   });
 
@@ -353,7 +353,7 @@ describe('SalidaLaunchPage', () => {
     await waitFor(() => expect(audit.length).toBeGreaterThan(0));
 
     const requested = lineOf('requested');
-    const stored = JSON.parse(localStorage.getItem(AERO_PENDING_ATTEMPT_STORAGE_KEY) ?? 'null') as {
+    const stored = JSON.parse(localStorage.getItem(SALIDA_PENDING_ATTEMPT_STORAGE_KEY) ?? 'null') as {
       action: string;
       attemptId: string;
       date?: string;
@@ -468,13 +468,7 @@ describe('SalidaLaunchPage — iPhone header', () => {
   });
 
 
-  /**
-   * Con el ERP contestando, la ventana de éxito NO se saltea.
-   *
-   * Antes, un viaje aceptado por la planta retornaba antes de abrir el diálogo: el formulario se vaciaba y el
-   * operario no sabía si la baja existía. La ventana dice que quedó en Trindade y que el ERP la aceptó.
-   */
-  it('confirms the launch in a dialog even when the ERP accepted it', async () => {
+  it('confirms the local save but does not claim ERP acceptance when the bridge opens', async () => {
     post.mockResolvedValue({ movement: MOVEMENT });
     ticket.mockResolvedValue({ ticket: 't-1', ticketUrl: 'https://example.test/ticket' });
     Object.defineProperty(window.navigator, 'onLine', { configurable: true, value: true });
@@ -485,9 +479,10 @@ describe('SalidaLaunchPage — iPhone header', () => {
 
     const dialog = await screen.findByTestId('salida-success-dialog');
     expect(dialog).toBeInTheDocument();
-    expect(within(dialog).getByTestId('salida-erp-answer').textContent).toContain(
-      i18n.t('salida.erpAccepted'),
-    );
+    expect(ticket).toHaveBeenCalledTimes(1);
+    const answer = within(dialog).getByTestId('salida-erp-answer');
+    expect(answer).toHaveTextContent(i18n.t('salida.erpNoAnswer'));
+    expect(answer).not.toHaveTextContent(i18n.t('salida.erpAccepted'));
     expect(within(dialog).getByTestId('salida-success-total').textContent).toContain('25');
     // Y el formulario quedó vacío: no se puede enviar dos veces.
     expect((screen.getByTestId('salida-quantity-1357') as HTMLInputElement).value).toBe('');
@@ -523,6 +518,30 @@ describe('SalidaLaunchPage — iPhone header', () => {
   });
 
   /** Si el día no se puede leer, tampoco se inventa un pendiente. */
+  it.each(['sent', 'partial', 'invalid response'] as const)('does not discard retry trips after %s', async (scenario) => {
+    const { SALIDA_OUTBOX_KEY } = await import('../../lib/salida');
+    const saved = JSON.stringify({
+      movementId: 12,
+      date: saoPauloToday(),
+      trips: [{ action: 'saida', payloads: [{ PRO_COD: '1357', PRO_QTD: 2000 }] }],
+      startedAt: new Date().toISOString(),
+    });
+    localStorage.setItem(SALIDA_OUTBOX_KEY, saved);
+    const movement: SalidaMovement = {
+      ...MOVEMENT,
+      erp: { status: scenario === 'partial' ? 'partial' : 'sent', message: null, sentAt: new Date().toISOString() },
+    };
+    get.mockImplementation(async (path: string) => {
+      if (path === '/salida/catalog') return { products: [...SALIDA_FALLBACK_PRODUCTS] };
+      if (path.startsWith('/salida?date=')) return scenario === 'invalid response' ? {} : { movements: [movement] };
+      return {};
+    });
+    await renderReady();
+    await waitFor(() => expect(get).toHaveBeenCalledWith(`/salida?date=${saoPauloToday()}`));
+    expect(screen.queryByTestId('salida-outbox')).not.toBeInTheDocument();
+    expect(localStorage.getItem(SALIDA_OUTBOX_KEY)).toBe(saved);
+  });
+
   it('does not invent a pending outbox when the day cannot be read', async () => {
     const { SALIDA_OUTBOX_KEY } = await import('../../lib/salida');
     localStorage.setItem(

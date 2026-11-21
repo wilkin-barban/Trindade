@@ -68,7 +68,8 @@ remediaciones de esa etapa y el checklist que Android debe cumplir.
 
 ### 2.6 Diálogo de éxito sin compartir
 - **Referencia web**: `packages/frontend/src/components/salida/SalidaSuccessDialog.tsx`.
-- El diálogo tras el lanzamiento confirma la persistencia local y el veredicto del ERP, pero **no** incluye previsualización ni botón de WhatsApp. La gestión y compartición se trasladaron por completo al histórico.
+- El diálogo tras el lanzamiento confirma la persistencia en Trindade, pero **no** incluye previsualización ni botón de WhatsApp. En web, abrir Scriptable deja la respuesta del ERP pendiente: solo el veredicto recibido de vuelta permite informar aceptación en el histórico.
+- Cambiar la fecha visible o no poder leer el histórico no liquida un viaje pendiente. Para limpiar la cola por ausencia del movimiento, se exige una lectura válida de su fecha, sin aplicar el filtro de operario de la vista. Un estado `sent` o `partial` puede corresponder a un viaje individual: no liquida los viajes restantes ni habilita por sí solo el reenvío.
 
 ### 2.7 Fotografías en el histórico
 - **Referencia web**: `packages/frontend/src/components/salida/SalidaMovementCard.tsx`, `packages/frontend/src/components/salida/SalidaPhotoPicker.tsx`, `packages/backend/src/modules/salida/salida.routes.ts` (`POST /api/salida/:id/photos`, `DELETE /api/salida/photos/:photoId`).

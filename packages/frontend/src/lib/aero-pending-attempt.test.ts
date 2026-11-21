@@ -79,6 +79,20 @@ describe('the attempt the bridge carries away', () => {
     assert.equal(loadAeroPendingAttempt('entrada', storage), null);
   });
 
+  it('keeps Salida and Massas attempts independent in both write orders', () => {
+    const storage = memoryStorage();
+    const massas = { action: 'entrada' as const, attemptId: 'massas', startedAt: 10 };
+    const salida = { action: 'saida' as const, attemptId: 'salida', startedAt: 20 };
+    saveAeroPendingAttempt(massas, storage);
+    saveAeroPendingAttempt(salida, storage);
+    assert.deepEqual(loadAeroPendingAttempt('entrada', storage), massas);
+    saveAeroPendingAttempt(massas, storage);
+    assert.deepEqual(loadAeroPendingAttempt('saida', storage), salida);
+    clearAeroPendingAttempt(storage);
+    assert.deepEqual(loadAeroPendingAttempt('saida', storage), salida);
+    assert.equal(loadAeroPendingAttempt('entrada', storage), null);
+  });
+
   it('ignores a stored value that is not an attempt', () => {
     const storage = memoryStorage();
     storage.setItem(AERO_PENDING_ATTEMPT_STORAGE_KEY, '{"action":"movimentos"}');

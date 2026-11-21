@@ -8,6 +8,8 @@ import {
   SALIDA_BLOCKS,
   SALIDA_MAX_PHOTOS,
   canRelaunchSalida,
+  salidaOutboxIsOwed,
+  type SalidaOutbox,
   salidaEntLans,
   salidaPhotoRejection,
   salidaPrimaryStatus,
@@ -33,6 +35,7 @@ export function SalidaMovementCard({
   timeLabel,
   onShare,
   onResend,
+  queuedRetry,
   onRefresh,
   resending = false,
   readOnly = false,
@@ -48,6 +51,7 @@ export function SalidaMovementCard({
   timeLabel: string;
   onShare: (movement: SalidaMovement) => void;
   onResend?: (movement: SalidaMovement) => void;
+  queuedRetry?: SalidaOutbox;
   onRefresh?: () => void;
   resending?: boolean;
   readOnly?: boolean;
@@ -327,7 +331,7 @@ export function SalidaMovementCard({
                   puntos suspensivos. El icono sigue diciendo de qué red se trata. */}
               <span className="truncate sm:overflow-visible">{t('salida.share')}</span>
             </Button>
-            {canRelaunchSalida(movement) && onResend && (
+            {(queuedRetry ? salidaOutboxIsOwed(queuedRetry, [movement]) : canRelaunchSalida(movement)) && onResend && (
               <Button
                 type="button"
                 variant="outline"

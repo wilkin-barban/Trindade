@@ -12,6 +12,11 @@
  */
 
 export const AERO_PENDING_ATTEMPT_STORAGE_KEY = 'trindade.aero.pending-attempt.v1';
+export const SALIDA_PENDING_ATTEMPT_STORAGE_KEY = 'trindade.aero.saida-pending-attempt.v1';
+
+function attemptKey(action?: AeroPendingAction): string {
+  return action === 'saida' ? SALIDA_PENDING_ATTEMPT_STORAGE_KEY : AERO_PENDING_ATTEMPT_STORAGE_KEY;
+}
 
 /**
  * Which bridge trip the attempt belongs to. The page names it, the callback checks it.
@@ -62,7 +67,7 @@ export function saveAeroPendingAttempt(
 ): void {
   const target = storageOf(storage);
   if (target) {
-    target.setItem(AERO_PENDING_ATTEMPT_STORAGE_KEY, JSON.stringify(attempt));
+    target.setItem(attemptKey(attempt.action), JSON.stringify(attempt));
   }
 }
 
@@ -79,7 +84,7 @@ export function loadAeroPendingAttempt(
 ): AeroPendingAttempt | null {
   const target = storageOf(storage);
   if (!target) return null;
-  const raw = target.getItem(AERO_PENDING_ATTEMPT_STORAGE_KEY);
+  const raw = target.getItem(attemptKey(action));
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as Record<string, unknown> | null;
@@ -103,12 +108,28 @@ export function loadAeroPendingAttempt(
   }
 }
 
+// A missing callback must not block unrelated Salida movements forever. Expiring this slot does
+// not clear the outbox's in-flight marker: the abandoned trip must not be replayed blindly.
+const SALIDA_RESERVATION_MS = 10 * 60 * 1000;
+
+export async function reserveSalidaAttempt(attempt: AeroPendingAttempt): Promise<boolean> {
+  const reserve = () => {
+    const pending = loadAeroPendingAttempt('saida');
+    if (pending && attempt.startedAt - pending.startedAt < SALIDA_RESERVATION_MS) return false;
+    saveAeroPendingAttempt(attempt);
+    return loadAeroPendingAttempt('saida')?.attemptId === attempt.attemptId;
+  };
+  const locks = typeof navigator === 'undefined' ? undefined : navigator.locks;
+  return locks ? locks.request('trindade:saida-attempt', reserve) : reserve();
+}
+
 /** Forgets the attempt once its result line has been written. */
 export function clearAeroPendingAttempt(
   storage?: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null,
+  action?: AeroPendingAction,
 ): void {
   const target = storageOf(storage);
   if (target) {
-    target.removeItem(AERO_PENDING_ATTEMPT_STORAGE_KEY);
+    target.removeItem(attemptKey(action));
   }
 }
