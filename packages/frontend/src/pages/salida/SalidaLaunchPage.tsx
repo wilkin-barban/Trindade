@@ -12,6 +12,7 @@ import { DaySessionHeader } from '../../components/DaySessionHeader';
 import { SalidaBlockSwitch, SalidaProductGrid } from '../../components/salida/SalidaBlocks';
 import { SalidaSummaryBar } from '../../components/salida/SalidaSummaryBar';
 import { SalidaSuccessDialog, type SalidaErpOutcome } from '../../components/salida/SalidaSuccessDialog';
+import { MessageDialog } from '../../components/ui/message-dialog';
 import { Dialog } from '../../components/ui/dialog';
 import { saoPauloToday } from '../../lib/date';
 import {
@@ -387,11 +388,11 @@ export function SalidaLaunchPage() {
         </div>
       )}
 
-      {notice && (
-        <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-          {notice.message}
-        </p>
-      )}
+      <MessageDialog
+        open={notice !== null && success === null}
+        message={notice?.message ?? ''}
+        onClose={() => setNotice(null)}
+      />
 
       <Card className="border-gray-200 shadow-sm">
         <CardContent className="p-4 sm:p-6">

@@ -386,6 +386,17 @@ describe('SalidaLaunchPage', () => {
     expect(screen.queryByTestId('salida-erp-answer')).toBeNull();
   });
 
+  it('shows a failed local save in a dialog without requesting an ERP ticket', async () => {
+    post.mockRejectedValue(new Error('Save refused'));
+    await renderReady();
+    fireEvent.change(screen.getByTestId('salida-quantity-1357'), { target: { value: '20' } });
+    confirmLaunch();
+    const dialog = await screen.findByRole('dialog', { name: i18n.t('ui.actionFailed') });
+    expect(dialog).toHaveTextContent('Save refused');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(ticket).not.toHaveBeenCalled();
+  });
+
   it('falls back to the fixed catalogue when the server does not answer', async () => {
     get.mockImplementation(async (url: string) => {
       if (url === '/salida/catalog') throw new Error('offline');
