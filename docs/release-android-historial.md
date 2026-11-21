@@ -5,14 +5,14 @@ hash. Es la referencia para responder "¿qué build tiene este teléfono?" y par
 
 La guía de firma y publicación está en [release-android.md](release-android.md).
 
-## Aceptación parcial de 0.8.6 en emulador
+## Aceptación de 0.8.6 en emulador
 
 La APK de prueba instalada en `emulator-5554` coincide con el SHA-256
 `8efc23c90b26d0ad5ceb3ea52506d2dbe7dc94fe4679f14aac86ec92bb9084a6` y su certificado coincide con la huella oficial.
 No se publicó como release. El usuario informó que la web de producción abrió y cerró correctamente el diálogo de
 confirmación de Salida y mostró el aviso de conexión de Aero32 en Massas; también informó que el histórico Android
 muestra la fecha de WhatsApp en formato `DD/MM/YYYY` y conserva los nombres del ERP. Estas observaciones del usuario
-no sustituyen una comprobación independiente de todos los flujos. El usuario informó además que en el emulador se guardó un horario, se abrió la pantalla de compartir y el histórico se actualizó; en Salida se confirmó un lanzamiento, se mostró el error ERP en un diálogo, se abrió el selector de fotos y se eliminó el movimiento con confirmación y resultado modal. Esas observaciones fueron aportadas por el usuario. Permanecen sin evidencia específica la carga y visualización de miniaturas, el límite de tres fotos y la invalidación de la grilla tras borrar un horario; no se contactó al ERP real.
+no sustituyen una comprobación independiente de todos los flujos. El usuario informó además que en el emulador se guardó un horario, se abrió la pantalla de compartir y el histórico se actualizó; en Salida se confirmó un lanzamiento, se mostró el error ERP en un diálogo, se abrió el selector de fotos y se eliminó el movimiento con confirmación y resultado modal. Esas observaciones fueron aportadas por el usuario. El usuario informó posteriormente que, al borrar el horario y volver, la grilla quedó en `04:00: 0/3 fleteros`; que el selector permitió tres fotos y rechazó una cuarta; y que se mostraron tres miniaturas, desapareció la opción de agregar y se eliminó el movimiento de prueba. La aceptación funcional comunicada por el usuario queda completa para el alcance sin acceso al ERP: se verificó el manejo controlado de su ausencia, no una conexión con el ERP real.
 
 ## 1. Builds
 
