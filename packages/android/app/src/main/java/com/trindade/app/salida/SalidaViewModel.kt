@@ -65,7 +65,11 @@ data class SalidaUiState(
 }
 
 /** Un aviso para el operario: lo que pasó, sin códigos. */
-data class SalidaNotice(val message: String, val isError: Boolean)
+data class SalidaNotice(
+    val message: String,
+    val isError: Boolean,
+    val localizedMessage: com.trindade.app.ui.UiText? = null,
+)
 
 /**
  * La baja, como la entiende la pantalla.
@@ -233,16 +237,33 @@ class SalidaViewModel @Inject constructor(
      */
     fun attachPhoto(movementId: Int, jpeg: ByteArray) {
         viewModelScope.launch {
-            val saved = repository.attachPhoto(movementId, jpeg)
+            val result = repository.attachPhoto(movementId, jpeg)
+            val message = when (result) {
+                SalidaPhotoOutcome.Saved -> com.trindade.app.R.string.salida_photo_saved
+                SalidaPhotoOutcome.Limit -> com.trindade.app.R.string.salida_photo_limit_error
+                SalidaPhotoOutcome.Failed -> com.trindade.app.R.string.salida_photo_save_error
+            }
             _state.value = _state.value.copy(
-                notice = if (saved) {
-                    SalidaNotice("Foto guardada.", isError = false)
-                } else {
-                    SalidaNotice("No se pudo guardar la foto.", isError = true)
-                },
+                notice = SalidaNotice("", isError = result != SalidaPhotoOutcome.Saved, localizedMessage = com.trindade.app.ui.UiText.of(message)),
             )
-            if (saved) refreshHistory()
+            if (result == SalidaPhotoOutcome.Saved) refreshHistory()
         }
+    }
+
+    suspend fun photoBytes(photoId: Int): ByteArray? = repository.photoBytes(photoId)
+
+    /** La selección completa se rechaza cuando excede el cupo del movimiento. */
+    fun photoLimitExceeded() {
+        _state.value = _state.value.copy(
+            notice = SalidaNotice("", isError = true, localizedMessage = com.trindade.app.ui.UiText.of(com.trindade.app.R.string.salida_photo_limit_error)),
+        )
+    }
+
+    /** El histórico ya no contiene el movimiento que abrió el selector. */
+    fun photoMovementUnavailable() {
+        _state.value = _state.value.copy(
+            notice = SalidaNotice("", isError = true, localizedMessage = com.trindade.app.ui.UiText.of(com.trindade.app.R.string.salida_photo_movement_unavailable)),
+        )
     }
 
     /** Comprime y sube una foto elegida en la galería, por su ruta local. */
@@ -250,7 +271,7 @@ class SalidaViewModel @Inject constructor(
         val engine = compressor ?: return
         viewModelScope.launch {
             val jpeg = engine.compressToJpeg(path) ?: run {
-                _state.value = _state.value.copy(notice = SalidaNotice("No se pudo leer la foto.", isError = true))
+                _state.value = _state.value.copy(notice = SalidaNotice("", isError = true, localizedMessage = com.trindade.app.ui.UiText.of(com.trindade.app.R.string.salida_photo_read_error)))
                 return@launch
             }
             attachPhoto(movementId, jpeg)
@@ -262,7 +283,7 @@ class SalidaViewModel @Inject constructor(
         viewModelScope.launch {
             val removed = repository.deletePhoto(photoId)
             if (removed) refreshHistory()
-            else _state.value = _state.value.copy(notice = SalidaNotice("No se pudo borrar la foto.", isError = true))
+            else _state.value = _state.value.copy(notice = SalidaNotice("", isError = true, localizedMessage = com.trindade.app.ui.UiText.of(com.trindade.app.R.string.salida_photo_delete_error)))
         }
     }
 

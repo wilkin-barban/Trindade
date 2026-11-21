@@ -42,6 +42,23 @@ class StockMessageAbbreviationsTest {
     }
 
     @Test
+    fun `message and email display the plant date in the same format as web`() {
+        val count = day(product("1356", "EMBALAG. DISCO 400g"))
+        assertTrue(stockMessage(count).contains("18/11/2026"))
+        assertTrue(stockEmailBody(count).contains("18/11/2026"))
+    }
+
+    @Test
+    fun `empty counts format the date and invalid dates remain unchanged`() {
+        val empty = day().copy(totalBoxes = 0)
+        assertTrue(stockMessage(empty).contains("18/11/2026"))
+        assertTrue(stockEmailBody(empty).contains("18/11/2026"))
+        val invalid = empty.copy(date = "fecha desconocida")
+        assertTrue(stockMessage(invalid).contains("fecha desconocida"))
+        assertTrue(stockEmailBody(invalid).contains("fecha desconocida"))
+    }
+
+    @Test
     fun `without a table the name travels as it came`() {
         val text = stockMessage(day(product("1356", "EMBALAG. DISCO 400g")), WhatsappAbbreviations.EMPTY)
         assertTrue(text, text.contains("EMBALAG. DISCO 400g"))

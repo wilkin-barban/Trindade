@@ -2,6 +2,7 @@ package com.trindade.app.stock
 
 import com.trindade.app.contract.models.StockDay
 import com.trindade.app.contract.models.StockDayProductsInner
+import com.trindade.app.massas.brazilianDate
 import java.net.URLEncoder
 
 /**
@@ -26,10 +27,11 @@ fun stockMessage(
     abbreviations: com.trindade.app.massas.WhatsappAbbreviations = com.trindade.app.massas.WhatsappAbbreviations.EMPTY,
 ): String {
     val products = counted(day)
+    val date = brazilianDate(day.date)
     if (products.isEmpty()) {
-        return "🗒️ *Contagem de estoque* — ${day.date}\n\nNenhuma caixa contada até agora."
+        return "🗒️ *Contagem de estoque* — $date\n\nNenhuma caixa contada até agora."
     }
-    val lines = mutableListOf("🗒️ *Contagem de estoque* — ${day.date}", "")
+    val lines = mutableListOf("🗒️ *Contagem de estoque* — $date", "")
     for (category in products.map { it.category }.distinct()) {
         val emoji = if (category == "Massas") "🍝" else "📦"
         lines += "$emoji *$category*"
@@ -52,8 +54,9 @@ fun stockMessage(
  */
 fun stockEmailBody(day: StockDay): String {
     val products = counted(day)
+    val date = brazilianDate(day.date)
     if (products.isEmpty()) {
-        return "Contagem de estoque — ${day.date}\n\nNenhuma caixa contada até agora."
+        return "Contagem de estoque — $date\n\nNenhuma caixa contada até agora."
     }
     val headers = listOf("Categoria", "Produto", "Unidades")
     val rows = products.map { listOf(it.category, it.name, it.units.toString()) }
@@ -66,7 +69,7 @@ fun stockEmailBody(day: StockDay): String {
         .joinToString(" | ")
     val separator = widths.joinToString("-+-") { "-".repeat(it) }
     return buildString {
-        append("Contagem de estoque — ${day.date}\n\n")
+        append("Contagem de estoque — $date\n\n")
         append(line(headers)).append('\n')
         append(separator).append('\n')
         rows.forEach { append(line(it)).append('\n') }

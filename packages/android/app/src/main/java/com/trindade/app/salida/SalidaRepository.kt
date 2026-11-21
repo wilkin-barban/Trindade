@@ -21,11 +21,27 @@ import com.trindade.app.contract.models.SalidaErpResultRequest
 import com.trindade.app.network.SalidaApi
 import com.trindade.app.network.toCreateRequest
 import javax.inject.Inject
+import com.trindade.app.di.NetworkModule.BackendClient
+import com.trindade.app.BuildConfig
+import okhttp3.OkHttpClient
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import okio.Buffer
+import okhttp3.Request
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+
+internal val salidaThumbnailSemaphore = Semaphore(3)
 
 /** Cómo terminó el retiro de un borrador. La frase del 409 es del servidor, no de la pantalla. */
+sealed interface SalidaPhotoOutcome {
+    data object Saved : SalidaPhotoOutcome
+    data object Limit : SalidaPhotoOutcome
+    data object Failed : SalidaPhotoOutcome
+}
+
 sealed interface SalidaDeleteOutcome {
     data object Deleted : SalidaDeleteOutcome
     data class Failed(val message: String) : SalidaDeleteOutcome
@@ -54,6 +70,7 @@ class SalidaRepository @Inject constructor(
     private val settings: AeroSettingsPort,
     private val outbox: SalidaOutboxStore,
     private val audit: SalidaAudit,
+    @BackendClient private val photoClient: OkHttpClient? = null,
 ) {
 
     suspend fun catalog(): List<SalidaCatalog.Product> = withContext(Dispatchers.IO) {
@@ -198,14 +215,51 @@ class SalidaRepository @Inject constructor(
         }
 
     /** Sube una foto ya comprimida a JPEG; el tipo declarado tiene que coincidir con los bytes. */
-    suspend fun attachPhoto(movementId: Int, jpeg: ByteArray): Boolean = withContext(Dispatchers.IO) {
+    suspend fun attachPhoto(movementId: Int, jpeg: ByteArray): SalidaPhotoOutcome = withContext(Dispatchers.IO) {
         val part = MultipartBody.Part.createFormData(
             name = "file",
             filename = "photo.jpg",
             body = jpeg.toRequestBody("image/jpeg".toMediaType()),
         )
-        val response = runCatching { api.uploadPhoto(movementId, part) }.getOrNull() ?: return@withContext false
-        response.isSuccessful
+        val response = runCatching { api.uploadPhoto(movementId, part) }.getOrNull()
+            ?: return@withContext SalidaPhotoOutcome.Failed
+        if (response.isSuccessful) return@withContext SalidaPhotoOutcome.Saved
+        val code = runCatching { org.json.JSONObject(response.errorBody()?.string().orEmpty()).optString("code") }.getOrNull()
+        if (response.code() == 409 && code == "SALIDA_PHOTO_LIMIT") SalidaPhotoOutcome.Limit
+        else SalidaPhotoOutcome.Failed
+    }
+
+    /** Solo una ruta construida por id hacia el backend propio recibe el cliente autenticado. */
+    suspend fun photoBytes(photoId: Int): ByteArray? = withContext(Dispatchers.IO) {
+        if (photoId <= 0) return@withContext null
+        val client = photoClient ?: return@withContext null
+        val base = BuildConfig.API_BASE_URL.toHttpUrlOrNull() ?: return@withContext null
+        val normalized = base.newBuilder().encodedPath(base.encodedPath.trimEnd('/') + "/")
+            .query(null).fragment(null).build()
+        val url = normalized.resolve("api/salida/photos/$photoId") ?: return@withContext null
+        // La misma cota cubre descargas y decodificaciones, también en reintentos sin redirecciones.
+        val noRedirects = client.newBuilder().followRedirects(false).followSslRedirects(false).build()
+        salidaThumbnailSemaphore.withPermit {
+            runCatching {
+                val request = Request.Builder().url(url).build()
+                noRedirects.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) return@use null
+                    val body = response.body ?: return@use null
+                    val maxBytes = 5L * 1024 * 1024
+                    if (body.contentLength() > maxBytes) return@use null
+                    val source = body.source()
+                    val buffer = Buffer()
+                    var total = 0L
+                    while (true) {
+                        val read = source.read(buffer, minOf(8192L, maxBytes + 1 - total))
+                        if (read == -1L) break
+                        total += read
+                        if (total > maxBytes) return@use null
+                    }
+                    buffer.readByteArray()
+                }
+            }.getOrNull()
+        }
     }
 
     /**

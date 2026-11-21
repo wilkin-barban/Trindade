@@ -1,5 +1,7 @@
 package com.trindade.app.salida
 
+import com.trindade.app.ui.resolve
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -290,7 +292,7 @@ fun SalidaLaunchScreen(
 internal fun SalidaLaunchActionResults(notice: SalidaNotice?, onDismiss: () -> Unit) {
     notice?.let {
         ActionResultDialog(
-            message = it.message,
+            message = it.localizedMessage?.resolve() ?: it.message,
             isSuccess = !it.isError,
             onDismiss = onDismiss,
         )

@@ -1,6 +1,14 @@
 package com.trindade.app.salida
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.sync.withPermit
+import androidx.compose.ui.graphics.asImageBitmap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.Icon
 import androidx.compose.material3.CardDefaults
@@ -19,7 +27,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -182,6 +189,8 @@ internal fun SalidaHistoryEmpty(
     }
 }
 
+private const val SALIDA_MAX_PHOTOS = 3
+
 @Composable
 fun SalidaHistoryScreen(
     viewModel: SalidaViewModel,
@@ -218,8 +227,19 @@ fun SalidaHistoryScreen(
     ) { uris ->
         val movementId = pendingPhotoMovement
         pendingPhotoMovement = null
-        if (movementId == null) return@rememberLauncherForActivityResult
-        uris.take(3).forEach { uri ->
+        if (movementId == null || uris.isEmpty()) return@rememberLauncherForActivityResult
+        val movement = viewModel.state.value.history
+            .flatMap { it.movements }
+            .firstOrNull { it.id == movementId }
+        if (movement == null) {
+            viewModel.photoMovementUnavailable()
+            return@rememberLauncherForActivityResult
+        }
+        if (movement.photos.size + uris.size > SALIDA_MAX_PHOTOS) {
+            viewModel.photoLimitExceeded()
+            return@rememberLauncherForActivityResult
+        }
+        uris.forEach { uri ->
             val target = java.io.File(context.cacheDir, "salida-${System.currentTimeMillis()}.jpg")
             runCatching {
                 context.contentResolver.openInputStream(uri)?.use { input ->
@@ -230,34 +250,33 @@ fun SalidaHistoryScreen(
         }
     }
 
-    // Un solo scroll para el día entero: el encabezado, el estado, las tarjetas de movimientos y, al final, el
-    // bloque de WhatsApp. Antes las tarjetas vivían dentro de su propio `Column(weight)` en un contenedor sin
-    // altura acotada -- la columna se colapsaba y el mensaje quedaba arriba, con el día invisible --.
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        // El mismo ritmo del histórico de Masas: cada bloque respira 16 dp, sin separadores ad-hoc entre unos y
-        // otros. Antes el panel ERP, la tarjeta de salidas y el vacío se tocaban.
+    val today = state.date
+    val selected = state.historyDate ?: today
+    val days = state.history
+    val visibleDates = salidaHistoryVisibleDates(today, days.map { it.date }, state.historyAll)
+    val summaryLabels = salidaSummaryLabels()
+    val movements = days.firstOrNull { it.date == selected }?.movements.orEmpty()
+    var block by remember { mutableStateOf<String?>(null) }
+    val hasShareableData = salidaHasShareableData(movements.size, state.salidaDay?.operators.orEmpty())
+    if (salidaHistoryShowsDayBody(selected, today)) {
+        LaunchedEffect(selected) { viewModel.loadSalidaDay(selected) }
+    }
+
+    // Cada tarjeta es un item perezoso: al salir de pantalla se descarta junto con sus miniaturas.
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().testTag("salida-history-list"),
+        contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        item {
         // El mismo header que los demás históricos, sin contador: el número de días no es lo que el operario viene
         // a leer, y un contador arriba competía con el total del día que está adentro de cada tarjeta.
         HistoryHeader(
             title = stringResource(R.string.salida_history_title),
-            // Sin «Voltar»: la barra superior tiene Lanzamiento al lado y el atrás físico cierra el archivo.
             onHelp = { showHelpDialog = true },
         )
-
-        // El día que el operario viene a mirar. Los chips son la única navegación que queda arriba, y en el
-        // pasado lo único que se muestra debajo es el bloque de WhatsApp: el resto es información de un día que
-        // ya se lanzó y no se toca.
-        val today = state.date
-        val selected = state.historyDate ?: today
-        val days = state.history
-        val visibleDates = salidaHistoryVisibleDates(today, days.map { it.date }, state.historyAll)
-
+        }
+        item {
         SalidaHistoryChips(
             dates = visibleDates,
             selected = selected,
@@ -266,10 +285,10 @@ fun SalidaHistoryScreen(
             onSelect = viewModel::selectHistoryDate,
             onToggleAll = viewModel::toggleHistoryAll,
         )
-
-        val summaryLabels = salidaSummaryLabels()
+        }
 
         if (salidaHistoryShowsDayBody(selected, today)) {
+            item {
             // Hoy es el día que se consulta y se sincroniza. El pasado se queda con el share solo -- ni sync, ni
             // bloque del ERP, ni tarjetas --, que es la regla que el dueño pidió dos veces.
             SalidaErpBlock(
@@ -280,10 +299,11 @@ fun SalidaHistoryScreen(
                 syncedAt = state.lastSyncedAt?.substringAfter(' ')?.take(5),
                 showEmptyText = false,
             )
-            LaunchedEffect(selected) { viewModel.loadSalidaDay(selected) }
+            }
         }
 
         if (!salidaHistoryShowsDayBody(selected, today)) {
+            item {
             // Pasado: sólo el bloque de compartir, con el texto del servidor o la prévia vacía si ese día no tuvo
             // salidas. Sin tarjetas, sin fotos, sin filtros, sin pendientes y sin nota de solo lectura.
             SalidaWhatsAppShare(
@@ -298,36 +318,14 @@ fun SalidaHistoryScreen(
                     if (!sharedWithPhotos) viewModel.historyWhatsAppLink(summaryLabels)?.let { onOpenWhatsApp(it) }
                 },
             )
-            return@Column
-        }
-
-        // El contador de pendientes ya no se dibuja arriba: la tarjeta de cada movimiento dice su estado y ofrece
-        // reenviarlo, y una cifra suelta encima del día se leía como un estado del día que nadie podía resolver.
-
-        if (selected != today) {
-            // El pasado no se toca: el histórico muestra lo que se lanzó y su estado, y nada de eso se edita.
-            Text(
-                text = stringResource(R.string.salida_history_past_readonly),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .padding(bottom = 8.dp)
-                    .testTag("salida-history-readonly-note"),
-            )
-        }
-
-        val movements = days.firstOrNull { it.date == selected }?.movements.orEmpty()
-
-        // El filtro por bloque es de la pantalla y no del servidor: los movimientos del día ya están acá.
-        var block by remember { mutableStateOf<String?>(null) }
-
-        // El día puede tener datos sólo del ERP: el mensaje se arma con los dos, y el vacío es para el día sin nada.
-        val hasShareableData = salidaHasShareableData(movements.size, state.salidaDay?.operators.orEmpty())
+            }
+        } else {
 
         // El día vacío se dibuja como en la web: su estado -- con la puerta al lanzamiento si es hoy -- y,
         // debajo, el bloque de compartir con la prévia vacía y el envío deshabilitado. Ocultarlo dejaba al
         // operario sin saber si el día no tenía nada o si la pantalla no había cargado.
         if (!hasShareableData) {
+            item {
             SalidaHistoryEmptyDay(
                 isToday = selected == today,
                 onLaunch = onLaunch,
@@ -339,9 +337,12 @@ fun SalidaHistoryScreen(
                     viewModel.historyWhatsAppLink(summaryLabels)?.let { onOpenWhatsApp(it) }
                 },
             )
+            }
         } else {
         val blocks = movements.flatMap { movement -> movement.items.map { it.block.value } }.distinct().sorted()
         if (blocks.size > 1) {
+            item {
+            Column {
             Row(
                 modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -364,22 +365,30 @@ fun SalidaHistoryScreen(
                 }
             }
             Spacer(Modifier.height(8.dp))
+            }
+            }
         }
 
         // Sin total suelto encima de las tarjetas: cada tarjeta ya dice sus unidades y su total, y el número
         // grande arriba -- «13 un» -- se leía como el total del día sin decir de qué.
-        Column(modifier = Modifier.fillMaxWidth()) {
-            movements
-                .filter { movement -> block == null || movement.items.any { it.block.value == block } }
-                .forEach { movement ->
+        val visibleMovements = movements.filter { movement -> block == null || movement.items.any { it.block.value == block } }
+        items(visibleMovements, key = { it.id }) { movement ->
                 SalidaMovementCard(
                     movement = movement,
+                    loadPhoto = viewModel::photoBytes,
                     // Las fotos son de hoy: el pasado es el registro de lo que se lanzó, y la web esconde el
                     // selector en un día cerrado. El share y el reenvío pendiente siguen disponibles.
                     // Sólo hoy y sólo si el movimiento es de esta cuenta: el de otro operario se lee, como el
                     // asiento que vino del ERP.
-                    onAddPhoto = if (selected == today && movement.owns(viewerUsername)) {
-                        { pendingPhotoMovement = movement.id }
+                    onAddPhoto = if (selected == today && movement.owns(viewerUsername) && movement.photos.size < SALIDA_MAX_PHOTOS) {
+                        {
+                            pendingPhotoMovement = movement.id
+                            pickPhotos.launch(
+                                androidx.activity.result.PickVisualMediaRequest(
+                                    androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly,
+                                ),
+                            )
+                        }
                     } else {
                         null
                     },
@@ -396,14 +405,14 @@ fun SalidaHistoryScreen(
                         null
                     },
                 )
-            }
-            }
+        }
         }
 
         // El compartir es del día entero y vive donde el día se lee: con el mensaje armado desde la tabla
         // de abreviaturas, la prévia a la vista y una sola acción. El día vacío monta su propio bloque, con la
         // prévia vacía y el envío deshabilitado, junto al estado que lo explica.
         if (hasShareableData) {
+            item {
             SalidaWhatsAppShare(
                 text = viewModel.dayShareText(summaryLabels),
                 // Las fotos del día acompañan al mensaje: la miniatura dice qué viaja con el texto.
@@ -418,6 +427,8 @@ fun SalidaHistoryScreen(
                     if (!sharedWithPhotos) viewModel.historyWhatsAppLink(summaryLabels)?.let { onOpenWhatsApp(it) }
                 },
             )
+            }
+        }
         }
     }
 
@@ -471,7 +482,8 @@ fun SalidaHistoryScreen(
     // Lo que una acción o el espejo respondieron se lee en una ventana con Cerrar: la tabla de abajo ya cambió y un
     // cartel dentro de ella se lee como parte del estado que se está mirando.
     if (state.notice != null && state.erpError == null) {
-        SalidaNoticeDialog(state.notice!!.message, state.notice!!.isError, viewModel::dismissNotice)
+        val notice = state.notice!!
+        SalidaNoticeDialog(notice.localizedMessage?.resolve() ?: notice.message, notice.isError, viewModel::dismissNotice)
     }
     state.erpError?.let { erpError ->
         SalidaNoticeDialog(erpError.resolve(), true, viewModel::dismissErpError)
@@ -648,6 +660,75 @@ private data class SalidaCardAction(
     val destructive: Boolean = false,
 )
 
+/** Decodifica solo una versión muestreada: nunca reserva primero la imagen a resolución completa. */
+internal fun decodeSalidaThumbnail(bytes: ByteArray): android.graphics.Bitmap? {
+    if (bytes.isEmpty() || bytes.size > 5 * 1024 * 1024) return null
+    return try {
+        val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        val longest = maxOf(bounds.outWidth, bounds.outHeight).toLong()
+        var sample = 1
+        while ((longest + sample - 1) / sample > 128L) sample *= 2
+        val options = android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }
+        val decoded = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options) ?: return null
+        val decodedLongest = maxOf(decoded.width, decoded.height)
+        if (decodedLongest <= 128) return decoded
+        val width = maxOf(1, (decoded.width.toLong() * 128 / decodedLongest).toInt())
+        val height = maxOf(1, (decoded.height.toLong() * 128 / decodedLongest).toInt())
+        try {
+            android.graphics.Bitmap.createScaledBitmap(decoded, width, height, true)
+        } finally {
+            decoded.recycle()
+        }
+    } catch (_: RuntimeException) {
+        null
+    }
+}
+
+@Composable
+private fun SalidaPhotoThumbnail(
+    photoId: Int,
+    position: Int,
+    loadPhoto: (suspend (Int) -> ByteArray?)?,
+) {
+    var loading by remember(photoId) { mutableStateOf(true) }
+    var bitmap by remember(photoId) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    LaunchedEffect(photoId) {
+        var decoded: android.graphics.Bitmap? = null
+        try {
+            withContext(Dispatchers.IO) {
+                val bytes = loadPhoto?.invoke(photoId)
+                if (bytes != null) {
+                    salidaThumbnailSemaphore.withPermit { decoded = decodeSalidaThumbnail(bytes) }
+                }
+            }
+            bitmap = decoded?.asImageBitmap()
+            loading = false
+            // Mantener el bitmap solo mientras este item perezoso permanezca compuesto.
+            awaitCancellation()
+        } finally {
+            bitmap = null
+            decoded?.recycle()
+        }
+    }
+    val image = bitmap
+    when {
+        image != null -> Image(
+            bitmap = image,
+            contentDescription = stringResource(R.string.salida_photo_number, position),
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+            modifier = Modifier.size(56.dp).padding(end = 8.dp),
+        )
+        loading -> CircularProgressIndicator(modifier = Modifier.size(32.dp).padding(end = 8.dp), strokeWidth = 2.dp)
+        else -> Text(
+            stringResource(R.string.salida_photo_unavailable),
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(end = 8.dp),
+        )
+    }
+}
+
 @Composable
 internal fun SalidaMovementCard(
     movement: SalidaCreateResponseMovement,
@@ -660,13 +741,14 @@ internal fun SalidaMovementCard(
      * Administrador, y el ERP sin confirmar --; el servidor decide igual.
      */
     onDelete: (() -> Unit)? = null,
+    loadPhoto: (suspend (Int) -> ByteArray?)? = null,
 ) {
     // La misma ficha que el histórico de Masas: superficie tonal, esquinas del tema, 16 dp por dentro y la
     // jerarquía fecha/operador/estado arriba, productos en el medio, total al pie. No es una caja blanca con
     // renglones: es la tarjeta de producto de la app.
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).testTag("salida-movement-${movement.id}"),
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -735,12 +817,13 @@ internal fun SalidaMovementCard(
                     style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.testTag("salida-photos-${movement.id}"),
                 )
-                movement.photos.forEach { photo ->
+                movement.photos.forEachIndexed { index, photo ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        SalidaPhotoThumbnail(photo.id, index + 1, loadPhoto)
                         Text(
                             text = photo.filePath.substringAfterLast('/'),
                             style = MaterialTheme.typography.bodySmall,

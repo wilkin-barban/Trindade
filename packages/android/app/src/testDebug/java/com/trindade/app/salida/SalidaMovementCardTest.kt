@@ -5,6 +5,12 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.test.core.app.ApplicationProvider
+import android.content.Context
+import android.graphics.Bitmap
+import java.io.File
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.trindade.app.contract.models.SalidaCreateResponseMovement
@@ -102,6 +108,129 @@ class SalidaMovementCardTest {
 
         composeRule.onAllNodesWithText("Excluir foto")[1].performClick()
         assertEquals(92, deleted)
+    }
+
+    @Test
+    fun unavailablePhotoIsExplainedAndStillCanBeDeleted() {
+        var deleted = 0
+        composeRule.setContent {
+            TrindadeTheme {
+                SalidaMovementCard(
+                    movement = movement(listOf(photo(91, "/p/unavailable.jpg"))),
+                    onDeletePhoto = { deleted = it },
+                    onShare = {},
+                )
+            }
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            composeRule.onAllNodesWithText("Foto indisponível").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("Foto indisponível").assertIsDisplayed()
+        composeRule.onNodeWithText("Excluir foto").performClick()
+        assertEquals(91, deleted)
+    }
+
+    @Test
+    fun thumbnailBitmapIsAtMost128PixelsPerEdge() {
+        val source = Bitmap.createBitmap(3200, 1800, Bitmap.Config.ARGB_8888)
+        val bytes = java.io.ByteArrayOutputStream().use { output ->
+            source.compress(Bitmap.CompressFormat.PNG, 100, output)
+            source.recycle()
+            output.toByteArray()
+        }
+        val thumbnail = decodeSalidaThumbnail(bytes)!!
+        try {
+            org.junit.Assert.assertTrue("Ancho de miniatura: ${thumbnail.width}", thumbnail.width in 1..128)
+            org.junit.Assert.assertTrue("Alto de miniatura: ${thumbnail.height}", thumbnail.height in 1..128)
+            org.junit.Assert.assertTrue("Asignación de miniatura: ${thumbnail.allocationByteCount}", thumbnail.allocationByteCount <= 128 * 128 * 4)
+            org.junit.Assert.assertEquals(3200.0 / 1800, thumbnail.width.toDouble() / thumbnail.height, 0.05)
+        } finally {
+            thumbnail.recycle()
+        }
+    }
+
+    @Test
+    fun decodedThumbnailDimensionsAreBoundedAndPreserveAspectRatio() {
+        fun png(width: Int, height: Int): ByteArray {
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            return java.io.ByteArrayOutputStream().use { output ->
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)
+                bitmap.recycle()
+                output.toByteArray()
+            }
+        }
+        val large = decodeSalidaThumbnail(png(3200, 1800))!!
+        org.junit.Assert.assertTrue(large.width in 1..128)
+        org.junit.Assert.assertTrue(large.height in 1..128)
+        org.junit.Assert.assertEquals(3200.0 / 1800, large.width.toDouble() / large.height, 0.05)
+        large.recycle()
+        val narrow = decodeSalidaThumbnail(png(1, 3200))!!
+        assertEquals(1, narrow.width)
+        org.junit.Assert.assertTrue(narrow.height in 1..128)
+        narrow.recycle()
+        org.junit.Assert.assertNull(decodeSalidaThumbnail(byteArrayOf(1, 2, 3)))
+    }
+
+    @Test
+    fun malformedPhotoIsExplainedInsteadOfShownAsAnImage() {
+        composeRule.setContent {
+            TrindadeTheme {
+                SalidaMovementCard(
+                    movement = movement(listOf(photo(91, "/p/invalid.jpg"))),
+                    onShare = {},
+                    loadPhoto = { byteArrayOf(1, 2, 3) },
+                )
+            }
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            composeRule.onAllNodesWithText("Foto indisponível").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("Foto indisponível").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Foto 1").assertDoesNotExist()
+    }
+
+    @Test
+    fun largeValidPhotoRemainsVisible() {
+        val file = File(ApplicationProvider.getApplicationContext<Context>().cacheDir, "salida-large.png")
+        Bitmap.createBitmap(3200, 1800, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(android.graphics.Color.RED)
+            file.outputStream().use { compress(Bitmap.CompressFormat.PNG, 100, it) }
+            recycle()
+        }
+        composeRule.setContent {
+            TrindadeTheme {
+                SalidaMovementCard(
+                    movement = movement(listOf(photo(91, "/p/large.png"))),
+                    onShare = {},
+                    loadPhoto = { file.readBytes() },
+                )
+            }
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            composeRule.onAllNodesWithContentDescription("Foto 1").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithContentDescription("Foto 1").assertIsDisplayed()
+    }
+
+    @Test
+    fun movementPhotoShowsAnAccessibleThumbnail() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val file = File(context.cacheDir, "salida-card-thumbnail.png")
+        Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(android.graphics.Color.RED)
+            file.outputStream().use { compress(Bitmap.CompressFormat.PNG, 100, it) }
+            recycle()
+        }
+        val evidence = photo(91, "/p/uno.png").copy(publicUrl = file.toURI().toString())
+        composeRule.setContent {
+            TrindadeTheme {
+                SalidaMovementCard(movement = movement(listOf(evidence)), onShare = {}, loadPhoto = { file.readBytes() })
+            }
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            composeRule.onAllNodesWithContentDescription("Foto 1").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithContentDescription("Foto 1").assertIsDisplayed()
     }
 
     @Test

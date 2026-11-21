@@ -54,22 +54,22 @@ fun SalidaReportCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("SAÍDAS / BAIXA", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.salida_report_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 day?.let {
                     // El total de la tarjeta, no el del mensaje: el texto dejó de llevar "Total" y acá se nombra, sin el
                     // emoji que el grupo leía en el mensaje.
-                    Text("Total: ${it.totalUnits} un", style = MaterialTheme.typography.labelLarge)
+                    Text(stringResource(R.string.salida_report_total, it.totalUnits), style = MaterialTheme.typography.labelLarge)
                 }
             }
 
             when {
                 error != null -> Text(
-                    "Não foi possível ler as saídas do dia.",
+                    stringResource(R.string.salida_report_read_error),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                 )
 
-                day == null -> Text("Lendo as saídas do dia…", style = MaterialTheme.typography.bodySmall)
+                day == null -> Text(stringResource(R.string.salida_report_loading), style = MaterialTheme.typography.bodySmall)
 
                 day.operators.isEmpty() -> if (showEmptyText) Text(
                     stringResource(R.string.salida_none_this_day),
@@ -83,11 +83,11 @@ fun SalidaReportCard(
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Text(
-                            "👤 ${operator.username}" + if (operator.erpOnly) " (só ERP)" else "",
+                            "👤 ${operator.username}" + if (operator.erpOnly) " (${stringResource(R.string.salida_report_erp_only)})" else "",
                             fontWeight = FontWeight.SemiBold,
                             style = MaterialTheme.typography.bodyMedium,
                         )
-                        Text("${operator.units} un", style = MaterialTheme.typography.bodySmall)
+                        Text(stringResource(R.string.salida_units_format, operator.units), style = MaterialTheme.typography.bodySmall)
                     }
                     operator.products.forEach { product ->
                         Row(
@@ -96,7 +96,7 @@ fun SalidaReportCard(
                         ) {
                             // El nombre corto es el del catálogo, que es el que la planta usa en el mensaje.
                             Text("- ${product.name}", style = MaterialTheme.typography.bodySmall)
-                            Text("${product.units} un", style = MaterialTheme.typography.bodySmall)
+                            Text(stringResource(R.string.salida_units_format, product.units), style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
