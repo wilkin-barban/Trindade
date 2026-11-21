@@ -78,16 +78,19 @@ class IntegrationSettingsSaveTest {
     }
 
     /** Nothing here probes the plant: the save path never asks the network, and the test proves it. */
-    private class NeverProbes : AeroReachabilityPort {
+    private class NeverProbes(private val beforeDiagnose: () -> Unit) : AeroReachabilityPort {
         var calls = 0
 
         override suspend fun diagnose(wsUrl: String?, timeoutMillis: Int): AeroDiagnosis {
             calls++
+            beforeDiagnose()
             return AeroDiagnosis(wifiConnected = false, hostReachable = null)
         }
     }
 
-    private val reachability = NeverProbes()
+    private val audit = FakeMirrorPort()
+    private var phasesAtPreflight: List<String?> = emptyList()
+    private val reachability = NeverProbes { phasesAtPreflight = audit.logs.map { it.phase } }
 
     @Before
     fun setUp() {
@@ -99,7 +102,7 @@ class IntegrationSettingsSaveTest {
             client = AeroErpClient(json),
             reachability = reachability,
             authRepository = AuthRepository(NoAuthApi(), NoTokenStore(), json),
-            audit = FakeMirrorPort(),
+            audit = audit,
         )
     }
 
@@ -117,6 +120,19 @@ class IntegrationSettingsSaveTest {
         viewModel.setWsUrl(wsUrl)
         viewModel.setUsername(username)
         viewModel.setPassword(password)
+    }
+
+    @Test
+    fun `connection test records its request before preflight and pairs the refused result`() {
+        fillIn(wsUrl = "http://example.test/api")
+        viewModel.test()
+
+        assertEquals(listOf("requested"), phasesAtPreflight)
+        assertEquals(listOf("requested", "result"), audit.logs.map { it.phase })
+        assertNotNull(audit.logs.first().attemptId)
+        assertEquals(audit.logs.first().attemptId, audit.logs.last().attemptId)
+        assertFalse(viewModel.state.value.isTesting)
+        assertTrue(viewModel.state.value.messageIsError)
     }
 
     @Test

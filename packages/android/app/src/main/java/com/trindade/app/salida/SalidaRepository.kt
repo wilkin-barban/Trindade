@@ -6,6 +6,11 @@ import okhttp3.MediaType.Companion.toMediaType
 
 import okhttp3.MultipartBody
 
+import com.trindade.app.aero.AeroAudit
+import com.trindade.app.aero.AeroAuditAttempt
+import com.trindade.app.aero.AeroMirrorPort
+import com.trindade.app.aero.aeroEndpoint
+import com.trindade.app.aero.auditCode
 import com.trindade.app.aero.AeroErpClient
 import com.trindade.app.aero.AeroSettings
 import com.trindade.app.aero.AeroSettingsPort
@@ -104,7 +109,9 @@ class SalidaRepository @Inject constructor(
                 queue = queue.copy(trips = trips)
                 var tripOk = true
                 for (payload in trip) {
-                    val result = erpClient.postExit(credentials.wsUrl, credentials.username, credentials.password, payload)
+                    val result = audit.recordWrite(movement.id, credentials.wsUrl) {
+                        erpClient.postExit(credentials.wsUrl, credentials.username, credentials.password, payload)
+                    }
                     when (result) {
                         is AeroWriteResult.Ok -> sent += 1
                         is AeroWriteResult.Failed -> {
@@ -141,7 +148,10 @@ class SalidaRepository @Inject constructor(
         for (trip in pending.pendingTrips) {
             var tripOk = true
             for (payload in trip) {
-                when (val result = erpClient.postExit(credentials.wsUrl, credentials.username, credentials.password, payload)) {
+                val result = audit.recordWrite(pending.movementId, credentials.wsUrl) {
+                    erpClient.postExit(credentials.wsUrl, credentials.username, credentials.password, payload)
+                }
+                when (result) {
                     is AeroWriteResult.Ok -> sent += 1
                     is AeroWriteResult.Failed -> {
                         tripOk = false
@@ -239,7 +249,6 @@ class SalidaRepository @Inject constructor(
         }
         // El servidor guarda el veredicto y la auditoría del viaje: es lo que el histórico muestra como estado.
         runCatching { api.recordErpResult(movement.id, SalidaErpResultRequest(status = status)) }
-        audit.sync(movement.id, status.value, outcome)
         return outcome
     }
 
@@ -251,6 +260,20 @@ class SalidaRepository @Inject constructor(
 
 /** La auditoría de la baja, con el mismo nombre de evento que la web. */
 @Singleton
-class SalidaAudit @Inject constructor() {
-    fun sync(movementId: Int, status: String, outcome: SalidaErpOutcome) = Unit
+class SalidaAudit @Inject constructor(private val mirror: AeroMirrorPort) {
+    suspend fun recordWrite(movementId: Int, wsUrl: String, write: suspend () -> AeroWriteResult): AeroWriteResult {
+        val attempt = AeroAuditAttempt(AeroAudit.Event.SALIDA_SYNC, aeroEndpoint(wsUrl, "saidasitem"))
+        val detail = "movement=$movementId"
+        mirror.log(attempt.requested(detail = detail))
+        val start = System.nanoTime()
+        val result = write()
+        val failure = result as? AeroWriteResult.Failed
+        mirror.log(attempt.result(
+            detail = detail,
+            httpStatus = failure?.httpStatus,
+            durationMs = (System.nanoTime() - start) / 1_000_000L,
+            error = failure?.let { it.code?.auditCode ?: "erp_write_failed" },
+        ))
+        return result
+    }
 }

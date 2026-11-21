@@ -191,18 +191,20 @@ class IntegrationSettingsViewModel @Inject constructor(
 
         viewModelScope.launch {
             _state.value = _state.value.copy(isTesting = true, message = null, messageIsError = false)
-            val diagnosis = reachability.diagnose(settings.wsUrl)
-            // The network is asked first, and only a reachable plant is probed: an address that does not
-            // answer costs the operator 2.5 seconds either way, but the sentence they get is different and
-            // only one of them tells them to go look at the Wi-Fi.
+            val attempt = normalized?.let { address ->
+                AeroAuditAttempt(event = AeroAudit.Event.TEST, destinationUrl = aeroEndpoint(address, "usuarios"))
+            }
+            if (attempt != null) audit.log(attempt.requested())
             val startedAt = System.currentTimeMillis()
+            val diagnosis = reachability.diagnose(settings.wsUrl)
+            // Only a reachable plant is probed. Preflight failures still close the recorded attempt.
             val answer = if (normalized == null || !settings.ready || !diagnosis.plantReachable) {
                 null
             } else {
                 client.testConnection(normalized, settings.username, settings.password)
             }
             val elapsed = System.currentTimeMillis() - startedAt
-            recordProbe(settings, normalized, diagnosis, answer, elapsed)
+            if (attempt != null) recordProbe(attempt, settings, diagnosis, answer, elapsed)
             _state.value = _state.value.copy(
                 isTesting = false,
                 message = describe(diagnosis, answer),
@@ -212,7 +214,7 @@ class IntegrationSettingsViewModel @Inject constructor(
     }
 
     /**
-     * Writes the probe to the plant's log, once per attempt, and never blocks the answer on it.
+     * Records the result of the same attempt that was logged before preflight.
      *
      * An attempt with no address to call is not written: the operator was told the form is incomplete, and a line
      * saying "a probe happened" about a probe that never left the phone is evidence of nothing. Every other
@@ -220,13 +222,12 @@ class IntegrationSettingsViewModel @Inject constructor(
      * shift's launches found an unreachable plant while the phone said it had Wi-Fi.
      */
     private fun recordProbe(
+        attempt: AeroAuditAttempt,
         settings: AeroSettings,
-        normalized: String?,
         diagnosis: AeroDiagnosis,
         answer: AeroErpClient.Probe?,
         elapsedMs: Long,
     ) {
-        val address = normalized ?: return
         val (outcome, status, detail) = when {
             !settings.ready -> Triple("nao-configurado", null, null)
             !diagnosis.plantReachable ->
@@ -246,17 +247,7 @@ class IntegrationSettingsViewModel @Inject constructor(
                 AeroFailureCode.ERP_REFUSED.auditCode
             else -> null
         }
-        val attempt = AeroAuditAttempt(
-            event = AeroAudit.Event.TEST,
-            destinationUrl = aeroEndpoint(address, "usuarios"),
-        )
-
         viewModelScope.launch {
-            audit.log(
-                attempt.requested(
-                    detail = "wifi=${diagnosis.wifiConnected} host=${diagnosis.hostReachable}",
-                ),
-            )
             audit.log(
                 attempt.result(
                     detail = listOfNotNull(outcome, detail?.trim()?.takeIf { it.isNotEmpty() })

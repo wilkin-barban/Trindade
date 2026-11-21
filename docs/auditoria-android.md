@@ -40,6 +40,10 @@ Cada intento contra el ERP emite dos líneas con el mismo `attemptId`:
 1. `phase: "requested"` antes del preflight o del request.
 2. `phase: "result"` al terminar, con `httpStatus`, `durationMs` y `error` cuando corresponda.
 
+La prueba de conexión registra `requested` antes de comprobar la conectividad. Salida registra un par
+`salida_sync` por cada llamada a `saidasitem` que devuelve un resultado, tanto en el envío inicial como en el
+reintento. Un `requested` sin `result` no demuestra que el ERP haya aceptado o rechazado la escritura.
+
 Ejemplo de una consulta:
 
 ```json
