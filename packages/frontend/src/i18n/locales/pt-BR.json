@@ -120,6 +120,7 @@
     "temperaturesRequired": "Falta colocar as temperaturas no relatório.",
     "reportAlreadyExists": "Já existe um relatório para este turno hoje.",
     "loadingError": "Erro ao carregar dados. Tente novamente.",
+    "historyActionSaved": "O relatório foi atualizado.",
     "loadError": "Erro ao carregar o relatório.",
     "notFound": "Relatório não encontrado.",
     "backToHistory": "Voltar ao histórico",

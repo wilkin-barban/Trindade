@@ -123,6 +123,7 @@ describe('ReportHistoryPage', () => {
 
     fireEvent.click(button);
     await waitFor(() => expect(patch).toHaveBeenCalledWith('/reports/41/activate', {}));
+    expect(await screen.findByRole('dialog', { name: i18n.t('ui.actionDone') })).toBeInTheDocument();
   });
 
   it('keeps the retire of a past day, which the server still offers', async () => {

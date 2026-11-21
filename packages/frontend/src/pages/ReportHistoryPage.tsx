@@ -8,6 +8,7 @@ import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { LoadingSpinner } from '../components/ui/loading-spinner';
 import { ConfirmDialog } from '../components/ui/confirm-dialog';
+import { MessageDialog } from '../components/ui/message-dialog';
 import { ModuleHelpModal } from '../components/ui/ModuleHelpModal';
 import { HistoryFilters } from '../components/history/HistoryFilters';
 import { historyActionErrorMessageKey, historyAffordances } from '../lib/history-permissions';
@@ -44,16 +45,13 @@ export function ReportHistoryPage() {
   const [userId, setUserId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [actionError, setActionError] = useState('');
+  const [feedback, setFeedback] = useState<{ tone: 'error' | 'success'; message: string } | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [pendingDelete, setPendingDelete] = useState<ReportListItem | null>(null);
 
   const fetchReports = useCallback(async (page = 1) => {
     setLoading(true);
     setError('');
-    // A fresh fetch supersedes any earlier action failure; leaving both set would put two alert
-    // regions on screen at once, which is the duplicate announcement this screen must avoid.
-    setActionError('');
     try {
       const params = new URLSearchParams({ page: String(page), pageSize: '30' });
       if (date) params.set('date', date);
@@ -89,15 +87,16 @@ export function ReportHistoryPage() {
   }, []);
 
   async function runAction(id: number, action: () => Promise<unknown>) {
-    setActionError('');
+    setFeedback(null);
     setBusyId(id);
     try {
       await action();
       await fetchReports(pagination.page);
+      setFeedback({ tone: 'success', message: t('reports.historyActionSaved') });
     } catch (err) {
       // A refusal is expected: the server decides what this role may do, and the operator has
       // to read the reason instead of meeting an unhandled rejection.
-      setActionError(t(historyActionErrorMessageKey(err)));
+      setFeedback({ tone: 'error', message: t(historyActionErrorMessageKey(err)) });
     } finally {
       setBusyId(null);
     }
@@ -152,8 +151,16 @@ export function ReportHistoryPage() {
       />
 
       {loading && <div className="flex items-center justify-center py-12"><LoadingSpinner /></div>}
-      {error && <div role="alert" className="p-4 text-red-700 bg-red-50 border rounded-lg mb-4">{error}</div>}
-      {actionError && <div role="alert" data-testid="history-action-error" className="p-4 text-red-700 bg-red-50 border rounded-lg mb-4">{actionError}</div>}
+      <MessageDialog
+        open={feedback !== null || error !== ''}
+        tone={feedback?.tone ?? 'error'}
+        message={feedback?.message ?? error}
+        onClose={() => {
+          if (feedback) setFeedback(null);
+          else setError('');
+        }}
+        testId="history-feedback"
+      />
       {!loading && !error && reports.length === 0 && <div className="text-center py-12"><LucideCalendar className="h-12 w-12 mx-auto text-gray-300 mb-3" /><p className="text-gray-500">{t('reports.noReports')}</p></div>}
       {!loading && !error && reports.length > 0 && (
         <div className="space-y-3">

@@ -15,8 +15,8 @@ Base: `97436e32`. Corregir los hallazgos del informe en su orden y verificar ant
 
 - T1 · S1 · Android Cargamento: navegación al share e invalidación de grilla; inline; verificado en `b4e9591`.
 - T2 · S2 · Web Salida: veredicto del puente y retención del outbox; 74 pruebas y TypeScript OK; segunda verificación encontró que la cola conservada sigue sin recuperación y puede ser reemplazada. en curso: almacenamiento por movimiento, selección en el puente y reanudación selectiva implementados; revisión independiente encontró retorno tardío y carrera al pedir tickets; 78 pruebas y TypeScript confirmados de forma independiente; vencimiento y exclusión de reservas mediante Web Locks (si está disponible) GREEN job-79: 79 pruebas de páginas, 57 de módulo y `tsc`; revisión `mwpqnjpo-8-odua` detectó colisión con Massas; aislamiento aplicado; GREEN job-80 y comparación diferencial aprobados; verificación independiente `mwpqt24y-9-98o7` aprobó el alcance local; commit `471f0aff`.
-- T3 · S2 · Android: pares de auditoría de Salida y prueba de conexión; 22 pruebas aprobadas; commit de esta unidad. Verificador no disponible por cuota.
-- T4 · S3 · Resultados de acción inline y validación de Relatório; en curso en `main`.
+- T3 · S2 · Android: pares de auditoría de Salida y prueba de conexión; 22 pruebas aprobadas; commit `dc83dc2c`. Verificador no disponible por cuota.
+- T4 · S3 · Resultados de acción inline y validación de Relatório; en curso en `main`: Histórico de Relatório web en verificación (job-87).
 - T5 · S2,S4 · Adjuntos por movimiento, i18n/encoding, Stock y verificación visual; pendiente.
 - T6 · S2–S5 · Alinear documentación, pruebas ERP en aislamiento y aceptación por cliente; pendiente.
 - T7 · S5 · Verificación independiente, deploy con rollback y APK de prueba en Ubuntu con respaldo; pendiente.
