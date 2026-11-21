@@ -12,8 +12,7 @@ La APK de prueba instalada en `emulator-5554` coincide con el SHA-256
 No se publicó como release. El usuario informó que la web de producción abrió y cerró correctamente el diálogo de
 confirmación de Salida y mostró el aviso de conexión de Aero32 en Massas; también informó que el histórico Android
 muestra la fecha de WhatsApp en formato `DD/MM/YYYY` y conserva los nombres del ERP. Estas observaciones del usuario
-no sustituyen una comprobación independiente de todos los flujos. Siguen pendientes la aceptación de adjuntos y
-miniaturas, la invalidación de Cargamento y el resultado modal de error ERP en el emulador; no se contactó al ERP real.
+no sustituyen una comprobación independiente de todos los flujos. El usuario informó además que en el emulador se guardó un horario, se abrió la pantalla de compartir y el histórico se actualizó; en Salida se confirmó un lanzamiento, se mostró el error ERP en un diálogo, se abrió el selector de fotos y se eliminó el movimiento con confirmación y resultado modal. Esas observaciones fueron aportadas por el usuario. Permanecen sin evidencia específica la carga y visualización de miniaturas, el límite de tres fotos y la invalidación de la grilla tras borrar un horario; no se contactó al ERP real.
 
 ## 1. Builds
 

@@ -19,7 +19,7 @@ Base: `97436e32`. Corregir los hallazgos del informe en su orden y verificar ant
 - T4 · S3 · Resultados de acción y validación de Relatório; cerrado por definición del usuario: Histórico Relatório `b4be5eaf`, validación Android `bab8493`, Stock Android `9ffdbb6`, Salida web `bc97d3b`, Massas web `46050ab` y `1ba83f5`, error ERP de edición `81936dc5`; suite Android completa job-99: 1569 pruebas, cero fallos; TypeScript aprobado.
 - T5 · S2,S4 · Adjuntos por movimiento, i18n y Stock: implementado y pruebas locales aprobadas (jobs 111 y 116); revisión independiente favorable para memoria y URL `mwqhdr90-y-iwt9`. Verificación visual, encoding integral y sesión real quedan para T7.
 - T6 · S2–S5 · Documentación alineada y pruebas locales registradas; aceptación en ambos clientes y ERP real no verificado quedan para T7 y posterior acceso al ERP.
-- T7 · S5 · Deploy web/API realizado y APK firmada instalada en Ubuntu con hash y certificado verificados; aceptación parcial. El usuario informó confirmación/cancelación del diálogo web de Salida, aviso Aero32 de Massas y fecha/nombres en histórico Android. Pendientes evidencia de adjuntos/miniaturas, invalidación de Cargamento y modal de error ERP Android; no se verificó el ERP real.
+- T7 · S5 · Deploy web/API realizado y APK firmada instalada en Ubuntu con hash y certificado verificados; aceptación parcial. El usuario informó diálogo web de Salida y aviso Aero32 en Massas; en Android informó guardar horario, compartir y actualizar histórico, y en Salida modal de confirmación, error ERP, selector nativo y borrado con resultado modal. Pendientes evidencia de carga y visualización de miniaturas, límite de tres fotos e invalidación de grilla después de borrar horario; no se verificó el ERP real.
 
 ## Log
 
