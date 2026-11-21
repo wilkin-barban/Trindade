@@ -470,6 +470,16 @@ class ReportEditScreenTest {
     }
 
     @Test
+    fun `an incomplete temperature reading still lets the operator request validation`() {
+        var submits = 0
+        render(state(temperatures = mapOf(TEMPERATURE_TASK_ID to listOf("4.5", ""))), onSubmit = { submits++ })
+
+        composeRule.onNodeWithText(copy(R.string.report_update)).performClick()
+
+        assertEquals(1, submits)
+    }
+
+    @Test
     fun `navigation back and update action meet 48dp touch targets and invoke callbacks`() {
         var backed = 0
         var submitted = 0
