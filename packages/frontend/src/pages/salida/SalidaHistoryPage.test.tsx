@@ -334,21 +334,39 @@ describe('SalidaHistoryPage', () => {
     expect(post.mock.calls.filter(([path]) => path === '/integration/aero/movements')).toHaveLength(0);
   });
 
-  it('does not overwrite the snapshot when a returned seat is unreadable', async () => {
+  it('stores valid movements even when a returned seat is unreadable or skipped', async () => {
     saveSalidaMovementsAttempt({ action: 'movimentos', attemptId: 'read-partial', startedAt: 1_700_000_000_000, date: '2026-11-13' });
-    const data = encodeURIComponent(JSON.stringify({ success: true, data: [{ ENT_LAN: 42 }] }));
+    const data = encodeURIComponent(JSON.stringify({
+      success: true,
+      data: [
+        { ENT_LAN: 42 },
+        { ENT_LAN: 43, PRO_COD: '001357', PRO_DES: 'DISCO', PRO_QTD: 10, ENT_DTA: '2026-11-13', ENT_USU: 'OPERADOR', ENTSAI: 'S' },
+      ],
+    }));
     await renderReady(`/salida-history?movimentos_attempt=read-partial&aero_action=movimentos&aero_data=${data}`);
-    expect(await screen.findByTestId('salida-history-erp-note')).toBeInTheDocument();
-    expect(post.mock.calls.filter(([path]) => path === '/integration/aero/movements')).toHaveLength(0);
+    await waitFor(() => expect(post).toHaveBeenCalledWith('/integration/aero/movements', expect.objectContaining({
+      date: '2026-11-13',
+      movements: [expect.objectContaining({ ent_lan: 43 })],
+    }), expect.anything()));
+    expect(await screen.findByTestId('salida-history-erp-note')).toHaveTextContent(i18n.t('salida.erpSyncSuccess', { count: 1 }));
     await waitFor(() => expect(lineOf('result', 'read_history').attemptId).toBe('read-partial'));
   });
 
-  it('does not store a bridge response that reports omitted seats', async () => {
+  it('stores valid movements when bridge response reports omitted seats', async () => {
     saveSalidaMovementsAttempt({ action: 'movimentos', attemptId: 'bridge-skipped', startedAt: 1_700_000_000_000, date: '2026-11-13' });
-    const data = encodeURIComponent(JSON.stringify({ success: true, data: [], skipped: 1 }));
+    const data = encodeURIComponent(JSON.stringify({
+      success: true,
+      data: [
+        { ENT_LAN: 44, PRO_COD: '001357', PRO_DES: 'DISCO', PRO_QTD: 5, ENT_DTA: '2026-11-13', ENT_USU: 'OPERADOR', ENTSAI: 'S' },
+      ],
+      skipped: 9,
+    }));
     await renderReady(`/salida-history?movimentos_attempt=bridge-skipped&aero_action=movimentos&aero_data=${data}`);
-    expect(await screen.findByTestId('salida-history-erp-note')).toBeInTheDocument();
-    expect(post.mock.calls.filter(([path]) => path === '/integration/aero/movements')).toHaveLength(0);
+    await waitFor(() => expect(post).toHaveBeenCalledWith('/integration/aero/movements', expect.objectContaining({
+      date: '2026-11-13',
+      movements: [expect.objectContaining({ ent_lan: 44 })],
+    }), expect.anything()));
+    expect(await screen.findByTestId('salida-history-erp-note')).toHaveTextContent(i18n.t('salida.erpSyncSuccess', { count: 1 }));
   });
 
   it('reports a failed snapshot save instead of claiming synchronization', async () => {

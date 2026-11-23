@@ -21,6 +21,7 @@ Base: `60e032ca`; pruebas con respuestas y almacenamiento aislados, sin consulta
 - T2 · S7–S9 · ✓ Confirmación pendiente manejada (`STATUS_PENDING_USER_ACTION` con `runCatching` y `FLAG_ACTIVITY_NEW_TASK`) y receptor no exportado (`android:exported="false"`); Android job-167: 1606 casos, cero fallos y uno omitido. `ApkInstallerTest` ampliado con 7 tests verdes.
 - T3 · S1–S10 · ✓ Verificación integral completada: Backend 998/998, Frontend Node 767/767, Frontend Unit 313/313, Android 1606/1606 (0 fallos). Documentación ODD y cierre con commit y push a main sin atribuciones a IA.
 - T4 · S10 · ✓ Correlación por ticket e intento opcional implementada con compatibilidad legacy; rechaza replays distintos y duplicidades. OpenAPI y cliente Android regenerados; backend final job-184: 998/998; revisión independiente mwtk2xa9 confirmó replay y correlación.
+- T5 · L8 · ✓ Remediación de asientos omitidos: eliminada guarda que rechazaba cuando `read.skipped > 0` o `incompleteBridgeResult` en `SalidaHistoryPage.tsx`; se persisten todos los movimientos válidos cuando `read.status === 'ok'`. Tests unitarios en `SalidaHistoryPage.test.tsx` adaptados para verificar persistencia ante asientos incompletos u omitidos (70/70 pasando). Suites de frontend 100% verdes: 313 unitarias Vitest y 767 Node pasando.
 
 ## Log
 
@@ -49,12 +50,24 @@ Lo que necesito que implementes:
 - Revisión independiente: Massas no participa en el lock y podía consumir un intento de Salida del slot compartido. Se aisló el slot de lectura de Salida; prueba RED job-187, verificación y revisión finales pendientes. Ante fallo del POST se requiere una lectura nueva para no reproducir datos viejos sobre un espejo más reciente; el mensaje lo indica y la auditoría delimita el fallo al POST.
 - Suite posterior a ajustes anteriores: backend job-184 998/998; frontend Node job-185 767/767. Unit frontend job-185 falló una prueba ajena por mayúsculas en fixture; repetición sin carga paralela job-186 312/312. Tras aislar el slot, frontend final job-191: 767 Node y 313 unitarias verdes; TypeScript y 70 pruebas enfocadas verdes en job-190.
 - L7. «El modelo fue cambiado a Gemini 3.8 Flash Tiered para continuar sin trabas por la cuota de ChatGPT. Todas las suites han pasado en verde: Frontend Node 767/767, Frontend Unit 313/313 (aislamiento de slot Salida/Massas y Web Locks verificado), Backend 998/998, Android 1606/1606. Procedé ahora mismo con el cierre final: 1) Actualizá odd/tasks/salida-movimentos-callback.md con las evidencias finales; 2) Hacé el commit atómico en main bajo Conventional Commits (ej: fix(web,android): handle saida erp sync callback and pending installer confirmation) ESTRICTAMENTE SIN Co-Authored-By ni atribución a IA; 3) Ejecutá git push origin main; 4) Quedá a la espera en tu sesión sin cerrarla.»
-- Cierre y evidencias observadas:
-  - Backend: 998 tests pasando (job-184).
-  - Frontend: 767 tests Node pasando + 313 tests unitarios Vitest pasando (job-191) con aislamiento estricto de slot en localStorage (`trindade.aero.salida-movimentos-attempt.v1`) y Web Locks (`trindade:salida-movimentos`). TypeScript limpio en job-190.
-  - Android: 1.606 casos ejecutados, 0 fallos, 1 omitido por configuración de URL externa (job-167).
-  - Integración ERP: correlación unívoca por `attemptId` en backend y rechazo de conflictos por replay con HTTP 409. Contratos OpenAPI y cliente Kotlin sincronizados.
-  - Actualización Android: receptor `UpdateReceiver` no exportado y manejo resiliente de `STATUS_PENDING_USER_ACTION` para confirmaciones de usuario del sistema.
+- L8. «Che, probamos la sincronización en vivo en la web y saltó el cartel de "Não foi possível consultar o ERP. Revise o acesso configurado e tente de novo".
+
+Hice el análisis forense en la base de datos y en los logs de producción del ticket #92:
+1. Scriptable y el puente funcionaron perfecto: trajeron 272 movimientos reales de Aero32 para el día de hoy.
+2. En Aero32 hay 9 asientos que vienen con la descripción vacía (PRO_DES: ""). El parser readAeroMovements los omite legítimamente (skipped: 9) y extrae los 263 movimientos válidos restantes, exactamente como funciona en MassasHistoryPage.tsx.
+3. El fallo se produjo por sobreingeniería en packages/frontend/src/pages/salida/SalidaHistoryPage.tsx (línea 386): agregaste una guarda hiper-estricta que aborta y dispara erpCheckError ante cualquier asiento omitido.
+
+Necesito que remedies esto de forma limpia y directa:
+1. En SalidaHistoryPage.tsx: eliminá la condición que rechaza cuando read.skipped > 0 o incompleteBridgeResult. Al igual que en MassasHistoryPage.tsx (líneas 516-548), si read.status === 'ok', se persisten todos los movimientos válidos obtenidos (filtrando por la fecha consultada si aplica) mediante api.post('/integration/aero/movements', buildAeroMovementsSnapshot(...)).
+2. En SalidaHistoryPage.test.tsx: actualizá o eliminá los tests que forzaban el rechazo ante asientos omitidos ('does not store a bridge response that reports omitted seats' y 'does not overwrite the snapshot when a returned seat is unreadable'), y asegurate de que prueben que los movimientos válidos SÍ se persisten aunque haya asientos omitidos.
+3. Corré la suite de frontend (npm --workspace=packages/frontend run test:unit && npm --workspace=packages/frontend run test:node) y verificá que quede 100% en verde.
+4. Actualizá odd/tasks/salida-movimentos-callback.md con la evidencia.
+5. Hacé commit atómico en main bajo Conventional Commits (ej: fix(web): allow partial valid movements in salida erp sync without rejecting on skipped items) ESTRICTAMENTE SIN Co-Authored-By ni menciones a IA, y hacé git push origin main.
+6. Al terminar quedá a la espera en tu sesión sin cerrarla.»
+- Evidencia T5:
+  - `SalidaHistoryPage.tsx`: eliminadas las guardas `read.skipped > 0` e `incompleteBridgeResult`. Al igual que `MassasHistoryPage.tsx`, se persisten los movimientos válidos si `read.status === 'ok'`.
+  - `SalidaHistoryPage.test.tsx`: actualizadas pruebas para asegurar que ante asientos omitidos o incompletos (`read-partial` y `bridge-skipped`) se persisten los movimientos válidos en `/integration/aero/movements` y se muestra el feedback de éxito correspondiente. 70 pruebas pasando.
+  - Verificación de suites: 313/313 pruebas unitarias Vitest y 767/767 pruebas Node pasando en `@trindade/frontend`.
 - L5. «El endpoint /bridge-tickets/last-result ya está acotado en backend por user_id a los últimos 10 minutos.» «En frontend, exigí que exista el intento pendiente con loadAeroPendingAttempt('movimentos'). Si no hay intento pendiente o la fecha no coincide, descartalo sin pisar el espejo.» «Envolvé el context.startActivity(confirmIntent) en un runCatching con log/fallback en caso de SecurityException/BackgroundActivityStartException en Android 10+.»
 - L4. «Excelente hallazgo en la auditoría. En UpdateReceiver.kt, agregá el manejo de 'com.trindade.app.ACTION_INSTALL_COMMIT':
 Cuando status == PackageInstaller.STATUS_PENDING_USER_ACTION, extraé el Intent.EXTRA_INTENT del bundle (con compatibilidad para getParcelableExtra) y ejecutá context.startActivity(confirmIntent.apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }) para que si Android o Play Protect requieren confirmación de usuario, la pantalla del sistema se levante sin trabarse.

@@ -379,11 +379,7 @@ export function SalidaHistoryPage() {
           }
           const requestedDate = aeroAttemptDate(attempt, answeredDate);
           const read = readAeroMovements(callback.data);
-          const bridgeSkipped = typeof callback.data === 'object' && callback.data !== null && !Array.isArray(callback.data)
-            ? (callback.data as Record<string, unknown>).skipped
-            : undefined;
-          const incompleteBridgeResult = bridgeSkipped !== undefined && bridgeSkipped !== 0;
-          if (!isRealPastOrToday(requestedDate) || read.status === 'error' || read.skipped > 0 || incompleteBridgeResult || read.movements.some((movement) => movement.entryDate !== requestedDate)) {
+          if (!isRealPastOrToday(requestedDate) || read.status === 'error' || read.movements.some((movement) => movement.entryDate !== requestedDate)) {
             const detail = read.status === 'error' ? read.message : null;
             setErpNote(detail || t('salida.erpCheckError'));
             void postAeroAuditEvent(salidaReadResultEvent({ date: requestedDate, attempt, seats: null, error: detail || 'movements_unreadable' }));
