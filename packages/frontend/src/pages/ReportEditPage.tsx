@@ -437,7 +437,7 @@ export function ReportEditPage() {
         testId="report-edit-action-message"
       />
 
-      <form onSubmit={handleSubmit} data-testid="report-edit-form">
+      <form onSubmit={handleSubmit} data-testid="report-edit-form" className="pb-28 sm:pb-0">
         {/* Turno selector */}
         <Card className="mb-6">
           <CardHeader className="pb-3">
@@ -638,7 +638,7 @@ export function ReportEditPage() {
 
         {!readOnly && (
           <div
-            className="fixed inset-x-0 bottom-0 z-10 flex justify-end gap-3 border-t border-gray-200 bg-white/95 px-4 py-3 backdrop-blur sm:static sm:mb-8 sm:mt-4 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none"
+            className="fixed inset-x-0 bottom-0 z-10 flex justify-end gap-3 border-t border-gray-200 bg-white/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] backdrop-blur sm:static sm:mb-8 sm:mt-4 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none"
             data-testid="report-save-bar"
           >
             <Button type="button" variant="outline" onClick={() => navigate(`/reports/${id}`)}>

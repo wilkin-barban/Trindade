@@ -272,4 +272,19 @@ describe('ReportEditPage — the phone, 390 px', () => {
     expect(classes).toContain('sm:opacity-0');
     expect(classes).toContain('sm:group-hover:opacity-100');
   });
+
+  it('adds bottom padding on mobile to clear the fixed save bar and includes safe area spacing', async () => {
+    renderPage();
+
+    await waitFor(() => expect(screen.getByTestId('report-edit-form')).toBeInTheDocument());
+    const form = screen.getByTestId('report-edit-form');
+    expect(form.className).toContain('pb-28');
+    expect(form.className).toContain('sm:pb-0');
+
+    const saveBar = screen.getByTestId('report-save-bar');
+    expect(saveBar.className).toContain('fixed');
+    expect(saveBar.className).toContain('bottom-0');
+    expect(saveBar.className).toContain('pt-3');
+    expect(saveBar.className).toContain('pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]');
+  });
 });

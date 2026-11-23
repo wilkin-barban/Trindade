@@ -475,7 +475,7 @@ export function ReportsPage() {
         testId="report-action-message"
       />
 
-      <form onSubmit={handleSubmit} data-testid="report-builder-form">
+      <form onSubmit={handleSubmit} data-testid="report-builder-form" className="pb-28 sm:pb-0">
         {/* Sincronizar com ERP: la primera opción visible, antes del turno. */}
         {erpSyncAction}
 
@@ -639,7 +639,7 @@ export function ReportsPage() {
         {/* Submit: fijo al pie en el teléfono, como la barra de Salida y la de Masas. Un reporte son treinta
             casillas y cinco temperaturas; el botón que lo cierra no puede estar al final de la lista. */}
         <div
-          className="fixed inset-x-0 bottom-0 z-10 flex justify-end border-t border-gray-200 bg-white/95 px-4 py-3 backdrop-blur sm:static sm:mt-4 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none"
+          className="fixed inset-x-0 bottom-0 z-10 flex justify-end border-t border-gray-200 bg-white/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] backdrop-blur sm:static sm:mt-4 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none"
           data-testid="report-save-bar"
         >
           <Button type="submit" disabled={submitting} size="lg" data-testid="submit-report-btn">
