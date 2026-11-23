@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import i18n from '../../i18n/config';
 import {
@@ -66,6 +66,11 @@ vi.mock('../../lib/date', async (importOriginal) => ({
 }));
 
 const { SalidaHistoryPage } = await import('./SalidaHistoryPage');
+
+const SALIDA_MOVEMENTS_ATTEMPT_KEY = 'trindade.aero.salida-movimentos-attempt.v1';
+function saveSalidaMovementsAttempt(attempt: Parameters<typeof saveAeroPendingAttempt>[0]) {
+  localStorage.setItem(SALIDA_MOVEMENTS_ATTEMPT_KEY, JSON.stringify(attempt));
+}
 
 function movement(overrides: Partial<SalidaMovement> & { id: number }): SalidaMovement {
   return {
@@ -138,10 +143,16 @@ function history() {
   };
 }
 
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="test-location">{location.search}</div>;
+}
+
 async function renderReady(entry = '/salida-history') {
   const view = render(
     <MemoryRouter initialEntries={[entry]}>
       <SalidaHistoryPage />
+      <LocationProbe />
     </MemoryRouter>,
   );
   await screen.findByTestId('salida-history-date');
@@ -155,6 +166,7 @@ beforeEach(async () => {
   vault.mockReset();
   vault.mockResolvedValue({ configured: false, wsUrl: null, username: null, hasPassword: false, updatedAt: null });
   localStorage.clear();
+  Object.defineProperty(navigator, 'locks', { configurable: true, value: { request: vi.fn(async (_name: string, action: () => Promise<unknown> | unknown) => action()) } });
   audit = [];
 
   get.mockImplementation(async (url: string) => {
@@ -189,6 +201,171 @@ function expectNoCredential(entries: readonly Record<string, unknown>[]) {
 }
 
 describe('SalidaHistoryPage', () => {
+  it('stores returned movements under the attempted date and refreshes the mirror', async () => {
+    saveSalidaMovementsAttempt({ action: 'movimentos', attemptId: 'read-attempt', startedAt: 1_700_000_000_000, date: '2026-11-12' });
+    const data = encodeURIComponent(JSON.stringify({ success: true, data: [
+      { ENT_LAN: 42, PRO_COD: '001357', PRO_DES: 'DISCO', PRO_QTD: 10, ENT_DTA: '2026-11-12', ENT_USU: 'OPERADOR', ENTSAI: 'S' },
+    ] }));
+    await renderReady(`/salida-history?date=2026-11-13&movimentos_attempt=read-attempt&aero_action=movimentos&aero_data=${data}`);
+    await waitFor(() => expect(post).toHaveBeenCalledWith('/integration/aero/movements', expect.objectContaining({
+      date: '2026-11-12', movements: [expect.objectContaining({ ent_lan: 42, movement_type: 'S' })],
+    }), expect.anything()));
+    await waitFor(() => expect(lineOf('result', 'read_history').attemptId).toBe('read-attempt'));
+    await waitFor(() => expect(screen.getByTestId('test-location')).toHaveTextContent('date=2026-11-12'));
+    expect(await screen.findByTestId('salida-history-erp-note')).toHaveTextContent('1');
+    expect(get).toHaveBeenCalledWith('/integration/aero/movements?date=2026-11-12');
+    expect(localStorage.getItem('trindade.aero.salida-movimentos-attempt.v1')).toBeNull();
+    expectNoCredential(audit);
+  });
+
+  it('does not consume the pending Massas read when Salida returns its own movements', async () => {
+    saveAeroPendingAttempt({ action: 'movimentos', attemptId: 'massas-read', startedAt: 1_700_000_000_000, date: '2026-11-12' });
+    localStorage.setItem('trindade.aero.salida-movimentos-attempt.v1', JSON.stringify({ action: 'movimentos', attemptId: 'salida-read', startedAt: 1_700_000_000_000, date: '2026-11-13' }));
+    const data = encodeURIComponent(JSON.stringify({ success: true, data: [] }));
+    await renderReady(`/salida-history?movimentos_attempt=salida-read&aero_action=movimentos&aero_data=${data}`);
+    await waitFor(() => expect(post).toHaveBeenCalledWith('/integration/aero/movements', expect.objectContaining({ date: '2026-11-13' }), expect.anything()));
+    expect(JSON.parse(localStorage.getItem('trindade.aero.pending-attempt.v1')!)).toMatchObject({ attemptId: 'massas-read' });
+    expect(localStorage.getItem('trindade.aero.salida-movimentos-attempt.v1')).toBeNull();
+  });
+
+  it('serializes two tabs returning the same movements callback', async () => {
+    let queue: Promise<unknown> = Promise.resolve();
+    Object.defineProperty(navigator, 'locks', { configurable: true, value: {
+      request: (_name: string, action: () => Promise<unknown> | unknown) => {
+        const result = queue.then(action);
+        queue = result.catch(() => undefined);
+        return result;
+      },
+    } });
+    saveSalidaMovementsAttempt({ action: 'movimentos', attemptId: 'two-tabs', startedAt: 1_700_000_000_000, date: '2026-11-13' });
+    const data = encodeURIComponent(JSON.stringify({ success: true, data: [] }));
+    const entry = `/salida-history?movimentos_attempt=two-tabs&aero_action=movimentos&aero_data=${data}`;
+    const first = render(<MemoryRouter initialEntries={[entry]}><SalidaHistoryPage /><LocationProbe /></MemoryRouter>);
+    const second = render(<MemoryRouter initialEntries={[entry]}><SalidaHistoryPage /><LocationProbe /></MemoryRouter>);
+    await waitFor(() => expect(within(first.container).getByTestId('test-location')).not.toHaveTextContent('aero_data'));
+    await waitFor(() => expect(within(second.container).getByTestId('test-location')).not.toHaveTextContent('aero_data'));
+    expect(post.mock.calls.filter(([path]) => path === '/integration/aero/movements')).toHaveLength(1);
+  });
+
+  it('does not process a movements callback when cross-tab locking is unavailable', async () => {
+    Object.defineProperty(navigator, 'locks', { configurable: true, value: undefined });
+    saveSalidaMovementsAttempt({ action: 'movimentos', attemptId: 'no-lock', startedAt: 1_700_000_000_000, date: '2026-11-13' });
+    const data = encodeURIComponent(JSON.stringify({ success: true, data: [] }));
+    await renderReady(`/salida-history?movimentos_attempt=no-lock&aero_action=movimentos&aero_data=${data}`);
+    expect(await screen.findByTestId('salida-history-erp-note')).toHaveTextContent(i18n.t('salida.erpSyncLockUnavailable'));
+    expect(post.mock.calls.filter(([path]) => path === '/integration/aero/movements')).toHaveLength(0);
+    expect(JSON.parse(localStorage.getItem('trindade.aero.salida-movimentos-attempt.v1')!)).toMatchObject({ attemptId: 'no-lock' });
+  });
+
+  it('retrieves a stored result for the exact movements attempt', async () => {
+    saveSalidaMovementsAttempt({ action: 'movimentos', attemptId: 'stored-read', startedAt: 1_700_000_000_000, date: '2026-11-13' });
+    get.mockImplementation(async (url: string) => {
+      if (url === '/salida/history') return history();
+      if (url === '/integration/aero/bridge-tickets/last-result?action=movimentos&attemptId=stored-read') return { data: { success: true, data: [] } };
+      return {};
+    });
+    await renderReady('/salida-history?movimentos_attempt=stored-read&aero_action=movimentos&aero_result=stored');
+    await waitFor(() => expect(get).toHaveBeenCalledWith('/integration/aero/bridge-tickets/last-result?action=movimentos&attemptId=stored-read'));
+    await waitFor(() => expect(post).toHaveBeenCalledWith('/integration/aero/movements', expect.objectContaining({ date: '2026-11-13', movements: [] }), expect.anything()));
+  });
+
+  it('ignores a movements callback without a matching pending attempt', async () => {
+    const data = encodeURIComponent(JSON.stringify({ success: true, data: [] }));
+    await renderReady(`/salida-history?movimentos_attempt=missing&aero_action=movimentos&aero_data=${data}`);
+    await waitFor(() => expect(screen.getByTestId('test-location')).not.toHaveTextContent('aero_data'));
+    expect(post.mock.calls.filter(([path]) => path === '/integration/aero/movements')).toHaveLength(0);
+  });
+
+  it('rejects a callback containing duplicate attempt identifiers', async () => {
+    saveSalidaMovementsAttempt({ action: 'movimentos', attemptId: 'duplicate-id', startedAt: 1_700_000_000_000, date: '2026-11-13' });
+    const data = encodeURIComponent(JSON.stringify({ success: true, data: [] }));
+    await renderReady(`/salida-history?movimentos_attempt=duplicate-id&movimentos_attempt=other&aero_action=movimentos&aero_data=${data}`);
+    await waitFor(() => expect(screen.getByTestId('test-location')).not.toHaveTextContent('aero_data'));
+    expect(post.mock.calls.filter(([path]) => path === '/integration/aero/movements')).toHaveLength(0);
+    expect(JSON.parse(localStorage.getItem('trindade.aero.salida-movimentos-attempt.v1')!)).toMatchObject({ attemptId: 'duplicate-id' });
+  });
+
+  it('does not consume a newer attempt when an older movements callback returns', async () => {
+    saveSalidaMovementsAttempt({ action: 'movimentos', attemptId: 'newer', startedAt: 1_700_000_000_000, date: '2026-11-12' });
+    const data = encodeURIComponent(JSON.stringify({ success: true, data: [] }));
+    await renderReady(`/salida-history?movimentos_attempt=older&aero_action=movimentos&aero_data=${data}`);
+    await waitFor(() => expect(screen.getByTestId('test-location')).not.toHaveTextContent('aero_data'));
+    expect(post.mock.calls.filter(([path]) => path === '/integration/aero/movements')).toHaveLength(0);
+    expect(JSON.parse(localStorage.getItem('trindade.aero.salida-movimentos-attempt.v1')!)).toMatchObject({ attemptId: 'newer' });
+  });
+
+  it('arms a dated, correlated movements attempt before opening the bridge', async () => {
+    vault.mockResolvedValue({ configured: true, wsUrl: 'http://192.168.25.250:1453/api', username: 'OPERADOR', hasPassword: true });
+    ticket.mockResolvedValue({ ticket: 'fixture-ticket', ticketUrl: 'https://app.example/ticket' });
+    await renderReady();
+    fireEvent.click(screen.getByTestId('salida-history-erp-sync'));
+    await waitFor(() => expect(ticket).toHaveBeenCalled());
+    const attempt = JSON.parse(localStorage.getItem('trindade.aero.salida-movimentos-attempt.v1')!);
+    expect(attempt).toMatchObject({ action: 'movimentos', date: '2026-11-13' });
+    expect(ticket.mock.calls[0][0]).toMatchObject({ action: 'movimentos', callbackPath: expect.stringContaining(`movimentos_attempt=${attempt.attemptId}`) });
+    await waitFor(() => expect(lineOf('requested', 'read_history').attemptId).toBe(attempt.attemptId));
+    expectNoCredential(audit);
+  });
+
+  it('does not store movements from another day', async () => {
+    saveSalidaMovementsAttempt({ action: 'movimentos', attemptId: 'wrong-day', startedAt: 1_700_000_000_000, date: '2026-11-13' });
+    const data = encodeURIComponent(JSON.stringify({ success: true, data: [
+      { ENT_LAN: 42, PRO_COD: '001357', PRO_DES: 'DISCO', PRO_QTD: 10, ENT_DTA: '2026-11-12', ENT_USU: 'OPERADOR', ENTSAI: 'S' },
+    ] }));
+    await renderReady(`/salida-history?movimentos_attempt=wrong-day&aero_action=movimentos&aero_data=${data}`);
+    expect(await screen.findByTestId('salida-history-erp-note')).toBeInTheDocument();
+    expect(post.mock.calls.filter(([path]) => path === '/integration/aero/movements')).toHaveLength(0);
+  });
+
+  it('audits a correlated bridge error without writing the mirror', async () => {
+    saveSalidaMovementsAttempt({ action: 'movimentos', attemptId: 'network-error', startedAt: 1_700_000_000_000, date: '2026-11-13' });
+    await renderReady('/salida-history?movimentos_attempt=network-error&aero_action=movimentos&aero_error=timeout');
+    expect(await screen.findByTestId('salida-history-erp-note')).toBeInTheDocument();
+    await waitFor(() => expect(lineOf('result', 'read_history').attemptId).toBe('network-error'));
+    expect(post.mock.calls.filter(([path]) => path === '/integration/aero/movements')).toHaveLength(0);
+  });
+
+  it('reports a refused ERP response without overwriting the snapshot', async () => {
+    saveSalidaMovementsAttempt({ action: 'movimentos', attemptId: 'read-error', startedAt: 1_700_000_000_000, date: '2026-11-13' });
+    const data = encodeURIComponent(JSON.stringify({ success: false, message: 'ERP indisponível' }));
+    await renderReady(`/salida-history?movimentos_attempt=read-error&aero_action=movimentos&aero_data=${data}`);
+    expect(await screen.findByTestId('salida-history-erp-note')).toHaveTextContent('ERP indisponível');
+    await waitFor(() => expect(lineOf('result', 'read_history').attemptId).toBe('read-error'));
+    expect(post.mock.calls.filter(([path]) => path === '/integration/aero/movements')).toHaveLength(0);
+  });
+
+  it('does not overwrite the snapshot when a returned seat is unreadable', async () => {
+    saveSalidaMovementsAttempt({ action: 'movimentos', attemptId: 'read-partial', startedAt: 1_700_000_000_000, date: '2026-11-13' });
+    const data = encodeURIComponent(JSON.stringify({ success: true, data: [{ ENT_LAN: 42 }] }));
+    await renderReady(`/salida-history?movimentos_attempt=read-partial&aero_action=movimentos&aero_data=${data}`);
+    expect(await screen.findByTestId('salida-history-erp-note')).toBeInTheDocument();
+    expect(post.mock.calls.filter(([path]) => path === '/integration/aero/movements')).toHaveLength(0);
+    await waitFor(() => expect(lineOf('result', 'read_history').attemptId).toBe('read-partial'));
+  });
+
+  it('does not store a bridge response that reports omitted seats', async () => {
+    saveSalidaMovementsAttempt({ action: 'movimentos', attemptId: 'bridge-skipped', startedAt: 1_700_000_000_000, date: '2026-11-13' });
+    const data = encodeURIComponent(JSON.stringify({ success: true, data: [], skipped: 1 }));
+    await renderReady(`/salida-history?movimentos_attempt=bridge-skipped&aero_action=movimentos&aero_data=${data}`);
+    expect(await screen.findByTestId('salida-history-erp-note')).toBeInTheDocument();
+    expect(post.mock.calls.filter(([path]) => path === '/integration/aero/movements')).toHaveLength(0);
+  });
+
+  it('reports a failed snapshot save instead of claiming synchronization', async () => {
+    saveSalidaMovementsAttempt({ action: 'movimentos', attemptId: 'save-error', startedAt: 1_700_000_000_000, date: '2026-11-13' });
+    post.mockImplementation(async (path: string, body?: unknown) => {
+      if (path === '/integration/aero/log') { audit.push(body as Record<string, unknown>); return { ok: true }; }
+      if (path === '/integration/aero/movements') throw new Error('storage failed');
+      return {};
+    });
+    const data = encodeURIComponent(JSON.stringify({ success: true, data: [] }));
+    await renderReady(`/salida-history?movimentos_attempt=save-error&aero_action=movimentos&aero_data=${data}`);
+    expect(await screen.findByTestId('salida-history-erp-note')).toHaveTextContent(i18n.t('salida.erpSyncSaveFailed'));
+    await waitFor(() => expect(lineOf('result', 'read_history').attemptId).toBe('save-error'));
+    expect(lineOf('result', 'read_history').error).toBeTruthy();
+    expect(localStorage.getItem(SALIDA_MOVEMENTS_ATTEMPT_KEY)).toBeNull();
+    await waitFor(() => expect(screen.getByTestId('test-location')).not.toHaveTextContent('aero_data'));
+  });
   it('shows the reconciliation state and the ENT_LAN of each card', async () => {
     await renderReady();
 

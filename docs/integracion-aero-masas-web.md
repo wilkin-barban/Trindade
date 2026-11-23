@@ -533,8 +533,16 @@ El puente (app Atajos de iPhone) **no** devuelve la respuesta del ERP dentro de 
    la URL del ERP, los encabezados, los cuerpos y un `resultUrl`.
 2. El script envía al ERP y **postea la respuesta** a `resultUrl` con el ticket en `X-Trindade-Ticket`.
 3. El script abre el callback corto: `…?aero_action=<acción>&aero_result=stored`.
-4. La página canjea ese marcador con `GET /bridge-tickets/last-result?action=<acción>`, que devuelve el último
-   resultado del propio usuario dentro de 10 minutos.
+4. La página canjea ese marcador con `GET /bridge-tickets/last-result?action=<acción>`. Sin filtro adicional,
+   devuelve el último resultado del propio usuario dentro de 10 minutos. El Histórico de Salidas añade `attemptId`
+   para exigir el ticket de ese intento; si falta, está duplicado o ya no tiene un resultado vigente, recibe 404
+   y no reemplaza el espejo. Para esos tickets de movimientos, repetir el mismo resultado es idempotente y un
+   resultado distinto se rechaza con 409.
+
+En el Histórico de Salidas, el intento de lectura se guarda separado de los intentos de Massas y se coordina entre
+pestañas mediante Web Locks. Si el navegador no ofrece esa API, la sincronización se bloquea y pide actualizarlo
+(Safari en iOS la admite desde 15.4). Si falla el guardado del espejo, hay que volver a sincronizar para obtener una
+lectura nueva; no se reproduce una respuesta vieja que podría reemplazar un espejo más reciente.
 
 La razón es concreta: el diseño anterior abría `callback + encodeURIComponent(respuesta)` y un día con muchas filas
 superaba el límite de una línea de encabezado del proxy, que respondía `414 Request-URI Too Large`. Con la respuesta

@@ -2196,6 +2196,7 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
       400: jsonResponse('The body is malformed or missing data', ErrorEnvelopeSchema),
       401: jsonResponse('The ticket header is missing', ErrorEnvelopeSchema),
       404: jsonResponse('No ticket matches that token', ErrorEnvelopeSchema),
+      409: jsonResponse('A different result was already stored for this correlated movements ticket', ErrorEnvelopeSchema),
       413: jsonResponse('The result exceeds the 2 MB limit', ErrorEnvelopeSchema),
     },
   });
@@ -2206,11 +2207,13 @@ registerComponent(registry, 'StockHistory', StockHistorySchema);
     summary: 'Read the newest result for a bridge action belonging to the current user within 10 minutes',
     description:
       'Authenticated per operator: returns the newest stored result for the specified action from a ticket ' +
-      'owned by the caller whose result was recorded within the last 10 minutes. Returns 404 otherwise.',
+      'owned by the caller whose result was recorded within the last 10 minutes. For movimentos, the optional ' +
+      'attemptId selects the exact ticket callback; no other result is returned if that attempt is missing.',
     tags: ['integration'],
     request: {
       query: z.object({
         action: AeroBridgeActionSchema,
+        attemptId: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/).optional(),
       }),
     },
     responses: {

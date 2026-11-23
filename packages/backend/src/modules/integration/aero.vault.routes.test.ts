@@ -729,6 +729,55 @@ describe('ERP vault and bridge tickets', () => {
       assert.deepEqual(lastResult.json(), { data: { lancamento: 200, updated: true } });
     });
 
+    it('GET last-result selects the exact movements attempt without exposing stale or foreign results', async () => {
+      const issue = async (attempt: string) => {
+        const response = await app.inject({
+          method: 'POST', url: '/api/integration/aero/bridge-tickets', headers: auth(wilkinToken),
+          payload: { action: 'movimentos', payloads: [{ ENTSAI: 'E' }], callbackPath: `/salida-history?date=2026-11-13&movimentos_attempt=${attempt}` },
+        });
+        assert.equal(response.statusCode, 201);
+        return response.json().ticket as string;
+      };
+      const old = await issue('attempt-old');
+      await app.inject({ method: 'POST', url: '/api/integration/aero/bridge-tickets/result', headers: { 'x-trindade-ticket': old }, payload: { data: { result: 'old' } } });
+      const newer = await issue('attempt-new');
+      const missing = await app.inject({ method: 'GET', url: '/api/integration/aero/bridge-tickets/last-result?action=movimentos&attemptId=attempt-new', headers: auth(wilkinToken) });
+      assert.equal(missing.statusCode, 404);
+      await app.inject({ method: 'POST', url: '/api/integration/aero/bridge-tickets/result', headers: { 'x-trindade-ticket': newer }, payload: { data: { result: 'new' } } });
+      const exact = await app.inject({ method: 'GET', url: '/api/integration/aero/bridge-tickets/last-result?action=movimentos&attemptId=attempt-old', headers: auth(wilkinToken) });
+      assert.equal(exact.statusCode, 200);
+      assert.deepEqual(exact.json(), { data: { result: 'old' } });
+      const foreign = await app.inject({ method: 'GET', url: '/api/integration/aero/bridge-tickets/last-result?action=movimentos&attemptId=attempt-old', headers: auth(workerToken) });
+      assert.equal(foreign.statusCode, 404);
+      const legacy = await app.inject({ method: 'GET', url: '/api/integration/aero/bridge-tickets/last-result?action=movimentos', headers: auth(wilkinToken) });
+      assert.equal(legacy.statusCode, 200);
+      assert.deepEqual(legacy.json(), { data: { result: 'new' } });
+      await issue('attempt-old'); // A duplicate callback identity must not expose the old result.
+      const ambiguous = await app.inject({ method: 'GET', url: '/api/integration/aero/bridge-tickets/last-result?action=movimentos&attemptId=attempt-old', headers: auth(wilkinToken) });
+      assert.equal(ambiguous.statusCode, 404);
+      const valid = await issue('attempt-dual');
+      await app.inject({ method: 'POST', url: '/api/integration/aero/bridge-tickets/result', headers: { 'x-trindade-ticket': valid }, payload: { data: { result: 'valid' } } });
+      await issue('attempt-dual&movimentos_attempt=other');
+      const duplicateParameter = await app.inject({ method: 'GET', url: '/api/integration/aero/bridge-tickets/last-result?action=movimentos&attemptId=attempt-dual', headers: auth(wilkinToken) });
+      assert.equal(duplicateParameter.statusCode, 404);
+    });
+
+    it('never overwrites a correlated movements result with a different replay', async () => {
+      const issued = await app.inject({
+        method: 'POST', url: '/api/integration/aero/bridge-tickets', headers: auth(wilkinToken),
+        payload: { action: 'movimentos', payloads: [{ ENTSAI: 'E' }], callbackPath: '/salida-history?movimentos_attempt=attempt-replay' },
+      });
+      assert.equal(issued.statusCode, 201);
+      const token = issued.json().ticket as string;
+      const save = (data: unknown) => app.inject({ method: 'POST', url: '/api/integration/aero/bridge-tickets/result', headers: { 'x-trindade-ticket': token }, payload: { data } });
+      assert.equal((await save({ value: 'original' })).statusCode, 200);
+      assert.equal((await save({ value: 'original' })).statusCode, 200);
+      assert.equal((await save({ value: 'replacement' })).statusCode, 409);
+      const stored = await app.inject({ method: 'GET', url: '/api/integration/aero/bridge-tickets/last-result?action=movimentos&attemptId=attempt-replay', headers: auth(wilkinToken) });
+      assert.equal(stored.statusCode, 200);
+      assert.deepEqual(stored.json(), { data: { value: 'original' } });
+    });
+
     it('GET /bridge-tickets/last-result requires session authentication (401)', async () => {
       const response = await app.inject({
         method: 'GET',

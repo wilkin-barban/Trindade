@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ClipboardX, RefreshCw } from 'lucide-react';
@@ -25,12 +25,14 @@ import { formatDateLabel, saoPauloDaysAgo, saoPauloToday } from '../../lib/date'
 import {
   aeroBridgeCallbackFor,
   buildAeroBridgeTriggerUrl,
+  buildAeroMovementsSnapshot,
+  readAeroMovements,
   resolveAeroCallback,
 } from '../../lib/aero-integration';
 import { readAeroBatchResult } from '../../lib/aero-feedback';
 import { markAeroBridgePending } from '../../lib/aero-watchdog';
-import { clearAeroPendingAttempt, loadAeroPendingAttempt, reserveSalidaAttempt } from '../../lib/aero-pending-attempt';
-import { newAeroAttempt, postAeroAuditEvent } from '../../lib/aero-audit';
+import { aeroAttemptDate, clearAeroPendingAttempt, loadAeroPendingAttempt, reserveSalidaAttempt, saveAeroPendingAttempt } from '../../lib/aero-pending-attempt';
+import { aeroAttemptHeaders, newAeroAttempt, postAeroAuditEvent } from '../../lib/aero-audit';
 import { requestAeroBridgeTicket } from '../../lib/aero-vault';
 import {
   SALIDA_TICKET_REFUSED,
@@ -48,6 +50,8 @@ import {
   salidaBatchToErpStatus,
   salidaDaySummaryText,
   salidaPhotoFiles,
+  salidaReadRequestedEvent,
+  salidaReadResultEvent,
   salidaSummaryText,
   salidaSyncRequestedEvent,
   salidaSyncResultEvent,
@@ -61,6 +65,14 @@ import {
 } from '../../lib/salida';
 
 /** One day of the history, as `GET /api/salida/history` serves it. */
+// A movements read from Salida must never replace or consume Massas' pending bridge attempt.
+const SALIDA_MOVEMENTS_ATTEMPT_KEY = 'trindade.aero.salida-movimentos-attempt.v1';
+const salidaMovementsStorage = {
+  getItem: () => localStorage.getItem(SALIDA_MOVEMENTS_ATTEMPT_KEY),
+  setItem: (_key: string, value: string) => localStorage.setItem(SALIDA_MOVEMENTS_ATTEMPT_KEY, value),
+  removeItem: () => localStorage.removeItem(SALIDA_MOVEMENTS_ATTEMPT_KEY),
+};
+
 export interface SalidaHistoryDay {
   date: string;
   total_units: number;
@@ -141,6 +153,8 @@ export function SalidaHistoryPage() {
   // El sync del espejo es del día de hoy y no escribe en Trindade: lee las salidas que el ERP registró -- las de
   // otros operarios incluidas -- y el bloque del Relatório las muestra. El pasado se queda con el share solo.
   const [erpSyncing, setErpSyncing] = useState(false);
+  const erpSyncStarting = useRef(false);
+  const processingMovements = useRef<string | null>(null);
   const [erpNote, setErpNote] = useState<string | null>(null);
   const [erpRefetchKey, setErpRefetchKey] = useState(0);
   // El día que leyó la sección del ERP, para sumarlo al mensaje sin pedirlo dos veces.
@@ -159,9 +173,15 @@ export function SalidaHistoryPage() {
   }, []);
 
   const handleSyncErp = useCallback(async () => {
-    if (erpSyncing) return;
+    if (erpSyncing || erpSyncStarting.current) return;
+    if (!navigator.locks) {
+      setErpNote(t('salida.erpSyncLockUnavailable'));
+      return;
+    }
+    erpSyncStarting.current = true;
     setErpSyncing(true);
     setErpNote(null);
+    const armed = { attempt: null as { action: 'movimentos'; attemptId: string; startedAt: number; date: string } | null };
     try {
       const vault = await fetchAeroVaultSettings();
       if (!vault.configured) {
@@ -179,17 +199,37 @@ export function SalidaHistoryPage() {
         setErpNote(t('salida.erpSyncUnavailable'));
         return;
       }
-      const fired = await triggerAeroMovementsSync(settings, {
-        date,
-        callbackPath: location.pathname,
-        includeExits: true,
+      // Reserve the shared attempt while holding the same lock used by this page's callback.
+      await navigator.locks.request('trindade:salida-movimentos', async () => {
+        const pending = loadAeroPendingAttempt('movimentos', salidaMovementsStorage);
+        if (pending && (pending.action !== 'movimentos' || Date.now() - pending.startedAt < 10 * 60 * 1000)) {
+          setErpNote(t('salida.erpCheckError'));
+          return;
+        }
+        if (pending) clearAeroPendingAttempt(salidaMovementsStorage, 'movimentos');
+        const attempt = { action: 'movimentos' as const, ...newAeroAttempt(), date };
+        armed.attempt = attempt;
+        saveAeroPendingAttempt(attempt, salidaMovementsStorage);
+        void postAeroAuditEvent(salidaReadRequestedEvent({ date, attempt }));
+        const fired = await triggerAeroMovementsSync(settings, {
+          date,
+          callbackPath: `${location.pathname}?date=${date}&movimentos_attempt=${encodeURIComponent(attempt.attemptId)}`,
+          includeExits: true,
+        });
+        if (!fired && loadAeroPendingAttempt('movimentos', salidaMovementsStorage)?.attemptId === attempt.attemptId) {
+          clearAeroPendingAttempt(salidaMovementsStorage, 'movimentos');
+          void postAeroAuditEvent(salidaReadResultEvent({ date, attempt, seats: null, error: 'bridge_not_started' }));
+        }
+        if (!fired) setErpNote(t('salida.erpCheckError'));
       });
-      // Un pedido en camino no es un error: la pantalla no se secuestra con un modal rojo que dice "Leyendo".
-      // Si el viaje no salió, lo que se explica es el fallo de acceso al ERP, no el progreso.
-      if (!fired) setErpNote(t('salida.erpCheckError'));
     } catch {
+      if (armed.attempt && loadAeroPendingAttempt('movimentos', salidaMovementsStorage)?.attemptId === armed.attempt.attemptId) {
+        clearAeroPendingAttempt(salidaMovementsStorage, 'movimentos');
+        void postAeroAuditEvent(salidaReadResultEvent({ date, attempt: armed.attempt, seats: null, error: 'bridge_not_started' }));
+      }
       setErpNote(t('salida.erpCheckError'));
     } finally {
+      erpSyncStarting.current = false;
       setErpSyncing(false);
       setErpRefetchKey((key) => key + 1);
       await loadLastSync(date);
@@ -302,19 +342,74 @@ export function SalidaHistoryPage() {
     setParams(next === today ? {} : { date: next }, { replace: true });
   };
 
-  // The shortcut comes back with the ERP's answer in the query. Only a resend arrives here now: the day's exits are
-  // read by the report, which is where the operator syncs the day.
+  // The shortcut returns either a resend verdict or the day's ERP movements.
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const callback = await resolveAeroCallback(location.search);
+      const params = new URLSearchParams(location.search);
+      const storedMovements = params.get('aero_action') === 'movimentos' && params.get('aero_result') === 'stored';
+      const movementAttemptIds = params.getAll('movimentos_attempt');
+      const storedAttemptId = movementAttemptIds.length === 1 ? movementAttemptIds[0] : null;
+      if (storedMovements && (!storedAttemptId || loadAeroPendingAttempt('movimentos', salidaMovementsStorage)?.attemptId !== storedAttemptId)) {
+        setParams({ date }, { replace: true });
+        return;
+      }
+      const callback = await resolveAeroCallback(location.search, {
+        get: <T,>(path: string) => api.get<T>(storedMovements ? `${path}&attemptId=${encodeURIComponent(storedAttemptId!)}` : path),
+      });
       if (!callback || cancelled) return;
 
-      const params = new URLSearchParams(location.search);
       const answered = params.get('date');
-      const answeredDate = answered && /^\d{4}-\d{2}-\d{2}$/.test(answered) ? answered : date;
+      let answeredDate = isRealPastOrToday(answered) ? answered : date;
 
-      if (callback.kind === 'bridge' && callback.action === 'saida') {
+      if (callback.kind === 'bridge' && callback.action === 'movimentos') {
+        const attemptId = storedAttemptId;
+        if (attemptId && processingMovements.current === attemptId) return;
+        if (!navigator.locks) {
+          setErpNote(t('salida.erpSyncLockUnavailable'));
+          setParams({ date: answeredDate }, { replace: true });
+          return;
+        }
+        processingMovements.current = attemptId;
+        await navigator.locks.request('trindade:salida-movimentos', async () => {
+          const attempt = loadAeroPendingAttempt('movimentos', salidaMovementsStorage);
+          if (!attempt || !attemptId || attempt.attemptId !== attemptId) {
+            setParams({ date: answeredDate }, { replace: true });
+            return;
+          }
+          const requestedDate = aeroAttemptDate(attempt, answeredDate);
+          const read = readAeroMovements(callback.data);
+          const bridgeSkipped = typeof callback.data === 'object' && callback.data !== null && !Array.isArray(callback.data)
+            ? (callback.data as Record<string, unknown>).skipped
+            : undefined;
+          const incompleteBridgeResult = bridgeSkipped !== undefined && bridgeSkipped !== 0;
+          if (!isRealPastOrToday(requestedDate) || read.status === 'error' || read.skipped > 0 || incompleteBridgeResult || read.movements.some((movement) => movement.entryDate !== requestedDate)) {
+            const detail = read.status === 'error' ? read.message : null;
+            setErpNote(detail || t('salida.erpCheckError'));
+            void postAeroAuditEvent(salidaReadResultEvent({ date: requestedDate, attempt, seats: null, error: detail || 'movements_unreadable' }));
+          } else {
+            answeredDate = requestedDate;
+            let saved = false;
+            try {
+              await api.post('/integration/aero/movements', buildAeroMovementsSnapshot(answeredDate, read.movements), { headers: aeroAttemptHeaders(attempt) });
+              saved = true;
+            } catch {
+              void postAeroAuditEvent(salidaReadResultEvent({ date: answeredDate, attempt, seats: read.movements.length, stored: 0, error: 'snapshot_store_failed' }));
+              setErpNote(t('salida.erpSyncSaveFailed'));
+            }
+            if (saved) {
+              void postAeroAuditEvent(salidaReadResultEvent({ date: answeredDate, attempt, seats: read.movements.length }));
+              await loadLastSync(answeredDate);
+              setErpRefetchKey((key) => key + 1);
+              setErpNote(t('salida.erpSyncSuccess', { count: read.movements.length }));
+            }
+          }
+          // A failed save requires a fresh ERP read; replaying an old response could overwrite a newer snapshot.
+          if (loadAeroPendingAttempt('movimentos', salidaMovementsStorage)?.attemptId === attemptId) {
+            clearAeroPendingAttempt(salidaMovementsStorage, 'movimentos');
+          }
+        });
+      } else if (callback.kind === 'bridge' && callback.action === 'saida') {
         // A resend comes back here, not to the launch screen: same dialog, same trail, same attempt.
         const attempt = loadAeroPendingAttempt('saida');
         if (!attempt || params.get('saida_attempt') !== attempt.attemptId) {
@@ -411,16 +506,32 @@ export function SalidaHistoryPage() {
           );
           setNotice({ type: 'error', message: salidaActionableErrorMessage(callback.code, callback.message, t) });
           setOutbox(readSalidaOutbox());
+        } else if (params.has('movimentos_attempt')) {
+          if (!navigator.locks) {
+            setErpNote(t('salida.erpSyncLockUnavailable'));
+          } else {
+            await navigator.locks.request('trindade:salida-movimentos', () => {
+              const attempt = loadAeroPendingAttempt('movimentos', salidaMovementsStorage);
+              if (attempt && storedAttemptId === attempt.attemptId) {
+                clearAeroPendingAttempt(salidaMovementsStorage, 'movimentos');
+                const requestedDate = aeroAttemptDate(attempt, answeredDate);
+                if (isRealPastOrToday(requestedDate)) answeredDate = requestedDate;
+                void postAeroAuditEvent(salidaReadResultEvent({ date: requestedDate, attempt, seats: null, error: callback.code, message: callback.message }));
+                setErpNote(salidaActionableErrorMessage(callback.code, callback.message, t));
+              }
+            });
+          }
         }
       }
 
       setParams({ date: answeredDate }, { replace: true });
+      processingMovements.current = null;
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [location.search, date, load, setParams, t]);
+  }, [location.search, date, load, loadLastSync, setParams, t]);
 
   /**
    * Rebuilds the trip of a movement the ERP never confirmed.
@@ -737,14 +848,14 @@ export function SalidaHistoryPage() {
 
       {/* Las salidas del ERP: sólo en el día de hoy, y sin el botón ni la hora, que viven en la tarjeta de la
           fecha. */}
+      <MessageDialog
+        open={erpNote !== null}
+        message={erpNote ?? ''}
+        onClose={() => setErpNote(null)}
+        testId="salida-history-erp-note"
+      />
       {!isReadOnly && (
         <div className="space-y-2" data-testid="salida-history-erp">
-          <MessageDialog
-            open={erpNote !== null}
-            message={erpNote ?? ''}
-            onClose={() => setErpNote(null)}
-            testId="salida-history-erp-note"
-          />
           <SalidaReportSection
             date={date}
             refetchKey={erpRefetchKey}

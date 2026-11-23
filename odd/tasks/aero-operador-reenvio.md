@@ -15,12 +15,12 @@ Trabajar en `main`; no modificar datos reales ni contactar el ERP de planta. La 
 
 ## Tasks
 
-- T1 · S1,S3 · ✓ Completado: normalización de espacios, matching por username y displayName, prevención de ambigüedades; suites Web y Android verdes (AeroLogicTest, aero-integration.test).
-- T2 · S2,S3 · ✓ Completado: reserva atómica de fila, deshabilitación de botón en vuelo/despachado, reintento tras fallo; suites verdes (MassasLaunchViewModelTest, MassasUnifiedTableTest).
+- T1 · S1,S3 · Implementado y con suites anteriores verdes; auditoría independiente detectó ambigüedad residual cuando faltan IDs y dos operadores comparten el mismo par de nombres. No se comprobó que ese estado sea posible en producción.
+- T2 · S2,S3 · Implementado con pruebas previas verdes de reserva y botón; auditoría parcial, pendiente completar inspección de competencia entre cola y envío individual.
 - T3 · S4,S6 · ✓ Completado: APK firmado oficial build 8011 verificado (SHA-256 c7b51faa64b44298175bdbbf56a972ece81e47fc6963dcabadcb8dfff1a3e5a2); metadatos en app.service.ts y docs en release-android-historial.md actualizados.
-- T4 · S4,S5 · ✓ Completado: Sustitución de asset en GitHub release v0.8.6 (clobber) y despliegue en producción de trindade-api y trindade-web verificado en vivo.
-- T5 · S7 · ✓ Completado: consulta de entradas y salidas en dos peticiones ("E" y "S") sin enviar null; RED observado y GREEN probado en AeroErpClientTest.
-- T6 · S8 · ✓ Completado: aviso en ProfileScreen para Play Protect, UPDATE_PACKAGES_WITHOUT_USER_ACTION y setRequireUserAction(USER_ACTION_NOT_REQUIRED) en ApkInstaller con fallback; ProfileScreenTest y suites verdes.
+- T4 · S4,S5 · Usuario informó sustitución del asset y despliegue en producción; la auditoría verificó hash y firma de la APK local, no el artefacto descargado ni su correspondencia exacta con el código.
+- T5 · S7 · Implementado y con test de combinación E+S verde; auditoría parcial, sin cobertura independiente confirmada para fallo en cada lado ni suma de `skipped`.
+- T6 · S8 · Auditoría detectó que la confirmación pendiente no se manejaba y que el aviso de permiso aparece después de abrir ajustes. Se implementó manejo de confirmación con receptor no exportado en el trabajo posterior; quedan sin comprobar en dispositivo la apertura desde segundo plano, el fallo asíncrono y el retorno desde ajustes. Android puede exigir confirmación y Play Protect no se elimina.
 
 ## Log
 

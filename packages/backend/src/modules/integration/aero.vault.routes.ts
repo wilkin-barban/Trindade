@@ -286,7 +286,8 @@ export async function aeroVaultRoutes(fastify: FastifyInstance) {
    *
    * Unauthenticated by design: the ticket is the credential, presented in the X-Trindade-Ticket header.
    * Finds the ticket by token hash even if already consumed, stores JSON.stringify(data) in result and
-   * datetime('now') in result_at. Overwrites previous result idempotently. Maximum body size 2 MB.
+   * datetime('now') in result_at. Correlated movements retain their first result; legacy actions may overwrite.
+   * Maximum body size 2 MB.
    */
   fastify.post(
     '/bridge-tickets/result',
@@ -333,6 +334,9 @@ export async function aeroVaultRoutes(fastify: FastifyInstance) {
 
       const stored = storeBridgeTicketResult(fastify.db, token, parsed.data.data);
       if (!stored.ok) {
+        if (stored.code === 'AERO_TICKET_RESULT_CONFLICT') {
+          return reply.status(409).send(apiError('El resultado del intento ya fue registrado.', AERO_TICKET_ERROR_CODES.RESULT_CONFLICT));
+        }
         return reply.status(404).send(apiError(TICKET_NOT_FOUND_MESSAGE, AERO_TICKET_ERROR_CODES.NOT_FOUND));
       }
 
@@ -352,13 +356,17 @@ export async function aeroVaultRoutes(fastify: FastifyInstance) {
     async (request: FastifyRequest, reply: FastifyReply) => {
       reply.header('Cache-Control', 'no-store');
 
-      const query = request.query as { action?: string };
+      const query = request.query as { action?: unknown; attemptId?: unknown };
       const rawAction = typeof query?.action === 'string' ? query.action.trim() : '';
       if (!isBridgeAction(rawAction)) {
         return reply.status(400).send(apiError(INVALID_ACTION_MESSAGE, AERO_BRIDGE_ERROR_CODES.INVALID_ACTION));
       }
 
-      const result = readLastBridgeTicketResult(fastify.db, request.user!.sub, rawAction);
+      if (query.attemptId !== undefined &&
+          (rawAction !== 'movimentos' || typeof query.attemptId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(query.attemptId))) {
+        return reply.status(400).send(apiError('El identificador del intento no es válido.', AERO_BRIDGE_ERROR_CODES.INVALID_PAYLOADS));
+      }
+      const result = readLastBridgeTicketResult(fastify.db, request.user!.sub, rawAction, query.attemptId as string | undefined);
       if (!result.ok) {
         return reply
           .status(404)

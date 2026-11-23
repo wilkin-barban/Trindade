@@ -1,6 +1,9 @@
 package com.trindade.app.update
 
 import android.content.Context
+import android.content.ContextWrapper
+import android.content.ComponentName
+import android.content.pm.PackageInstaller
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -97,6 +100,40 @@ class ApkInstallerTest {
         val nextIntent = shadowOf(ApplicationProvider.getApplicationContext<Context>() as android.app.Application).nextStartedActivity
         assertNotNull(nextIntent)
         assertEquals(Intent.ACTION_VIEW, nextIntent.action)
+    }
+
+    @Test
+    @Config(sdk = [33])
+    fun `pending package install opens the system confirmation in a new task`() {
+        val confirmation = Intent("android.intent.action.CONFIRM_INSTALL")
+        val callback = Intent("com.trindade.app.ACTION_INSTALL_COMMIT")
+            .putExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_PENDING_USER_ACTION)
+            .putExtra(Intent.EXTRA_INTENT, confirmation)
+
+        UpdateReceiver().onReceive(context, callback)
+
+        val launched = shadowOf(ApplicationProvider.getApplicationContext<Context>() as android.app.Application).nextStartedActivity
+        assertNotNull(launched)
+        assertEquals(confirmation.action, launched.action)
+        assertTrue((launched.flags and Intent.FLAG_ACTIVITY_NEW_TASK) != 0)
+    }
+
+    @Test
+    fun `blocked confirmation does not crash the receiver`() {
+        val blockedContext = object : ContextWrapper(context) {
+            override fun startActivity(intent: Intent) { throw SecurityException("blocked") }
+        }
+        val callback = Intent("com.trindade.app.ACTION_INSTALL_COMMIT")
+            .putExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_PENDING_USER_ACTION)
+            .putExtra(Intent.EXTRA_INTENT, Intent("android.intent.action.CONFIRM_INSTALL"))
+
+        UpdateReceiver().onReceive(blockedContext, callback)
+    }
+
+    @Test
+    fun `update receiver is not exported to other applications`() {
+        val info = context.packageManager.getReceiverInfo(ComponentName(context, UpdateReceiver::class.java), 0)
+        assertTrue(!info.exported)
     }
 
     @Test

@@ -12665,6 +12665,16 @@
               }
             }
           },
+          "409": {
+            "description": "A different result was already stored for this correlated movements ticket",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
           "413": {
             "description": "The result exceeds the 2 MB limit",
             "content": {
@@ -12681,7 +12691,7 @@
     "/api/integration/aero/bridge-tickets/last-result": {
       "get": {
         "summary": "Read the newest result for a bridge action belonging to the current user within 10 minutes",
-        "description": "Authenticated per operator: returns the newest stored result for the specified action from a ticket owned by the caller whose result was recorded within the last 10 minutes. Returns 404 otherwise.",
+        "description": "Authenticated per operator: returns the newest stored result for the specified action from a ticket owned by the caller whose result was recorded within the last 10 minutes. For movimentos, the optional attemptId selects the exact ticket callback; no other result is returned if that attempt is missing.",
         "tags": [
           "integration"
         ],
@@ -12699,6 +12709,15 @@
             },
             "required": true,
             "name": "action",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,128}$"
+            },
+            "required": false,
+            "name": "attemptId",
             "in": "query"
           }
         ],

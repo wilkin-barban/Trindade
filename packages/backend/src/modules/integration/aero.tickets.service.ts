@@ -345,22 +345,34 @@ export function redeemBridgeTicket(
  *
  * Unauthenticated: the token is the credential. Finds the ticket even if already consumed,
  * stores the serialized JSON data and stamps result_at with datetime('now').
- * Idempotent: repeating the call overwrites the previous result.
+ * Correlated movements are immutable after the first result; identical retries remain idempotent.
+ * Legacy actions retain their existing overwrite behavior.
  */
 export function storeBridgeTicketResult(
   db: Database.Database,
   token: string,
   data: unknown,
-): { ok: true } | { ok: false; code: 'AERO_TICKET_NOT_FOUND' } {
+): { ok: true } | { ok: false; code: 'AERO_TICKET_NOT_FOUND' | 'AERO_TICKET_RESULT_CONFLICT' } {
   const tokenHash = hashBridgeTicket(token);
   const serialized = JSON.stringify(data);
 
-  return db.transaction((): { ok: true } | { ok: false; code: 'AERO_TICKET_NOT_FOUND' } => {
-    const ticket = db.prepare(`SELECT id FROM ${TABLE} WHERE token_hash = ?`).get(tokenHash) as
-      | { id: number }
+  return db.transaction((): { ok: true } | { ok: false; code: 'AERO_TICKET_NOT_FOUND' | 'AERO_TICKET_RESULT_CONFLICT' } => {
+    const ticket = db.prepare(`SELECT id, action, callback_url, result FROM ${TABLE} WHERE token_hash = ?`).get(tokenHash) as
+      | { id: number; action: string; callback_url: string; result: string | null }
       | undefined;
     if (!ticket) {
       return { ok: false, code: 'AERO_TICKET_NOT_FOUND' };
+    }
+
+    let correlatedMovements = false;
+    try {
+      correlatedMovements = ticket.action === 'movimentos' && new URL(ticket.callback_url).searchParams.has('movimentos_attempt');
+    } catch {
+      // A stored ticket with an invalid callback is not safe to replay.
+      correlatedMovements = ticket.action === 'movimentos';
+    }
+    if (correlatedMovements && ticket.result !== null) {
+      return ticket.result === serialized ? { ok: true } : { ok: false, code: 'AERO_TICKET_RESULT_CONFLICT' };
     }
 
     db.prepare(`UPDATE ${TABLE} SET result = ?, result_at = datetime('now') WHERE id = ?`).run(
@@ -381,19 +393,37 @@ export function readLastBridgeTicketResult(
   db: Database.Database,
   userId: number,
   action: AeroBridgeActionName,
+  attemptId?: string,
 ): { ok: true; data: unknown } | { ok: false; code: 'AERO_TICKET_RESULT_NOT_FOUND' } {
-  const row = db
-    .prepare(
+  // The legacy endpoint keeps selecting the latest result. A correlated read must instead match the
+  // exact callback attached to the same ticket; never fall back to a different trip when it is missing.
+  let row: { result: string } | undefined;
+  if (attemptId !== undefined) {
+    const candidates = db.prepare(
+      `SELECT id, callback_url FROM ${TABLE}
+       WHERE user_id = ? AND action = ?
+       ORDER BY id DESC`,
+    ).all(userId, action) as Array<{ id: number; callback_url: string }>;
+    const tickets = candidates.flatMap((candidate) => {
+      try {
+        const ids = new URL(candidate.callback_url).searchParams.getAll('movimentos_attempt');
+        return ids.includes(attemptId) ? [{ id: candidate.id, unique: ids.length === 1 }] : [];
+      } catch {
+        return [];
+      }
+    });
+    if (tickets.length === 1 && tickets[0].unique) {
+      row = db.prepare(`SELECT result FROM ${TABLE} WHERE id = ? AND result IS NOT NULL AND result_at >= datetime('now', '-10 minutes')`)
+        .get(tickets[0].id) as { result: string } | undefined;
+    }
+  } else {
+    row = db.prepare(
       `SELECT result FROM ${TABLE}
-       WHERE user_id = ?
-         AND action = ?
-         AND result IS NOT NULL
-         AND result_at IS NOT NULL
+       WHERE user_id = ? AND action = ? AND result IS NOT NULL AND result_at IS NOT NULL
          AND result_at >= datetime('now', '-10 minutes')
-       ORDER BY result_at DESC, id DESC
-       LIMIT 1`,
-    )
-    .get(userId, action) as { result: string } | undefined;
+       ORDER BY result_at DESC, id DESC LIMIT 1`,
+    ).get(userId, action) as { result: string } | undefined;
+  }
 
   if (!row) {
     return { ok: false, code: 'AERO_TICKET_RESULT_NOT_FOUND' };
