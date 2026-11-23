@@ -220,6 +220,16 @@ class AeroLogicTest {
     }
 
     @Test
+    fun `reconciles a dispatched operator despite internal whitespace`() {
+        val movements = listOf(seat(901, "1192", 15.0, "2026-10-30", "ANA SILVA"))
+        val launches = listOf(AeroLocalLaunch(1, "2026-10-30", "1192", 15.0, "ana silva"))
+        val compact = listOf(seat(902, "1192", 15.0, "2026-10-30", "ANASILVA"))
+
+        assertEquals(listOf(1), reconcileAeroMovements(compact, launches).matchedLaunchIds)
+        assertEquals(listOf(1), reconcileAeroMovements(movements, launches).matchedLaunchIds)
+    }
+
+    @Test
     fun `each seat reconciles at most one launch`() {
         val movements = listOf(
             seat(entLan = 901, code = "1192", quantity = 15.0, date = "2026-10-30", operator = "WILKIN"),

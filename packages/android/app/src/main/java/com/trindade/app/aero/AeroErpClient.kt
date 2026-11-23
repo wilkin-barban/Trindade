@@ -205,8 +205,9 @@ class AeroErpClient @Inject constructor(
     /**
      * `POST /movimentoitem?_method=PATCH`: the whole day, every operator.
      *
-     * `includeExits` is the report's own request: it needs both sides of the day, so the filter travels as null
-     * instead of `E`. Every other caller keeps the entries-only default.
+     * `includeExits` is the report's own request: it needs both sides of the day. The ERP Delphi/PHP router
+     * fails with HTTP 500 if ENTSAI is null, so when `includeExits` is true we query "E" and "S" separately
+     * and combine them. Every other caller keeps the entries-only default ("E").
      */
     suspend fun readMovements(
         wsUrl: String,
@@ -215,18 +216,40 @@ class AeroErpClient @Inject constructor(
         date: String,
         includeExits: Boolean = false,
     ): AeroMovementsResult {
+        if (!includeExits) {
+            return readMovementsSingle(wsUrl, username, password, date, "E")
+        }
+        val entries = readMovementsSingle(wsUrl, username, password, date, "E")
+        if (entries is AeroMovementsResult.Failed) return entries
+        val exits = readMovementsSingle(wsUrl, username, password, date, "S")
+        if (exits is AeroMovementsResult.Failed) return exits
+
+        val entriesOk = entries as AeroMovementsResult.Ok
+        val exitsOk = exits as AeroMovementsResult.Ok
+        return AeroMovementsResult.Ok(
+            movements = entriesOk.movements + exitsOk.movements,
+            skipped = entriesOk.skipped + exitsOk.skipped,
+        )
+    }
+
+    private suspend fun readMovementsSingle(
+        wsUrl: String,
+        username: String,
+        password: String,
+        date: String,
+        movementType: String,
+    ): AeroMovementsResult {
         val url = aeroMovementsUrl(wsUrl)
         return runCatching {
             api.postMovements(
                 url = url,
                 authorization = basicAuthHeader(username, password),
-                // The mirror is the entries side of Aero32, exactly like the certified web bridge: E,
+                // The mirror is the entries side of Aero32, exactly like the certified web bridge: E or S,
                 // not null, and `_method` in the body so the Delphi router selects PATCH.
                 body = buildMovimentoItemPayload(
                     userName = null,
                     startDate = date,
-                    // `null` es los dos lados del día; `E` es solo las entradas, el default de siempre.
-                    movementType = if (includeExits) null else "E",
+                    movementType = movementType,
                 ),
             )
         }.fold(

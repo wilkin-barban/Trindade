@@ -5,6 +5,7 @@
     <!-- Read to answer one question the operator asks out loud: is this phone on the plant's Wi-Fi? -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
 
     <application
         android:name=".TrindadeApp"

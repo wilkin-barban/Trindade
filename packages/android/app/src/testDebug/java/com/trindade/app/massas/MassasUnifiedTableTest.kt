@@ -1,6 +1,9 @@
 package com.trindade.app.massas
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -132,6 +135,40 @@ class MassasUnifiedTableTest {
         composeRule.onNodeWithText(string(R.string.massas_action_on_tablet)).performClick()
 
         assertEquals(listOf(6), acked?.launchIds)
+    }
+
+    /** El bloqueo pertenece al lanzamiento, no a toda la tabla ni al índice visual de la fila. */
+    @Test
+    fun `en vuelo y despachado deshabilitan solo la fila correspondiente y fallo permite reintentar`() {
+        val first = MassaIndividualLaunch(
+            id = 21, launchDate = "2026-10-30", date = "2026-10-30", productCode = "1192",
+            productName = "MASSA PASTEL", boxes = 2, units = 20, userId = 1,
+            username = "ana", displayName = "Ana",
+        )
+        val second = first.copy(id = 22, userId = 2, username = "bia", displayName = "Bia")
+        val state = androidx.compose.runtime.mutableStateOf(
+            MassasLaunchViewModel.UiState(dayView = day(listOf(first, second)), sendingLaunchIds = setOf(21)),
+        )
+        composeRule.setContent {
+            TrindadeTheme {
+                MassasUnifiedTable(
+                    state = state.value, onSend = {}, onAcknowledge = {}, onImport = {},
+                )
+            }
+        }
+        fun sendButtons() = composeRule.onAllNodesWithText(string(R.string.massas_action_send))
+
+        sendButtons()[0].assertIsNotEnabled()
+        sendButtons()[1].assertIsEnabled()
+
+        composeRule.runOnIdle { state.value = state.value.copy(sendingLaunchIds = emptySet(), dispatchedLaunchIds = setOf(21)) }
+        sendButtons()[0].assertIsNotEnabled()
+        sendButtons()[1].assertIsEnabled()
+
+        // Un fallo no es un despacho: al terminar el intento la misma fila vuelve a aceptar el reenvío.
+        composeRule.runOnIdle { state.value = state.value.copy(dispatchedLaunchIds = emptySet()) }
+        sendButtons()[0].assertIsEnabled()
+        sendButtons()[1].assertIsEnabled()
     }
 
     private fun string(resId: Int, vararg args: Any): String =

@@ -515,6 +515,8 @@ data class AeroLocalLaunch(
     val username: String,
     /** El asiento del ERP del que salió este lanzamiento, cuando se importó uno. */
     val entLan: Int? = null,
+    val displayName: String? = null,
+    val userId: Int? = null,
 )
 
 data class AeroMovementReconciliation(
@@ -561,31 +563,35 @@ fun reconcileAeroMovements(
 
     // Segunda pasada: lo que se cargó acá a mano no tiene asiento y sigue emparejándose por día, producto,
     // unidades y nombre.
-    val byKey = mutableMapOf<String, MutableList<Int>>()
+    fun compact(name: String?) = aeroOperatorKey(name).replace(Regex("\\s+"), "")
+    fun identity(launch: AeroLocalLaunch) = launch.userId?.let { "id:$it" }
+        ?: "user:${aeroOperatorKey(launch.username)}:${aeroOperatorKey(launch.displayName)}"
+    val aliases = mutableMapOf<String, MutableSet<String>>()
     for (launch in launches) {
-        if (launch.id in consumed) continue
-        val key = aeroReconciledKey(
-            aeroMovementKey(launch.launchDate, launch.productCode, launch.units),
-            launch.username,
-        )
-        byKey.getOrPut(key) { mutableListOf() }.add(launch.id)
+        for (name in listOf(launch.username, launch.displayName)) {
+            val key = compact(name)
+            if (key.isNotEmpty()) aliases.getOrPut(key) { mutableSetOf() }.add(identity(launch))
+        }
     }
 
-    val settledSeats = reconciled.toSet()
+    val settledSeats = reconciled.toMutableSet()
     for (movement in movements) {
         if (movement.movementType != "E") continue
         if (movement.entLan in settledSeats) continue
-        if (aeroOperatorKey(movement.operatorName).isEmpty()) continue
-
-        val key = aeroReconciledKey(
-            aeroMovementKey(movement.entryDate, movement.productCode, movement.quantity),
-            movement.operatorName,
-        )
-        val ids = byKey[key]
-        if (ids.isNullOrEmpty()) continue
-
+        val operator = compact(movement.operatorName)
+        val owners = aliases[operator] ?: continue
+        if (operator.isEmpty() || owners.size != 1) continue
+        val owner = owners.single()
+        val key = aeroMovementKey(movement.entryDate, movement.productCode, movement.quantity)
+        val launch = launches.firstOrNull {
+            it.id !in consumed && identity(it) == owner &&
+                aeroMovementKey(it.launchDate, it.productCode, it.units) == key &&
+                listOf(it.username, it.displayName).any { name -> compact(name) == operator }
+        } ?: continue
+        consumed.add(launch.id)
+        settledSeats.add(movement.entLan)
         reconciled.add(movement.entLan)
-        matchedLaunchIds.add(ids.removeAt(0))
+        matchedLaunchIds.add(launch.id)
     }
 
     val matched = matchedLaunchIds.toSet()
@@ -605,9 +611,6 @@ private fun aeroMovementKey(date: String, code: String, quantity: Double): Strin
 /** The operator as both sides write it: padding and case are noise, a different name is not. */
 private fun aeroOperatorKey(value: String?): String =
     value?.trim().orEmpty().uppercase().replace(Regex("\\s+"), " ")
-
-private fun aeroReconciledKey(movementKey: String, operator: String?): String =
-    "$movementKey|${aeroOperatorKey(operator)}"
 
 /** Which controls of the integration screen a given operator may actually edit. */
 data class AeroSettingsPermissions(

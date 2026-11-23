@@ -132,6 +132,8 @@ class MassasLaunchViewModel @Inject constructor(
         val inactiveOperators: Set<String> = emptySet(),
         /** How many launches are still waiting in the persisted queue, for the retry button to say. */
         val queuedLaunches: Int = 0,
+        val sendingLaunchIds: Set<Int> = emptySet(),
+        val dispatchedLaunchIds: Set<Int> = emptySet(),
     ) {
         /** True when a launch can be sent to the plant without asking the operator anything else. */
         val aeroReady: Boolean get() = aeroSettings.ready
@@ -190,6 +192,7 @@ class MassasLaunchViewModel @Inject constructor(
      * segundo toque reenviaría lo que el primero acaba de mandar.
      */
     private val dispatchedLaunchIds = mutableSetOf<Int>()
+    private val rowSendLock = Any()
 
     init {
         loadCurrentUser()
@@ -570,6 +573,7 @@ class MassasLaunchViewModel @Inject constructor(
                 is AeroDispatchOutcome.Sent -> {
                     sent++
                     dispatchedLaunchIds += request.launchId
+                    _state.value = _state.value.copy(dispatchedLaunchIds = dispatchedLaunchIds.toSet())
                     queueSnapshot = queueSnapshot.settle(listOf(request.launchId))
                     aeroQueueStore.write(queueSnapshot)
                 }
@@ -744,8 +748,18 @@ class MassasLaunchViewModel @Inject constructor(
             return
         }
 
+        synchronized(rowSendLock) {
+            if (row.launchIds.any { it in state.value.sendingLaunchIds || it in state.value.dispatchedLaunchIds }) return
+            _state.value = _state.value.copy(sendingLaunchIds = state.value.sendingLaunchIds + row.launchIds)
+        }
         viewModelScope.launch {
-            erpDispatchMutex.withLock { sendPendingRow(row, launch, settings) }
+            try {
+                erpDispatchMutex.withLock { sendPendingRow(row, launch, settings) }
+            } finally {
+                synchronized(rowSendLock) {
+                    _state.value = _state.value.copy(sendingLaunchIds = state.value.sendingLaunchIds - row.launchIds.toSet())
+                }
+            }
         }
     }
 
@@ -790,6 +804,7 @@ class MassasLaunchViewModel @Inject constructor(
         when (val outcome = aeroDispatcher.dispatch(settings, request)) {
             is AeroDispatchOutcome.Sent -> {
                 dispatchedLaunchIds += request.launchId
+                _state.value = _state.value.copy(dispatchedLaunchIds = dispatchedLaunchIds.toSet())
                 aeroQueueStore.write(queue.settle(listOf(request.launchId)))
                 // El asiento recién enviado se busca en el mismo viaje que el lote: una lectura, y la
                 // fila deja de estar pendiente sin que el operario toque «Sincronizar con ERP».
@@ -918,6 +933,7 @@ class MassasLaunchViewModel @Inject constructor(
                     is AeroDispatchOutcome.Sent -> {
                         sent++
                         dispatchedLaunchIds += item.launchIds
+                        _state.value = _state.value.copy(dispatchedLaunchIds = dispatchedLaunchIds.toSet())
                         queue = queue.settle(item.launchIds)
                     }
                     // El motivo no se guarda: lo que la cola conserva es el trabajo, no el diagnóstico. La

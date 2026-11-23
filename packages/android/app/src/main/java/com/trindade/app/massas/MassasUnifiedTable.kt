@@ -96,6 +96,7 @@ fun MassasUnifiedTable(
                     UnifiedRow(
                         row = row,
                         readOnly = state.isReadOnly,
+                        sendEnabled = row.launchIds.none { it in state.sendingLaunchIds || it in state.dispatchedLaunchIds },
                         isAdmin = isAdmin,
                         canImport = canImport,
                         canCreate = canCreate,
@@ -156,6 +157,7 @@ private fun BalanceBar(balance: MassasBalance, modifier: Modifier = Modifier) {
 private fun UnifiedRow(
     row: MassasUnifiedRow,
     readOnly: Boolean,
+    sendEnabled: Boolean,
     isAdmin: Boolean,
     canImport: Boolean,
     canCreate: Boolean,
@@ -208,6 +210,7 @@ private fun UnifiedRow(
                 MassasRowState.PENDING_ERP -> ActionRow(
                     primaryLabel = stringResource(R.string.massas_action_send),
                     onPrimary = onSend,
+                    primaryEnabled = sendEnabled,
                     // Una fila ya marcada ofrece deshacer: el ack es la palabra del operario, y una palabra se
                     // puede decir dos veces. Sin esto, la fila quedaba muda para siempre.
                     secondaryLabel = if (row.tabletAcked) {
@@ -261,9 +264,10 @@ private fun ActionRow(
     onPrimary: () -> Unit,
     secondaryLabel: String?,
     onSecondary: () -> Unit,
+    primaryEnabled: Boolean = true,
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        RowAction(label = primaryLabel, onClick = onPrimary)
+        RowAction(label = primaryLabel, onClick = onPrimary, enabled = primaryEnabled)
         if (secondaryLabel != null) {
             RowAction(label = secondaryLabel, onClick = onSecondary)
         }
@@ -272,18 +276,18 @@ private fun ActionRow(
 
 /** A 44dp-high tap target that reads as a link, not as a filled button: the row is already dense. */
 @Composable
-private fun RowAction(label: String, onClick: () -> Unit) {
+private fun RowAction(label: String, onClick: () -> Unit, enabled: Boolean = true) {
     Box(
         modifier = Modifier
             .sizeIn(minWidth = 48.dp, minHeight = 44.dp)
             .padding(end = 4.dp)
-            .clickable(onClick = onClick),
+            .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.CenterStart,
     ) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-            color = MaterialTheme.colorScheme.primary,
+            color = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
         )
     }
 }

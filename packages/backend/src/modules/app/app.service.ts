@@ -46,7 +46,7 @@ export const LOCAL_APK_FILENAME = 'trindade-0.8.6.apk';
  * 7018 compares it, sees it went up and updates, while the public version is what tells everyone else that this
  * is a release of its own rather than another replacement of 0.7.4.
  */
-export const LOCAL_APK_BUILD_NUMBER = 8010;
+export const LOCAL_APK_BUILD_NUMBER = 8011;
 
 const LOCAL_APK_PATH = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),

@@ -1501,6 +1501,12 @@ describe('aero-integration: ERP movements mirror', () => {
     assert.deepEqual(reconciliation.reconciled, [1]);
   });
 
+  it('reconciles an operator despite internal whitespace when the identity is unambiguous', () => {
+    const seats = [{ entLan: 1, productCode: '001192', productDesc: 'X', quantity: 90, entryDate: '2026-10-28', operatorName: 'ANASILVA', movementType: 'E' as const }];
+    const launches = [{ id: 2, launch_date: '2026-10-28', product_code: '1192', units: 90, username: 'ana silva' }];
+    assert.deepEqual(reconcileAeroMovements(seats, launches).matchedLaunchIds, [2]);
+  });
+
   it('consumes one local launch per seat, so two equal seats need two local launches', () => {
     const seats = [
       { entLan: 1, productCode: '001192', productDesc: 'X', quantity: 90, entryDate: '2026-10-28', operatorName: 'A', movementType: 'E' as const },

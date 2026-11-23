@@ -185,4 +185,41 @@ class AeroErpClientTest {
             body(recorded),
         )
     }
+
+    @Test
+    fun `reads movements including exits by querying E and S separately and combining them`() = runBlocking {
+        server.enqueue(
+            MockResponse().setBody(
+                """{"success":true,"data":[{"ENT_LAN":901,"PRO_COD":"001192","PRO_DES":"MASSA QUADRADA",""" +
+                    """"PRO_QTD":15,"ENT_DTA":"2026-10-30T00:00:00","ENT_USU":"wilkin","ENTSAI":"E"}]}""",
+            ),
+        )
+        server.enqueue(
+            MockResponse().setBody(
+                """{"success":true,"data":[{"ENT_LAN":902,"PRO_COD":"001356","PRO_DES":"DISCO 400G",""" +
+                    """"PRO_QTD":10,"ENT_DTA":"2026-10-30T00:00:00","ENT_USU":"wilkin","ENTSAI":"S"}]}""",
+            ),
+        )
+
+        val result = client.readMovements(wsUrl(), "wilkin", "secret", "2026-10-30", includeExits = true)
+
+        assertTrue(result is AeroMovementsResult.Ok)
+        val ok = result as AeroMovementsResult.Ok
+        assertEquals(2, ok.movements.size)
+        assertEquals(listOf("E", "S"), ok.movements.map { it.movementType })
+
+        val reqE = server.takeRequest()
+        assertEquals("/api/movimentoitem?_method=PATCH", reqE.path)
+        assertEquals(
+            """{"_method":"PATCH","CODFOR":null,"NOMUSU":null,"CODPRO":null,"DTINI":"2026-10-30","DTFIM":"2026-10-30","ENTSAI":"E"}""",
+            body(reqE),
+        )
+
+        val reqS = server.takeRequest()
+        assertEquals("/api/movimentoitem?_method=PATCH", reqS.path)
+        assertEquals(
+            """{"_method":"PATCH","CODFOR":null,"NOMUSU":null,"CODPRO":null,"DTINI":"2026-10-30","DTFIM":"2026-10-30","ENTSAI":"S"}""",
+            body(reqS),
+        )
+    }
 }

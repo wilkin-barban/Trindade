@@ -27,6 +27,7 @@ class MassasUnifiedTest {
         displayName: String = "Jefferson",
         date: String = "2026-10-30",
         entLan: Int? = null,
+        userId: Int = 1,
     ) = MassaIndividualLaunch(
         id = id,
         launchDate = date,
@@ -35,7 +36,7 @@ class MassasUnifiedTest {
         productName = "MASSA DE PASTEL 500G",
         boxes = boxes,
         units = units,
-        userId = 1,
+        userId = userId,
         username = username,
         displayName = displayName,
         entLan = entLan,
@@ -89,6 +90,30 @@ class MassasUnifiedTest {
         assertEquals(MassasRowState.RECONCILED, row.state)
         assertEquals(listOf(90), row.launchIds)
         assertFalse(rows.any { it.state == MassasRowState.ERP_ONLY })
+    }
+
+    @Test
+    fun `the dispatched operator reconciles by visible name instead of login`() {
+        val rows = massasUnifiedRows(MassasUnifiedInput(
+            launches = listOf(launch(id = 1, username = "operador1", displayName = "Ana Silva")),
+            movements = listOf(seat(entLan = 900, operatorName = "ANA SILVA")),
+            products = products,
+        ))
+        assertEquals(setOf(1), reconciledLaunchIds(rows))
+        assertEquals(1, rows.size)
+    }
+
+    @Test
+    fun `distinct operators with colliding compact names are not guessed`() {
+        val rows = massasUnifiedRows(MassasUnifiedInput(
+            launches = listOf(
+                launch(id = 1, userId = 1, username = "ana silva", displayName = "Ana Silva"),
+                launch(id = 2, userId = 2, username = "anasilva", displayName = "Outra Pessoa"),
+            ),
+            movements = listOf(seat(entLan = 900, operatorName = "ANASILVA")),
+            products = products,
+        ))
+        assertEquals(emptySet<Int>(), reconciledLaunchIds(rows))
     }
 
     @Test

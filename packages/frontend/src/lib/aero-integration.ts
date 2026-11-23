@@ -836,6 +836,8 @@ export interface AeroLocalLaunchLike {
    * record the same boxes on the same day and one of them may never have opened Trindade.
    */
   username: string;
+  display_name?: string | null;
+  user_id?: number | null;
   /** The ERP seat this launch was imported from, when it came from one. */
   ent_lan?: number | null;
 }
@@ -890,32 +892,39 @@ export function reconcileAeroMovements(
   }
 
   // Second pass: what the plant typed here has no seat, so it still pairs on day, product, units and name.
-  const byKey = new Map<string, number[]>();
+  const aliases = new Map<string, Set<string>>();
+  const identity = (launch: AeroLocalLaunchLike) =>
+    launch.user_id != null
+      ? `id:${launch.user_id}`
+      : `user:${aeroOperatorKey(launch.username)}:${aeroOperatorKey(launch.display_name)}`;
+  const compact = (name: string | null | undefined) => aeroOperatorKey(name).replace(/\s+/g, '');
   for (const launch of launches) {
-    if (consumed.has(launch.id)) continue;
-    const key = aeroReconciledKey(
-      aeroMovementKey(launch.launch_date, launch.product_code, launch.units),
-      launch.username,
-    );
-    const ids = byKey.get(key);
-    if (ids) ids.push(launch.id);
-    else byKey.set(key, [launch.id]);
+    for (const name of [launch.username, launch.display_name]) {
+      const key = compact(name);
+      if (!key) continue;
+      const owners = aliases.get(key) ?? new Set<string>();
+      owners.add(identity(launch));
+      aliases.set(key, owners);
+    }
   }
 
   const takenSeats = new Set(reconciled);
   for (const movement of movements) {
     if (movement.movementType !== 'E') continue;
     if (takenSeats.has(movement.entLan)) continue;
-    const operator = aeroOperatorKey(movement.operatorName);
-    if (!operator) continue;
-    const key = aeroReconciledKey(
-      aeroMovementKey(movement.entryDate, movement.productCode, movement.quantity),
-      movement.operatorName,
-    );
-    const ids = byKey.get(key);
-    if (!ids || ids.length === 0) continue;
+    const operator = compact(movement.operatorName);
+    const owners = aliases.get(operator);
+    if (!operator || !owners || owners.size !== 1) continue;
+    const owner = [...owners][0];
+    const key = aeroMovementKey(movement.entryDate, movement.productCode, movement.quantity);
+    const launch = launches.find((item) => !consumed.has(item.id) && identity(item) === owner &&
+      aeroMovementKey(item.launch_date, item.product_code, item.units) === key &&
+      [item.username, item.display_name].some((name) => compact(name) === operator));
+    if (!launch) continue;
+    consumed.add(launch.id);
+    takenSeats.add(movement.entLan);
     reconciled.push(movement.entLan);
-    matchedLaunchIds.push(ids.shift() as number);
+    matchedLaunchIds.push(launch.id);
   }
 
   const matched = new Set(matchedLaunchIds);
@@ -940,9 +949,6 @@ function aeroOperatorKey(value: string | null | undefined): string {
   return (value ?? '').trim().toUpperCase().replace(/\s+/g, ' ');
 }
 
-function aeroReconciledKey(movementKey: string, operator: string | null | undefined): string {
-  return `${movementKey}|${aeroOperatorKey(operator)}`;
-}
 
 /**
  * What the bridge can be asked to do, one word each.

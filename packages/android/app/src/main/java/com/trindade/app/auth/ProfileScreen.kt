@@ -378,6 +378,25 @@ fun ProfileScreen(
                 }
 
                 is DownloadState.Completed -> {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = "Aviso de instalação:",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Como este é um app corporativo interno da fábrica, o Android/Play Protect pode exibir um aviso de desenvolvedor desconhecido. Para continuar, toque em \"Mais detalhes\" e depois em \"Instalar assim mesmo\".",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                     AdminPrimaryButton(
                         onClick = { onInstallApk(dl.file) },
                         text = "Atualizar Agora",

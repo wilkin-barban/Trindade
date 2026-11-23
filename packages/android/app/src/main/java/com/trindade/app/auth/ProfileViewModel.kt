@@ -462,7 +462,16 @@ class ProfileViewModel @Inject constructor(
     }
 
     fun installApk(file: File) {
-        installer?.installApk(file)
+        val result = installer?.installApk(file)
+        if (result is ApkInstaller.InstallResult.PermissionRequired) {
+            _state.update {
+                it.copy(
+                    message = "Permissão necessária para instalar atualizações. Ative a opção nas configurações.",
+                )
+            }
+        } else if (result is ApkInstaller.InstallResult.Error) {
+            _state.update { it.copy(message = result.message) }
+        }
     }
 
     // Typing clears the previous line, the way the login form does: a refusal that stays on screen

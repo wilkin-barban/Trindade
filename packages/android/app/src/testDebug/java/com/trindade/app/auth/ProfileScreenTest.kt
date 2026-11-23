@@ -291,6 +291,7 @@ class ProfileScreenTest {
 
         val button = composeRule.onNodeWithText("Atualizar Agora")
         button.assertIsDisplayed()
+        composeRule.onNodeWithText("Aviso de instalação:").assertIsDisplayed()
         button.performClick()
         assertEquals(1, installed)
     }

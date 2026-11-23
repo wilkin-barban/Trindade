@@ -1481,6 +1481,8 @@ class MassasLaunchViewModelTest {
         )
         testVm.sendPendingLaunch(row)
         testScheduler.runCurrent()
+        assertTrue(89 in testVm.state.value.sendingLaunchIds)
+        assertFalse(90 in testVm.state.value.sendingLaunchIds)
         testVm.sendPendingLaunch(row)
         testScheduler.runCurrent()
 
@@ -1488,6 +1490,35 @@ class MassasLaunchViewModelTest {
         advanceUntilIdle()
 
         assertEquals("una sola caja viajó al ERP", 1, erpPort.entryCalls)
+        assertFalse(89 in testVm.state.value.sendingLaunchIds)
+        assertTrue(89 in testVm.state.value.dispatchedLaunchIds)
+        assertFalse(90 in testVm.state.value.dispatchedLaunchIds)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun sendPendingLaunch_failure_releasesRowForRetry() = runTest {
+        val repo = DayRepository(massasApi, dayWith(launch(89, boxes = 3, units = 30)))
+        val gate = CompletableDeferred<Unit>()
+        erpPort.entryGate = gate
+        erpPort.writeResults.addAll(listOf(AeroWriteResult.Failed("sin saldo"), AeroWriteResult.Ok(null)))
+        val testVm = newViewModel(repo)
+        testVm.loadDay(MassasLaunchViewModel.saopauloToday())
+        testScheduler.runCurrent()
+        val row = testVm.state.value.unifiedRows.single()
+
+        testVm.sendPendingLaunch(row)
+        testScheduler.runCurrent()
+        assertTrue(89 in testVm.state.value.sendingLaunchIds)
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertFalse(89 in testVm.state.value.sendingLaunchIds)
+        assertFalse(89 in testVm.state.value.dispatchedLaunchIds)
+
+        testVm.sendPendingLaunch(row)
+        advanceUntilIdle()
+        assertEquals(2, erpPort.entryCalls)
+        assertTrue(89 in testVm.state.value.dispatchedLaunchIds)
     }
 
     /**

@@ -140,6 +140,26 @@ describe('massasUnifiedRows', () => {
     assert.equal(rows.some((row) => row.state === 'erpOnly'), false);
   });
 
+  it('reconciles the dispatched operator by visible name rather than the login', () => {
+    const rows = massasUnifiedRows(input({
+      launches: [launch({ id: 1, username: 'operador1', display_name: 'Ana Silva' })],
+      movements: [seat({ entLan: 900, operatorName: 'ANA SILVA' })],
+    }));
+    assert.deepEqual([...reconciledLaunchIds(rows)], [1]);
+    assert.equal(rows.length, 1);
+  });
+
+  it('does not guess between distinct operators whose names collide without spaces', () => {
+    const rows = massasUnifiedRows(input({
+      launches: [
+        launch({ id: 1, user_id: 1, username: 'ana silva', display_name: 'Ana Silva' }),
+        launch({ id: 2, user_id: 2, username: 'anasilva', display_name: 'Outra Pessoa' }),
+      ],
+      movements: [seat({ entLan: 900, operatorName: 'ANASILVA' })],
+    }));
+    assert.deepEqual([...reconciledLaunchIds(rows)], []);
+  });
+
   it('keeps a launch Delphi has not seen as pending, and remembers the day it was already carried', () => {
     const pending = massasUnifiedRows(input({ launches: [launch({ id: 7 })] }));
     assert.equal(pending.length, 1);
