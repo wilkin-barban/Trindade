@@ -22,6 +22,7 @@ Base: `60e032ca`; pruebas con respuestas y almacenamiento aislados, sin consulta
 - T3 · S1–S10 · ✓ Verificación integral completada: Backend 998/998, Frontend Node 767/767, Frontend Unit 313/313, Android 1606/1606 (0 fallos). Documentación ODD y cierre con commit y push a main sin atribuciones a IA.
 - T4 · S10 · ✓ Correlación por ticket e intento opcional implementada con compatibilidad legacy; rechaza replays distintos y duplicidades. OpenAPI y cliente Android regenerados; backend final job-184: 998/998; revisión independiente mwtk2xa9 confirmó replay y correlación.
 - T5 · L8 · ✓ Remediación de asientos omitidos: eliminada guarda que rechazaba cuando `read.skipped > 0` o `incompleteBridgeResult` en `SalidaHistoryPage.tsx`; se persisten todos los movimientos válidos cuando `read.status === 'ok'`. Tests unitarios en `SalidaHistoryPage.test.tsx` adaptados para verificar persistencia ante asientos incompletos u omitidos (70/70 pasando). Suites de frontend 100% verdes: 313 unitarias Vitest y 767 Node pasando.
+- T6 · L9 · ✓ Tone de éxito en diálogo de sync, nombres de operarios ERP normalizados y reflect en share: MessageDialog configurado con tone='success' ante sincronización exitosa y tone='error' ante fallos; salidaDaySummaryText actualizado para usar display name del operario y normalizar códigos de productos con ceros a la izquierda (code.replace(/^0+/, '')); contador de movimientos/total actualizado ante datos ERP y limpieza inmediata de query params en callback exitoso. 70/70 tests de Salida y 768 tests Node pasando al 100%.
 
 ## Log
 
@@ -68,6 +69,30 @@ Necesito que remedies esto de forma limpia y directa:
   - `SalidaHistoryPage.tsx`: eliminadas las guardas `read.skipped > 0` e `incompleteBridgeResult`. Al igual que `MassasHistoryPage.tsx`, se persisten los movimientos válidos si `read.status === 'ok'`.
   - `SalidaHistoryPage.test.tsx`: actualizadas pruebas para asegurar que ante asientos omitidos o incompletos (`read-partial` y `bridge-skipped`) se persisten los movimientos válidos en `/integration/aero/movements` y se muestra el feedback de éxito correspondiente. 70 pruebas pasando.
   - Verificación de suites: 313/313 pruebas unitarias Vitest y 767/767 pruebas Node pasando en `@trindade/frontend`.
+- L9. «Che, probamos la sincronización en vivo en el iPhone y encontramos dos detalles puntuales para corregir en el Histórico de Saídas Web:
+
+1. Cartel de falso error en la sincronización:
+En packages/frontend/src/pages/salida/SalidaHistoryPage.tsx (línea 847), MessageDialog recibe erpNote pero no define tone, por lo que toma el valor por defecto 'error'. Por eso, cuando el sync termina con éxito (511 movimientos sincronizados), la pantalla muestra un diálogo rojo con título «Não foi possível concluir a ação» y adentro el texto «Movimentações sincronizadas: 511».
+Cambiá el estado erpNote a { tone: 'success' | 'error'; message: string } | null (tal como se hace en MassasHistoryPage.tsx con manualResult / deleteResult) y pasale tone={erpNote?.tone ?? 'error'}. En el callback exitoso seteá tone: 'success', y en los errores tone: 'error'.
+
+2. Movimientos del ERP en Compartir por WhatsApp:
+En packages/frontend/src/lib/salida.ts (salidaDaySummaryText) y packages/frontend/src/pages/salida/SalidaHistoryPage.tsx:
+- En salidaDaySummaryText, al iterar erpOperators, usá el nombre para mostrar del operador (operator.name || operator.username) en vez de clavar el username en mayúsculas sin espacios ('JOAOH:').
+- Al emparejar códigos en known.has(product.code), normalizá con code.replace(/^0+/, '') para que los códigos con ceros a la izquierda del ERP (ej: 001068 vs 1068) se comparen correctamente y no queden inconsistencias.
+- Asegurate de que el contador de movimientos o el total refleje el día completo cuando hay datos del ERP, y que previewMessage se reactive apenas SalidaReportSection carga o refresca el día con onDayLoaded.
+- En el callback exitoso de SalidaHistoryPage.tsx, limpiá la URL con setParams({ date: answeredDate }, { replace: true }) para no dejar colgados los parámetros de attempt/aero_action.
+
+3. Pruebas y cierre:
+- Actualizá las pruebas unitarias en SalidaHistoryPage.test.tsx y salida-share.test.ts para validar que el diálogo de sync muestre tone='success' y que los movimientos del ERP aparezcan con sus nombres y productos en la vista previa del share de WhatsApp.
+- Corré la suite de frontend: npm --workspace=packages/frontend run test:unit && npm --workspace=packages/frontend run test:node y asegurate de que quede 100% en verde.
+- Registrá la tarea y evidencias en odd/tasks/salida-movimentos-callback.md.
+- Hacé un commit atómico en main bajo Conventional Commits (ej: fix(web): display success tone for salida erp sync and include erp movements in day share preview) ESTRICTAMENTE SIN Co-Authored-By ni menciones a IA, y hacé git push origin main.
+- Al terminar quedá a la espera en tu sesión sin cerrarla.»
+- Evidencia T6:
+  - `SalidaHistoryPage.tsx`: `erpNote` reestructurado a `{ tone: 'success' | 'error'; message: string } | null`, pasando `tone={erpNote?.tone ?? 'error'}` a `MessageDialog`. Diálogo de éxito renderiza con cabecera verde y `CheckCircle2`. Callback exitoso ejecuta `setParams({ date: answeredDate }, { replace: true })` para limpiar la URL. `erpDay` se resetea al cambiar fecha y reactiva `previewMessage` en `onDayLoaded`.
+  - `salida.ts`: `salidaDaySummaryText` utiliza el nombre legible `operator.name || operator.username` para operarios ERP, normaliza códigos numéricos de productos con `code.replace(/^0+/, '')` para evitar duplicaciones por ceros a la izquierda, y refleja los movimientos del día completo cuando hay datos del ERP (`movementsCount`).
+  - Pruebas unitarias: `salida-share.test.ts` verifica el display name y desduplicación de códigos; `SalidaHistoryPage.test.tsx` valida `tone='success'` y que los operarios ERP se muestren con su nombre visible.
+  - Verificación: 313 unitarias Vitest y 768 tests Node pasando al 100%. TypeScript sin errores.
 - L5. «El endpoint /bridge-tickets/last-result ya está acotado en backend por user_id a los últimos 10 minutos.» «En frontend, exigí que exista el intento pendiente con loadAeroPendingAttempt('movimentos'). Si no hay intento pendiente o la fecha no coincide, descartalo sin pisar el espejo.» «Envolvé el context.startActivity(confirmIntent) en un runCatching con log/fallback en caso de SecurityException/BackgroundActivityStartException en Android 10+.»
 - L4. «Excelente hallazgo en la auditoría. En UpdateReceiver.kt, agregá el manejo de 'com.trindade.app.ACTION_INSTALL_COMMIT':
 Cuando status == PackageInstaller.STATUS_PENDING_USER_ACTION, extraé el Intent.EXTRA_INTENT del bundle (con compatibilidad para getParcelableExtra) y ejecutá context.startActivity(confirmIntent.apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }) para que si Android o Play Protect requieren confirmación de usuario, la pantalla del sistema se levante sin trabarse.

@@ -674,48 +674,68 @@ export function salidaDaySummaryText(
      * mismo formato y la misma tabla, sin repetir a nadie.
      */
     erpOperators?: readonly SalidaErpOperator[];
+    erpMovementsCount?: number;
   },
 ): string {
   const { labels } = args;
 
   // Una línea del mensaje, venga de Trindade o del ERP: el nombre que se imprime se resuelve igual en los dos.
   type Line = { code: string; name: string; block: SalidaBlock; units: number };
-  const merged = new Map<string, Line[]>();
+  type OperatorGroup = { displayName: string; lines: Line[] };
+  const merged = new Map<string, OperatorGroup>();
 
   for (const movement of movements) {
     const key = String(movement.username ?? '').toUpperCase();
-    const lines = merged.get(key) ?? [];
+    const entry = merged.get(key) ?? { displayName: key, lines: [] };
     for (const item of movement.items) {
-      lines.push({ code: item.product_code, name: item.product_name, block: item.block, units: salidaQuantity(item.quantity) });
+      entry.lines.push({ code: item.product_code, name: item.product_name, block: item.block, units: salidaQuantity(item.quantity) });
     }
-    merged.set(key, lines);
+    merged.set(key, entry);
   }
 
   for (const operator of args.erpOperators ?? []) {
     const key = String(operator.username ?? '').toUpperCase();
-    const known = new Set((merged.get(key) ?? []).map((line) => line.code));
+    const displayName = operator.name?.trim() || operator.username || key;
+    const existing = merged.get(key);
+    const lines = existing ? existing.lines : [];
+    const known = new Set(lines.map((line) => line.code.replace(/^0+/, '')));
     const extra = operator.products
-      .filter((product) => product.units > 0 && !known.has(product.code))
+      .filter((product) => product.units > 0 && !known.has(product.code.replace(/^0+/, '')))
       .map<Line>((product) => ({
         code: product.code,
         name: product.name,
         block: product.block as SalidaBlock,
         units: product.units,
       }));
-    if (extra.length === 0) continue;
-    merged.set(key, [...(merged.get(key) ?? []), ...extra]);
+    if (existing) {
+      if (operator.name?.trim()) existing.displayName = displayName;
+      if (extra.length > 0) existing.lines.push(...extra);
+    } else if (extra.length > 0) {
+      merged.set(key, { displayName, lines: extra });
+    }
   }
+
+  const erpExtraCount = (args.erpOperators ?? []).reduce(
+    (count, op) => count + (op.erpOnly ? Math.max(1, op.products.length) : 0),
+    0,
+  );
+  const movementsCount = Math.max(
+    movements.length + erpExtraCount,
+    args.erpMovementsCount ?? 0,
+    args.erpOperators && movements.length === 0 ? args.erpOperators.length : 0,
+  );
 
   const lines: string[] = [];
   lines.push(`🚛 *${labels.title} — ${formatDateLabel(args.date)}*`);
-  lines.push(`${labels.movements}: ${movements.length}`);
+  lines.push(`${labels.movements}: ${movementsCount}`);
   lines.push('');
 
   let index = 0;
-  for (const [operator, entries] of merged) {
+  for (const [, { displayName, lines: entries }] of merged) {
+    if (entries.length === 0) continue;
     if (index > 0) lines.push('');
     index += 1;
-    lines.push(`👤 ${operator}:`);
+    lines.push(`👤 ${displayName}:`);
     for (const block of SALIDA_BLOCKS) {
       const items = entries.filter((entry) => entry.block === block);
       if (items.length === 0) continue;

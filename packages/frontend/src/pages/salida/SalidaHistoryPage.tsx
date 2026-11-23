@@ -155,27 +155,31 @@ export function SalidaHistoryPage() {
   const [erpSyncing, setErpSyncing] = useState(false);
   const erpSyncStarting = useRef(false);
   const processingMovements = useRef<string | null>(null);
-  const [erpNote, setErpNote] = useState<string | null>(null);
+  const [erpNote, setErpNote] = useState<{ tone: 'success' | 'error'; message: string } | null>(null);
   const [erpRefetchKey, setErpRefetchKey] = useState(0);
   // El día que leyó la sección del ERP, para sumarlo al mensaje sin pedirlo dos veces.
   const [erpDay, setErpDay] = useState<SalidaReportDay | null>(null);
   // La última lectura del espejo de ese día, como la muestra el Histórico de Masas.
   const [lastSync, setLastSync] = useState<string | null>(null);
+  const [erpSnapshotCount, setErpSnapshotCount] = useState<number>(0);
 
   const loadLastSync = useCallback(async (targetDate: string) => {
     try {
       const body = await api.get<unknown>(`/integration/aero/movements?date=${targetDate}`);
-      setLastSync(readAeroMovementsSnapshot(body)?.syncedAt ?? null);
+      const snapshot = readAeroMovementsSnapshot(body);
+      setLastSync(snapshot?.syncedAt ?? null);
+      setErpSnapshotCount(snapshot?.movements.length ?? 0);
     } catch {
       // Sin lectura no hay hora que mostrar: el botón sigue ofreciendo la sincronización.
       setLastSync(null);
+      setErpSnapshotCount(0);
     }
   }, []);
 
   const handleSyncErp = useCallback(async () => {
     if (erpSyncing || erpSyncStarting.current) return;
     if (!navigator.locks) {
-      setErpNote(t('salida.erpSyncLockUnavailable'));
+      setErpNote({ tone: 'error', message: t('salida.erpSyncLockUnavailable') });
       return;
     }
     erpSyncStarting.current = true;
@@ -185,7 +189,7 @@ export function SalidaHistoryPage() {
     try {
       const vault = await fetchAeroVaultSettings();
       if (!vault.configured) {
-        setErpNote(t('salida.erpSyncUnavailable'));
+        setErpNote({ tone: 'error', message: t('salida.erpSyncUnavailable') });
         return;
       }
       const settings: AeroSettings = {
@@ -196,14 +200,14 @@ export function SalidaHistoryPage() {
         lastSyncAt: null,
       };
       if (!aeroSettingsReady(settings)) {
-        setErpNote(t('salida.erpSyncUnavailable'));
+        setErpNote({ tone: 'error', message: t('salida.erpSyncUnavailable') });
         return;
       }
       // Reserve the shared attempt while holding the same lock used by this page's callback.
       await navigator.locks.request('trindade:salida-movimentos', async () => {
         const pending = loadAeroPendingAttempt('movimentos', salidaMovementsStorage);
         if (pending && (pending.action !== 'movimentos' || Date.now() - pending.startedAt < 10 * 60 * 1000)) {
-          setErpNote(t('salida.erpCheckError'));
+          setErpNote({ tone: 'error', message: t('salida.erpCheckError') });
           return;
         }
         if (pending) clearAeroPendingAttempt(salidaMovementsStorage, 'movimentos');
@@ -220,14 +224,14 @@ export function SalidaHistoryPage() {
           clearAeroPendingAttempt(salidaMovementsStorage, 'movimentos');
           void postAeroAuditEvent(salidaReadResultEvent({ date, attempt, seats: null, error: 'bridge_not_started' }));
         }
-        if (!fired) setErpNote(t('salida.erpCheckError'));
+        if (!fired) setErpNote({ tone: 'error', message: t('salida.erpCheckError') });
       });
     } catch {
       if (armed.attempt && loadAeroPendingAttempt('movimentos', salidaMovementsStorage)?.attemptId === armed.attempt.attemptId) {
         clearAeroPendingAttempt(salidaMovementsStorage, 'movimentos');
         void postAeroAuditEvent(salidaReadResultEvent({ date, attempt: armed.attempt, seats: null, error: 'bridge_not_started' }));
       }
-      setErpNote(t('salida.erpCheckError'));
+      setErpNote({ tone: 'error', message: t('salida.erpCheckError') });
     } finally {
       erpSyncStarting.current = false;
       setErpSyncing(false);
@@ -366,7 +370,7 @@ export function SalidaHistoryPage() {
         const attemptId = storedAttemptId;
         if (attemptId && processingMovements.current === attemptId) return;
         if (!navigator.locks) {
-          setErpNote(t('salida.erpSyncLockUnavailable'));
+          setErpNote({ tone: 'error', message: t('salida.erpSyncLockUnavailable') });
           setParams({ date: answeredDate }, { replace: true });
           return;
         }
@@ -381,7 +385,7 @@ export function SalidaHistoryPage() {
           const read = readAeroMovements(callback.data);
           if (!isRealPastOrToday(requestedDate) || read.status === 'error' || read.movements.some((movement) => movement.entryDate !== requestedDate)) {
             const detail = read.status === 'error' ? read.message : null;
-            setErpNote(detail || t('salida.erpCheckError'));
+            setErpNote({ tone: 'error', message: detail || t('salida.erpCheckError') });
             void postAeroAuditEvent(salidaReadResultEvent({ date: requestedDate, attempt, seats: null, error: detail || 'movements_unreadable' }));
           } else {
             answeredDate = requestedDate;
@@ -391,13 +395,14 @@ export function SalidaHistoryPage() {
               saved = true;
             } catch {
               void postAeroAuditEvent(salidaReadResultEvent({ date: answeredDate, attempt, seats: read.movements.length, stored: 0, error: 'snapshot_store_failed' }));
-              setErpNote(t('salida.erpSyncSaveFailed'));
+              setErpNote({ tone: 'error', message: t('salida.erpSyncSaveFailed') });
             }
             if (saved) {
               void postAeroAuditEvent(salidaReadResultEvent({ date: answeredDate, attempt, seats: read.movements.length }));
               await loadLastSync(answeredDate);
               setErpRefetchKey((key) => key + 1);
-              setErpNote(t('salida.erpSyncSuccess', { count: read.movements.length }));
+              setErpNote({ tone: 'success', message: t('salida.erpSyncSuccess', { count: read.movements.length }) });
+              setParams({ date: answeredDate }, { replace: true });
             }
           }
           // A failed save requires a fresh ERP read; replaying an old response could overwrite a newer snapshot.
@@ -504,7 +509,7 @@ export function SalidaHistoryPage() {
           setOutbox(readSalidaOutbox());
         } else if (params.has('movimentos_attempt')) {
           if (!navigator.locks) {
-            setErpNote(t('salida.erpSyncLockUnavailable'));
+            setErpNote({ tone: 'error', message: t('salida.erpSyncLockUnavailable') });
           } else {
             await navigator.locks.request('trindade:salida-movimentos', () => {
               const attempt = loadAeroPendingAttempt('movimentos', salidaMovementsStorage);
@@ -513,7 +518,7 @@ export function SalidaHistoryPage() {
                 const requestedDate = aeroAttemptDate(attempt, answeredDate);
                 if (isRealPastOrToday(requestedDate)) answeredDate = requestedDate;
                 void postAeroAuditEvent(salidaReadResultEvent({ date: requestedDate, attempt, seats: null, error: callback.code, message: callback.message }));
-                setErpNote(salidaActionableErrorMessage(callback.code, callback.message, t));
+                setErpNote({ tone: 'error', message: salidaActionableErrorMessage(callback.code, callback.message, t) });
               }
             });
           }
@@ -637,6 +642,7 @@ export function SalidaHistoryPage() {
 
   useEffect(() => {
     void loadLastSync(date);
+    setErpDay(null);
   }, [date, loadLastSync]);
 
   // Un día puede tener datos sólo del ERP: operarios y productos que Trindade no lanzó pero que el grupo tiene
@@ -651,6 +657,7 @@ export function SalidaHistoryPage() {
     return salidaDaySummaryText(visibleMovements, {
       date,
       erpOperators,
+      erpMovementsCount: erpSnapshotCount > 0 ? erpSnapshotCount : erpDay?.movementCount,
       labels: {
         title: t('salida.dayShareTitle'),
         movements: t('salida.dayShareMovements'),
@@ -669,7 +676,7 @@ export function SalidaHistoryPage() {
         },
       },
     });
-  }, [visibleMovements, erpDay, hasShareableData, date, t]);
+  }, [visibleMovements, erpDay, hasShareableData, date, t, erpSnapshotCount]);
 
   const handleOpenWhatsApp = async () => {
     if (!hasShareableData) return;
@@ -846,7 +853,8 @@ export function SalidaHistoryPage() {
           fecha. */}
       <MessageDialog
         open={erpNote !== null}
-        message={erpNote ?? ''}
+        tone={erpNote?.tone ?? 'error'}
+        message={erpNote?.message ?? ''}
         onClose={() => setErpNote(null)}
         testId="salida-history-erp-note"
       />
@@ -856,7 +864,7 @@ export function SalidaHistoryPage() {
             date={date}
             refetchKey={erpRefetchKey}
             onDayLoaded={(day) => setErpDay(day)}
-            onLoadError={(message) => setErpNote(message)}
+            onLoadError={(message) => setErpNote({ tone: 'error', message })}
           />
         </div>
       )}

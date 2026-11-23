@@ -91,6 +91,56 @@ describe('salidaDaySummaryText', () => {
     assert.match(text, /Movimientos: 0/);
     assert.doesNotMatch(text, /Total:/);
   });
+
+  it('uses operator display name and avoids duplicate products with leading zeros from ERP', () => {
+    const text = salidaDaySummaryText(
+      [movement({ id: 1, items: [{
+        id: 10,
+        product_code: '1474',
+        product_name: 'EMBALAG. NHOQUE 1kg',
+        block: 'embalagens',
+        quantity: 20,
+        position: 0,
+      }] })],
+      {
+        date: '2026-11-14',
+        labels,
+        erpOperators: [
+          {
+            username: 'wilkin',
+            name: 'Wilkin Barban',
+            products: [
+              // 001474 with leading zeros should match 1474 and not duplicate
+              { code: '001474', name: 'EMBALAG. NHOQUE 1kg', block: 'embalagens', units: 20 },
+              // new product from ERP
+              { code: '001900', name: 'BOBINA ROLO', block: 'bobinas', units: 5 },
+            ],
+          },
+          {
+            username: 'joaoh',
+            name: 'João Henrique',
+            erpOnly: true,
+            products: [
+              { code: '002500', name: 'GORDURA', block: 'materia-prima', units: 10 },
+            ],
+          },
+        ],
+      },
+    );
+
+    // Operator display names with spaces/accents instead of JOAOH:
+    assert.match(text, /👤 Wilkin Barban:/);
+    assert.match(text, /👤 João Henrique:/);
+    assert.doesNotMatch(text, /👤 JOAOH:/);
+    // Product 1474 is only listed once despite ERP having 001474
+    const nhoqueMatches = text.match(/EMBALAG\. NHOQUE 1kg/g);
+    assert.equal(nhoqueMatches?.length, 1);
+    // ERP extra product and ERP-only operator are included
+    assert.match(text, /BOBINA ROLO: 5 un/);
+    assert.match(text, /GORDURA: 10 un/);
+    // Count reflects local movements plus ERP-only operator
+    assert.match(text, /Movimientos: 2/);
+  });
 });
 
 describe('salidaPhotoFiles', () => {

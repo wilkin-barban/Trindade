@@ -212,7 +212,11 @@ describe('SalidaHistoryPage', () => {
     }), expect.anything()));
     await waitFor(() => expect(lineOf('result', 'read_history').attemptId).toBe('read-attempt'));
     await waitFor(() => expect(screen.getByTestId('test-location')).toHaveTextContent('date=2026-11-12'));
-    expect(await screen.findByTestId('salida-history-erp-note')).toHaveTextContent('1');
+    const note = await screen.findByTestId('salida-history-erp-note');
+    expect(note).toHaveTextContent('1');
+    expect(within(note).getByText(i18n.t('ui.actionDone'))).toBeInTheDocument();
+    expect(screen.getByTestId('test-location')).not.toHaveTextContent('movimentos_attempt');
+    expect(screen.getByTestId('test-location')).not.toHaveTextContent('aero_data');
     expect(get).toHaveBeenCalledWith('/integration/aero/movements?date=2026-11-12');
     expect(localStorage.getItem('trindade.aero.salida-movimentos-attempt.v1')).toBeNull();
     expectNoCredential(audit);
@@ -1088,7 +1092,7 @@ describe('SalidaHistoryPage — T3 per-movement state, relaunch, operator filter
     await renderReady('/salida-history?date=2026-11-13');
 
     await waitFor(() =>
-      expect(screen.getByTestId('salida-preview-message').textContent).toContain('VINICIUS:'),
+      expect(screen.getByTestId('salida-preview-message').textContent).toContain('Vinícius R:'),
     );
     expect(screen.getByTestId('salida-preview-message').textContent).toContain('GORDURA: 7 un');
     // El operario local sigue estando una sola vez.
