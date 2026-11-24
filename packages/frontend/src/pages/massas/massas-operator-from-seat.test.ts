@@ -52,4 +52,28 @@ describe('operator creation from ERP seat (S16-S19)', () => {
   it('refreshes both the launches and the mirror immediately after creation (S18)', () => {
     assert.ok(page.includes('await Promise.all([loadDay(date), loadMirror(date)])'));
   });
+
+  it('stacks the row on mobile so the creation button cannot crush the operator and product', () => {
+    // On a 390 px phone the action block used to take more than half the row and leave the info column in a
+    // ~100 px strip: the row stacks and the horizontal layout comes back from `sm` on.
+    assert.ok(table.includes('flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-2'));
+    assert.ok(table.includes('min-w-0 w-full sm:w-auto sm:flex-1'));
+    assert.ok(table.includes('flex w-full flex-col items-stretch gap-1.5 sm:w-auto sm:shrink-0 sm:items-end'));
+  });
+
+  it('gives every action a full-width, thumb-sized target on mobile and keeps it natural on desktop', () => {
+    for (const testId of ['massas-import-', 'massas-create-operator-', 'massas-unified-send', 'massas-ack-']) {
+      assert.ok(table.includes(testId), `${testId} must still be rendered`);
+    }
+    const responsiveControl = 'min-h-[44px] w-full items-center justify-center gap-1.5';
+    const count = table.split(responsiveControl).length - 1;
+    assert.equal(count, 4, 'every row action keeps its 44 px floor and goes full width on mobile');
+    assert.ok(table.includes('sm:w-auto sm:justify-start'));
+  });
+
+  it('lets the explanatory notes read fluidly on mobile and keeps the narrow column on desktop', () => {
+    assert.ok(table.includes("className=\"w-full text-left text-[11px] text-amber-600 sm:max-w-[9rem] sm:w-auto sm:text-right\""));
+    const fluidNotes = table.split('w-full text-left text-[11px] text-gray-500 sm:max-w-[9rem] sm:w-auto sm:text-right').length - 1;
+    assert.equal(fluidNotes, 2, 'both gray notes drop the fixed width on mobile');
+  });
 });

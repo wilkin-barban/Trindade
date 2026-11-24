@@ -109,8 +109,8 @@ export function MassasUnifiedTable({
                 data-state={row.state}
                 className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-colors"
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-2">
+                  <div className="min-w-0 w-full sm:w-auto sm:flex-1">
                     <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium text-gray-900">
                       <span className="truncate">{row.operatorName}</span>
                       <span className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold ${STATE_CLASS[row.state]}`}>
@@ -135,7 +135,7 @@ export function MassasUnifiedTable({
                     )}
                   </div>
 
-                  <div className="flex shrink-0 flex-col items-end gap-1.5">
+                  <div className="flex w-full flex-col items-stretch gap-1.5 sm:w-auto sm:shrink-0 sm:items-end">
                     {row.state === 'erpOnly' &&
                       onImport &&
                       // A partial seat never reaches the button: importing it would invent units the ERP
@@ -154,7 +154,7 @@ export function MassasUnifiedTable({
                             })
                           }
                           disabled={busy || deviceLimited}
-                          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg bg-sky-600 px-3 text-xs font-semibold text-white disabled:opacity-50"
+                          className="inline-flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-lg bg-sky-600 px-3 text-xs font-semibold text-white disabled:opacity-50 sm:w-auto sm:justify-start"
                           data-testid={`massas-import-${row.entLans[0]}`}
                         >
                           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CloudUpload className="h-4 w-4" />}
@@ -168,7 +168,7 @@ export function MassasUnifiedTable({
                           type="button"
                           onClick={() => onCreateOperator(row)}
                           disabled={creatingOperatorEntLan === row.entLans[0] || deviceLimited}
-                          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                          className="inline-flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 sm:w-auto sm:justify-start"
                           data-testid={`massas-create-operator-${row.entLans[0]}`}
                         >
                           {creatingOperatorEntLan === row.entLans[0] ? (
@@ -183,7 +183,7 @@ export function MassasUnifiedTable({
                         exists, so the fix is reactivating the account, not creating it again. */}
                     {row.state === 'erpOnly' && seatNeedsReactivation(row) && (
                       <span
-                        className="max-w-[9rem] text-right text-[11px] text-amber-600"
+                        className="w-full text-left text-[11px] text-amber-600 sm:max-w-[9rem] sm:w-auto sm:text-right"
                         data-testid={`massas-reactivate-${row.entLans[0]}`}
                       >
                         {t('massas.unified.operatorInactive', 'Operador inativo: reative em Admin › Operários')}
@@ -193,14 +193,14 @@ export function MassasUnifiedTable({
                       !isAdmin &&
                       row.importable &&
                       seatOwnerStatus(row) === 'missing' && (
-                        <span className="max-w-[9rem] text-right text-[11px] text-gray-500">
+                        <span className="w-full text-left text-[11px] text-gray-500 sm:max-w-[9rem] sm:w-auto sm:text-right">
                           {t('massas.unified.operatorNotLinked', 'Operador não vinculado')}
                         </span>
                       )}
                     {/* The seat itself says why it cannot come in, whoever is reading: the reason is the
                         ERP's boxes, not the viewer's role. */}
                     {row.state === 'erpOnly' && !row.importable && (
-                      <span className="max-w-[9rem] text-right text-[11px] text-gray-500">
+                      <span className="w-full text-left text-[11px] text-gray-500 sm:max-w-[9rem] sm:w-auto sm:text-right">
                         {t('massas.unified.notWholeBoxes', 'Não fecha caixas inteiras')}
                       </span>
                     )}
@@ -212,7 +212,7 @@ export function MassasUnifiedTable({
                             type="button"
                             onClick={() => onSendToErp(row)}
                             disabled={!canSync || deviceLimited}
-                            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg bg-amber-600 px-3 text-xs font-semibold text-white disabled:opacity-50"
+                            className="inline-flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-lg bg-amber-600 px-3 text-xs font-semibold text-white disabled:opacity-50 sm:w-auto sm:justify-start"
                             data-testid="massas-unified-send"
                           >
                             <CloudUpload className="h-4 w-4" />
@@ -224,7 +224,7 @@ export function MassasUnifiedTable({
                             type="button"
                             onClick={() => onToggleAck(row)}
                             aria-pressed={row.tabletAcked}
-                            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-gray-300 px-3 text-xs font-semibold text-gray-700"
+                            className="inline-flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-lg border border-gray-300 px-3 text-xs font-semibold text-gray-700 sm:w-auto sm:justify-start"
                             data-testid={`massas-ack-${row.launchIds[0]}`}
                           >
                             <Smartphone className="h-4 w-4" />
