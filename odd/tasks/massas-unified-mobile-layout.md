@@ -29,18 +29,20 @@ Todos los tests unitarios (`test:unit`, `test:node`) y E2E deben mantenerse pasa
 - [x] T2 — Ajustar el maquetado responsivo en `packages/frontend/src/pages/massas/MassasUnifiedTable.tsx`.
 - [x] T3 — Añadir aserciones de regresión unitaria en `packages/frontend/src/pages/massas/massas-operator-from-seat.test.ts`.
 - [x] T4 — Ejecutar suites: `test:unit` 315/315, `test:node` 771/771, `tsc --noEmit` y `build` verdes.
-- [x] T5 — Commit atómico en `main` y push a `origin/main`.
-- [ ] T6 — Recompilar y desplegar el contenedor de producción `trindade-web-1` (`docker compose build web && docker compose up -d web`) y verificar salud.
+- [x] T5 — Commit atómico `65cacce9` en `main` y push a `origin/main`.
+- [x] T6 — Recompilar y desplegar el contenedor de producción `trindade-web-1` (`docker compose build web && docker compose up -d web`) y verificar salud.
 
 ## Evidencia
 
+- Commit: `65cacce96e1af348796dbee744dd83276bc147a1` en `main` (sin `Co-Authored-By` ni autoría IA).
+- Contenedor web de producción: `trindade-web-1` Up (healthy) en puerto 8085.
 - Contenedor de fila: `flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-2`.
 - Columna izquierda: `min-w-0 w-full sm:w-auto sm:flex-1`.
 - Bloque de acciones: `flex w-full flex-col items-stretch gap-1.5 sm:w-auto sm:shrink-0 sm:items-end`.
 - Los cuatro botones de fila (Importar, Criar Operário, Enviar ao ERP, Já na tablet) llevan `min-h-[44px] w-full items-center justify-center gap-1.5` y `sm:w-auto sm:justify-start`.
 - Notas aclaratorias: `w-full text-left text-[11px] … sm:max-w-[9rem] sm:w-auto sm:text-right`.
 - Todos los `data-testid` intactos.
-- T6 queda pendiente: el usuario la ejecuta al recompilar y desplegar.
+- Tests: 771/771 en `test:node`, 315/315 en `test:unit`, `tsc` y build limpios.
 
 ## Invariantes
 
