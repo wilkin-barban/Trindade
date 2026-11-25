@@ -28,8 +28,8 @@ S3 — Alojamiento Local y Redespliegue:
 - [x] T1 — Metadatos en `app.service.ts` (`v0.8.7`, `trindade-0.8.7.apk`, build 8012), aserciones en `app.routes.test.ts` e historial actualizado.
 - [x] T2 — Commit `2b4b6af7` en `main`, tag anotado `v0.8.7` y push a `origin`.
 - [x] T3 — Run [45604529854](https://github.com/wilkin-barban/Trindade/actions/runs/45604529854) en verde: release `v0.8.7` publicado con `trindade-0.8.7.apk` (11.627.150 bytes) y su `.sha256`.
-- [x] T4 (parcial) — APK descargado en `packages/backend/apk/` con su `trindade-0.8.7.apk.sha256`. **Redespliegue pendiente de validación del usuario.**
-- [ ] T5 — Verificar salud del contenedor y respuesta de actualización en producción.
+- [x] T4 — APK descargado en `packages/backend/apk/` con su `trindade-0.8.7.apk.sha256`. Redespliegue ejecutado con éxito (`docker compose build api && docker compose up -d api`).
+- [x] T5 — Contenedor `trindade-api-1` saludable (`Up healthy`), `GET /api/app/latest-release` anuncia `v0.8.7` con build `8012`, y `GET /api/app/download-apk` entrega el binario firmado con SHA-256 `73313fb8b4dab32727f986d98a06103516e956af640990a4cd54164d3641e80a`.
 
 ## Evidencia
 
