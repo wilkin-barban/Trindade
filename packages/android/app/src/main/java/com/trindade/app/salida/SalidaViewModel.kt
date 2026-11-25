@@ -204,7 +204,8 @@ class SalidaViewModel @Inject constructor(
 
     fun retryPending(username: String?) {
         viewModelScope.launch {
-            val outcome = repository.retryPending()
+            // El reenvío genérico no tiene un movimiento en la mano: si la cola está vacía, no hay nada que rearmar.
+            val outcome = repository.retryPending(null, username)
             _state.value = _state.value.copy(
                 history = runCatching { repository.history() }.getOrDefault(_state.value.history),
                 notice = SalidaNotice(outcome.message(), isError = !salidaErpOutcomeSucceeded(outcome)),
@@ -459,9 +460,15 @@ class SalidaViewModel @Inject constructor(
         }
     }
 
-    fun resendPending() {
+    /**
+     * Reenvía el documento que el histórico ofrece como pendiente.
+     *
+     * Se pasa el movimiento porque la cola local puede no existir: el servidor lo tiene en `failed` y sus ítems
+     * alcanzan para rearmar el viaje con la fecha del documento, en vez de dejar al operario sin salida.
+     */
+    fun resendPending(movement: SalidaCreateResponseMovement? = null) {
         viewModelScope.launch {
-            val outcome = repository.retryPending()
+            val outcome = repository.retryPending(movement, movement?.username)
             _state.value = _state.value.copy(
                 notice = SalidaNotice(
                     if (outcome is SalidaErpOutcome.Failed) "Reenvío con fallas: ${outcome.message}" else "Reenvío completado.",

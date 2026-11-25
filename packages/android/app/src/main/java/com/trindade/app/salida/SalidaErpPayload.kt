@@ -1,5 +1,8 @@
 package com.trindade.app.salida
 
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.Serializable
+
 /** Una línea de la baja, como se escribe en la pantalla: código del catálogo y unidades enteras. */
 data class SalidaLine(val code: String, val quantity: Int)
 
@@ -15,7 +18,12 @@ data class SalidaSelection(val lines: List<SalidaLine>) {
  *
  * Los nombres y el orden de los campos son los del contrato que la web usa desde la primera versión: el
  * WebService rechaza con 500 cualquier variación, así que esto no se "mejora".
+ *
+ * Lleva `@Serializable` porque Retrofit serializa el `@Body` en memoria antes de tocar la red: sin la
+ * anotación el viaje muere como `SerializationException` y el log lo cuenta como `AERO_ERP_UNREACHABLE`
+ * en pocos milisegundos, sin que el ERP llegue a ver el request.
  */
+@Serializable
 data class SaidaItemPayload(
     val PRO_COD: String,
     val PRO_DES: String,
@@ -25,7 +33,8 @@ data class SaidaItemPayload(
     val PED_SER: String,
     val PED_DTANOT: String,
     val PED_OBS: String,
-    val LOTES: List<String> = emptyList(),
+    // Siempre presente: el parser del ERP lee la clave aunque venga vacía, y omitirla devuelve 500.
+    @EncodeDefault val LOTES: List<String> = emptyList(),
 )
 
 object SalidaErpPayload {

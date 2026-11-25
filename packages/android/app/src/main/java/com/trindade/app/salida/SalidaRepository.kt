@@ -18,6 +18,7 @@ import com.trindade.app.aero.AeroWriteResult
 import com.trindade.app.contract.models.SalidaCreateResponseMovement
 import com.trindade.app.contract.models.SalidaHistoryResponseDaysInner
 import com.trindade.app.contract.models.SalidaErpResultRequest
+import com.trindade.app.contract.models.SalidaMovementErp
 import com.trindade.app.network.SalidaApi
 import com.trindade.app.network.toCreateRequest
 import javax.inject.Inject
@@ -68,7 +69,7 @@ class SalidaRepository @Inject constructor(
     private val api: SalidaApi,
     private val erpClient: AeroErpClient,
     private val settings: AeroSettingsPort,
-    private val outbox: SalidaOutboxStore,
+    private val outbox: SalidaOutboxPort,
     private val audit: SalidaAudit,
     @BackendClient private val photoClient: OkHttpClient? = null,
 ) {
@@ -154,9 +155,21 @@ class SalidaRepository @Inject constructor(
             finish(movement, outcome)
         }
 
-    /** Retoma lo que quedó pendiente, si hay algo. */
-    suspend fun retryPending(): SalidaErpOutcome = withContext(Dispatchers.IO) {
-        val pending = outbox.load() ?: return@withContext SalidaErpOutcome.Skipped
+    /**
+     * Retoma lo que quedó pendiente, si hay algo.
+     *
+     * La cola es la fuente principal, porque guarda los documentos armados con la fecha del día en que salieron.
+     * Pero una cola puede faltar -- el teléfono se reinstaló, el archivo se perdió, el operario limpió los datos --
+     * y el movimiento en Trindade queda clavado en `failed` sin nada que reintentar. Para ese caso el llamador
+     * pasa el movimiento: si el servidor lo tiene en fallo, sus ítems alcanzan para rearmar los documentos, con
+     * la fecha del movimiento y no la de hoy.
+     */
+    suspend fun retryPending(
+        movement: SalidaCreateResponseMovement? = null,
+        username: String? = null,
+    ): SalidaErpOutcome = withContext(Dispatchers.IO) {
+        val pending = outbox.load() ?: rebuild(movement, username)
+            ?: return@withContext SalidaErpOutcome.Skipped
         val credentials = credentials() ?: return@withContext SalidaErpOutcome.NotConfigured
         var sent = 0
         var failed = 0
@@ -183,11 +196,37 @@ class SalidaRepository @Inject constructor(
             }
             queue = outbox.advance(queue) ?: queue.copy(done = queue.trips.size)
         }
-        when {
+        val outcome = when {
             failed == 0 -> SalidaErpOutcome.Complete(sent)
             sent == 0 -> SalidaErpOutcome.Failed(message)
             else -> SalidaErpOutcome.Partial(sent, failed, message)
         }
+        // Reenviar no alcanza: sin este registro el servidor sigue mostrando el documento como fallido.
+        recordVerdict(pending.movementId, outcome)
+    }
+
+    /**
+     * Rearma la cola desde los ítems del movimiento cuando no hay nada guardado.
+     *
+     * Solo para un movimiento que el servidor tiene en fallo: rearmar uno conciliado o parcial inventaria un
+     * segundo envío de algo que el ERP ya recibió.
+     */
+    private fun rebuild(
+        movement: SalidaCreateResponseMovement?,
+        username: String?,
+    ): SalidaOutbox? {
+        if (movement == null) return null
+        if (movement.erp?.status != SalidaMovementErp.Status.failed) return null
+        val lines = movement.items.map { SalidaLine(it.productCode, it.quantity) }
+        val payloads = SalidaErpPayload.payloads(
+            SalidaSelection(lines),
+            movement.movementDate,
+            username ?: movement.username,
+        )
+        if (payloads.isEmpty()) return null
+        val rebuilt = SalidaOutbox(movement.id, movement.movementDate, SalidaErpPayload.trips(payloads))
+        outbox.save(rebuilt)
+        return rebuilt
     }
 
     /**
@@ -294,7 +333,10 @@ class SalidaRepository @Inject constructor(
     private suspend fun finish(
         movement: SalidaCreateResponseMovement,
         outcome: SalidaErpOutcome,
-    ): SalidaErpOutcome {
+    ): SalidaErpOutcome = recordVerdict(movement.id, outcome)
+
+    /** Escribe en Trindade el veredicto del viaje: es lo que el histórico muestra como estado del documento. */
+    private suspend fun recordVerdict(movementId: Int, outcome: SalidaErpOutcome): SalidaErpOutcome {
         val status = when (outcome) {
             is SalidaErpOutcome.Complete -> SalidaErpResultRequest.Status.sent
             is SalidaErpOutcome.Partial -> SalidaErpResultRequest.Status.partial
@@ -302,7 +344,7 @@ class SalidaRepository @Inject constructor(
             else -> return outcome
         }
         // El servidor guarda el veredicto y la auditoría del viaje: es lo que el histórico muestra como estado.
-        runCatching { api.recordErpResult(movement.id, SalidaErpResultRequest(status = status)) }
+        runCatching { api.recordErpResult(movementId, SalidaErpResultRequest(status = status)) }
         return outcome
     }
 

@@ -398,7 +398,7 @@ fun SalidaHistoryScreen(
                         null
                     },
                     onShare = { onOpenWhatsApp(viewModel.movementShareLink(movement, summaryLabels)) },
-                    onResend = if (viewModel.isPending(movement)) viewModel::resendPending else null,
+                    onResend = if (viewModel.isPending(movement)) { { viewModel.resendPending(movement) } } else null,
                     onDelete = if (salidaOffersDelete(movement, viewerUsername, viewerIsAdmin)) {
                         { viewModel.requestDeleteMovement(movement) }
                     } else {

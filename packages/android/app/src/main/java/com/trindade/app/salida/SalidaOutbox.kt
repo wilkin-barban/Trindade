@@ -23,30 +23,43 @@ data class SalidaOutbox(
 }
 
 /**
+ * Lo que el repositorio necesita de la cola.
+ *
+ * Una interfaz y no la clase concreta porque el reenvío se prueba con una cola en memoria: el viaje al ERP y
+ * el veredicto que se escribe en Trindade son la regla que hay que sostener, no las preferencias de Android.
+ */
+interface SalidaOutboxPort {
+    fun save(outbox: SalidaOutbox)
+    fun load(): SalidaOutbox?
+    fun clear()
+    fun advance(outbox: SalidaOutbox): SalidaOutbox?
+}
+
+/**
  * El almacén de la cola.
  *
  * Guarda el JSON en preferencias y lo lee con la misma forma: un archivo a medio escribir no puede dejar la app
  * con una cola que no se puede interpretar, así que una lectura fallida se trata como "no hay nada pendiente" y
  * el operario puede volver a lanzar.
  */
-class SalidaOutboxStore(private val context: Context) {
+class SalidaOutboxStore(private val context: Context) : SalidaOutboxPort {
 
-    fun save(outbox: SalidaOutbox) {
+    override fun save(outbox: SalidaOutbox) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit { putString(KEY, encode(outbox)) }
     }
 
-    fun load(): SalidaOutbox? {
+    override fun load(): SalidaOutbox? {
         val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, null) ?: return null
         return decode(raw)
     }
 
-    fun clear() {
+    override fun clear() {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { remove(KEY) }
     }
 
     /** Marca un viaje como confirmado; si ya no queda ninguno, la cola se vacía. */
-    fun advance(outbox: SalidaOutbox): SalidaOutbox? {
+    override fun advance(outbox: SalidaOutbox): SalidaOutbox? {
         val next = outbox.copy(done = outbox.done + 1)
         return if (next.isComplete) {
             clear()

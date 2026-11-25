@@ -208,6 +208,13 @@ object NetworkModule {
     fun provideSalidaOutboxStore(@ApplicationContext context: android.content.Context): com.trindade.app.salida.SalidaOutboxStore =
         com.trindade.app.salida.SalidaOutboxStore(context)
 
+    /** El repositorio habla con el puerto para que la cola se pueda sustituir en las pruebas del reenvío. */
+    @Provides
+    @Singleton
+    fun provideSalidaOutboxPort(
+        store: com.trindade.app.salida.SalidaOutboxStore,
+    ): com.trindade.app.salida.SalidaOutboxPort = store
+
     @Provides
     @Singleton
     fun provideAdminApi(@BackendClient retrofit: Retrofit): AdminApi = retrofit.create(AdminApi::class.java)
