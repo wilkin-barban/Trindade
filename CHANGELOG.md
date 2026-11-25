@@ -12,6 +12,16 @@ verificaciones está en [docs/release-android-historial.md](docs/release-android
 
 ## [Unreleased]
 
+### Histórico de Salida Android: compartir una baja con sus fotos y tirar la foto desde la app (0.8.10, build 8015)
+
+- **Compartir una baja suelta**: el botón de la tarjeta ahora arma el texto de esa baja con la tabla de
+  abreviaturas y adjunta sus fotos -- descargadas a la caché -- en la hoja del sistema, igual que la web. Antes
+  llamaba a `wa.me` con el texto y el callback que debía abrir la hoja estaba descolgado en `{}`, así que el botón
+  no hacía nada. Si el movimiento no tiene fotos, o ninguna llegó, el mensaje sale solo.
+- **Tirar foto con la cámara**: agregar una foto ofrece las dos puertas de la web (`capture="environment"` y el
+  carrete). La captura escribe en la caché y se comparte por FileProvider, y al volver se comprime y se sube al
+  movimiento; una captura cancelada no se confunde con un error de lectura.
+
 ### Salida y Masas: respuestas en ventana, acciones que no se parten y borradores que se retiran (2026-11-20)
 
 - **Salida**: los errores de sync/ERP (sin Wi-Fi de la empresa, ERP no configurado, conexión caída) y los avisos de
