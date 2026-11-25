@@ -47,7 +47,7 @@ S3 — Release Android v0.8.8 y Despliegue en Servidor:
 - [x] T2 — Restricción de reenvío en `SalidaHistoryScreen.kt`, `SalidaViewModel.kt`, `salida.routes.ts` y sus respectivos tests unitarios.
 - [x] T3 — Metadatos de release en `app.service.ts` (`v0.8.8`, build 8013), `app.routes.test.ts`, historial y commit atómico en `main`.
 - [ ] T4 — Tag `v0.8.8`, build y firma oficial en GitHub Actions.
-- [ ] T5 — Descarga de APK a `packages/backend/apk/`, redespliegue de `trindade-api-1` y verificación de salud y descarga.
+- [x] T5 — APK y `.sha256` en `packages/backend/apk/`; `trindade-api-1` reconstruido y reiniciado (healthy). `GET /api/app/latest-release` anuncia `v0.8.8` con `buildNumber: 8013` y `apkSize: 11627150`; `GET /api/app/download-apk` responde 200 con 11.627.150 bytes y SHA-256 `1166dbb09f84764d5cb97c064b5e73445b0109161c4082c753c98e0fc472b89e`.
 
 ## Log
 
