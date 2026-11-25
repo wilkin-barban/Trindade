@@ -327,6 +327,33 @@ export function isSalidaReadOnly(date: string, today: string = saoPauloToday()):
  * Only movements whose transmission is null or failed, and whose seats the company has not accepted.
  * A movement the ERP already accepted (sent or reconciled) must not be offered for relaunch.
  */
+/**
+ * ¿Se le ofrece a esta cuenta reenviar el documento al ERP?
+ *
+ * Reenviar escribe en la empresa y la baja viaja a nombre del operario que la lanzó. El histórico dibuja el día
+ * de toda la planta, así que la oferta es del dueño del movimiento o de un administrador: la tarjeta esconde el
+ * botón y la página vuelve a preguntar lo mismo antes de armar el viaje.
+ */
+export function salidaOffersResend(
+  movement: Pick<SalidaMovement, 'username' | 'erp'>,
+  viewerUsername: string | null | undefined,
+  isAdmin: boolean,
+  /**
+   * A stored trip still owes a document even when the ERP already confirmed the head of the trip, which is how
+   * a multiple-trip movement works: the movement reads `sent` and the remainder is still waiting. Without this
+   * the button would disappear exactly when there is something left to send.
+   */
+  hasOwedTrip = false,
+): boolean {
+  const status = movement.erp?.status ?? null;
+  const isPending = status === null || status === 'failed' || hasOwedTrip;
+  if (!isPending) return false;
+  if (isAdmin) return true;
+  const cleanViewer = String(viewerUsername ?? '').trim().toLowerCase();
+  const cleanOwner = String(movement.username ?? '').trim().toLowerCase();
+  return Boolean(cleanViewer) && cleanViewer === cleanOwner;
+}
+
 export function canRelaunchSalida(
   movement: Pick<SalidaMovement, 'erp' | 'reconciliation'> | null | undefined,
   isToday = true,

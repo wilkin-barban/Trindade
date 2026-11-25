@@ -16,7 +16,7 @@ import { aeroSettingsReady, type AeroSettings } from '../../lib/aero-integration
 import { fetchAeroVaultSettings } from '../../lib/aero-vault';
 import { lastSyncLabel, readAeroMovementsSnapshot, triggerAeroMovementsSync } from '../../lib/aero-mirror';
 import { SalidaReportSection, type SalidaReportDay } from '../../components/reports/SalidaReportSection';
-import { salidaOffersDelete, salidaOutboxIsOwed } from '../../lib/salida';
+import { salidaOffersDelete, salidaOffersResend, salidaOutboxIsOwed } from '../../lib/salida';
 import {
   SalidaSuccessDialog,
   type SalidaErpOutcome,
@@ -540,8 +540,20 @@ export function SalidaHistoryPage() {
    * The payloads are built from the movement itself, not from the catalogue: the product names that left are the
    * ones the record kept, and a catalogue that changed since then must not rewrite the exit.
    */
+  /** ¿Queda un viaje guardado que todavía debe un documento? Es lo que hace ofrecer el reenvío de una baja `sent`. */
+  const owesTrip = (target: SalidaMovement): boolean => {
+    const queued = readSalidaOutbox(undefined, target.id);
+    return Boolean(queued && salidaOutboxIsOwed(queued, [target]));
+  };
+
   const resendToErp = async (movement: SalidaMovement) => {
     if (isReadOnly) return;
+    // La tarjeta ya no dibuja el botón de una baja ajena; esto es la misma regla del lado de la acción, porque
+    // esconder un botón no autoriza el viaje que llegue igual.
+    if (!salidaOffersResend(movement, user?.username, Boolean(user?.role === 'Administrador'), owesTrip(movement))) {
+      setNotice({ type: 'error', message: t('salida.notOwner') });
+      return;
+    }
     setResendingId(movement.id);
     setNotice(null);
     try {
@@ -838,7 +850,11 @@ export function SalidaHistoryPage() {
               timeLabel={salidaTimeLabel(movement.created_at)}
               onShare={(target) => void shareMovement(target)}
               queuedRetry={readSalidaOutbox(undefined, movement.id) ?? undefined}
-              onResend={(target) => void resendToErp(target)}
+              onResend={
+                salidaOffersResend(movement, user?.username, Boolean(user?.role === 'Administrador'), owesTrip(movement))
+                  ? (target) => void resendToErp(target)
+                  : undefined
+              }
               onRefresh={() => void load()}
               resending={resendingId === movement.id}
               readOnly={isReadOnly}

@@ -37,6 +37,7 @@ import {
   salidaBatchToErpStatus,
   salidaPrimaryStatus,
   canRelaunchSalida,
+  salidaOffersResend,
   filterSessionMovements,
   isSalidaReadOnly,
   salidaClassifyError,
@@ -621,6 +622,44 @@ describe('movement primary status and relaunch rules (T3)', () => {
   it('offers relaunch only for null or failed erp, and never for accepted movements', () => {
     // Can relaunch:
     assert.equal(canRelaunchSalida({ erp: null, reconciliation: { status: 'pending', ent_lans: [], matched_item_ids: [] } }), true);
+  });
+
+  /**
+   * Quién puede reenviar una baja al ERP.
+   *
+   * Reenviar escribe en la empresa y la baja viaja a nombre de quien la lanzó: el histórico dibuja el día de
+   * toda la planta, así que la oferta es del dueño o de un administrador.
+   */
+  it('offers the resend to the owner and to an administrator, and to nobody else', () => {
+    const pending = movement({ username: 'ana', erp: null });
+
+    assert.equal(salidaOffersResend(pending, 'ana', false), true);
+    // La sesión puede traer otro casing: el nombre es el mismo.
+    assert.equal(salidaOffersResend(pending, ' ANA ', false), true);
+    assert.equal(salidaOffersResend(pending, 'wilkin', false), false);
+    assert.equal(salidaOffersResend(pending, '', false), false);
+    assert.equal(salidaOffersResend(pending, null, false), false);
+    assert.equal(salidaOffersResend(pending, 'wilkin', true), true);
+  });
+
+  it('never offers the resend on a movement the erp already took', () => {
+    const sent = movement({
+      username: 'ana',
+      erp: { status: 'sent', message: null, sentAt: '2026-11-13T12:00:00.000Z' },
+    });
+    const partial = movement({
+      username: 'ana',
+      erp: { status: 'partial', message: null, sentAt: '2026-11-13T12:00:00.000Z' },
+    });
+    const failed = movement({
+      username: 'ana',
+      erp: { status: 'failed', message: 'AERO_ERP_UNREACHABLE', sentAt: '2026-11-13T12:00:00.000Z' },
+    });
+
+    assert.equal(salidaOffersResend(sent, 'ana', true), false);
+    assert.equal(salidaOffersResend(partial, 'ana', true), false);
+    // Un intento fallido sí se puede repetir, y es el caso que la pantalla ofrece.
+    assert.equal(salidaOffersResend(failed, 'ana', false), true);
     assert.equal(
       canRelaunchSalida({
         erp: { status: 'failed', message: 'Falha', sentAt: '2026-11-16T15:14:00Z' },
