@@ -103,6 +103,31 @@ fun canImportRow(row: MassasUnifiedRow, viewerId: Int?, isAdmin: Boolean): Boole
 }
 
 /**
+ * Whether this account may send a pending row to the ERP, or mark it on the tablet.
+ *
+ * Sending writes in the company's book and the ack is the operator's word about a paper tablet: both belong to
+ * whoever launched the line, or to an administrator. The screen hides the actions and the view model refuses the
+ * call, because a list that draws every row is not permission to operate all of them.
+ */
+fun canManagePendingRow(row: MassasUnifiedRow, viewerId: Int?, isAdmin: Boolean): Boolean {
+    if (row.state != MassasRowState.PENDING_ERP) return false
+    return ownsPendingRow(row, viewerId, isAdmin)
+}
+
+/**
+ * Whether this account is the one the row belongs to, or an administrator.
+ *
+ * The table asks this together with the row state, because a reconciled row has nothing to send. The view model
+ * asks only this one: a row that is already settled still has to answer «ya está conciliada», which is the truth
+ * the operator needs, instead of a refusal about ownership that only describes who is looking.
+ */
+fun ownsPendingRow(row: MassasUnifiedRow, viewerId: Int?, isAdmin: Boolean): Boolean {
+    if (isAdmin) return true
+    val owner = row.ownerUserId ?: return false
+    return owner == viewerId
+}
+
+/**
  * Whether an administrator can create the operator directly from the unlinked ERP seat (S16, S19).
  *
  * An unlinked seat has `ownerUserId == null`. An inactive operator requires reactivation rather than creation.

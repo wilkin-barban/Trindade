@@ -93,9 +93,17 @@ fun MassasUnifiedTable(
                         isAdmin = isAdmin,
                         isInactive = isInactive,
                     )
+                    // Mandar al ERP y marcar «Na tablet» son actos del dueño del lanzamiento o de un
+                    // administrador: la tabla muestra el día de todos, pero no opera el de cualquiera.
+                    val canManagePending = canManagePendingRow(
+                        row = row,
+                        viewerId = viewer?.id,
+                        isAdmin = isAdmin,
+                    )
                     UnifiedRow(
                         row = row,
                         readOnly = state.isReadOnly,
+                        canManagePending = canManagePending,
                         sendEnabled = row.launchIds.none { it in state.sendingLaunchIds || it in state.dispatchedLaunchIds },
                         isAdmin = isAdmin,
                         canImport = canImport,
@@ -157,6 +165,7 @@ private fun BalanceBar(balance: MassasBalance, modifier: Modifier = Modifier) {
 private fun UnifiedRow(
     row: MassasUnifiedRow,
     readOnly: Boolean,
+    canManagePending: Boolean,
     sendEnabled: Boolean,
     isAdmin: Boolean,
     canImport: Boolean,
@@ -207,7 +216,9 @@ private fun UnifiedRow(
         if (!readOnly) {
             when (row.state) {
                 MassasRowState.RECONCILED -> Unit
-                MassasRowState.PENDING_ERP -> ActionRow(
+                MassasRowState.PENDING_ERP -> if (!canManagePending) {
+                    Unit
+                } else ActionRow(
                     primaryLabel = stringResource(R.string.massas_action_send),
                     onPrimary = onSend,
                     primaryEnabled = sendEnabled,

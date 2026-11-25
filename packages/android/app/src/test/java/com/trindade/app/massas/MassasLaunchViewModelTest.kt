@@ -119,7 +119,26 @@ class MassasLaunchViewModelTest {
         reachability = FakeReachability()
 
         viewModel = newViewModel(massasRepository)
+        // Quien mira la pantalla en estos tests es un administrador: las filas pendientes que construyen son
+        // suyas para operar. Los casos de permiso describen a la persona que corresponde.
+        viewModel.setViewer(adminViewer)
     }
+
+    /** Un trabajador de la planta que no lanzó las filas de estos casos. */
+    private val workerViewer = com.trindade.app.contract.models.ProfileResponseUser(
+        id = 17,
+        username = "ana",
+        displayName = "Ana",
+        role = "Trabalhador",
+    )
+
+    /** El administrador de la planta: ve y opera todas las filas. */
+    private val adminViewer = com.trindade.app.contract.models.ProfileResponseUser(
+        id = 1,
+        username = "wilkin",
+        displayName = "Wilkin",
+        role = "Administrador",
+    )
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @After
@@ -166,6 +185,48 @@ class MassasLaunchViewModelTest {
 
         testVm.promptDelete(settled.id)
         assertEquals(null, testVm.state.value.deleteConfirmLaunchId)
+    }
+
+    /**
+     * La tabla esconde las acciones de las filas ajenas; el view model las rechaza igual.
+     *
+     * Esconder no es autorizar: una composición vieja, otra pantalla o un test pueden llegar al mismo método.
+     * Sin `currentUser` resuelto la cuenta no es nadie, así que el ack de otro operario no se escribe.
+     */
+    @Test
+    fun `a viewer who is not the owner cannot acknowledge another operator row`() = runTest {
+        val pending = launch(21)
+        val repo = DayRepository(massasApi, dayWith(pending))
+        val testVm = newViewModel(repo)
+        testVm.setViewer(workerViewer)
+        testVm.refresh()
+        advanceUntilIdle()
+
+        val row = testVm.state.value.unifiedRows.single()
+        assertEquals(MassasRowState.PENDING_ERP, row.state)
+
+        testVm.acknowledgeLaunch(row)
+
+        assertFalse("El ack ajeno no se guarda", testVm.state.value.ackedLaunchIds.contains(pending.id))
+        assertEquals(UiText.of(R.string.massas_error_not_owner), testVm.state.value.resultDialogMessage)
+    }
+
+    @Test
+    fun `a viewer who is not the owner cannot put another operator row back on the tablet`() = runTest {
+        val pending = launch(22)
+        val repo = DayRepository(massasApi, dayWith(pending))
+        val testVm = newViewModel(repo)
+        testVm.setViewer(workerViewer)
+        testVm.refresh()
+        advanceUntilIdle()
+
+        val row = testVm.state.value.unifiedRows.single()
+        testVm.acknowledgeLaunch(row)
+        // El intento anterior tampoco escribió: no hay nada que deshacer y el aviso sigue siendo el mismo.
+        testVm.undoAcknowledgeLaunch(row)
+
+        assertTrue(testVm.state.value.ackedLaunchIds.isEmpty())
+        assertEquals(UiText.of(R.string.massas_error_not_owner), testVm.state.value.resultDialogMessage)
     }
 
     /**
@@ -255,7 +316,10 @@ class MassasLaunchViewModelTest {
         aeroDispatcher = AeroDispatcher(erpPort, mirrorPort, reachability),
         tabletAckStore = ackPort,
         usersRepository = usersRepository,
-    ).also { createdViewModels += it }
+    ).also {
+        createdViewModels += it
+        it.setViewer(adminViewer)
+    }
 
     @Test
     fun saopauloToday_matchesDateFormat() {

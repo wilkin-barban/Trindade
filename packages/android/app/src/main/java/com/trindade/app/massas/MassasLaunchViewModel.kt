@@ -236,10 +236,18 @@ class MassasLaunchViewModel @Inject constructor(
     }
 
     private fun loadCurrentUser() {
-        viewModelScope.launch {
-            val profile = authRepository.profile()
-            _state.value = _state.value.copy(currentUser = profile)
-        }
+        viewModelScope.launch { setViewer(authRepository.profile()) }
+    }
+
+    /**
+     * El único lugar donde se escribe quién está mirando.
+     *
+     * La pantalla decide con este dato qué filas puede operar, y el view model vuelve a preguntar lo mismo antes
+     * de mandar nada: sin saber quién mira, no se opera la fila de nadie. Los tests lo usan para describir esa
+     * persona sin levantar el perfil por red.
+     */
+    internal fun setViewer(profile: ProfileResponseUser?) {
+        _state.value = _state.value.copy(currentUser = profile)
     }
 
     fun onScreenActive(active: Boolean) {
@@ -748,6 +756,9 @@ class MassasLaunchViewModel @Inject constructor(
             return
         }
 
+        // El permiso se pregunta después de la verdad local: una fila ya conciliada contesta eso, no quién mira.
+        if (!mayManagePending(row)) return
+
         synchronized(rowSendLock) {
             if (row.launchIds.any { it in state.value.sendingLaunchIds || it in state.value.dispatchedLaunchIds }) return
             _state.value = _state.value.copy(sendingLaunchIds = state.value.sendingLaunchIds + row.launchIds)
@@ -965,7 +976,31 @@ class MassasLaunchViewModel @Inject constructor(
      * Kept on the device on purpose: it is what the operator standing next to the tablet knows, and it is not
      * something the ERP can tell us. It silences the button for this device without touching the row.
      */
+    /**
+     * El permiso de operar una fila pendiente, comprobado también acá.
+     *
+     * La tabla esconde los botones de las filas ajenas, pero esconder no es autorizar: un toque que llegue igual
+     * -- una composición vieja, un test, otra pantalla -- tiene que contestar lo mismo que la tabla, sin mandar
+     * nada al ERP ni escribir el ack de otro operario.
+     */
+    private fun mayManagePending(row: MassasUnifiedRow): Boolean {
+        val viewer = state.value.currentUser
+        val allowed = ownsPendingRow(
+            row = row,
+            viewerId = viewer?.id,
+            isAdmin = viewer?.role == "Administrador",
+        )
+        if (!allowed) {
+            _state.value = _state.value.copy(
+                resultDialogMessage = UiText.of(R.string.massas_error_not_owner),
+                resultDialogIsSuccess = false,
+            )
+        }
+        return allowed
+    }
+
     fun acknowledgeLaunch(row: MassasUnifiedRow) {
+        if (!mayManagePending(row)) return
         val id = row.launchIds.firstOrNull() ?: return
         tabletAckStore.ack(id)
         // The rows are derived from the state, and the ack is part of that derivation: the copy is what
@@ -980,6 +1015,7 @@ class MassasLaunchViewModel @Inject constructor(
      * the row stayed silent for the rest of the device's life and the only way out was clearing the app.
      */
     fun undoAcknowledgeLaunch(row: MassasUnifiedRow) {
+        if (!mayManagePending(row)) return
         val id = row.launchIds.firstOrNull() ?: return
         tabletAckStore.unack(id)
         _state.value = _state.value.copy(ackedLaunchIds = _state.value.ackedLaunchIds - id)

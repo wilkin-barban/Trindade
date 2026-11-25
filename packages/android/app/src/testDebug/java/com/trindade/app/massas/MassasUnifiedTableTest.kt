@@ -45,15 +45,24 @@ class MassasUnifiedTableTest {
         totalUnits = launches.sumOf { it.units },
     )
 
+    /** Un administrador mira la tabla salvo que el test diga otra cosa: es quien ve todas las filas. */
+    private val admin = com.trindade.app.contract.models.ProfileResponseUser(
+        id = 1,
+        username = "wilkin",
+        displayName = "Wilkin",
+        role = "Administrador",
+    )
+
     private fun draw(
         state: MassasLaunchViewModel.UiState,
+        viewer: com.trindade.app.contract.models.ProfileResponseUser? = admin,
         onAcknowledge: (MassasUnifiedRow) -> Unit = {},
         onUndoAcknowledge: (MassasUnifiedRow) -> Unit = {},
     ) {
         composeRule.setContent {
             TrindadeTheme {
                 MassasUnifiedTable(
-                    state = state,
+                    state = state.copy(currentUser = viewer),
                     onSend = {},
                     onAcknowledge = onAcknowledge,
                     onUndoAcknowledge = onUndoAcknowledge,
@@ -147,7 +156,11 @@ class MassasUnifiedTableTest {
         )
         val second = first.copy(id = 22, userId = 2, username = "bia", displayName = "Bia")
         val state = androidx.compose.runtime.mutableStateOf(
-            MassasLaunchViewModel.UiState(dayView = day(listOf(first, second)), sendingLaunchIds = setOf(21)),
+            MassasLaunchViewModel.UiState(
+                dayView = day(listOf(first, second)),
+                sendingLaunchIds = setOf(21),
+                currentUser = admin,
+            ),
         )
         composeRule.setContent {
             TrindadeTheme {

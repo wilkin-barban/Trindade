@@ -342,6 +342,61 @@ class MassasUnifiedTest {
         assertFalse("A worker is never offered operator creation", canCreateOperatorRow(row, isAdmin = false))
     }
 
+    /**
+     * Quién puede mandar un pendiente al ERP o marcarlo en la tablet.
+     *
+     * La tabla muestra el día de toda la planta, pero mandar escribe en el libro de la empresa y el ack es la
+     * palabra de un operario sobre un papel: ninguno de los dos es de quien esté mirando la lista.
+     */
+    @Test
+    fun `only the owner or an administrator may operate a pending row`() {
+        val rows = massasUnifiedRows(
+            MassasUnifiedInput(
+                launches = listOf(launch(id = 51, userId = 12, entLan = null)),
+                movements = emptyList(),
+                products = products,
+            ),
+        )
+        val row = rows.single()
+        assertEquals(MassasRowState.PENDING_ERP, row.state)
+        assertEquals(12, row.ownerUserId)
+
+        assertTrue(canManagePendingRow(row, viewerId = 12, isAdmin = false))
+        assertFalse(canManagePendingRow(row, viewerId = 17, isAdmin = false))
+        assertTrue(canManagePendingRow(row, viewerId = 1, isAdmin = true))
+    }
+
+    @Test
+    fun `a row with no owner is nobody's to send, not even for the worker who sees it`() {
+        val rows = massasUnifiedRows(
+            MassasUnifiedInput(
+                launches = listOf(launch(id = 52, userId = 12, entLan = null)),
+                movements = emptyList(),
+                products = products,
+            ),
+        )
+        val unowned = rows.single().copy(ownerUserId = null)
+
+        assertFalse(canManagePendingRow(unowned, viewerId = 12, isAdmin = false))
+        assertTrue("An administrator still arbitrates a row nobody owns", canManagePendingRow(unowned, viewerId = 1, isAdmin = true))
+    }
+
+    @Test
+    fun `a reconciled row offers nothing to send, not even to its owner`() {
+        // El lanzamiento con su asiento del espejo es una fila conciliada: ya no hay nada que mandar.
+        val rows = massasUnifiedRows(
+            MassasUnifiedInput(
+                launches = listOf(launch(id = 53, userId = 12, entLan = 880)),
+                movements = listOf(seat(entLan = 880, operatorName = "JEFFERSON", ownerUserId = 12, quantity = 36.0)),
+                products = products,
+            ),
+        )
+        val row = rows.single()
+        assertEquals(MassasRowState.RECONCILED, row.state)
+
+        assertFalse(canManagePendingRow(row, viewerId = 12, isAdmin = true))
+    }
+
     @Test
     fun `an inactive operator does not offer operator creation to an administrator`() {
         val rows = massasUnifiedRows(

@@ -1024,6 +1024,7 @@
     <string name="massas_error_already_imported">Este lanzamiento del ERP ya fue importado.</string>
     <string name="massas_error_not_found">Lanzamiento no encontrado.</string>
     <string name="massas_error_reconciled">Esta producción ya fue conciliada con el ERP y no puede modificarse.</string>
+    <string name="massas_error_not_owner">Solo quien lanzó esta producción o un administrador puede enviarla al ERP.</string>
     <string name="massas_error_invalid_boxes">Cantidad de cajas inválida.</string>
     <string name="massas_error_future_date">No es posible lanzar en fechas futuras.</string>
     <string name="massas_error_create_refused">El servidor rechazó el lanzamiento (código %1$d).</string>
