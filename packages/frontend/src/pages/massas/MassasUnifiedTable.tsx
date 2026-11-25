@@ -3,6 +3,7 @@ import { CloudUpload, Loader2, Smartphone, UserPlus } from 'lucide-react';
 import { MassasBalanceBar } from './MassasBalanceBar';
 import {
   canCreateOperatorRow,
+  canManagePendingRow,
   seatNeedsReactivation,
   seatOwnerStatus,
   canImportRow,
@@ -205,7 +206,7 @@ export function MassasUnifiedTable({
                       </span>
                     )}
 
-                    {row.state === 'pendingErp' && (
+                    {row.state === 'pendingErp' && canManagePendingRow(row, { userId: currentUserId, isAdmin }) && (
                       <>
                         {onSendToErp && (
                           <button

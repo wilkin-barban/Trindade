@@ -718,6 +718,7 @@
       "mirrorMissing": "A tabela espelho do ERP não existe: rode as migrações."
     },
     "unified": {
+      "notOwner": "Somente quem lançou esta produção ou um administrador pode enviá-la ao ERP.",
       "title": "Produção do dia",
       "subtitle": "Trindade e tablet da empresa, cada caixa contada uma vez.",
       "empty": "Nenhuma massa lançada neste dia.",
@@ -917,7 +918,8 @@
         }
       ]
     },
-    "salida": {
+      "notOwner": "Somente quem lançou esta baixa ou um administrador pode reenviá-la ao ERP.",
+"salida": {
       "title": "Saída / Baixa",
       "subtitle": "Baixa de insumos pela web",
       "description": "Registre a saída de embalagens, bobinas e matéria-prima em unidades. A data e o operador vêm da sessão: não são escolhidos.",

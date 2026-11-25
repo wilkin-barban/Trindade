@@ -81,6 +81,24 @@ export function canImportRow(
 }
 
 /**
+ * Whether this viewer may send a pending row to the ERP or mark it on the tablet.
+ *
+ * Sending writes in the company's book and the ack is the operator's word about a paper tablet: both belong to
+ * whoever launched the line, or to an administrator. The table hides the actions and the page refuses the call,
+ * because a list that draws every row is not permission to operate all of them.
+ */
+export function canManagePendingRow(
+  row: Pick<MassasUnifiedRow, 'state' | 'ownerUserId'>,
+  viewer: { userId?: number | null; isAdmin?: boolean },
+): boolean {
+  if (row.state !== 'pendingErp') return false;
+  if (viewer.isAdmin) return true;
+  if (row.ownerUserId === null) return false;
+  if (viewer.userId === null || viewer.userId === undefined) return false;
+  return row.ownerUserId === viewer.userId;
+}
+
+/**
  * Whether the viewer is offered the inline button to create the operator from the seat (S16, S19).
  *
  * Only an administrator, and only for an `erpOnly` seat whose operator is not linked yet (`ownerUserId === null`).

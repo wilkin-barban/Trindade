@@ -28,7 +28,7 @@ describe('an integration whose vault has no password', () => {
   });
 
   it('tells the operator when a pending row cannot be resent', () => {
-    const guard = blockAfter(history, 'const handleSendPendingLaunch = useCallback(');
+    const guard = blockAfter(history, 'const handleSendPendingLaunch = useCallback(', 800);
 
     assert.match(guard, /setNotice\(\{ type: 'error', message: erpNotReadyMessage/);
   });

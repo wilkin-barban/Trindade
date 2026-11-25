@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   canImportRow,
   canCreateOperatorRow,
+  canManagePendingRow,
   deriveDisplayName,
   seatNeedsReactivation,
   seatOwnerStatus,
@@ -308,6 +309,35 @@ describe('who the table offers the import to', () => {
     const row = workerSeat();
     assert.equal(canImportRow(row, { userId: 12, isAdmin: false }), true);
     assert.equal(canImportRow(row, { userId: 17, isAdmin: false }), false);
+  });
+
+  /**
+   * Quién puede mandar un pendiente al ERP o marcarlo en la tablet.
+   *
+   * La tabla dibuja el día de toda la planta; mandar escribe en el libro de la empresa y el ack es la palabra
+   * de un operario sobre un papel. Ninguno de los dos es de quien esté mirando la lista.
+   */
+  it('offers the pending actions to the owner and to an administrator, and to nobody else', () => {
+    const pending = massasUnifiedRows(input({ launches: [launch({ id: 41, user_id: 12 })] })).find(
+      (row) => row.state === 'pendingErp',
+    )!;
+
+    assert.equal(canManagePendingRow(pending, { userId: 12, isAdmin: false }), true);
+    assert.equal(canManagePendingRow(pending, { userId: 17, isAdmin: false }), false);
+    assert.equal(canManagePendingRow(pending, { userId: 1, isAdmin: true }), true);
+    assert.equal(canManagePendingRow(pending, { userId: null, isAdmin: false }), false);
+  });
+
+  it('never offers the pending actions on a reconciled row, not even to its owner', () => {
+    const reconciled = massasUnifiedRows(
+      input({
+        launches: [launch({ id: 42, ent_lan: 35938 })],
+        movements: [seat({ entLan: 35938, productCode: '001045', quantity: 20, operatorName: 'ALICE' })],
+      }),
+    ).find((row) => row.state === 'reconciled')!;
+
+    assert.ok(reconciled, 'the fixture must reconcile into a single row');
+    assert.equal(canManagePendingRow(reconciled, { userId: 1, isAdmin: true }), false);
   });
 
   it('offers every seat to an administrator only when the operator is already linked', () => {

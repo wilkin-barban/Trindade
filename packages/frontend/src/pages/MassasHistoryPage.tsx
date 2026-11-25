@@ -22,6 +22,7 @@ import { ArrowLeft, RefreshCw } from 'lucide-react';
 import { ModuleHelpModal } from '../components/ui/ModuleHelpModal';
 import { MassasCollectiveTable } from './massas/MassasCollectiveTable';
 import {
+  canManagePendingRow,
   deriveDisplayName,
   loadAckedLaunchIds,
   massasUnifiedRows,
@@ -433,6 +434,12 @@ export function MassasHistoryPage() {
 
   const handleSendPendingLaunch = useCallback(
     (row: MassasUnifiedRow) => {
+      // La tabla esconde las acciones de las filas ajenas; esto es la misma regla del lado del que actúa,
+      // porque esconder un botón no autoriza la llamada que llegue igual.
+      if (!canManagePendingRow(row, { userId: user?.id, isAdmin: user?.role === 'Administrador' })) {
+        setNotice({ type: 'error', message: t('massas.unified.notOwner') });
+        return;
+      }
       if (!aeroSettingsReady(aeroSettings)) {
         setNotice({ type: 'error', message: erpNotReadyMessage(t, aeroSettings) });
         return;
@@ -999,6 +1006,10 @@ export function MassasHistoryPage() {
   };
 
   const handleToggleAck = (row: MassasUnifiedRow) => {
+    if (!canManagePendingRow(row, { userId: user?.id, isAdmin: user?.role === 'Administrador' })) {
+      setNotice({ type: 'error', message: t('massas.unified.notOwner') });
+      return;
+    }
     const launchId = row.launchIds[0];
     if (launchId === undefined) return;
     setAckedLaunchIds(toggleAckedLaunchId(date, launchId));
