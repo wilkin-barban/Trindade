@@ -18,6 +18,7 @@ no sustituyen una comprobación independiente de todos los flujos. El usuario in
 
 | Versión | Build | Fecha | Estado | Cambios principales | SHA-256 del APK |
 | --- | ---: | --- | --- | --- | --- |
+| 0.8.7 | 8012 | 2026-11-24 | **Publicada** | Corrección de serialización de `SaidaItemPayload` (`@Serializable`), que hacía fallar el envío a `POST /saidasitem` con `AERO_ERP_UNREACHABLE` en milisegundos sin que el ERP viera el request; el reenvío ahora registra el veredicto en Trindade (`recordErpResult`) y puede rearmarse desde los ítems del movimiento cuando la cola local está vacía y el documento quedó en `failed` | Pendiente de la build de GitHub Actions |
 | 0.8.6 | 8011 | 2026-11-23 | **Publicada** | Sustitución interna de 0.8.6: conciliación de operario normalizada por espacios y display name, bloqueo de doble envío en masa, consulta de entradas/salidas en dos peticiones sin HTTP 500, aviso de instalación Play Protect y soporte de instalación desatendida en Android 12+ | `c7b51faa64b44298175bdbbf56a972ece81e47fc6963dcabadcb8dfff1a3e5a2` |
 | 0.8.6 | 8010 | 2026-11-21 | Reemplazada | Primera entrega de 0.8.6: remediación de paridad web/Android, modales en lugar de texto inline, cuota de 3 fotos y formato DD/MM/YYYY | `8efc23c90b26d0ad5ceb3ea52506d2dbe7dc94fe4679f14aac86ec92bb9084a6` |
 | 0.4.0 | 400 | 2026-10-14 | No publicada | Teléfono del conductor, compartir nativo, envío directo y tarjeta de cronograma activo | `11d219393ae457e6776c0c675b9fed634f6850043e8c283658c214a18ecfc273` |

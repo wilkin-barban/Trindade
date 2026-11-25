@@ -7,7 +7,7 @@ export const TRINDADE_APK_DOWNLOAD_URL =
   'https://trindademasas.duckdns.org/api/app/download-apk';
 
 export const FALLBACK_UPSTREAM_APK_URL =
-  'https://github.com/wilkin-barban/Trindade/releases/download/v0.8.6/trindade-0.8.6.apk';
+  'https://github.com/wilkin-barban/Trindade/releases/download/v0.8.7/trindade-0.8.7.apk';
 
 /**
  * The signed APK this project ships.
@@ -16,7 +16,7 @@ export const FALLBACK_UPSTREAM_APK_URL =
  * backend and is served from disk. Resolving it from this module and not from `process.cwd()` keeps the same
  * path in `tsx` (src/modules/app) and in the image (dist/modules/app), three levels below `packages/backend`.
  */
-export const LOCAL_APK_FILENAME = 'trindade-0.8.6.apk';
+export const LOCAL_APK_FILENAME = 'trindade-0.8.7.apk';
 
 /**
  * The internal build the file on disk carries.
@@ -77,7 +77,7 @@ function localApk(): { path: string; size: number; modifiedAt: string } | null {
 }
 
 export const FALLBACK_RELEASE: LatestReleaseResponse = {
-  version: 'v0.8.6',
+  version: 'v0.8.7',
   apkUrl: TRINDADE_APK_DOWNLOAD_URL,
   apkName: 'trindade.apk',
   apkSize: null,
