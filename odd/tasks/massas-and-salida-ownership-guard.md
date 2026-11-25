@@ -67,7 +67,11 @@ S4 — Release Android v0.8.9 (build 8014) y Despliegue Completo:
 - [x] T2 — Web: `canManagePendingRow` en `lib/massas-unified.ts`, gating en `MassasUnifiedTable.tsx` y rechazo en los dos handlers de `MassasHistoryPage.tsx`; `MassasCollectiveTable` sólo delega props. Tests en `massas-unified.test.ts`.
 - [x] T3 — Web: `salidaOffersResend` en `lib/salida.ts` con el cuarto parámetro `hasOwedTrip` (un viaje guardado que aún debe un documento mantiene la oferta con la cabeza en `sent`), usado por `SalidaHistoryPage.tsx` en la tarjeta y en `resendToErp`. `SalidaMovementCard` ya sólo dibuja el botón con `onResend`. Tests en `salida.test.ts`.
 - [x] T4 — `v0.8.9` / build 8014 en `app.service.ts`, `app.routes.test.ts`, `build.gradle.kts` y el historial. Backend 1001/1001.
-- [ ] T5 — Tag `v0.8.9`, build oficial en GitHub Actions, descarga de APK + hash a `packages/backend/apk/`, rebuild/deploy de `trindade-web-1` y `trindade-api-1`, verificación final.
+- [x] T5 — Tag `v0.8.9` y build oficial. El job `build` del run [45647359686](https://github.com/wilkin-barban/Trindade/actions/runs/45647359686) terminó en verde y verificó firma y versión; el job `publish` cayó tres veces con `HTTP 500/502/503` de la API de GitHub (lecturas respondían 200). El APK firmado y su `.sha256` se bajaron del artefacto `android-release` del propio run, se verificaron con `aapt2` (`8014` / `0.8.9`) y `apksigner` (`ee0e404b…c431f6`), y quedaron en `packages/backend/apk/` con `sha256sum -c` OK. El release `v0.8.9` se publicó cuando la API volvió: `trindade-0.8.9.apk` (11.627.726 bytes) y su checksum, con el asset de GitHub respondiendo 200.
+- `trindade-web-1` y `trindade-api-1` reconstruidos y recreados, ambos **healthy**.
+- Producción: `GET /api/app/latest-release` → `v0.8.9`, `buildNumber: 8014`, `apkSize: 11627726`; `GET /api/app/download-apk` → 200 con 11.627.726 bytes y SHA-256 `00c3d065c6c2245e485a7932ef519aff27c44ccca528b38346954d6f27360894`, idéntico al asset publicado.
+- **SHA-256 de la build 0.8.9**: `00c3d065c6c2245e485a7932ef519aff27c44ccca528b38346954d6f27360894`.
+- Incidente registrado: la API de escritura de releases de GitHub estuvo devolviendo 5xx durante ~10 minutos; no se movió el tag ni se reintentó el build, sólo la publicación.
 
 ## Log
 
