@@ -26,7 +26,7 @@ S4 — Bump de Build para Auto-Update de Android:
 - [x] T2 — `retryPending()` registra el veredicto con `recordErpResult` y rearma la cola desde los ítems cuando la cola está vacía y el movimiento quedó en `failed` (`SalidaRetryPendingTest`, 5 casos).
 - [x] T3 — `LOCAL_APK_BUILD_NUMBER = 8012` en `packages/backend/src/modules/app/app.service.ts`; las dos aserciones de `app.routes.test.ts` actualizadas.
 - [x] T4 — Suites: Android `com.trindade.app.salida.*` 101/101 (1 omitido preexistente), backend completo 998/998, frontend Node 771/771.
-- [ ] T5 — Commit atómico en `main` y push a `origin/main` sin `Co-Authored-By`.
+- [x] T5 — Commit atómico en `main` (`6f7f65e8`) y push a `origin/main` sin `Co-Authored-By`.
 
 ## Evidencia
 
