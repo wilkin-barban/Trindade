@@ -1,11 +1,8 @@
 package com.trindade.app.update
 
-import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageInstaller
 import android.net.Uri
-import android.os.Build
 import androidx.core.content.FileProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -38,7 +35,12 @@ class ApkInstaller @Inject constructor(
     }
 
     /**
-     * Triggers the package installation if permission is granted, or returns [InstallResult.PermissionRequired].
+     * Abre el instalador del sistema en primer plano.
+     *
+     * La sesión de `PackageInstaller` con `USER_ACTION_NOT_REQUIRED` se resolvía por un broadcast, y desde Android
+     * 12 el sistema bloquea el `startActivity` que ese receptor intentaba después: el viaje terminaba sin que el
+     * operario viera nada. El toque en «Atualizar Agora» ya es una acción en primer plano, así que el instalador
+     * se abre desde acá y la confirmación la muestra el propio sistema, que es donde el usuario la espera.
      */
     fun installApk(apkFile: File): InstallResult {
         if (!apkFile.exists() || apkFile.length() == 0L) {
@@ -51,34 +53,6 @@ class ApkInstaller @Inject constructor(
             }
             runCatching { context.startActivity(manageIntent) }
             return InstallResult.PermissionRequired(manageIntent)
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val sessionResult = runCatching {
-                val packageInstaller = context.packageManager.packageInstaller
-                val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
-                    setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
-                }
-                val sessionId = packageInstaller.createSession(params)
-                packageInstaller.openSession(sessionId).use { session ->
-                    apkFile.inputStream().use { input ->
-                        session.openWrite("package", 0, apkFile.length()).use { output ->
-                            input.copyTo(output)
-                            session.fsync(output)
-                        }
-                    }
-                    val intent = Intent(context, UpdateReceiver::class.java).apply {
-                        action = "com.trindade.app.ACTION_INSTALL_COMMIT"
-                    }
-                    val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
-                    val pendingIntent = PendingIntent.getBroadcast(context, sessionId, intent, flags)
-                    session.commit(pendingIntent.intentSender)
-                }
-                InstallResult.Launched(createInstallIntent(apkFile))
-            }
-            if (sessionResult.isSuccess) {
-                return sessionResult.getOrThrow()
-            }
         }
 
         return try {

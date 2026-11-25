@@ -103,6 +103,45 @@ class ApkInstallerTest {
     }
 
     @Test
+    fun `installApk opens the system installer directly instead of going through a package session`() {
+        shadowOf(context.packageManager).setCanRequestPackageInstalls(true)
+
+        val result = installer.installApk(testApk)
+
+        assertTrue(result is ApkInstaller.InstallResult.Launched)
+        val launched = shadowOf(ApplicationProvider.getApplicationContext<Context>() as android.app.Application).nextStartedActivity
+        assertEquals(Intent.ACTION_VIEW, launched.action)
+        assertEquals("application/vnd.android.package-archive", launched.type)
+    }
+
+    @Test
+    @Config(sdk = [34])
+    fun `on android 14 the installer still opens in the foreground from the tap`() {
+        shadowOf(context.packageManager).setCanRequestPackageInstalls(true)
+
+        val result = installer.installApk(testApk)
+
+        // La sesión de PackageInstaller delegaba en el receptor, y en Android 14 el sistema bloquea ese
+        // startActivity en segundo plano: el resultado era un viaje que no mostraba nada.
+        assertTrue(result is ApkInstaller.InstallResult.Launched)
+        val launched = shadowOf(ApplicationProvider.getApplicationContext<Context>() as android.app.Application).nextStartedActivity
+        assertEquals(Intent.ACTION_VIEW, launched.action)
+        assertTrue((launched.flags and Intent.FLAG_ACTIVITY_NEW_TASK) != 0)
+    }
+
+    @Test
+    fun `installApk reports an error instead of crashing when the installer cannot be opened`() {
+        shadowOf(context.packageManager).setCanRequestPackageInstalls(true)
+        val blockedContext = object : ContextWrapper(context) {
+            override fun startActivity(intent: Intent) { throw SecurityException("blocked") }
+        }
+
+        val result = ApkInstaller(blockedContext, permissionManager).installApk(testApk)
+
+        assertTrue(result is ApkInstaller.InstallResult.Error)
+    }
+
+    @Test
     @Config(sdk = [33])
     fun `pending package install opens the system confirmation in a new task`() {
         val confirmation = Intent("android.intent.action.CONFIRM_INSTALL")
