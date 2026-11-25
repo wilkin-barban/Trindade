@@ -31,7 +31,7 @@ S6 — Testing y Verificación:
 - [x] T3 — Crear pruebas unitarias en `packages/frontend/src/pages/EstoquePage.test.tsx` (6 casos).
 - [x] T4 — Suites: `test:unit` 321/321, `test:node` 771/771, `tsc --noEmit` sin errores, `build` correcto.
 - [x] T5 — Commit atómico en `main` y push a `origin/main` sin `Co-Authored-By`.
-- [ ] T6 — Recompilar y desplegar `trindade-web-1` (`docker compose build web && docker compose up -d web`) y verificar salud.
+- [x] T6 — Recompilar y desplegar `trindade-web-1` (`docker compose build web && docker compose up -d web`) y verificar salud.
 
 ## Evidencia
 
@@ -43,7 +43,7 @@ S6 — Testing y Verificación:
 - **S6** — Cero texto de resultado en el cuerpo: todo pasa por `MessageDialog` (`data-testid="estoque-message"`) o por la ventana neutra de sugerencia. Los mensajes de error usan las claves i18n, nunca el `message` crudo de una excepción.
 - **Definición del saldo ERP (decisión registrada)** — el WebService Aero32 no expone endpoint de existencia; solo `/movimentoitem`. La métrica ERP es el **movimiento neto del día** (`Σ E − Σ S` por código, comparando con `code.replace(/^0+/, '')`). Un espejo de otra fecha se trata como no sincronizado (test dedicado) en vez de restar días distintos. La etiqueta de la tarjeta dice `ERP (Día)` para no presentarlo como saldo de depósito.
 - **Verificación** — `test:unit` 321/321 (34 archivos), `test:node` 771/771 (186 suites), `tsc --noEmit` sin errores, `build` de Vite correcto con `EstoquePage` en su propio chunk. Dos corridas completas consecutivas de `test:unit` verdes; una corrida intermedia falló sin que se capturara el caso y no volvió a reproducirse.
-- T6 queda pendiente: la ejecuta el usuario al recompilar y desplegar.
+- **T6 completada** — Contenedor web recompilado y desplegado (`docker compose build web && docker compose up -d web`). Contenedor `trindade-web-1` en estado `Up (healthy)`, respondiendo HTTP 200 en `/estoque`. Commit de implementación: `bbd65045e5658208d7649eca630bd84ddea080a3`.
 
 ## Invariantes
 
