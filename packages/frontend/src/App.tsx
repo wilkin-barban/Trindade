@@ -31,6 +31,7 @@ const MassasLaunchPage = lazy(() => import('./pages/MassasLaunchPage').then(m =>
 const MassasHistoryPage = lazy(() => import('./pages/MassasHistoryPage').then(m => ({ default: m.MassasHistoryPage })));
 const SalidaLaunchPage = lazy(() => import('./pages/salida/SalidaLaunchPage').then(m => ({ default: m.SalidaLaunchPage })));
 const SalidaHistoryPage = lazy(() => import('./pages/salida/SalidaHistoryPage').then(m => ({ default: m.SalidaHistoryPage })));
+const EstoquePage = lazy(() => import('./pages/EstoquePage').then(m => ({ default: m.EstoquePage })));
 
 /**
  * The Android intercept, above the router because it is not about a page.
@@ -284,6 +285,14 @@ export function App() {
                 <SalidaRoute>
                   <SalidaHistoryPage />
                 </SalidaRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/estoque"
+            element={
+              <ProtectedRoute>
+                <EstoquePage />
               </ProtectedRoute>
             }
           />

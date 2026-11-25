@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { DeveloperCredit } from '../ui/DeveloperCredit';
 import { useTranslation } from 'react-i18next';
-import { LucideMenu, LucideX, LayoutDashboard, ClipboardList, Truck, ShieldCheck, History, Share2, Layers, Calculator, Boxes, CalendarDays, Archive, FileClock, FileSearch, PackageMinus, ClipboardX } from 'lucide-react';
+import { LucideMenu, LucideX, LayoutDashboard, ClipboardList, Truck, ShieldCheck, History, Share2, Layers, Calculator, Boxes, CalendarDays, Archive, FileClock, FileSearch, PackageMinus, ClipboardX, Warehouse } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { isSalidaVisible } from '../../lib/salida';
 import { Button } from '../ui/button';
@@ -133,7 +133,10 @@ export function AppShell({ children }: { children: ReactNode }) {
               </div>
               <NavItem href="/admin" icon={<ShieldCheck className="h-4 w-4" />} label={t('nav.adminPanel')} />
               {user?.role === 'Administrador' && (
-                <NavItem href="/admin/audit" icon={<FileSearch className="h-4 w-4" />} label={t('nav.audit')} />
+                <>
+                  <NavItem href="/estoque" icon={<Warehouse className="h-4 w-4" />} label={t('nav.estoque')} />
+                  <NavItem href="/admin/audit" icon={<FileSearch className="h-4 w-4" />} label={t('nav.audit')} />
+                </>
               )}
             </>
           )}

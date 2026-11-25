@@ -81,7 +81,8 @@
     "salidaHistory": "Historial de Salidas",
     "share": "Compartir",
     "stock": "Calculador de Estoque",
-    "stockHistory": "Historial de conteo"
+    "stockHistory": "Historial de conteo",
+    "estoque": "Estoque"
   },
   "ui": {
     "retry": "Intentar de nuevo",
@@ -1196,5 +1197,31 @@
     "downloadContinue": "Continuar en el navegador",
     "downloadStarting": "Iniciando la descarga…",
     "unknownOs": "dispositivo"
+  },
+  "estoque": {
+    "title": "Estoque",
+    "todayBadge": "Hoy, {{date}}",
+    "syncErp": "🔄 Sincronizar Stock ERP",
+    "syncing": "Sincronizando...",
+    "refresh": "Actualizar",
+    "lastSync": "Última sincronización: {{time}}",
+    "pendingSync": "Pendiente de sincronización",
+    "physical": "Físico",
+    "erp": "ERP (Día)",
+    "delta": "Diferencia",
+    "boxesLabel": "cjs",
+    "unitsLabel": "un",
+    "suggestEntrada": "Entrada",
+    "suggestSaida": "Salida",
+    "suggestEntradaTitle": "Sugerencia de Entrada",
+    "suggestSaidaTitle": "Sugerencia de Salida",
+    "suggestionEntradaMessage": "El stock físico ({{physical}} un) es mayor que el movimiento del ERP ({{erp}} un) por {{delta}} un. Sugerencia: registrar una Entrada en el ERP.",
+    "suggestionSaidaMessage": "El stock físico ({{physical}} un) es menor que el movimiento del ERP ({{erp}} un) por {{delta}} un. Sugerencia: registrar una Salida en el ERP.",
+    "suggestionNotice": "Esta es solo una recomendación de comprobación. Ninguna modificación fue enviada al ERP.",
+    "erpSyncUnavailable": "La integración con el ERP Aero32 no está configurada en la bóveda.",
+    "erpCheckError": "No fue posible sincronizar con el ERP.",
+    "erpSyncSuccess": "Sincronización con el ERP completada con éxito ({{count}} movimientos leídos).",
+    "erpSyncSaveFailed": "No fue posible guardar el espejo de movimientos del ERP.",
+    "loadError": "No fue posible cargar los datos de stock del día."
   }
 }
