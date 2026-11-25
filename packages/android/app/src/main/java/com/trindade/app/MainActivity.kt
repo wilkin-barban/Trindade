@@ -709,6 +709,9 @@ class MainActivity : ComponentActivity() {
                                             // El día vacío de hoy ofrece lanzar la primera baja: vuelve a la
                                             // pantalla de lanzamiento, no al tablero.
                                             onLaunch = { salidaHistoryOpen = false },
+                                            // La hoja del sistema es la primera puerta; este enlace es la que
+                                            // queda cuando el operario quiere mandarlo a un número concreto.
+                                            onOpenWhatsApp = { link -> salidaViewModel.openWhatsAppLink(link) },
                                         )
                                     } else {
                                         com.trindade.app.salida.SalidaLaunchScreen(

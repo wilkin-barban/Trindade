@@ -222,6 +222,24 @@ fun SalidaHistoryScreen(
     // deja el archivo en el carrete de la planta, así que una sola puerta alcanza para las dos.
     var pendingPhotoMovement by remember { mutableStateOf<Int?>(null) }
     val context = androidx.compose.ui.platform.LocalContext.current
+    // La captura directa es la puerta que la web ofrece con `capture="environment"`: el operario apunta al
+    // producto y la foto entra al movimiento sin pasar por el carrete. El archivo se escribe en la caché y se
+    // comparte por FileProvider, igual que en el detalle del Relatório.
+    var pendingCapture by remember { mutableStateOf<java.io.File?>(null) }
+    // Qué movimiento está eligiendo cómo agregar su foto: la cámara o el carrete.
+    var addPhotoMovement by remember { mutableStateOf<Int?>(null) }
+    val capturePhoto = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.TakePicture(),
+    ) { saved ->
+        val movementId = pendingPhotoMovement
+        val file = pendingCapture
+        pendingPhotoMovement = null
+        pendingCapture = null
+        // Una captura cancelada deja un archivo vacío: comprimirlo daría un error sobre la foto cuando lo que
+        // pasó es que el operario cerró la cámara.
+        if (!saved || movementId == null || file == null) return@rememberLauncherForActivityResult
+        viewModel.attachPhotoFromPath(movementId, file.absolutePath)
+    }
     val pickPhotos = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia(3),
     ) { uris ->
@@ -248,6 +266,16 @@ fun SalidaHistoryScreen(
             }.getOrNull()
             viewModel.attachPhotoFromPath(movementId, target.absolutePath)
         }
+    }
+
+    // La segunda puerta del carrete, para el diálogo de agregar foto.
+    fun chooseGallery(movementId: Int) {
+        pendingPhotoMovement = movementId
+        pickPhotos.launch(
+            androidx.activity.result.PickVisualMediaRequest(
+                androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly,
+            ),
+        )
     }
 
     val today = state.date
@@ -381,14 +409,7 @@ fun SalidaHistoryScreen(
                     // Sólo hoy y sólo si el movimiento es de esta cuenta: el de otro operario se lee, como el
                     // asiento que vino del ERP.
                     onAddPhoto = if (selected == today && movement.owns(viewerUsername) && movement.photos.size < SALIDA_MAX_PHOTOS) {
-                        {
-                            pendingPhotoMovement = movement.id
-                            pickPhotos.launch(
-                                androidx.activity.result.PickVisualMediaRequest(
-                                    androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly,
-                                ),
-                            )
-                        }
+                        { addPhotoMovement = movement.id }
                     } else {
                         null
                     },
@@ -397,7 +418,12 @@ fun SalidaHistoryScreen(
                     } else {
                         null
                     },
-                    onShare = { onOpenWhatsApp(viewModel.movementShareLink(movement, summaryLabels)) },
+                    onShare = {
+                        // La hoja del sistema lleva el texto y las fotos de esta baja; sin hoja, el enlace de siempre.
+                        if (!viewModel.shareMovementWithPhotos(movement, summaryLabels)) {
+                            onOpenWhatsApp(viewModel.movementShareLink(movement, summaryLabels))
+                        }
+                    },
                     onResend = if (salidaOffersResend(movement, viewerUsername, viewerIsAdmin, viewModel.isPending(movement))) {
                         { viewModel.resendPending(movement, viewerUsername, viewerIsAdmin) }
                     } else {
@@ -447,6 +473,47 @@ fun SalidaHistoryScreen(
                 ),
             ),
             onDismissRequest = { showHelpDialog = false },
+        )
+    }
+
+    // Agregar una foto tiene dos puertas, como la web: la cámara para apuntar al producto y el carrete para una
+    // foto que ya existe. La captura escribe en la caché y se comparte por FileProvider.
+    addPhotoMovement?.let { movementId ->
+        AlertDialog(
+            onDismissRequest = { addPhotoMovement = null },
+            title = { Text(stringResource(R.string.salida_photo_title)) },
+            text = { Text(stringResource(R.string.salida_photo_add)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        addPhotoMovement = null
+                        val file = com.trindade.app.reports.newCaptureFile(context)
+                        pendingCapture = file
+                        pendingPhotoMovement = movementId
+                        capturePhoto.launch(
+                            androidx.core.content.FileProvider.getUriForFile(
+                                context,
+                                "${context.packageName}.fileprovider",
+                                file,
+                            ),
+                        )
+                    },
+                    modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("salida-photo-camera"),
+                ) {
+                    Text(stringResource(R.string.salida_photo_take))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        addPhotoMovement = null
+                        chooseGallery(movementId)
+                    },
+                    modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("salida-photo-gallery"),
+                ) {
+                    Text(stringResource(R.string.salida_photo_gallery))
+                }
+            },
         )
     }
 

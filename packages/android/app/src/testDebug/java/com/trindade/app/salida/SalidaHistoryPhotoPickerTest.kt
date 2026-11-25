@@ -148,6 +148,8 @@ class SalidaHistoryPhotoPickerTest {
             hasTestTag("salida-photo-picker") and hasAnyAncestor(hasTestTag("salida-movement-$id")),
             useUnmergedTree = true,
         )[0].performClick()
+        // Agregar una foto tiene dos puertas, como la web: estos casos recorren la del carrete.
+        composeRule.onNodeWithTag("salida-photo-gallery").performClick()
     }
 
     @Test

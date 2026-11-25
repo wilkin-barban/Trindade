@@ -274,7 +274,7 @@ fun ReportDetailScreen(
  * The name carries a timestamp because the camera app may be handed several in a session and a fixed
  * name would have the second capture overwrite the first.
  */
-private fun newCaptureFile(context: Context): File {
+internal fun newCaptureFile(context: Context): File {
     val directory = File(context.cacheDir, "captures").apply { mkdirs() }
     return File(directory, "photo_${System.currentTimeMillis()}.jpg")
 }

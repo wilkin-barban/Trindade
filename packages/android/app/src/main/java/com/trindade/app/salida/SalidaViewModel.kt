@@ -513,6 +513,47 @@ class SalidaViewModel @Inject constructor(
         return true
     }
 
+    /**
+     * Comparte una baja suelta con sus fotos en la hoja del sistema.
+     *
+     * Es lo que la web hace con la tarjeta de un movimiento: el mismo texto de la tabla de abreviaturas y las
+     * fotos de esa baja, no las del día. Sin fotos -- o si ninguna llegó -- el mensaje sale solo, porque la
+     * acción no se pierde por una imagen que el servidor no entregó. Devuelve false sólo cuando no hay con qué
+     * compartir, y la pantalla cae entonces al enlace de WhatsApp.
+     */
+    fun shareMovementWithPhotos(
+        movement: com.trindade.app.contract.models.SalidaCreateResponseMovement,
+        labels: SalidaSummaryLabels = SalidaSummaryLabels(),
+    ): Boolean {
+        val manager = shareManager ?: return false
+        val text = salidaDaySummaryText(
+            date = movement.movementDate,
+            movements = listOf(movement),
+            abbreviations = abbreviationsSource?.table ?: com.trindade.app.massas.WhatsappAbbreviations.EMPTY,
+            labels = labels,
+        )
+        if (text.isBlank()) return false
+        val urls = movement.photos.mapNotNull { photo -> photo.publicUrl ?: photo.url }.filter { it.isNotBlank() }
+        val downloader = photoFiles
+        if (urls.isEmpty() || downloader == null) {
+            manager.shareText(text)
+            return true
+        }
+        viewModelScope.launch { shareSalidaWithPhotos(text, urls, manager, downloader) }
+        return true
+    }
+
+    /**
+     * Abre un enlace de WhatsApp con el navegador o la app.
+     *
+     * Es la otra mitad del share: cuando la hoja del sistema no está -- o el operario elige mandarlo a un número --
+     * el enlace es el camino, y la pantalla no tiene por qué saber de intents.
+     */
+    fun openWhatsAppLink(link: String): Boolean {
+        if (link.isBlank()) return false
+        return shareManager?.openLink(link) ?: false
+    }
+
     /** El enlace de WhatsApp de un movimiento suelto: su texto, con o sin teléfono. */
     fun movementShareLink(
         movement: com.trindade.app.contract.models.SalidaCreateResponseMovement,

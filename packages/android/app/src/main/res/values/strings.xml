@@ -718,6 +718,9 @@
     <string name="salida_photos_count">Fotos (%1$d)</string>
     <string name="salida_photo_delete">Excluir foto</string>
     <string name="salida_photo_add">Adicionar foto</string>
+    <string name="salida_photo_title">Foto do movimento</string>
+    <string name="salida_photo_take">Tirar foto</string>
+    <string name="salida_photo_gallery">Escolher do celular</string>
     <string name="salida_photo_number">Foto %1$d</string>
     <string name="salida_photo_unavailable">Foto indisponível</string>
     <string name="salida_photo_saved">Foto salva.</string>
