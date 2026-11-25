@@ -47,4 +47,27 @@ class SalidaMovementOwnershipTest {
         // Un asiento sin firma no le pertenece a nadie que esté mirando.
         assertFalse(movement("").owns(""))
     }
+
+    /**
+     * Reenviar escribe en la empresa, no sólo lee: la oferta es del dueño o de un administrador.
+     *
+     * Antes la pantalla ofrecía el botón a cualquiera con el movimiento a la vista, así que un trabajador podía
+     * despachar la baja de otro operario al ERP y firmarla con el nombre del dueño.
+     */
+    @Test
+    fun `only the owner or an administrator is offered the resend`() {
+        val mine = movement("wilkin")
+
+        assertTrue(salidaOffersResend(mine, "wilkin", viewerIsAdmin = false, isPending = true))
+        assertTrue(salidaOffersResend(mine, "ana", viewerIsAdmin = true, isPending = true))
+        assertFalse(salidaOffersResend(mine, "ana", viewerIsAdmin = false, isPending = true))
+    }
+
+    @Test
+    fun `a movement that is not pending is never offered, not even to its owner`() {
+        val mine = movement("wilkin")
+
+        assertFalse(salidaOffersResend(mine, "wilkin", viewerIsAdmin = false, isPending = false))
+        assertFalse(salidaOffersResend(mine, "wilkin", viewerIsAdmin = true, isPending = false))
+    }
 }

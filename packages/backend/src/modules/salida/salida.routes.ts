@@ -205,6 +205,21 @@ export async function salidaRoutes(fastify: FastifyInstance, options: SalidaRout
       return reply.status(404).send(apiError('Movimento não encontrado', SALIDA_ERROR_CODES.NOT_FOUND));
     }
 
+    // Reenviar escribe en la empresa a nombre de quien lanzó la baja: sólo el dueño del movimiento o un
+    // administrador pueden registrar el veredicto. El asiento de otro operario se lee, no se reenvía.
+    const owner = service.salidaMovementOwnerId(fastify.db, movementId);
+    const isAdmin = request.user!.role === 'Administrador';
+    if (!isAdmin && (owner === null || owner !== request.user!.sub)) {
+      return reply
+        .status(403)
+        .send(
+          apiError(
+            'Somente quem lançou o movimento ou um administrador pode registrar o resultado do ERP.',
+            SALIDA_ERROR_CODES.NOT_OWNER,
+          ),
+        );
+    }
+
     const parsed = SalidaErpResultBodySchema.safeParse(request.body);
     if (!parsed.success) {
       return reply

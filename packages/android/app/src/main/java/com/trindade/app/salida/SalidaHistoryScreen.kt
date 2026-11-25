@@ -398,7 +398,11 @@ fun SalidaHistoryScreen(
                         null
                     },
                     onShare = { onOpenWhatsApp(viewModel.movementShareLink(movement, summaryLabels)) },
-                    onResend = if (viewModel.isPending(movement)) { { viewModel.resendPending(movement) } } else null,
+                    onResend = if (salidaOffersResend(movement, viewerUsername, viewerIsAdmin, viewModel.isPending(movement))) {
+                        { viewModel.resendPending(movement, viewerUsername, viewerIsAdmin) }
+                    } else {
+                        null
+                    },
                     onDelete = if (salidaOffersDelete(movement, viewerUsername, viewerIsAdmin)) {
                         { viewModel.requestDeleteMovement(movement) }
                     } else {
@@ -523,6 +527,19 @@ internal fun salidaOffersDelete(
     val status = movement.erp?.status?.value
     return status != "sent" && status != "partial"
 }
+
+/**
+ * ¿Se le ofrece a esta cuenta reenviar el documento al ERP?
+ *
+ * Reenviar escribe en la empresa: la baja viaja a nombre del operario que la lanzó. Por eso la oferta es del
+ * dueño del movimiento o de un administrador, y no de cualquiera que abra el histórico del día.
+ */
+internal fun salidaOffersResend(
+    movement: com.trindade.app.contract.models.SalidaCreateResponseMovement,
+    viewerUsername: String,
+    viewerIsAdmin: Boolean,
+    isPending: Boolean,
+): Boolean = isPending && (viewerIsAdmin || movement.owns(viewerUsername))
 
 internal fun SalidaCreateResponseMovement.owns(viewerUsername: String): Boolean =
     viewerUsername.isNotBlank() && username.equals(viewerUsername, ignoreCase = true)

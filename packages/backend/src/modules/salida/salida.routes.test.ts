@@ -858,6 +858,56 @@ describe('salida routes', () => {
       assert.equal(movement.erp.status, 'sent');
       assert.equal(movement.erp.message, null);
     });
+
+    it('refuses another operator with 403 and does not record the verdict', async () => {
+      const created = await launch([{ code: '1357', quantity: 4 }]);
+      assert.equal(created.statusCode, 201, created.body);
+      const movementId = JSON.parse(created.body).movement.id as number;
+
+      // Otra cuenta de la planta, sin ser el dueño ni administrador: el documento no es suyo.
+      const refused = await app.inject({
+        method: 'POST',
+        url: `/api/salida/${movementId}/erp-result`,
+        headers: auth(workerToken),
+        payload: { status: 'sent' },
+      });
+      assert.equal(refused.statusCode, 403, refused.body);
+      assert.equal(JSON.parse(refused.body).code, 'SALIDA_NOT_OWNER');
+
+      // El veredicto no se escribió: el documento sigue pendiente.
+      const day = await app.inject({ method: 'GET', url: '/api/salida', headers: wilkin() });
+      const stored = (JSON.parse(day.body).movements as { id: number; erp: { status: string } | null }[])
+        .find((row) => row.id === movementId);
+      assert.equal(stored?.erp ?? null, null);
+    });
+
+    it('lets the owner record the verdict of their own movement', async () => {
+      const created = await launch([{ code: '1357', quantity: 4 }], workerToken);
+      const movementId = JSON.parse(created.body).movement.id as number;
+
+      const response = await app.inject({
+        method: 'POST',
+        url: `/api/salida/${movementId}/erp-result`,
+        headers: auth(workerToken),
+        payload: { status: 'sent' },
+      });
+      assert.equal(response.statusCode, 200, response.body);
+      assert.equal(JSON.parse(response.body).movement.erp.status, 'sent');
+    });
+
+    it('lets the Administrador record the verdict of another operator movement', async () => {
+      const created = await launch([{ code: '1357', quantity: 4 }], workerToken);
+      const movementId = JSON.parse(created.body).movement.id as number;
+
+      const response = await app.inject({
+        method: 'POST',
+        url: `/api/salida/${movementId}/erp-result`,
+        headers: wilkin(),
+        payload: { status: 'sent' },
+      });
+      assert.equal(response.statusCode, 200, response.body);
+      assert.equal(JSON.parse(response.body).movement.erp.status, 'sent');
+    });
   });
 
   /**

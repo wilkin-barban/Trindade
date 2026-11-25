@@ -465,9 +465,22 @@ class SalidaViewModel @Inject constructor(
      *
      * Se pasa el movimiento porque la cola local puede no existir: el servidor lo tiene en `failed` y sus ítems
      * alcanzan para rearmar el viaje con la fecha del documento, en vez de dejar al operario sin salida.
+     *
+     * La comprobación de propiedad no es sólo de la pantalla: el ViewModel también la hace, porque reenviar
+     * escribe en la empresa a nombre del operario que lanzó la baja y una llamada de más no puede colarse.
      */
-    fun resendPending(movement: SalidaCreateResponseMovement? = null) {
+    fun resendPending(
+        movement: SalidaCreateResponseMovement? = null,
+        viewerUsername: String = "",
+        viewerIsAdmin: Boolean = false,
+    ) {
         viewModelScope.launch {
+            if (movement != null && !salidaOffersResend(movement, viewerUsername, viewerIsAdmin, isPending(movement))) {
+                _state.value = _state.value.copy(
+                    notice = SalidaNotice("Solo quien lanzó la baja puede reenviarla al ERP.", isError = true),
+                )
+                return@launch
+            }
             val outcome = repository.retryPending(movement, movement?.username)
             _state.value = _state.value.copy(
                 notice = SalidaNotice(
