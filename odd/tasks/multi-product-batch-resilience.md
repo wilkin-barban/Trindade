@@ -26,12 +26,12 @@ Rama: `fix/multi-product-batch-resilience` (desde `13c663de`) · Estrategia de e
 
 ## Tasks
 
-- [ ] T1 · S1 · inline · Bridge `Aero32Bridge.js`: serialización JSON segura en errores de lote (`indice >= 1`), deduplicación del loop de envío y regeneración de assets + test VM
-- [ ] T2 · S2 · inline · Web Massas: restauración de `inFlight` + auditoría en `wifi_required` y guard síncrono de callback en `MassasHistoryPage.tsx` + tests
-- [ ] T3 · S3 · inline · Web Salida: liberación de `currentTripPayloads` en error/fallo total y estado `'partial'` en multi-viaje (`SalidaHistoryPage.tsx`) + tests
-- [ ] T4 · S4 · inline · Android Massas: `erpBatchTimeoutMs`, pre-encolado completo en `AeroQueueStore` y `break` ante error de transporte en `MassasLaunchViewModel.kt` + tests
-- [ ] T5 · S5 · inline · Android Salida: outbox por `movementId`, liquidación por payload individual, `erpBatchTimeoutMs` y persistencia `NonCancellable` de outbox/veredicto + tests
-- [ ] T6 · S6 · verifier + inline · Suites completas (Frontend, Backend, Android), verificación diferencial contra base `13c663de`, revisor independiente de riesgo alto y cierre de documento ODD
+- [x] T1 · S1 · inline · `8c3b0356`, `f6829d69` · Bridge `Aero32Bridge.js`: serialización JSON segura en errores de lote (`indice >= 1`), deduplicación del loop de envío y regeneración de assets + test VM
+- [x] T2 · S2 · inline · `a1dfcb20`, `54585d25`, `f6829d69` · Web Massas: restauración de `inFlight` + auditoría en `wifi_required` y guard síncrono de callback en `MassasHistoryPage.tsx` + tests
+- [x] T3 · S3 · inline · `013f0ae4`, `f6829d69` · Web Salida: liberación de `currentTripPayloads` en error/fallo total y estado `'partial'` en multi-viaje (`SalidaHistoryPage.tsx`) + tests
+- [x] T4 · S4 · inline · `088abd41`, `f6829d69` · Android Massas: `erpBatchTimeoutMs`, pre-encolado completo en `AeroQueueStore` y `break` ante error de transporte en `MassasLaunchViewModel.kt` + tests
+- [x] T5 · S5 · inline · `fb7cb42c`, `f6829d69` · Android Salida: outbox por `movementId`, liquidación por payload individual, `erpBatchTimeoutMs` y persistencia `NonCancellable` de outbox/veredicto + tests
+- [x] T6 · S6 · verifier + inline · `f6829d69` + cierre ODD · Suites completas (Frontend, Backend, Android), verificación diferencial contra base `13c663de`, revisor independiente de riesgo alto y cierre de documento ODD
 
 ## Log
 
@@ -47,3 +47,15 @@ Entrégame un relatório con los hallazgos y remediaciones para la aplicación w
   - En producción (`2026-11-26T14:41:36Z`), `Scriptable` canjeó el ticket de `entrada_lote` desde IP `179.68.125.32` (Claro S.A.) mientras los demás intentos salieron por `189.11.66.175` (V.tal/Oi), causando `wifi_required` tras `TIEMPO_LIMITE = 10`s; adicionalmente se verificaron bugs reales en `Aero32Bridge.js` (JSON inválido cuando falla `indice >= 1`), `MassasHistoryPage.tsx` (cola `inFlight` huérfana y sin auditoría en error + race de doble callback), `SalidaHistoryPage.tsx` (`currentTripPayloads` bloqueando reenvío en `error` y `'sent'` prematuro en `trips > 1`), y Android (`withErpTimeout(25_000L)` global, pre-encolado parcial por ítem en Massas, reenvío duplicado por viaje y pérdida de outbox/veredicto en timeout de Salida).
   - Risk alto identificado: ítem 3 (contrato del puente `Aero32Bridge.js`, `AeroQueue` / `SalidaOutbox` compatibles hacia atrás) e ítem 4 (orden asíncrono de callbacks, `withErpTimeout`, `NonCancellable`, `erpDispatchMutex`).
   - Nota de Engram: `mem_current_project` sobre el workspace del runtime (`/home/wilkin/Desktop`) resolvió `desktop`, por lo que el mirror de Engram en el proyecto Trindade queda marcado pendiente y la fuente local autoritativa es este documento.
+- L3. Verificación diferencial contra base `13c663de`, revisión independiente y cierre (`2026-11-26`):
+  - Revisor independiente de solo lectura (`odd-independent-verifier`, conv `841a3906`) auditó `13c663de..54585d25`: veredicto `S1`–`S6` todas `met`, `0 Blockers` y 5 avisos no bloqueantes; sus 5 sondas regresivas quedaron integradas de forma permanente en `f6829d69`.
+  - Diferencial contra `13c663de` en copias aisladas: la base reproducía fallo de JSON `'unreadable'` en `Aero32Bridge.js`, pérdida/no restauración de `inFlight` y cuádruple lectura en `MassasHistoryPage`, y bloqueo/estado `'sent'` prematuro en `SalidaHistoryPage`; todas pasan en `HEAD`.
+  - Verificación completa ejecutada tras el último cambio de código/tests (`f6829d69`):
+    - `npm run typecheck`: OK (`0` errores).
+    - `npm run build --workspace=packages/frontend`: OK (`built in 16.24s`; `build-scriptable.mjs` reportó `sin cambios` en `public/Aero32Bridge.js` y `public/Aero32Bridge.scriptable`).
+    - `bash scripts/verify-schema-clis.sh` y `bash scripts/verify-openapi-artifact.sh`: OK.
+    - Backend (`npm run test --workspace=packages/backend` con `AERO_VAULT_KEY` efímera): `1001/1001` tests passed (`152` suites, `0` fallos).
+    - Frontend Node (`npm run test:node --workspace=packages/frontend`): `780/780` tests passed (`187` suites, `0` fallos).
+    - Frontend Unit (`npm run test:unit --workspace=packages/frontend`): `332/332` tests passed (`34/34` archivos, `0` errores en ejecución limpia; una corrida previa aislada mostró 1 rechazo asíncrono post-teardown preexistente en `LoadingSchedulePage.test.tsx`).
+    - Android (`./gradlew testDebugUnitTest --no-daemon` en copia limpia `scratch/android-check` por archivos root-owned preexistentes en `packages/android/app/build`): `BUILD SUCCESSFUL`, XML `files=201 tests=1649 skipped=1 failures=0 errors=0` (`SalidaPhotoTransportSafetyTest.literalPhotoUrlPreservesRootPathWithoutQueryOrFragment` con `@Ignore` preexistente).
+  - Risk de cierre: `item 3 (contrato del puente Aero32Bridge.js, AeroQueue y SalidaOutbox), item 4 (concurrencia de callbacks, withErpTimeout y NonCancellable)` — verificado por revisor independiente sin bloqueantes.
