@@ -77,6 +77,55 @@ if (!sobre || !sobre.url || !sobre.callback) {
   return;
 }
 
+function normalizeBatchItem(rawText) {
+  try {
+    return JSON.parse(rawText);
+  } catch (error) {
+    const text = typeof rawText === 'string' && rawText.trim() ? rawText.trim() : 'Error al enviar al ERP';
+    return { success: false, message: text };
+  }
+}
+
+async function sendPostBatch(url, method, headers, bodies, callbackUrl) {
+  const responses = [];
+  for (let indice = 0; indice < bodies.length; indice += 1) {
+    try {
+      const envio = new Request(url);
+      envio.method = method || 'POST';
+      envio.headers = headers;
+      envio.body = bodies[indice];
+      envio.allowInsecureRequest = true;
+      envio.timeoutInterval = TIEMPO_LIMITE;
+      responses.push(await envio.loadString());
+    } catch (error) {
+      if (indice === 0) {
+        // El primer cuerpo prueba el alcance: si no responde, no hay Wi-Fi o ERP.
+        Safari.open(
+          callbackUrl +
+            '&aero_error=wifi_required&aero_msg=' +
+            encodeURIComponent(MENSAJE_SIN_ERP),
+        );
+        Script.complete();
+        return { aborted: true, responses: [] };
+      }
+      const message = error && error.message ? String(error.message) : 'Error al enviar al ERP';
+      responses.push(JSON.stringify({ success: false, message }));
+    }
+  }
+  return { aborted: false, responses };
+}
+
+function parseBatchResponses(responses) {
+  if (responses.length === 1) {
+    try {
+      return JSON.parse(responses[0]);
+    } catch (error) {
+      return responses[0];
+    }
+  }
+  return responses.map(normalizeBatchItem);
+}
+
 let datoResultado = null;
 
 if (Array.isArray(sobre.steps) && sobre.steps.length > 0) {
@@ -88,40 +137,17 @@ if (Array.isArray(sobre.steps) && sobre.steps.length > 0) {
     Array.isArray(pasoLanzamiento.bodies) && pasoLanzamiento.bodies.length > 0
       ? pasoLanzamiento.bodies
       : [pasoLanzamiento.body];
-  const respuestasLanzamiento = [];
-
-  for (let indice = 0; indice < cuerposLanzamiento.length; indice += 1) {
-    try {
-      const envio = new Request(pasoLanzamiento.url);
-      envio.method = pasoLanzamiento.method || 'POST';
-      envio.headers = pasoLanzamiento.headers || sobre.headers;
-      envio.body = cuerposLanzamiento[indice];
-      envio.allowInsecureRequest = true;
-      envio.timeoutInterval = TIEMPO_LIMITE;
-      respuestasLanzamiento.push(await envio.loadString());
-    } catch (error) {
-      if (indice === 0) {
-        // El primer cuerpo prueba el alcance: si no responde, no hay Wi-Fi o ERP.
-        Safari.open(
-          sobre.callback +
-            '&aero_error=wifi_required&aero_msg=' +
-            encodeURIComponent(MENSAJE_SIN_ERP),
-        );
-        Script.complete();
-        return;
-      }
-      respuestasLanzamiento.push(error && error.message ? String(error.message) : 'Error al enviar al ERP');
-    }
+  const batchLanzamiento = await sendPostBatch(
+    pasoLanzamiento.url,
+    pasoLanzamiento.method || 'POST',
+    pasoLanzamiento.headers || sobre.headers,
+    cuerposLanzamiento,
+    sobre.callback,
+  );
+  if (batchLanzamiento.aborted) {
+    return;
   }
-
-  const rawLanzamiento =
-    respuestasLanzamiento.length === 1 ? respuestasLanzamiento[0] : '[' + respuestasLanzamiento.join(',') + ']';
-  let launch = rawLanzamiento;
-  try {
-    launch = JSON.parse(rawLanzamiento);
-  } catch (error) {
-    launch = rawLanzamiento;
-  }
+  const launch = parseBatchResponses(batchLanzamiento.responses);
 
   let read = null;
   if (sobre.steps.length > 1) {
@@ -162,49 +188,17 @@ if (Array.isArray(sobre.steps) && sobre.steps.length > 0) {
 } else {
   // Sobre simple legacy (o acciones sin steps como saida, test, movimentos aislados).
   const cuerpos = Array.isArray(sobre.bodies) && sobre.bodies.length > 0 ? sobre.bodies : [sobre.body];
-  const respuestas = [];
-
-  for (let indice = 0; indice < cuerpos.length; indice += 1) {
-    try {
-      const envio = new Request(sobre.url);
-      envio.method = 'POST';
-      envio.headers = sobre.headers;
-      envio.body = cuerpos[indice];
-      envio.allowInsecureRequest = true;
-      envio.timeoutInterval = TIEMPO_LIMITE;
-      respuestas.push(await envio.loadString());
-    } catch (error) {
-      if (indice === 0) {
-        Safari.open(
-          sobre.callback +
-            '&aero_error=wifi_required&aero_msg=' +
-            encodeURIComponent(MENSAJE_SIN_ERP),
-        );
-        Script.complete();
-        return;
-      }
-      respuestas.push(error && error.message ? String(error.message) : 'Error al enviar al ERP');
-    }
+  const batchLegacy = await sendPostBatch(sobre.url, 'POST', sobre.headers, cuerpos, sobre.callback);
+  if (batchLegacy.aborted) {
+    return;
   }
-
-  const resultado = respuestas.length === 1 ? respuestas[0] : '[' + respuestas.join(',') + ']';
-  try {
-    datoResultado = JSON.parse(resultado);
-  } catch (error) {
-    datoResultado = resultado;
-  }
+  datoResultado = parseBatchResponses(batchLegacy.responses);
 
   // Dos lados del día en un viaje: la página espera una sola lista de asientos, no una lista de listas.
   // Se unen las respuestas buenas y se suman los asientos que cada lado no pudo leer; si un lado falló, el
   // resultado es ese fallo, porque medio día presentado como el día entero es peor que un error.
   if (cuerpos.length > 1 && /movimentoitem/i.test(String(sobre.url))) {
-    const partes = respuestas.map(function (respuesta) {
-      try {
-        return JSON.parse(respuesta);
-      } catch (error) {
-        return null;
-      }
-    });
+    const partes = Array.isArray(datoResultado) ? datoResultado : [datoResultado];
     const todasListas = partes.every(function (parte) {
       return parte && parte.success === true && Array.isArray(parte.data);
     });
