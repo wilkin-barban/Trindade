@@ -171,3 +171,13 @@ export function takeNextAeroItem(queue: AeroQueue): { item: AeroQueueItem; rest:
   const [item, ...rest] = queue.items;
   return { item: item!, rest: { ...queue, items: rest } };
 }
+
+/** Moves any in-flight batch back to the front of `items` so a failed trip can be retried cleanly. */
+export function requeueInFlightAeroQueue(queue: AeroQueue): AeroQueue {
+  if (queue.inFlight.length === 0) return queue;
+  return {
+    ...queue,
+    items: [...queue.inFlight, ...queue.items],
+    inFlight: [],
+  };
+}

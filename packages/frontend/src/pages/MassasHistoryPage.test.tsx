@@ -6,6 +6,8 @@ import i18n from '../i18n/config';
 import type { MassasLaunchDayView } from '../lib/massas';
 import { saoPauloDaysAgo, saoPauloToday, saoPauloYesterday } from '../lib/date';
 import { saveAeroSettings } from '../lib/aero-integration';
+import { loadAeroPendingAttempt, saveAeroPendingAttempt } from '../lib/aero-pending-attempt';
+import { readAeroQueue, writeAeroQueue } from '../lib/aero-queue';
 
 const get = vi.fn();
 const post = vi.fn();
@@ -412,5 +414,104 @@ describe('MassasHistoryPage', () => {
     const failed = await screen.findByTestId('massas-sync-manual-result');
     expect(within(failed).getByText('No se pudo registrar o resultado no servidor')).toBeInTheDocument();
     expect(document.querySelector('[role="status"]')).toBeNull();
+  });
+
+  it('restores inFlight batch items and logs launch_sync error when wifi_required returns', async () => {
+    localStorage.clear();
+    saveAeroSettings({
+      wsUrl: 'http://192.168.25.250:1453/api',
+      username: 'APL',
+      syncEnabled: true,
+      hasPassword: true,
+      lastSyncAt: null,
+    });
+    const today = saoPauloToday();
+    writeAeroQueue({
+      createdAt: new Date().toISOString(),
+      date: today,
+      items: [],
+      inFlight: [
+        { productCode: '60', productName: 'MASSA DISCO 400G', quantity: 40000, launchIds: [243] },
+        { productCode: '5000', productName: 'MASSA ROLO 1KG', quantity: 4000, launchIds: [244] },
+        { productCode: '1047', productName: 'MASSA ROLO 2KG', quantity: 17400, launchIds: [245] },
+      ],
+    });
+    saveAeroPendingAttempt({
+      action: 'entrada_lote',
+      attemptId: 'attempt-lote-wifi',
+      startedAt: Date.now() - 10_000,
+      date: today,
+    });
+
+    renderPage(
+      `/massas-history?aero_action=entrada_lote&aero_data=&aero_error=wifi_required&aero_msg=${encodeURIComponent('No Wi-Fi')}`,
+    );
+
+    await screen.findByText(i18n.t('massas.aero.wifiRequiredTitle'));
+
+    await waitFor(() => {
+      const logCall = post.mock.calls.find(([url]) => url === '/integration/aero/log');
+      expect(logCall).toBeTruthy();
+      expect(logCall![1]).toMatchObject({
+        event: 'launch_sync',
+        phase: 'result',
+        attemptId: 'attempt-lote-wifi',
+        error: 'AERO_WIFI_REQUIRED',
+      });
+    });
+
+    const restored = readAeroQueue();
+    expect(restored?.inFlight).toEqual([]);
+    expect(restored?.items.map((item) => item.productCode)).toEqual(['60', '5000', '1047']);
+    expect(loadAeroPendingAttempt('entrada_lote')).toBeNull();
+  });
+
+  it('resolves stored bridge callback only once even when vault settings update re-runs the effect', async () => {
+    localStorage.clear();
+    saveAeroSettings({
+      wsUrl: 'http://192.168.25.250:1453/api',
+      username: 'APL',
+      syncEnabled: true,
+      hasPassword: true,
+      lastSyncAt: null,
+    });
+    const today = saoPauloToday();
+    saveAeroPendingAttempt({
+      action: 'entrada',
+      attemptId: 'attempt-single-stored',
+      startedAt: Date.now(),
+      date: today,
+    });
+
+    let lastResultCalls = 0;
+    let releaseLastResult!: (value: unknown) => void;
+    get.mockImplementation(async (url: string) => {
+      if (url.startsWith('/integration/aero/bridge-tickets/last-result')) {
+        lastResultCalls += 1;
+        return await new Promise((resolve) => {
+          releaseLastResult = resolve;
+        });
+      }
+      if (url.startsWith('/integration/aero/settings') || url.startsWith('/admin/aero/vault')) {
+        return { configured: true, wsUrl: 'http://192.168.25.99:1453/api', username: 'APL', hasPassword: true };
+      }
+      if (url.startsWith('/massas-launch/history')) return { days: [] };
+      if (url.startsWith('/massas-launch?')) return dayView(today, 'MASSA DE PASTEL');
+      if (url.startsWith('/integration/aero/movements')) return { date: today, movements: [] };
+      return {};
+    });
+
+    renderPage('/massas-history?aero_action=entrada&aero_data=&aero_result=stored');
+
+    await waitFor(() => expect(lastResultCalls).toBe(1));
+    await act(async () => {
+      releaseLastResult({ data: { launch: { success: true, message: 'OK' } } });
+    });
+
+    await waitFor(() => {
+      const logCalls = post.mock.calls.filter(([url]) => url === '/integration/aero/log');
+      expect(logCalls.length).toBe(1);
+    });
+    expect(lastResultCalls).toBe(1);
   });
 });

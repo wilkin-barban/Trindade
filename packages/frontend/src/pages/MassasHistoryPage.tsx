@@ -81,6 +81,7 @@ import {
   clearAeroQueue,
   pendingLaunchQueueItem,
   readAeroQueue,
+  requeueInFlightAeroQueue,
   takeAeroBatch,
   writeAeroQueue,
   type AeroQueue,
@@ -780,17 +781,39 @@ export function MassasHistoryPage() {
    */
   useEffect(() => {
     if (aeroCallbackHandled.current) return;
+    const queryString = location.search || window.location.search;
+    if (!parseAeroCallback(queryString)) return;
+    aeroCallbackHandled.current = true;
     void (async () => {
-      const queryString = location.search || window.location.search;
       const parsed = await resolveAeroCallback(queryString);
       if (!parsed) return;
-      aeroCallbackHandled.current = true;
       window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`);
       clearAeroBridgePending();
       disarmBridgeWatchdog();
 
       if (parsed.kind === 'error') {
+        const attempt =
+          loadAeroPendingAttempt('entrada_lote') ??
+          loadAeroPendingAttempt('entrada') ??
+          loadAeroPendingAttempt('movimentos');
         clearAeroPendingAttempt();
+        if (attempt?.action !== 'movimentos') {
+          const queue = readAeroQueue();
+          if (queue && queue.inFlight.length > 0) {
+            const restored = requeueInFlightAeroQueue(queue);
+            writeAeroQueue(restored);
+            setSyncAwaiting({ date: restored.date, remaining: restored.items.length });
+          }
+        }
+        void postAeroAuditEvent({
+          event: attempt?.action === 'movimentos' ? 'read_history' : 'launch_sync',
+          phase: 'result',
+          destinationUrl: aeroDestination() ?? aeroSettings.wsUrl ?? '',
+          error: parsed.code,
+          note: parsed.message ? `${parsed.message} · via=bridge` : 'via=bridge',
+          ...(attempt ? { attemptId: attempt.attemptId, startedAt: attempt.startedAt } : {}),
+          client: 'web',
+        });
         setResultModal({
           type: 'error',
           title: t('massas.aero.wifiRequiredTitle'),
@@ -942,7 +965,7 @@ export function MassasHistoryPage() {
           }
         }
 
-        const refused = outcome.status !== 'ok' && queue ? { ...queue, items: [...queue.inFlight, ...queue.items], inFlight: [] } : null;
+        const refused = outcome.status !== 'ok' && queue ? requeueInFlightAeroQueue(queue) : null;
         if (refused && refused.items.length > 0) {
           writeAeroQueue(refused);
           setSyncAwaiting({ date: refused.date, remaining: refused.items.length });
