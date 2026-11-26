@@ -6,7 +6,9 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import java.nio.ByteBuffer
 import java.nio.charset.Charset
+import java.nio.charset.CodingErrorAction
 import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -105,19 +107,68 @@ open class WhatsappAbbreviationsSource @Inject constructor(
     }
 }
 
+private fun buildSingleByteTable(charsetName: String, includeC1: Boolean): Map<Char, Byte> {
+    val decoder = Charset.forName(charsetName).newDecoder()
+        .onMalformedInput(CodingErrorAction.REPLACE)
+        .onUnmappableCharacter(CodingErrorAction.REPLACE)
+    val map = HashMap<Char, Byte>(256)
+    for (b in 0..255) {
+        val decoded = decoder.decode(ByteBuffer.wrap(byteArrayOf(b.toByte())))
+        if (decoded.hasRemaining()) {
+            val ch = decoded.get()
+            if (ch != '\uFFFD') map.putIfAbsent(ch, b.toByte())
+        }
+        decoder.reset()
+    }
+    if (includeC1) {
+        for (b in 0x80..0x9F) {
+            map.putIfAbsent(b.toChar(), b.toByte())
+        }
+    }
+    return map
+}
+
+private val ISO_8859_2_BYTES: Map<Char, Byte> by lazy { buildSingleByteTable("ISO-8859-2", includeC1 = false) }
+private val WIN_1252_AND_LATIN1_BYTES: Map<Char, Byte> by lazy { buildSingleByteTable("windows-1252", includeC1 = true) }
+
+private fun tryDecodeWithTable(text: String, table: Map<Char, Byte>): String? {
+    val bytes = ByteArray(text.length)
+    for (index in text.indices) {
+        val b = table[text[index]] ?: return null
+        bytes[index] = b
+    }
+    val decoder = Charsets.UTF_8.newDecoder()
+        .onMalformedInput(CodingErrorAction.REPORT)
+        .onUnmappableCharacter(CodingErrorAction.REPORT)
+    val candidate = runCatching { decoder.decode(ByteBuffer.wrap(bytes)).toString() }.getOrNull() ?: return null
+    return if (candidate.none { it.code in 0x7F..0x9F || it == '\uFFFD' }) candidate else null
+}
+
+private fun repairLoneTilde(text: String): String =
+    if ('Ă' in text) text.replace('Ă', 'Ã') else text
+
+private fun hasSuspiciousLatin1Pair(text: String): Boolean {
+    for (i in 0 until text.length - 1) {
+        val first = text[i]
+        if ((first == 'Ã' || first == 'Â') && text[i + 1].code > 0x7F) return true
+    }
+    return false
+}
+
 /**
  * Repairs the letter the ERP sent broken, without touching what Trindade stored.
  *
- * The company's WebService does not declare a charset, and when the bridge guesses ISO-8859-2 the UTF-8 bytes of
- * `Ç` arrive as `Ă` plus a control character. Encoding each character back to its ISO-8859-2 byte and decoding
- * those bytes as UTF-8 recovers the word, and the result is only accepted when no control character is left --
- * otherwise the original text travels unchanged, which is ugly but true.
+ * Covers ISO-8859-2 C1 controls (`AĂ\u0087UCAR` -> `AÇUCAR`), Windows-1252 / ISO-8859-1 mojibake
+ * (`AÃ\u0087UCAR` / `AÃ‡UCAR` -> `AÇUCAR`), and lone-byte `Ă` (`PĂO` -> `PÃO`).
  */
 fun repairErpEncoding(text: String): String {
-    if (text.none { it.code in 0x7F..0x9F }) return text
-    return runCatching {
-        val bytes = text.toByteArray(Charset.forName("ISO-8859-2"))
-        val candidate = String(bytes, Charsets.UTF_8)
-        if (candidate.none { it.code in 0x7F..0x9F || it == '\uFFFD' }) candidate else text
-    }.getOrDefault(text)
+    val hasControl = text.any { it.code in 0x7F..0x9F }
+    val hasSuspicious = hasSuspiciousLatin1Pair(text)
+    if (hasControl || hasSuspicious) {
+        val fromIso2 = if (hasControl) tryDecodeWithTable(text, ISO_8859_2_BYTES) else null
+        if (fromIso2 != null) return repairLoneTilde(fromIso2)
+        val fromLatin1 = tryDecodeWithTable(text, WIN_1252_AND_LATIN1_BYTES)
+        if (fromLatin1 != null && fromLatin1 != text) return repairLoneTilde(fromLatin1)
+    }
+    return repairLoneTilde(text)
 }

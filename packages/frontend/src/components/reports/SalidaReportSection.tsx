@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RefreshCw } from 'lucide-react';
 import { api } from '../../api/client';
+import { repairErpText } from '../../lib/aero-text';
 import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import { LoadingSpinner } from '../ui/loading-spinner';
@@ -138,7 +139,7 @@ export function SalidaReportSection({
                   data-testid={`salida-report-operator-${operator.username}`}
                 >
                   <p className="text-sm font-semibold text-gray-900">
-                    {operator.name}
+                    {repairErpText(operator.name)}
                     {operator.name !== operator.username && (
                       <span className="ml-1 text-xs font-normal text-gray-500">({operator.username})</span>
                     )}
@@ -156,7 +157,7 @@ export function SalidaReportSection({
                       .filter((product) => product.units > 0)
                       .map((product) => (
                         <li key={product.code} className="flex items-baseline justify-between gap-3 text-sm text-gray-700">
-                          <span className="min-w-0 truncate">{product.name}</span>
+                          <span className="min-w-0 truncate">{repairErpText(product.name)}</span>
                           <span className="shrink-0 tabular-nums text-gray-500">{product.units} un</span>
                         </li>
                       ))}

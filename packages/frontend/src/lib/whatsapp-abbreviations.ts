@@ -11,6 +11,10 @@
  * copia sin ese test es una promesa; con él, es una regla.
  */
 
+import { repairErpText } from './aero-text.js';
+
+export { repairErpText };
+
 /** El techo de la propuesta aprobada: una abreviatura nunca pasa de veinte caracteres. */
 export const WHATSAPP_ABBREVIATION_LIMIT = 20;
 
@@ -161,39 +165,6 @@ const NOISE_WORDS = new Set([
   'MASSA', 'MASSAS', 'PARA', 'DE', 'DA', 'DO', 'DAS', 'DOS', 'E', 'EMBALAGEM', 'EMBALAG.', 'PLASTICA',
   'PLÁSTICA', 'TRINDADE', 'EXTRA', 'FINA', 'FINAS', 'GROSSO', 'RALADO', 'DIVERSAS', 'DIVERSOS', 'COM', 'SEM',
 ]);
-
-/**
- * El texto del ERP cuando la heurística de charset del puente le erró.
- *
- * El espejo guarda lo que llegó -- `PĂO` en vez de `PÃO`, o `Ă` más un carácter de control --, y el mensaje lo
- * escribe como la planta lo dice. La ingesta no se toca: esto es del texto, igual que en el backend.
- */
-export function repairErpText(value: string): string {
-  if (!/[\u0080-\u009f]/.test(value)) return repairLoneTilde(value);
-  const decoder = new TextDecoder('iso-8859-2');
-  const bytes = new Map<string, number>();
-  for (let byte = 0; byte < 256; byte += 1) {
-    const character = decoder.decode(new Uint8Array([byte]));
-    if (!bytes.has(character)) bytes.set(character, byte);
-  }
-  const out: number[] = [];
-  for (const character of value) {
-    const byte = bytes.get(character);
-    if (byte === undefined) return repairLoneTilde(value);
-    out.push(byte);
-  }
-  try {
-    const repaired = new TextDecoder('utf-8', { fatal: true }).decode(new Uint8Array(out));
-    return /[\u0080-\u009f]/.test(repaired) ? repairLoneTilde(value) : repairLoneTilde(repaired);
-  } catch {
-    return repairLoneTilde(value);
-  }
-}
-
-/** El puente, en algunos cuerpos, comió el segundo byte y guardó `PĂO` en vez de `PÃO`. */
-function repairLoneTilde(value: string): string {
-  return value.includes('Ă') ? value.replace(/Ă/g, 'Ã') : value;
-}
 
 /** La forma con la que se comparan nombres: reparada, sin espacios de más, en mayúsculas. */
 function lookupKey(value: string): string {

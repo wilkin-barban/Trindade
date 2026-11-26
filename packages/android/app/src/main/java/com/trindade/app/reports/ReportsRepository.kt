@@ -7,6 +7,7 @@ import com.trindade.app.contract.models.ProductsResponse
 import com.trindade.app.contract.models.ReportHistoryResponse
 import com.trindade.app.contract.models.ReportResponseReport
 import com.trindade.app.contract.models.UpdateReportRequest
+import com.trindade.app.massas.repairErpEncoding
 import com.trindade.app.network.HistoryRead
 import com.trindade.app.network.ReportsApi
 import com.trindade.app.network.readHistory
@@ -163,6 +164,16 @@ class ReportsRepository @Inject constructor(
         runCatchingCancellable { api.receipts(date) }.getOrNull()
             ?.takeIf { it.isSuccessful }
             ?.body()
+            ?.let { day ->
+                day.copy(
+                    receipts = day.receipts.map { receipt ->
+                        receipt.copy(
+                            productDesc = repairErpEncoding(receipt.productDesc),
+                            operatorName = repairErpEncoding(receipt.operatorName),
+                        )
+                    },
+                )
+            }
 
     suspend fun create(body: CreateReportRequest): ReportWriteResult = submit { api.createReport(body) }
 

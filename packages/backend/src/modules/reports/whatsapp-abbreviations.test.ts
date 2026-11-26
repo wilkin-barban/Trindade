@@ -194,6 +194,9 @@ describe('abreviaturas del mensaje', () => {
   it('corrige el charset localmente, sin tocar el nombre cuando ya está bien', () => {
     assert.equal(abbreviateProduct('PĂO DE ALHO TRINDADE 400G TRADICIONAL'), 'PÃO ALHO 400g');
     assert.equal(abbreviateProduct('AĂ\u0087UCAR 5 KG'), 'AÇUCAR 5 KG');
+    assert.equal(abbreviateProduct('AÃ\u0087UCAR 5 KG'), 'AÇUCAR 5 KG');
+    assert.equal(abbreviateProduct('AÃ‡UCAR 5 KG'), 'AÇUCAR 5 KG');
+    assert.equal(abbreviateProduct('PĂO DE QUEIJO'), 'PÃO DE QUEIJO');
     // Texto sano intacto, con sus acentos.
     assert.equal(abbreviateProduct('AÇÚCAR 5kg', '1074'), 'AÇÚCAR 5kg');
     assert.equal(abbreviateProduct('PÃO DE ALHO TRINDADE 400G TRADICIONAL'), 'PÃO ALHO 400g');

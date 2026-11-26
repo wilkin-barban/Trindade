@@ -307,4 +307,26 @@ describe('salidaReportDayView', () => {
     assert.equal(day.totalUnits, 0);
   });
 
+  it('repairs lone Ă and Latin-1 mojibake product descriptions alongside C1 ISO-8859-2', () => {
+    db.exec('DELETE FROM salida_movement_items');
+    db.exec('DELETE FROM salida_movements');
+    db.exec('DELETE FROM aero_movements');
+    db.exec(`
+      INSERT INTO aero_movements
+        (movement_date, ent_lan, product_code, product_desc, quantity, entry_date, operator_name, movement_type, synced_at)
+      VALUES
+        ('2026-11-23', 7301, '009998', 'PĂO DE ALHO', 4, '2026-11-23', 'ANA SOUZA', 'S', '2026-11-23T10:00:00.000Z'),
+        ('2026-11-23', 7302, '009997', 'AÃ\u0087UCAR 5 KG', 3, '2026-11-23', 'ANA SOUZA', 'S', '2026-11-23T10:05:00.000Z')
+    `);
+
+    const day = salidaReportDayView(db, '2026-11-23');
+    assert.deepEqual(
+      day.operators[0]?.products.map((product) => [product.code, product.name]),
+      [
+        ['009998', 'PÃO DE ALHO'],
+        ['009997', 'AÇUCAR 5 KG'],
+      ],
+    );
+  });
+
 });

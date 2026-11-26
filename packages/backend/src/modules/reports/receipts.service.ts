@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3';
 import { aeroMovementsTableExists, listAeroMovements, type AeroMovement } from '../integration/aero.movements.service.js';
+import { repairErpText } from '../integration/aero-text.js';
 import { erpCodeKey, isMassa } from '../stock/stock.catalog.js';
 
 /**
@@ -103,9 +104,9 @@ export function supplyReceipts(movements: readonly AeroMovement[]): ReceiptLine[
     .map((movement) => ({
       entLan: movement.ent_lan,
       productCode: movement.product_code,
-      productDesc: movement.product_desc,
+      productDesc: repairErpText(movement.product_desc),
       quantity: movement.quantity,
-      operatorName: movement.operator_name,
+      operatorName: repairErpText(movement.operator_name),
       entryDate: movement.entry_date,
     }));
 }

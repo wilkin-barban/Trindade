@@ -296,6 +296,44 @@ class AeroLogicTest {
         )
     }
 
+    @Test
+    fun `readAeroMovements repairs mojibake PRO_DES and ENT_USU`() {
+        val raw = json.parseToJsonElement(
+            """
+            {
+              "success": true,
+              "data": [
+                {
+                  "ENT_LAN": 701,
+                  "PRO_COD": "001074",
+                  "PRO_DES": "AĂ\u0087UCAR 5 KG",
+                  "PRO_QTD": 162,
+                  "ENT_DTA": "2026-11-26",
+                  "ENT_USU": "JOĂ\u0083O",
+                  "ENTSAI": "E"
+                },
+                {
+                  "ENT_LAN": 702,
+                  "PRO_COD": "001236",
+                  "PRO_DES": "320 G PĂO DE ALHO",
+                  "PRO_QTD": 10,
+                  "ENT_DTA": "2026-11-26",
+                  "ENT_USU": "GUSTAVO H",
+                  "ENTSAI": "E"
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        val result = readAeroMovements(raw) as AeroMovementsResult.Ok
+        assertEquals(2, result.movements.size)
+        assertEquals("AÇUCAR 5 KG", result.movements[0].productDesc)
+        assertEquals("JOÃO", result.movements[0].operatorName)
+        assertEquals("320 G PÃO DE ALHO", result.movements[1].productDesc)
+        assertEquals("GUSTAVO H", result.movements[1].operatorName)
+    }
+
     private fun seat(
         entLan: Int,
         code: String,

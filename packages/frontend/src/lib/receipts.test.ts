@@ -35,6 +35,39 @@ describe('readReportReceiptsDay', () => {
     });
   });
 
+  it('repairs mojibake product descriptions and operator names in receipts', () => {
+    const day = readReportReceiptsDay({
+      date: '2026-11-26',
+      migrated: true,
+      syncedAt: '2026-11-26T18:00:00.000Z',
+      receipts: [
+        {
+          ...line,
+          productCode: '001074',
+          productDesc: 'AĂ\u0087UCAR 5 KG',
+          quantity: 162,
+          operatorName: 'JOĂ\u0083O',
+        },
+        {
+          ...line,
+          entLan: 35912,
+          productCode: '001236',
+          productDesc: '320 G PĂO DE ALHO',
+          quantity: 10,
+          operatorName: 'SÃ\u0089RGIO',
+        },
+      ],
+    });
+
+    assert.deepEqual(
+      day?.receipts.map((item) => [item.productDesc, item.operatorName]),
+      [
+        ['AÇUCAR 5 KG', 'JOÃO'],
+        ['320 G PÃO DE ALHO', 'SÉRGIO'],
+      ],
+    );
+  });
+
   it('reads an unsynced day and a day with no supplies', () => {
     assert.deepEqual(readReportReceiptsDay({ date: '2026-10-29', migrated: true, syncedAt: null, receipts: [] }), {
       date: '2026-10-29',

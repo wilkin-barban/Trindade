@@ -1,6 +1,7 @@
 package com.trindade.app.aero
 
 import android.util.Log
+import com.trindade.app.massas.repairErpEncoding
 import com.trindade.app.network.AeroAuditLogRequest
 import com.trindade.app.network.AeroMovementsSaved
 import com.trindade.app.network.AeroMovementsSnapshotRequest
@@ -122,10 +123,10 @@ class AeroMirrorAdapter @Inject constructor(
     fun AeroErpMovement.toStored() = AeroStoredMovement(
         entLan = entLan,
         productCode = productCode,
-        productDesc = productDesc,
+        productDesc = repairErpEncoding(productDesc),
         quantity = quantity,
         entryDate = entryDate,
-        operatorName = operatorName,
+        operatorName = repairErpEncoding(operatorName),
         movementType = movementType,
         ownerStatus = ownerStatus,
     )
@@ -145,10 +146,10 @@ class AeroMirrorAdapter @Inject constructor(
 fun AeroStoredMovement.toLogic(): AeroErpMovement = AeroErpMovement(
     entLan = entLan,
     productCode = productCode,
-    productDesc = productDesc,
+    productDesc = repairErpEncoding(productDesc),
     quantity = quantity,
     entryDate = entryDate,
-    operatorName = operatorName,
+    operatorName = repairErpEncoding(operatorName),
     movementType = movementType,
     ownerUserId = ownerUserId,
     ownerStatus = ownerStatus,

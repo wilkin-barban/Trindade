@@ -17,6 +17,7 @@ import {
 } from '../../lib/aero-integration';
 import { triggerAeroMovementsSync } from '../../lib/aero-mirror';
 import { clearAeroBridgePending } from '../../lib/aero-watchdog';
+import { repairErpText } from '../../lib/aero-text';
 import { fetchAeroVaultSettings } from '../../lib/aero-vault';
 import { aeroReceiptsAuditEvent, postAeroAuditEvent } from '../../lib/aero-audit';
 import { aeroEndpoint } from '../../lib/aero-integration';
@@ -343,14 +344,16 @@ export function ReceiptsSection({
               data-testid={`receipt-line-${receipt.entLan}-${receipt.productCode}`}
             >
               <div className="flex items-start justify-between gap-2">
-                <p className="min-w-0 text-sm font-semibold text-gray-900 break-words">{receipt.productDesc}</p>
+                <p className="min-w-0 text-sm font-semibold text-gray-900 break-words">
+                  {repairErpText(receipt.productDesc)}
+                </p>
                 <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-emerald-600 px-2 py-0.5 text-xs font-bold text-white tabular-nums">
                   <PackageCheck className="h-3 w-3" />
                   {t('reports.receiptsUnits', { quantity: receipt.quantity })}
                 </span>
               </div>
               <p className="mt-1 text-[11px] text-gray-500 tabular-nums">
-                {receipt.operatorName}
+                {repairErpText(receipt.operatorName)}
               </p>
             </li>
           ))}

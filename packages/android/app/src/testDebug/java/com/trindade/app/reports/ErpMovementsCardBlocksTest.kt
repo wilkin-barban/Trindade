@@ -166,4 +166,42 @@ class ErpMovementsCardBlocksTest {
             .onNodeWithText(context.getString(R.string.report_receipts_subtitle))
             .assertIsDisplayed()
     }
+
+    @Test
+    fun `insumos block repairs mojibake product descriptions and operator names`() {
+        val brokenReceipts = ReportReceipts(
+            date = "2026-11-26",
+            migrated = true,
+            syncedAt = "2026-11-26T18:00:00.000Z",
+            receipts = listOf(
+                ReportReceiptsReceiptsInner(
+                    entLan = 41109,
+                    productCode = "001074",
+                    productDesc = "AĂ\u0087UCAR 5 KG",
+                    quantity = BigDecimal("162"),
+                    operatorName = "JOĂ\u0083O",
+                    entryDate = "2026-11-26",
+                ),
+            ),
+        )
+        composeRule.setContent {
+            TrindadeTheme {
+                Box(modifier = Modifier.width(360.dp)) {
+                    ErpMovementsCard(
+                        massasDay = massasDay(),
+                        receipts = brokenReceipts,
+                        isSyncing = false,
+                        onSync = {},
+                    )
+                }
+            }
+        }
+
+        composeRule
+            .onNodeWithText("AÇUCAR 5 KG", substring = false, useUnmergedTree = true)
+            .assert(hasAnyAncestor(hasTestTag("report-receipts-block")))
+        composeRule
+            .onNodeWithText("JOÃO", substring = false, useUnmergedTree = true)
+            .assert(hasAnyAncestor(hasTestTag("report-receipts-block")))
+    }
 }

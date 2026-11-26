@@ -256,4 +256,40 @@ describe('aero-mirror: the seats this tab is about', () => {
     }
   });
 
+  it('repairs mojibake product_desc and operator_name when reading stored snapshot', () => {
+    const snapshot = readAeroMovementsSnapshot({
+      date: '2026-11-26',
+      movements: [
+        {
+          ent_lan: 1,
+          product_code: '001074',
+          product_desc: 'AĂ\u0087UCAR 5 KG',
+          quantity: 162,
+          entry_date: '2026-11-26',
+          operator_name: 'JOĂ\u0083O',
+          movement_type: 'E',
+          synced_at: '2026-11-26T18:00:00.000Z',
+        },
+        {
+          ent_lan: 2,
+          product_code: '001236',
+          product_desc: '320 G PĂO DE ALHO',
+          quantity: 12,
+          entry_date: '2026-11-26',
+          operator_name: 'GUSTAVO H',
+          movement_type: 'E',
+          synced_at: '2026-11-26T18:00:00.000Z',
+        },
+      ],
+    });
+
+    assert.deepEqual(
+      snapshot?.movements.map((m) => [m.productDesc, m.operatorName]),
+      [
+        ['AÇUCAR 5 KG', 'JOÃO'],
+        ['320 G PÃO DE ALHO', 'GUSTAVO H'],
+      ],
+    );
+  });
+
 });

@@ -227,6 +227,36 @@ describe('dayReceipts', () => {
     assert.equal(day.syncedAt, null);
   });
 
+  it('repairs mojibake product descriptions and operator names read from the mirror', () => {
+    const db = setupReportsDb();
+    seed(db, [
+      movement({
+        ent_lan: 35990,
+        product_code: '001074',
+        product_desc: 'AĂ\u0087UCAR 5 KG',
+        quantity: 162,
+        operator_name: 'JOĂ\u0083O',
+      }),
+      movement({
+        ent_lan: 35991,
+        product_code: '001236',
+        product_desc: '320 G PĂO DE ALHO',
+        quantity: 10,
+        operator_name: 'GUSTAVO H',
+      }),
+    ]);
+
+    const day = dayReceipts(db, '2026-10-29');
+
+    assert.deepEqual(
+      day.receipts.map((receipt) => [receipt.productDesc, receipt.operatorName]),
+      [
+        ['AÇUCAR 5 KG', 'JOÃO'],
+        ['320 G PÃO DE ALHO', 'GUSTAVO H'],
+      ],
+    );
+  });
+
   it('answers migrated:false instead of failing when the mirror table does not exist', () => {
     const db = setupReportsDb();
     db.exec('DROP TABLE aero_movements');

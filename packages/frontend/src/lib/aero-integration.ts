@@ -6,6 +6,7 @@
  */
 
 import { clearAeroAutoRead } from './aero-auto-read';
+import { repairErpText } from './aero-text';
 import { aeroTestVerdictFromToken, type AeroTestVerdict } from './aero-test';
 import { api } from '../api/client';
 
@@ -730,9 +731,11 @@ function readAeroMovementSeat(raw: unknown): AeroErpMovementItem | null {
   const rawQtd = record.PRO_QTD;
   const quantity = typeof rawQtd === 'number' ? rawQtd : parseFloat(String(rawQtd));
   const productCode = aeroMovementText(record.PRO_COD);
-  const productDesc = aeroMovementText(record.PRO_DES);
+  const rawDesc = aeroMovementText(record.PRO_DES);
+  const productDesc = rawDesc ? repairErpText(rawDesc) : null;
   const entryDate = aeroMovementDate(record.ENT_DTA);
-  const operatorName = aeroMovementText(record.ENT_USU);
+  const rawOperator = aeroMovementText(record.ENT_USU);
+  const operatorName = rawOperator ? repairErpText(rawOperator) : null;
   const movementType = record.ENTSAI;
 
   if (!Number.isInteger(entLan) || entLan <= 0) return null;

@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import com.trindade.app.R
 import com.trindade.app.contract.models.MassasReportDayView
 import com.trindade.app.contract.models.ReportReceipts
+import com.trindade.app.massas.repairErpEncoding
 import java.math.BigDecimal
 
 /**
@@ -217,7 +218,7 @@ private fun MassasDayBody(massasDay: MassasReportDayView?) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = operator.displayName,
+                    text = repairErpEncoding(operator.displayName),
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.weight(1f),
                 )
@@ -233,7 +234,7 @@ private fun MassasDayBody(massasDay: MassasReportDayView?) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = product.name,
+                        text = repairErpEncoding(product.name),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f),
@@ -268,7 +269,7 @@ private fun MassasDayBody(massasDay: MassasReportDayView?) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = product.name,
+                        text = repairErpEncoding(product.name),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f),
@@ -301,18 +302,19 @@ private fun ReceiptsBody(receipts: ReportReceipts?) {
     }
 
     receiptList.forEach { receipt ->
+        val repairedOperator = repairErpEncoding(receipt.operatorName)
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = receipt.productDesc.ifBlank { receipt.productCode },
+                    text = repairErpEncoding(receipt.productDesc).ifBlank { receipt.productCode },
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                if (receipt.operatorName.isNotBlank()) {
+                if (repairedOperator.isNotBlank()) {
                     Text(
-                        text = receipt.operatorName,
+                        text = repairedOperator,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

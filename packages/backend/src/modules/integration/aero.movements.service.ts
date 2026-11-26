@@ -2,6 +2,7 @@ import type Database from 'better-sqlite3';
 import type { AeroMovementItemInput } from './aero.movements.schema.js';
 import { matchOperatorUserId, type OperatorCandidate } from '../massas/massas-operator.js';
 import { getSaoPauloDateString } from '../../utils/date.js';
+import { repairErpText } from './aero-text.js';
 
 /**
  * What the seat's operator means for Trindade, in the terms a screen has to act on.
@@ -115,12 +116,12 @@ export function saveAeroMovements(
         date: args.date,
         ent_lan: movement.ent_lan,
         product_code: movement.product_code.trim(),
-        product_desc: movement.product_desc.trim(),
+        product_desc: repairErpText(movement.product_desc).trim(),
         quantity: movement.quantity,
         entry_date: movement.entry_date,
         // The ERP answers `ENT_USU` in uppercase; normalising here keeps one operator from rendering as
         // two chips when a hand-typed seat arrives in lower case.
-        operator_name: movement.operator_name.trim().toUpperCase(),
+        operator_name: repairErpText(movement.operator_name).trim().toUpperCase(),
         movement_type: movement.movement_type,
         synced_at: syncedAt,
       });
@@ -142,8 +143,13 @@ export function listAeroMovements(db: Database.Database, date: string): AeroMove
     .all(date) as RawAeroMovementRow[];
 
   if (rows.length === 0) return [];
-  const owners = seatOwners(db, rows.map((row) => row.operator_name));
-  return rows.map(({ id: _id, ...movement }) => {
+  const repairedRows = rows.map((row) => ({
+    ...row,
+    product_desc: repairErpText(row.product_desc),
+    operator_name: repairErpText(row.operator_name),
+  }));
+  const owners = seatOwners(db, repairedRows.map((row) => row.operator_name));
+  return repairedRows.map(({ id: _id, ...movement }) => {
     const owner = owners.get(movement.operator_name);
     return {
       ...movement,

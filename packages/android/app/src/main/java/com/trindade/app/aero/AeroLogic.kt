@@ -1,5 +1,6 @@
 package com.trindade.app.aero
 
+import com.trindade.app.massas.repairErpEncoding
 import java.net.URI
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -432,9 +433,9 @@ private fun readAeroMovementSeat(raw: JsonElement): AeroErpMovement? {
     if (!quantity.isFinite() || quantity < 0) return null
 
     val productCode = record["PRO_COD"].aeroText() ?: return null
-    val productDesc = record["PRO_DES"].aeroText() ?: return null
+    val productDesc = record["PRO_DES"].aeroText()?.let(::repairErpEncoding) ?: return null
     val entryDate = record["ENT_DTA"].aeroDateText() ?: return null
-    val operatorName = record["ENT_USU"].aeroText() ?: return null
+    val operatorName = record["ENT_USU"].aeroText()?.let(::repairErpEncoding) ?: return null
     val movementType = record["ENTSAI"].aeroText() ?: return null
     if (movementType != "E" && movementType != "S") return null
 

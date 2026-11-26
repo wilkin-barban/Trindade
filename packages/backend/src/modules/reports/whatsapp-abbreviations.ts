@@ -10,6 +10,10 @@
  * decide cómo se escribe lo que ya se leyó.
  */
 
+import { repairErpText } from '../integration/aero-text.js';
+
+export { repairErpText };
+
 /** El techo de la propuesta aprobada: una abreviatura nunca pasa de veinte caracteres. */
 export const WHATSAPP_ABBREVIATION_LIMIT = 20;
 
@@ -163,43 +167,6 @@ const NOISE_WORDS = new Set([
   'MASSA', 'MASSAS', 'PARA', 'DE', 'DA', 'DO', 'DAS', 'DOS', 'E', 'EMBALAGEM', 'EMBALAG.', 'PLASTICA',
   'PLÁSTICA', 'TRINDADE', 'EXTRA', 'FINA', 'FINAS', 'GROSSO', 'RALADO', 'DIVERSAS', 'DIVERSOS', 'COM', 'SEM',
 ]);
-
-/**
- * El texto del ERP, cuando la heurística de charset del puente le erró.
- *
- * El WebService no declara charset: los bytes UTF-8 de `Ç` o `Ã` viajan como `Ă` más un carácter de control y
- * quedan así en el espejo. Repararlos acá, en el mensaje, es lo que pide la propuesta aprobada (`PĂO` → `PÃO`);
- * tocar la ingesta sería cambiar lo que la planta guardó, y eso está fuera del alcance.
- */
-export function repairErpText(value: string): string {
-  if (!/[\u0080-\u009f]/.test(value)) return repairLoneTilde(value);
-  const decoder = new TextDecoder('iso-8859-2');
-  const bytes = new Map<string, number>();
-  for (let byte = 0; byte < 256; byte += 1) {
-    const character = decoder.decode(new Uint8Array([byte]));
-    if (!bytes.has(character)) bytes.set(character, byte);
-  }
-  const out: number[] = [];
-  for (const character of value) {
-    const byte = bytes.get(character);
-    if (byte === undefined) return value;
-    out.push(byte);
-  }
-  try {
-    const repaired = new TextDecoder('utf-8', { fatal: true }).decode(new Uint8Array(out));
-    return /[\u0080-\u009f]/.test(repaired) ? value : repairLoneTilde(repaired);
-  } catch {
-    return value;
-  }
-}
-
-/**
- * El puente, en algunos cuerpos, no dejó el byte de control: comió el segundo byte y guardó `PĂO` en vez de
- * `PÃO`. `Ă` no existe en portugués y el ERP nunca la escribe, así que acá se lee como lo que fue.
- */
-function repairLoneTilde(value: string): string {
-  return value.includes('Ă') ? value.replace(/Ă/g, 'Ã') : value;
-}
 
 /**
  * El ERP recorta la descripción a 32 caracteres, así que el mismo producto llega unas veces completo y otras

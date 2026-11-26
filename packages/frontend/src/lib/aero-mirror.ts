@@ -7,6 +7,7 @@ import {
   type AeroSettings,
 } from './aero-integration';
 import { requestAeroBridgeTicket, type AeroVaultClient } from './aero-vault';
+import { repairErpText } from './aero-text';
 import { clearAeroBridgePending, markAeroBridgePending } from './aero-watchdog';
 
 /**
@@ -165,9 +166,11 @@ function readStoredSeat(raw: unknown): { item: AeroErpMovementItem; syncedAt: st
   const entLan = record.ent_lan;
   const quantity = record.quantity;
   const productCode = snapshotText(record.product_code);
-  const productDesc = snapshotText(record.product_desc);
+  const rawDesc = snapshotText(record.product_desc);
+  const productDesc = rawDesc ? repairErpText(rawDesc) : null;
   const entryDate = snapshotDate(record.entry_date);
-  const operatorName = snapshotText(record.operator_name);
+  const rawOperator = snapshotText(record.operator_name);
+  const operatorName = rawOperator ? repairErpText(rawOperator) : null;
   const movementType = record.movement_type;
 
   if (typeof entLan !== 'number' || !Number.isInteger(entLan) || entLan <= 0) return null;

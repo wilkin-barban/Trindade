@@ -1578,4 +1578,41 @@ describe('aero-integration: ERP movements mirror', () => {
 
     assert.deepEqual(reconciliation.reconciled, []);
   });
+
+  it('repairs mojibake PRO_DES and ENT_USU when reading movements from bridge', () => {
+    const read = readAeroMovements({
+      success: true,
+      data: [
+        {
+          ENT_LAN: 901,
+          PRO_COD: '001074',
+          PRO_DES: 'AĂ\u0087UCAR 5 KG',
+          PRO_QTD: 162,
+          ENT_DTA: '2026-11-26',
+          ENT_USU: 'JOĂ\u0083O',
+          ENTSAI: 'E',
+        },
+        {
+          ENT_LAN: 902,
+          PRO_COD: '001236',
+          PRO_DES: '320 G PĂO DE ALHO',
+          PRO_QTD: 10,
+          ENT_DTA: '2026-11-26',
+          ENT_USU: 'GUSTAVO H',
+          ENTSAI: 'E',
+        },
+      ],
+    });
+
+    assert.equal(read.status, 'ok');
+    if (read.status === 'ok') {
+      assert.deepEqual(
+        read.movements.map((m) => [m.productDesc, m.operatorName]),
+        [
+          ['AÇUCAR 5 KG', 'JOÃO'],
+          ['320 G PÃO DE ALHO', 'GUSTAVO H'],
+        ],
+      );
+    }
+  });
 });

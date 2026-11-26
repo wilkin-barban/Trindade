@@ -161,5 +161,9 @@ class MassasWhatsappGoldenTest {
         assertTrue(repaired.length <= WHATSAPP_NAME_MAX)
         // La reparación no toca el texto sano, que es el que se guarda.
         assertEquals("AÇÚCAR 5kg", repairErpEncoding("AÇÚCAR 5kg"))
+        assertEquals("AÇUCAR 5 KG", repairErpEncoding("AĂ\u0087UCAR 5 KG"))
+        assertEquals("AÇUCAR 5 KG", repairErpEncoding("AÃ\u0087UCAR 5 KG"))
+        assertEquals("AÇUCAR 5 KG", repairErpEncoding("AÃ‡UCAR 5 KG"))
+        assertEquals("320 G PÃO DE ALHO", repairErpEncoding("320 G PĂO DE ALHO"))
     }
 }

@@ -1,3 +1,5 @@
+import { repairErpText } from './aero-text';
+
 /**
  * The report's Recebimento section, read from the ERP mirror.
  *
@@ -73,6 +75,10 @@ export function readReportReceiptsDay(body: unknown): ReportReceiptsDay | null {
     date: body.date,
     migrated: body.migrated,
     syncedAt: body.syncedAt,
-    receipts: body.receipts,
+    receipts: body.receipts.map((receipt) => ({
+      ...receipt,
+      productDesc: repairErpText(receipt.productDesc),
+      operatorName: repairErpText(receipt.operatorName),
+    })),
   };
 }

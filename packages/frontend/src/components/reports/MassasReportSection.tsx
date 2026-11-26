@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RefreshCw } from 'lucide-react';
 import { api } from '../../api/client';
+import { repairErpText } from '../../lib/aero-text';
 import { Button } from '../ui/button';
 import { LoadingSpinner } from '../ui/loading-spinner';
 
@@ -152,7 +153,7 @@ export function MassasReportSection({ date, hideRefresh = false, refetchKey }: M
               <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
                 <span className="flex min-w-0 items-center gap-1.5 text-sm font-medium text-gray-800">
                   <span aria-hidden="true">👤</span>
-                  <span className="truncate">{operator.name}</span>
+                  <span className="truncate">{repairErpText(operator.name)}</span>
                   {operator.erpOnly && (
                     <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-800">
                       {t('reports.massasErpOnly', 'só ERP')}
@@ -164,7 +165,7 @@ export function MassasReportSection({ date, hideRefresh = false, refetchKey }: M
               <ul className="mt-1 space-y-0.5">
                 {operator.products.map((product) => (
                   <li key={product.code} className="flex justify-between gap-2 text-sm text-gray-600">
-                    <span className="truncate">{product.name}</span>
+                    <span className="truncate">{repairErpText(product.name)}</span>
                     <span className="shrink-0">{product.units} un</span>
                   </li>
                 ))}
@@ -184,7 +185,7 @@ export function MassasReportSection({ date, hideRefresh = false, refetchKey }: M
               <li key={product.code} className="flex justify-between gap-2 text-sm text-gray-700">
                 <span className="flex min-w-0 items-center gap-1.5">
                   <span aria-hidden="true">📦</span>
-                  <span className="truncate">{product.name}</span>
+                  <span className="truncate">{repairErpText(product.name)}</span>
                 </span>
                 <span className="shrink-0 font-medium">{product.totalUnits} un</span>
               </li>
