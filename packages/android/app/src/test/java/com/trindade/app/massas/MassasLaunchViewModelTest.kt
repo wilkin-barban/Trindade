@@ -2406,6 +2406,7 @@ class MassasLaunchViewModelTest {
         assertEquals(listOf(1, 3, 2), testVm.state.value.resultDialogMessage?.args)
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun `confirmLaunch mid-batch timeout settles item 0 and keeps items 1-3 in persisted queue`() = runTest {
         val rows = listOf(
@@ -2466,6 +2467,7 @@ class MassasLaunchViewModelTest {
         assertEquals(3, testVm.state.value.queuedLaunches)
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun `confirmLaunch continues past ERP_REFUSED, settles Ok item, and breaks on transport failure keeping pre-seeded item`() = runTest {
         val rows = listOf(
