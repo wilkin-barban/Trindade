@@ -2305,4 +2305,105 @@ class MassasLaunchViewModelTest {
         assertNull(queuePort.stored)
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `confirmLaunch pre-enqueues all created rows before dispatching and preserves them on timeout`() = runTest {
+        val createdRows = listOf(
+            launch(7, productCode = "1045"),
+            launch(8, productCode = "1046"),
+            launch(9, productCode = "1047"),
+            launch(10, productCode = "1048"),
+        )
+        val repo = DayRepository(
+            massasApi,
+            dayWith(*createdRows.toTypedArray()),
+        )
+        repo.created = createdRows
+        val gate = CompletableDeferred<Unit>()
+        erpPort.entryGate = gate
+        val testVm = newViewModel(repo)
+
+        testVm.onQuantityChange("1045", "3")
+        testVm.requestLaunchConfirmation()
+        testVm.confirmLaunch()
+        testScheduler.runCurrent()
+
+        assertEquals(listOf(7, 8, 9, 10), queuePort.stored?.items?.flatMap { it.launchIds })
+
+        testScheduler.advanceTimeBy(com.trindade.app.aero.erpBatchTimeoutMs(4) + 1_000L)
+        testScheduler.runCurrent()
+
+        assertEquals(R.string.massas_aero_erp_timeout, testVm.state.value.resultDialogMessage?.resId)
+        assertFalse(testVm.state.value.resultDialogIsSuccess)
+        assertEquals(listOf(7, 8, 9, 10), queuePort.stored?.items?.flatMap { it.launchIds })
+        assertEquals(4, testVm.state.value.queuedLaunches)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `confirmLaunch keeps multi-item timeout alive past single-item 25s limit`() = runTest {
+        val createdRows = listOf(
+            launch(7, productCode = "1045"),
+            launch(8, productCode = "1046"),
+            launch(9, productCode = "1047"),
+            launch(10, productCode = "1048"),
+        )
+        val repo = DayRepository(
+            massasApi,
+            dayWith(*createdRows.toTypedArray()),
+        )
+        repo.created = createdRows
+        val gate = CompletableDeferred<Unit>()
+        erpPort.entryGate = gate
+        val testVm = newViewModel(repo)
+
+        testVm.onQuantityChange("1045", "3")
+        testVm.requestLaunchConfirmation()
+        testVm.confirmLaunch()
+        testScheduler.runCurrent()
+
+        testScheduler.advanceTimeBy(com.trindade.app.aero.ERP_DISPATCH_TIMEOUT_MS + 2_000L)
+        testScheduler.runCurrent()
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(4, erpPort.payloads.size)
+        assertTrue(testVm.state.value.resultDialogIsSuccess)
+        assertEquals(R.string.massas_aero_batch_sent, testVm.state.value.resultDialogMessage?.resId)
+        assertNull(queuePort.stored)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `confirmLaunch stops remaining batch items after transport failure while keeping queue intact`() = runTest {
+        val createdRows = listOf(
+            launch(7, productCode = "1045"),
+            launch(8, productCode = "1046"),
+            launch(9, productCode = "1047"),
+        )
+        val repo = DayRepository(
+            massasApi,
+            dayWith(*createdRows.toTypedArray()),
+        )
+        repo.created = createdRows
+        erpPort.writeResults.addAll(
+            listOf(
+                AeroWriteResult.Ok(null),
+                AeroWriteResult.Failed(null),
+            ),
+        )
+        val testVm = newViewModel(repo)
+
+        testVm.onQuantityChange("1045", "3")
+        testVm.requestLaunchConfirmation()
+        testVm.confirmLaunch()
+        advanceUntilIdle()
+
+        assertEquals(2, erpPort.payloads.size)
+        assertEquals(listOf(8, 9), queuePort.stored?.items?.flatMap { it.launchIds })
+        assertEquals(2, testVm.state.value.queuedLaunches)
+        assertEquals(R.string.massas_aero_batch_partial, testVm.state.value.resultDialogMessage?.resId)
+        assertEquals(listOf(1, 3, 2), testVm.state.value.resultDialogMessage?.args)
+    }
+
 }

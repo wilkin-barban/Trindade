@@ -4,6 +4,7 @@ import androidx.annotation.StringRes
 import com.trindade.app.R
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trindade.app.aero.erpBatchTimeoutMs
 import com.trindade.app.aero.withErpTimeout
 import com.trindade.app.aero.AERO_CLOSED_DAY_CODE
 import com.trindade.app.aero.AERO_QUEUE_EXPIRED_CODE
@@ -12,6 +13,7 @@ import com.trindade.app.aero.AeroQueueRead
 import com.trindade.app.aero.AeroQueueRejection
 import com.trindade.app.aero.AeroDispatchOutcome
 import com.trindade.app.aero.AeroFailure
+import com.trindade.app.aero.AeroFailureCode
 import com.trindade.app.aero.AeroDispatchRequest
 import com.trindade.app.aero.AeroDispatcher
 import com.trindade.app.aero.AeroErpMovement
@@ -485,7 +487,7 @@ class MassasLaunchViewModel @Inject constructor(
                     // pantalla pase lo que pase, y el pendiente ya quedó en la cola antes de salir.
                     try {
                         erpDispatchMutex.withLock {
-                            when (withErpTimeout { dispatchToErp(result.created, items) }) {
+                            when (withErpTimeout(erpBatchTimeoutMs(result.created.size)) { dispatchToErp(result.created, items) }) {
                                 is com.trindade.app.aero.ErpTrip.Done -> Unit
                                 com.trindade.app.aero.ErpTrip.TimedOut -> {
                                     refreshQueuedCount()
@@ -558,8 +560,8 @@ class MassasLaunchViewModel @Inject constructor(
         var queueSnapshot = aeroQueueStore.read()
             ?: AeroQueue(createdAt = System.currentTimeMillis(), date = state.value.date)
 
-        for (launch in created) {
-            val request = AeroDispatchRequest(
+        val requests = created.map { launch ->
+            AeroDispatchRequest(
                 launchId = launch.id,
                 productCode = launch.productCode,
                 productName = namesByCode[launch.productCode] ?: launch.productCode,
@@ -572,11 +574,15 @@ class MassasLaunchViewModel @Inject constructor(
                 // credits one person for everybody's work.
                 operatorName = launch.displayName.ifBlank { launch.username },
             )
-            // El pendiente queda guardado antes de salir: lo que el teléfono no alcanzó a mandar sigue ahí
-            // aunque la app se cierre a mitad del lote, y lo que la planta tomó se saca enseguida.
+        }
+        // Persist the entire batch before starting HTTP calls so any timeout or crash keeps unsent rows queued.
+        for (request in requests) {
             queueSnapshot = queueSnapshot.enqueue(queueItemFor(request))
-            aeroQueueStore.write(queueSnapshot)
+        }
+        aeroQueueStore.write(queueSnapshot)
+        refreshQueuedCount()
 
+        for (request in requests) {
             when (val outcome = aeroDispatcher.dispatch(settings, request)) {
                 is AeroDispatchOutcome.Sent -> {
                     sent++
@@ -585,7 +591,10 @@ class MassasLaunchViewModel @Inject constructor(
                     queueSnapshot = queueSnapshot.settle(listOf(request.launchId))
                     aeroQueueStore.write(queueSnapshot)
                 }
-                is AeroDispatchOutcome.Failed -> if (firstFailure == null) firstFailure = outcome.failure
+                is AeroDispatchOutcome.Failed -> {
+                    if (firstFailure == null) firstFailure = outcome.failure
+                    if (outcome.failure.code != AeroFailureCode.ERP_REFUSED) break
+                }
             }
         }
         // Lo que quedó en la cola después del lote es lo que el botón de reintento tiene para ofrecer.

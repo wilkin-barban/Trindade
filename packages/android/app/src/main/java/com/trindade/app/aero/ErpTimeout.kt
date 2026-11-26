@@ -6,6 +6,20 @@ import kotlinx.coroutines.withTimeout
 
 /** Cuánto se espera al host de la empresa antes de darlo por inalcanzable. */
 const val ERP_DISPATCH_TIMEOUT_MS: Long = 25_000L
+private const val ERP_PER_ITEM_TIMEOUT_MS: Long = 10_000L
+private const val ERP_MAX_BATCH_TIMEOUT_MS: Long = 180_000L
+
+/**
+ * Scales the dispatch timeout with batch size while keeping the 25 s single-item floor.
+ *
+ * A slow LAN reply of ~5 s per item is healthy for 1-4 items yet exceeded the fixed 25 s cap on
+ * 6+ products, aborting mid-batch even when the ERP was accepting every document.
+ */
+fun erpBatchTimeoutMs(itemCount: Int): Long {
+    val count = itemCount.coerceAtLeast(1)
+    return (ERP_DISPATCH_TIMEOUT_MS + (count - 1).toLong() * ERP_PER_ITEM_TIMEOUT_MS)
+        .coerceAtMost(ERP_MAX_BATCH_TIMEOUT_MS)
+}
 
 /** Cómo terminó un viaje al ERP: contestó, se quedó sin tiempo, o falló por otra razón. */
 sealed interface ErpTrip<out T> {

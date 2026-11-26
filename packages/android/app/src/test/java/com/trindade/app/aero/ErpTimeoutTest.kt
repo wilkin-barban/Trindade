@@ -58,4 +58,16 @@ class ErpTimeoutTest {
         val trip = withErpTimeout(1_000) { error("host refused") }
         assertTrue(trip is ErpTrip.Failed)
     }
+
+    @Test
+    fun `erpBatchTimeoutMs scales monotonically with batch size and keeps 25s floor`() {
+        assertEquals(ERP_DISPATCH_TIMEOUT_MS, erpBatchTimeoutMs(0))
+        assertEquals(ERP_DISPATCH_TIMEOUT_MS, erpBatchTimeoutMs(1))
+        val twoItems = erpBatchTimeoutMs(2)
+        val fourItems = erpBatchTimeoutMs(4)
+        val hugeBatch = erpBatchTimeoutMs(50)
+        assertTrue(twoItems > ERP_DISPATCH_TIMEOUT_MS)
+        assertTrue(fourItems > twoItems)
+        assertTrue(hugeBatch >= fourItems)
+    }
 }
