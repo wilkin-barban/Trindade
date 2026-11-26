@@ -24,8 +24,10 @@ import androidx.lifecycle.viewModelScope
 import com.trindade.app.reports.ReportPhotoFiles
 import java.io.File
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -174,8 +176,10 @@ class SalidaMovementShareTest {
     @After
     fun tearDown() {
         // Un scope que sigue vivo al terminar el test retoma en el `Main` del siguiente y kotlinx-coroutines-test
-        // lo reporta como excepción no capturada antes de empezar: se cancela primero, como en Massas.
-        created.forEach { it.viewModelScope.cancel() }
+        // lo reporta como excepción no capturada antes de empezar: cancelAndJoin espera a Dispatchers.IO antes de resetMain.
+        runBlocking {
+            created.forEach { it.viewModelScope.coroutineContext[Job]?.cancelAndJoin() }
+        }
         created.clear()
         Dispatchers.resetMain()
     }

@@ -4,6 +4,8 @@ import com.trindade.app.aero.AeroErpClient
 import com.trindade.app.aero.AeroMirrorPort
 import com.trindade.app.aero.AeroSettings
 import com.trindade.app.aero.AeroSettingsPort
+import com.trindade.app.aero.ErpTrip
+import com.trindade.app.aero.withErpTimeout
 import com.trindade.app.contract.models.PhotosResponse
 import com.trindade.app.contract.models.SalidaCatalogResponse
 import com.trindade.app.contract.models.SalidaCreateRequest
@@ -20,13 +22,16 @@ import com.trindade.app.contract.models.SalidaPhotoResponse
 import com.trindade.app.di.NetworkModule
 import com.trindade.app.network.AeroAuditLogRequest
 import com.trindade.app.network.SalidaApi
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.runBlocking
 import okhttp3.MultipartBody
+import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -146,7 +151,149 @@ class SalidaRetryPendingTest {
         assertEquals(31, outbox.load()?.movementId)
     }
 
+    @Test
+    fun `sendToErp persists outbox before first call and removes only confirmed payloads individually`() = runBlocking {
+        val snapshotsAtRequest = mutableListOf<List<String>>()
+        server.dispatcher = object : Dispatcher() {
+            private var callIndex = 0
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                snapshotsAtRequest.add(outbox.loadFor(41)?.pendingTrips?.flatten()?.map { it.PRO_COD }.orEmpty())
+                return when (callIndex++) {
+                    0, 1 -> MockResponse().setBody("""{"success":true}""")
+                    2 -> MockResponse().setResponseCode(500).setBody("""{"success":false,"message":"saldo"}""")
+                    else -> MockResponse().setBody("""{"success":true}""")
+                }
+            }
+        }
+        val fourItems = multiItemMovement(41, null, listOf("1357", "1356", "1355", "1358"))
+
+        val outcome = repository.sendToErp(fourItems, "wilkin")
+
+        assertTrue(outcome is SalidaErpOutcome.Partial)
+        assertEquals(
+            listOf(
+                listOf("001357", "001356", "001355", "001358"),
+                listOf("001356", "001355", "001358"),
+                listOf("001355", "001358"),
+                listOf("001355", "001358"),
+            ),
+            snapshotsAtRequest,
+        )
+        assertEquals(listOf("001355"), outbox.loadFor(41)?.pendingTrips?.flatten()?.map { it.PRO_COD })
+        assertEquals(listOf(41 to SalidaErpResultRequest.Status.partial), api.recorded)
+
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse =
+                MockResponse().setBody("""{"success":true}""")
+        }
+        val retryOutcome = repository.retryPending(fourItems, "wilkin")
+        assertTrue(retryOutcome is SalidaErpOutcome.Complete)
+        assertNull(outbox.loadFor(41))
+        assertEquals(5, server.requestCount)
+    }
+
+    @Test
+    fun `sendToErp breaks loop on transport failure and keeps unsent payloads queued`() = runBlocking {
+        server.enqueue(MockResponse().setBody("""{"success":true}"""))
+        server.enqueue(MockResponse().setResponseCode(200).setHeader("Content-Length", "100").setBody("""{"suc"""))
+        val fourItems = multiItemMovement(42, null, listOf("1357", "1356", "1355", "1358"))
+
+        val outcome = repository.sendToErp(fourItems, "wilkin")
+
+        assertTrue(outcome is SalidaErpOutcome.Partial)
+        assertEquals(2, server.requestCount)
+        assertEquals(
+            listOf("001356", "001355", "001358"),
+            outbox.loadFor(42)?.pendingTrips?.flatten()?.map { it.PRO_COD },
+        )
+        assertEquals(listOf(42 to SalidaErpResultRequest.Status.partial), api.recorded)
+    }
+
+    @Test
+    fun `sendToErp persists remaining outbox and partial verdict inside NonCancellable on mid-batch timeout`() =
+        runBlocking {
+            server.enqueue(MockResponse().setBody("""{"success":true}"""))
+            server.enqueue(MockResponse().setBodyDelay(5, TimeUnit.SECONDS).setBody("""{"success":true}"""))
+            val threeItems = multiItemMovement(43, null, listOf("1357", "1356", "1355"))
+
+            val trip = withErpTimeout(250L) { repository.sendToErp(threeItems, "wilkin") }
+
+            assertEquals(ErpTrip.TimedOut, trip)
+            assertEquals(
+                listOf("001356", "001355"),
+                outbox.loadFor(43)?.pendingTrips?.flatten()?.map { it.PRO_COD },
+            )
+            assertEquals(listOf(43 to SalidaErpResultRequest.Status.partial), api.recorded)
+        }
+
+    @Test
+    fun `sendToErp persists full outbox and failed verdict inside NonCancellable when first item times out`() =
+        runBlocking {
+            server.enqueue(MockResponse().setBodyDelay(5, TimeUnit.SECONDS).setBody("""{"success":true}"""))
+            val threeItems = multiItemMovement(44, null, listOf("1357", "1356", "1355"))
+
+            val trip = withErpTimeout(250L) { repository.sendToErp(threeItems, "wilkin") }
+
+            assertEquals(ErpTrip.TimedOut, trip)
+            assertEquals(
+                listOf("001357", "001356", "001355"),
+                outbox.loadFor(44)?.pendingTrips?.flatten()?.map { it.PRO_COD },
+            )
+            assertEquals(listOf(44 to SalidaErpResultRequest.Status.failed), api.recorded)
+        }
+
+    @Test
+    fun `retryPending preserves partial backend verdict when prior partial movement fails remaining items`() =
+        runBlocking {
+            server.enqueue(MockResponse().setResponseCode(500).setBody("""{"success":false}"""))
+            outbox.save(
+                SalidaOutbox(
+                    movementId = 45,
+                    date = "2026-11-24",
+                    trips = listOf(listOf(payload("1356", 20, "2026-11-24"))),
+                ),
+            )
+            val partialMovement = movement(id = 45, status = SalidaMovementErp.Status.partial)
+
+            val outcome = repository.retryPending(partialMovement, "wilkin")
+
+            assertTrue(outcome is SalidaErpOutcome.Failed)
+            assertEquals(listOf(45 to SalidaErpResultRequest.Status.partial), api.recorded)
+            assertEquals(listOf("001356"), outbox.loadFor(45)?.pendingTrips?.flatten()?.map { it.PRO_COD })
+        }
+
     // ---- fixtures ----
+
+    private fun multiItemMovement(
+        id: Int,
+        status: SalidaMovementErp.Status?,
+        codes: List<String>,
+    ): SalidaCreateResponseMovement = SalidaCreateResponseMovement(
+        id = id,
+        movementDate = "2026-11-22",
+        userId = 1,
+        username = "wilkin",
+        displayName = "Wilkin",
+        createdAt = "2026-11-22T11:00:00.000Z",
+        items = codes.mapIndexed { idx, code ->
+            SalidaMovementItemsInner(
+                id = id * 100 + idx,
+                productCode = code,
+                productName = "PRODUCT $code",
+                block = SalidaMovementItemsInner.Block.embalagens,
+                quantity = 20,
+                position = idx,
+            )
+        },
+        photos = emptyList(),
+        totalUnits = codes.size * 20,
+        reconciliation = SalidaMovementReconciliation(
+            status = SalidaMovementReconciliation.Status.pending,
+            entLans = emptyList(),
+            matchedItemIds = emptyList(),
+        ),
+        erp = status?.let { SalidaMovementErp(status = it, message = null, sentAt = "2026-11-22T11:00:00.000Z") },
+    )
 
     private fun payload(code: String, quantity: Int, date: String): SaidaItemPayload =
         SalidaErpPayload.payload(SalidaLine(code, quantity), date, "wilkin")!!
@@ -203,22 +350,28 @@ private class RecordingSalidaApi : SalidaApi {
 
 /** La cola, en memoria: lo que se prueba es el reenvío, no las preferencias de Android. */
 private class InMemoryOutbox : SalidaOutboxPort {
-    private var stored: SalidaOutbox? = null
+    private val entries = linkedMapOf<Int, SalidaOutbox>()
 
     override fun save(outbox: SalidaOutbox) {
-        stored = outbox
+        entries[outbox.movementId] = outbox
     }
 
-    override fun load(): SalidaOutbox? = stored
+    override fun load(): SalidaOutbox? = entries.values.firstOrNull()
+
+    override fun loadFor(movementId: Int): SalidaOutbox? = entries[movementId]
 
     override fun clear() {
-        stored = null
+        entries.clear()
+    }
+
+    override fun clearFor(movementId: Int) {
+        entries.remove(movementId)
     }
 
     override fun advance(outbox: SalidaOutbox): SalidaOutbox? {
         val next = outbox.copy(done = outbox.done + 1)
         return if (next.isComplete) {
-            clear()
+            clearFor(outbox.movementId)
             null
         } else {
             save(next)

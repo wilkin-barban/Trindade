@@ -8,6 +8,7 @@ import okhttp3.MultipartBody
 
 import com.trindade.app.aero.AeroAudit
 import com.trindade.app.aero.AeroAuditAttempt
+import com.trindade.app.aero.AeroFailureCode
 import com.trindade.app.aero.AeroMirrorPort
 import com.trindade.app.aero.aeroEndpoint
 import com.trindade.app.aero.auditCode
@@ -15,6 +16,7 @@ import com.trindade.app.aero.AeroErpClient
 import com.trindade.app.aero.AeroSettings
 import com.trindade.app.aero.AeroSettingsPort
 import com.trindade.app.aero.AeroWriteResult
+import com.trindade.app.aero.failure
 import com.trindade.app.contract.models.SalidaCreateResponseMovement
 import com.trindade.app.contract.models.SalidaHistoryResponseDaysInner
 import com.trindade.app.contract.models.SalidaErpResultRequest
@@ -30,6 +32,7 @@ import okio.Buffer
 import okhttp3.Request
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -65,7 +68,7 @@ sealed interface SalidaErpOutcome {
  * un pendiente que el operario puede reintentar; una que solo existe en el ERP no la puede corregir nadie.
  */
 @Singleton
-class SalidaRepository @Inject constructor(
+open class SalidaRepository @Inject constructor(
     private val api: SalidaApi,
     private val erpClient: AeroErpClient,
     private val settings: AeroSettingsPort,
@@ -74,7 +77,7 @@ class SalidaRepository @Inject constructor(
     @BackendClient private val photoClient: OkHttpClient? = null,
 ) {
 
-    suspend fun catalog(): List<SalidaCatalog.Product> = withContext(Dispatchers.IO) {
+    open suspend fun catalog(): List<SalidaCatalog.Product> = withContext(Dispatchers.IO) {
         val response = api.catalog()
         if (response.isSuccessful) {
             response.body()?.products?.map { product ->
@@ -90,7 +93,7 @@ class SalidaRepository @Inject constructor(
     }
 
     /** Escribe la baja en Trindade; el ERP se entera después. */
-    suspend fun create(selection: SalidaSelection): Result<SalidaCreateResponseMovement> =
+    open suspend fun create(selection: SalidaSelection): Result<SalidaCreateResponseMovement> =
         withContext(Dispatchers.IO) {
             runCatching {
                 val response = api.create(selection.toCreateRequest())
@@ -102,57 +105,40 @@ class SalidaRepository @Inject constructor(
             }
         }
 
+    open fun hasPendingOutbox(movementId: Int): Boolean =
+        outbox.loadFor(movementId)?.pendingTrips?.flatten()?.isNotEmpty() == true
+
+    open fun pendingItemCount(movement: SalidaCreateResponseMovement?): Int {
+        val fromOutbox = if (movement != null) outbox.loadFor(movement.id) else outbox.load()
+        val queuedCount = fromOutbox?.pendingTrips?.sumOf { it.size } ?: 0
+        return if (queuedCount > 0) queuedCount else (movement?.items?.size ?: 1).coerceAtLeast(1)
+    }
+
     /**
      * Manda al ERP lo que la baja tiene para mandar, y deja en la cola lo que no salió.
      *
-     * Tres documentos por viaje como máximo, y cada viaje con su resultado: el que entró se marca, y el que no
-     * deja la cola como estaba para el próximo intento.
+     * Persiste la cola antes del primer POST y descuenta cada payload confirmado conforme el ERP
+     * responde, para que un corte por timeout o red nunca duplique ítems ni pierda el veredicto.
      */
-    suspend fun sendToErp(movement: SalidaCreateResponseMovement, username: String?): SalidaErpOutcome =
+    open suspend fun sendToErp(movement: SalidaCreateResponseMovement, username: String?): SalidaErpOutcome =
         withContext(Dispatchers.IO) {
             val lines = movement.items.map { SalidaLine(it.productCode, it.quantity) }
             val payloads = SalidaErpPayload.payloads(SalidaSelection(lines), movement.movementDate, username)
             if (payloads.isEmpty()) return@withContext SalidaErpOutcome.Skipped
 
             val credentials = credentials()
-                ?: return@withContext finish(movement, SalidaErpOutcome.NotConfigured)
-
-            var sent = 0
-            var failed = 0
-            var message: String? = null
-            val trips = SalidaErpPayload.trips(payloads)
-            var queue = SalidaOutbox(movement.id, movement.movementDate, trips)
-
-            for (trip in trips) {
-                queue = queue.copy(trips = trips)
-                var tripOk = true
-                for (payload in trip) {
-                    val result = audit.recordWrite(movement.id, credentials.wsUrl) {
-                        erpClient.postExit(credentials.wsUrl, credentials.username, credentials.password, payload)
-                    }
-                    when (result) {
-                        is AeroWriteResult.Ok -> sent += 1
-                        is AeroWriteResult.Failed -> {
-                            tripOk = false
-                            failed += 1
-                            message = result.message ?: "HTTP ${result.httpStatus}"
-                        }
-                    }
-                }
-                if (!tripOk) {
-                    // La cola guarda los viajes que faltan desde este, con sus documentos intactos.
-                    outbox.save(queue.copy(done = trips.indexOf(trip)))
-                    break
-                }
-                queue = outbox.advance(queue) ?: queue.copy(done = trips.size)
+            if (credentials == null) {
+                outbox.save(SalidaOutbox(movement.id, movement.movementDate, SalidaErpPayload.trips(payloads)))
+                return@withContext finish(movement, SalidaErpOutcome.NotConfigured)
             }
 
-            val outcome = when {
-                failed == 0 -> SalidaErpOutcome.Complete(sent)
-                sent == 0 -> SalidaErpOutcome.Failed(message)
-                else -> SalidaErpOutcome.Partial(sent, failed, message)
-            }
-            finish(movement, outcome)
+            dispatchPayloads(
+                movementId = movement.id,
+                date = movement.movementDate,
+                initialPayloads = payloads,
+                credentials = credentials,
+                priorPartial = false,
+            )
         }
 
     /**
@@ -164,59 +150,121 @@ class SalidaRepository @Inject constructor(
      * pasa el movimiento: si el servidor lo tiene en fallo, sus ítems alcanzan para rearmar los documentos, con
      * la fecha del movimiento y no la de hoy.
      */
-    suspend fun retryPending(
+    open suspend fun retryPending(
         movement: SalidaCreateResponseMovement? = null,
         username: String? = null,
     ): SalidaErpOutcome = withContext(Dispatchers.IO) {
-        val pending = outbox.load() ?: rebuild(movement, username)
-            ?: return@withContext SalidaErpOutcome.Skipped
+        val pending = if (movement != null) {
+            outbox.loadFor(movement.id) ?: rebuild(movement, username)
+        } else {
+            outbox.load()
+        } ?: return@withContext SalidaErpOutcome.Skipped
         val credentials = credentials() ?: return@withContext SalidaErpOutcome.NotConfigured
+        val priorPartial = movement?.erp?.status == SalidaMovementErp.Status.partial
+
+        dispatchPayloads(
+            movementId = pending.movementId,
+            date = pending.date,
+            initialPayloads = pending.pendingTrips.flatten(),
+            credentials = credentials,
+            priorPartial = priorPartial,
+        )
+    }
+
+    private suspend fun dispatchPayloads(
+        movementId: Int,
+        date: String,
+        initialPayloads: List<SaidaItemPayload>,
+        credentials: AeroSettings,
+        priorPartial: Boolean,
+    ): SalidaErpOutcome {
+        if (initialPayloads.isEmpty()) {
+            outbox.clearFor(movementId)
+            return SalidaErpOutcome.Skipped
+        }
+        val stillOwed = initialPayloads.toMutableList()
+        // Save the full pending payload list before the first HTTP call so any timeout or crash leaves unsent rows recoverable.
+        outbox.save(SalidaOutbox(movementId, date, SalidaErpPayload.trips(stillOwed)))
+
         var sent = 0
         var failed = 0
         var message: String? = null
-        var queue = pending
-        for (trip in pending.pendingTrips) {
-            var tripOk = true
-            for (payload in trip) {
-                val result = audit.recordWrite(pending.movementId, credentials.wsUrl) {
+        var completedNormally = false
+
+        try {
+            val snapshot = stillOwed.toList()
+            for ((index, payload) in snapshot.withIndex()) {
+                val result = audit.recordWrite(movementId, credentials.wsUrl) {
                     erpClient.postExit(credentials.wsUrl, credentials.username, credentials.password, payload)
                 }
                 when (result) {
-                    is AeroWriteResult.Ok -> sent += 1
+                    is AeroWriteResult.Ok -> {
+                        sent += 1
+                        stillOwed.remove(payload)
+                        persistRemainingOutbox(movementId, date, stillOwed)
+                    }
                     is AeroWriteResult.Failed -> {
-                        tripOk = false
+                        if (message == null) message = result.message ?: "HTTP ${result.httpStatus}"
+                        if (result.failure.code != AeroFailureCode.ERP_REFUSED) {
+                            failed += snapshot.size - index
+                            break
+                        }
                         failed += 1
-                        message = result.message ?: "HTTP ${result.httpStatus}"
                     }
                 }
             }
-            if (!tripOk) {
-                outbox.save(queue.copy(done = queue.trips.indexOf(trip)))
-                break
+            completedNormally = true
+        } finally {
+            if (!completedNormally) {
+                withContext(NonCancellable) {
+                    persistRemainingOutbox(movementId, date, stillOwed)
+                    val interruptedStatus =
+                        if (sent > 0 || priorPartial) SalidaErpResultRequest.Status.partial
+                        else SalidaErpResultRequest.Status.failed
+                    recordStatus(movementId, interruptedStatus)
+                }
             }
-            queue = outbox.advance(queue) ?: queue.copy(done = queue.trips.size)
         }
+
         val outcome = when {
             failed == 0 -> SalidaErpOutcome.Complete(sent)
             sent == 0 -> SalidaErpOutcome.Failed(message)
             else -> SalidaErpOutcome.Partial(sent, failed, message)
         }
-        // Reenviar no alcanza: sin este registro el servidor sigue mostrando el documento como fallido.
-        recordVerdict(pending.movementId, outcome)
+        val status = when {
+            failed == 0 -> SalidaErpResultRequest.Status.sent
+            sent > 0 || priorPartial -> SalidaErpResultRequest.Status.partial
+            else -> SalidaErpResultRequest.Status.failed
+        }
+        recordStatus(movementId, status)
+        return outcome
+    }
+
+    private fun persistRemainingOutbox(
+        movementId: Int,
+        date: String,
+        remaining: List<SaidaItemPayload>,
+    ) {
+        if (remaining.isEmpty()) {
+            outbox.clearFor(movementId)
+        } else {
+            outbox.save(SalidaOutbox(movementId, date, SalidaErpPayload.trips(remaining)))
+        }
     }
 
     /**
      * Rearma la cola desde los ítems del movimiento cuando no hay nada guardado.
      *
-     * Solo para un movimiento que el servidor tiene en fallo: rearmar uno conciliado o parcial inventaria un
-     * segundo envío de algo que el ERP ya recibió.
+     * Solo para un movimiento que el servidor tiene sin confirmar o en fallo: rearmar uno conciliado o parcial
+     * inventaría un segundo envío de algo que el ERP ya recibió.
      */
     private fun rebuild(
         movement: SalidaCreateResponseMovement?,
         username: String?,
     ): SalidaOutbox? {
         if (movement == null) return null
-        if (movement.erp?.status != SalidaMovementErp.Status.failed) return null
+        val erpStatus = movement.erp?.status
+        if (erpStatus != null && erpStatus != SalidaMovementErp.Status.failed) return null
         val lines = movement.items.map { SalidaLine(it.productCode, it.quantity) }
         val payloads = SalidaErpPayload.payloads(
             SalidaSelection(lines),
@@ -236,7 +284,7 @@ class SalidaRepository @Inject constructor(
      * hoy, las cinco fechas anteriores y el resto: el contrato ya manda los días agrupados y el repositorio los
      * devuelve como llegan.
      */
-    suspend fun history(): List<SalidaHistoryResponseDaysInner> = withContext(Dispatchers.IO) {
+    open suspend fun history(): List<SalidaHistoryResponseDaysInner> = withContext(Dispatchers.IO) {
         api.history().body()?.days ?: emptyList()
     }
 
@@ -326,7 +374,7 @@ class SalidaRepository @Inject constructor(
         response.isSuccessful
     }
 
-    suspend fun day(date: String): List<SalidaCreateResponseMovement> = withContext(Dispatchers.IO) {
+    open suspend fun day(date: String): List<SalidaCreateResponseMovement> = withContext(Dispatchers.IO) {
         api.day(date).body()?.movements ?: emptyList()
     }
 
@@ -343,9 +391,13 @@ class SalidaRepository @Inject constructor(
             is SalidaErpOutcome.Failed -> SalidaErpResultRequest.Status.failed
             else -> return outcome
         }
+        recordStatus(movementId, status)
+        return outcome
+    }
+
+    private suspend fun recordStatus(movementId: Int, status: SalidaErpResultRequest.Status) {
         // El servidor guarda el veredicto y la auditoría del viaje: es lo que el histórico muestra como estado.
         runCatching { api.recordErpResult(movementId, SalidaErpResultRequest(status = status)) }
-        return outcome
     }
 
     private suspend fun credentials(): AeroSettings? {

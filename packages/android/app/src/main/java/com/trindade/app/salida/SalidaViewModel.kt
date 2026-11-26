@@ -167,7 +167,11 @@ class SalidaViewModel @Inject constructor(
             // El viaje al ERP tiene tiempo máximo y la pantalla se libera siempre: el movimiento ya está en
             // Trindade, así que lo que se pierde es el viaje, no la baja.
             try {
-                when (val trip = com.trindade.app.aero.withErpTimeout { repository.sendToErp(movement, username) }) {
+                when (
+                    val trip = com.trindade.app.aero.withErpTimeout(
+                        com.trindade.app.aero.erpBatchTimeoutMs(selection.lines.size),
+                    ) { repository.sendToErp(movement, username) }
+                ) {
                     is com.trindade.app.aero.ErpTrip.Done -> {
                         val outcome = trip.value
                         _state.value = _state.value.copy(
@@ -403,7 +407,9 @@ class SalidaViewModel @Inject constructor(
     fun isPending(movement: com.trindade.app.contract.models.SalidaCreateResponseMovement): Boolean {
         val erp = movement.erp?.status?.value?.lowercase()
         val reconciliation = movement.reconciliation.status.value.lowercase()
-        if (reconciliation == "reconciled" || reconciliation == "partial") return false
+        if (reconciliation == "reconciled") return false
+        if (erp != "sent" && repository.hasPendingOutbox(movement.id)) return true
+        if (reconciliation == "partial") return false
         return erp == null || erp == "failed"
     }
 
@@ -481,13 +487,28 @@ class SalidaViewModel @Inject constructor(
                 )
                 return@launch
             }
-            val outcome = repository.retryPending(movement, movement?.username)
-            _state.value = _state.value.copy(
-                notice = SalidaNotice(
-                    if (outcome is SalidaErpOutcome.Failed) "Reenvío con fallas: ${outcome.message}" else "Reenvío completado.",
-                    isError = outcome is SalidaErpOutcome.Failed,
-                ),
-            )
+            val expectedItems = repository.pendingItemCount(movement)
+            when (
+                val trip = com.trindade.app.aero.withErpTimeout(
+                    com.trindade.app.aero.erpBatchTimeoutMs(expectedItems),
+                ) { repository.retryPending(movement, movement?.username) }
+            ) {
+                is com.trindade.app.aero.ErpTrip.Done -> {
+                    val outcome = trip.value
+                    _state.value = _state.value.copy(
+                        notice = SalidaNotice(
+                            if (outcome is SalidaErpOutcome.Failed) "Reenvío con fallas: ${outcome.message}" else "Reenvío completado.",
+                            isError = outcome is SalidaErpOutcome.Failed,
+                        ),
+                    )
+                }
+                com.trindade.app.aero.ErpTrip.TimedOut,
+                is com.trindade.app.aero.ErpTrip.Failed -> {
+                    _state.value = _state.value.copy(
+                        notice = SalidaNotice("Reenvío con fallas: El ERP no respondió a tiempo.", isError = true),
+                    )
+                }
+            }
             refreshHistory()
         }
     }

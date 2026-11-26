@@ -31,7 +31,11 @@ data class SalidaOutbox(
 interface SalidaOutboxPort {
     fun save(outbox: SalidaOutbox)
     fun load(): SalidaOutbox?
+    fun loadFor(movementId: Int): SalidaOutbox? = load()?.takeIf { it.movementId == movementId }
     fun clear()
+    fun clearFor(movementId: Int) {
+        if (load()?.movementId == movementId) clear()
+    }
     fun advance(outbox: SalidaOutbox): SalidaOutbox?
 }
 
@@ -44,25 +48,54 @@ interface SalidaOutboxPort {
  */
 class SalidaOutboxStore(private val context: Context) : SalidaOutboxPort {
 
+    private fun prefs() = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+    private fun keyFor(movementId: Int): String = "${KEY}_$movementId"
+
+    private fun decodeLegacy(): SalidaOutbox? =
+        prefs().getString(KEY, null)?.let(::decode)
+
     override fun save(outbox: SalidaOutbox) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit { putString(KEY, encode(outbox)) }
+        val removeLegacy = decodeLegacy()?.movementId == outbox.movementId
+        prefs().edit {
+            putString(keyFor(outbox.movementId), encode(outbox))
+            if (removeLegacy) remove(KEY)
+        }
     }
 
     override fun load(): SalidaOutbox? {
-        val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, null) ?: return null
-        return decode(raw)
+        val all = prefs().all
+        val keyed = all.keys
+            .filter { it.startsWith("${KEY}_") }
+            .sorted()
+            .firstNotNullOfOrNull { key -> (all[key] as? String)?.let(::decode) }
+        return keyed ?: decodeLegacy()
+    }
+
+    override fun loadFor(movementId: Int): SalidaOutbox? =
+        prefs().getString(keyFor(movementId), null)?.let(::decode)
+            ?: decodeLegacy()?.takeIf { it.movementId == movementId }
+
+    override fun clearFor(movementId: Int) {
+        val removeLegacy = decodeLegacy()?.movementId == movementId
+        prefs().edit {
+            remove(keyFor(movementId))
+            if (removeLegacy) remove(KEY)
+        }
     }
 
     override fun clear() {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { remove(KEY) }
+        val keys = prefs().all.keys.filter { it == KEY || it.startsWith("${KEY}_") }
+        prefs().edit {
+            keys.forEach { remove(it) }
+        }
     }
 
     /** Marca un viaje como confirmado; si ya no queda ninguno, la cola se vacía. */
     override fun advance(outbox: SalidaOutbox): SalidaOutbox? {
         val next = outbox.copy(done = outbox.done + 1)
         return if (next.isComplete) {
-            clear()
+            clearFor(outbox.movementId)
             null
         } else {
             save(next)
