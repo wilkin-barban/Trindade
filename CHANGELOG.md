@@ -12,6 +12,20 @@ verificaciones está en [docs/release-android-historial.md](docs/release-android
 
 ## [Unreleased]
 
+### Resiliencia en envíos múltiples al ERP y reparación de codificación de textos ERP (0.8.11, build 8016)
+
+- **Puente Scriptable (`Aero32Bridge`)**: el catálogo de fallos por ítem en un lote ahora se serializa como JSON válido
+  para que los envíos con múltiples productos devuelvan errores estructurados sin romper el callback hacia la web.
+- **Lanzamiento de Masas (Web y Android)**: la web restaura las filas `inFlight` al recibir error de puente o transporte
+  y deduplica callbacks repetidos; Android pre-encola todos los productos del lote con el estado pendiente antes del
+  primer envío, escala el timeout por tamaño de lote (`min(25_000 + (n - 1) * 10_000, 180_000) ms`) y corta el resto del
+  bucle ante un error de transporte sin dejar filas perdidas.
+- **Salida / Baixas (Web y Android)**: el histórico web conserva la acción de reenvío cuando hay múltiples viajes
+  o estado de error; Android indexa su cola por clave de movimiento y persiste estados parciales si ocurre timeout.
+- **Textos ERP con mojibake**: backend, web y Android reparan secuencias UTF-8 mal decodificadas como Latin-1/Windows-1252
+  (por ejemplo `AÃ‡UCAR` / `AÇUCAR`, `PÃƒO` / `PÃO`, `JOÃƒO` / `JOÃO`) al ingerir, listar, generar comprobantes o emitir
+  reportes en Masas, Salida y espejo ERP.
+
 ### Histórico de Salida Android: compartir una baja con sus fotos y tirar la foto desde la app (0.8.10, build 8015)
 
 - **Compartir una baja suelta**: el botón de la tarjeta ahora arma el texto de esa baja con la tabla de
