@@ -1803,4 +1803,136 @@ describe('SalidaHistoryPage — T3 per-movement state, relaunch, operator filter
     expect(outbox?.retryState).toBe('ready');
     expect(outbox?.trips).toHaveLength(1);
   });
+
+  it('walks full 2-trip lifecycle and clears only movement 2 while preserving coexisting movement 99 outbox', async () => {
+    await i18n.changeLanguage('es');
+    sessionStorage.clear();
+    post.mockResolvedValue({ ok: true });
+    const { SALIDA_LAST_MOVEMENT_KEY, readSalidaOutbox } = await import('../../lib/salida');
+    const { saveAeroPendingAttempt } = await import('../../lib/aero-pending-attempt');
+
+    const trip1 = Array.from({ length: 8 }, (_, idx) => ({ PRO_COD: `00000${idx + 1}`, PRO_QTD: 100 }));
+    const trip2 = [{ PRO_COD: '000009', PRO_QTD: 100 }];
+    const mov = movement({ id: 2 });
+
+    localStorage.setItem(
+      SALIDA_OUTBOX_KEY,
+      JSON.stringify([
+        {
+          movementId: 2,
+          date: '2026-11-13',
+          trips: [{ action: 'saida', payloads: trip1 }, { action: 'saida', payloads: trip2 }],
+          startedAt: new Date().toISOString(),
+          currentTripPayloads: 8,
+        },
+        {
+          movementId: 99,
+          date: '2026-11-13',
+          trips: [{ action: 'saida', payloads: [{ PRO_COD: '001900', PRO_QTD: 100 }] }],
+          startedAt: new Date().toISOString(),
+          retryState: 'ready',
+        },
+      ]),
+    );
+    writeSalidaLastMovement({ ...mov, expectedPayloads: 8 });
+    saveAeroPendingAttempt({ action: 'saida', attemptId: 'att-t1', startedAt: Date.now(), date: '2026-11-13' });
+
+    const partialMov = movement({ id: 2, erp: { status: 'partial', message: null, sentAt: new Date().toISOString() } });
+    const otherMov = movement({ id: 99, erp: { status: 'partial', message: null, sentAt: new Date().toISOString() } });
+    get.mockImplementation(async (url: string) => {
+      if (url === '/salida/history') return { days: [{ date: '2026-11-13', total_units: 40, movements: [partialMov, otherMov] }] };
+      return {};
+    });
+
+    const data1 = encodeURIComponent(JSON.stringify(trip1.map(() => ({ success: true }))));
+    const v1 = await renderReady(`/salida-history?saida_attempt=att-t1&aero_action=saida&aero_data=${data1}`);
+
+    await waitFor(() => expect(post).toHaveBeenCalledWith('/salida/2/erp-result', { status: 'partial', message: null }));
+    let ob2 = readSalidaOutbox(undefined, 2);
+    expect(ob2?.trips).toHaveLength(1);
+    expect(ob2?.trips[0]?.payloads).toEqual(trip2);
+    expect(ob2?.retryState).toBe('ready');
+    expect(ob2?.currentTripPayloads).toBeUndefined();
+    expect(await screen.findByTestId('salida-resend-2')).toBeInTheDocument();
+    v1.unmount();
+
+    post.mockClear();
+    localStorage.setItem(
+      SALIDA_OUTBOX_KEY,
+      JSON.stringify([
+        { ...ob2, currentTripPayloads: 1 },
+        readSalidaOutbox(undefined, 99),
+      ]),
+    );
+    writeSalidaLastMovement({ ...partialMov, expectedPayloads: 1 });
+    saveAeroPendingAttempt({ action: 'saida', attemptId: 'att-t2-fail', startedAt: Date.now(), date: '2026-11-13' });
+
+    const data2Fail = encodeURIComponent(JSON.stringify({ success: false, message: 'Produto sem saldo' }));
+    const v2 = await renderReady(`/salida-history?saida_attempt=att-t2-fail&aero_action=saida&aero_data=${data2Fail}`);
+
+    await waitFor(() =>
+      expect(post).toHaveBeenCalledWith('/salida/2/erp-result', { status: 'partial', message: 'Produto sem saldo' }),
+    );
+    ob2 = readSalidaOutbox(undefined, 2);
+    expect(ob2?.retryState).toBe('ready');
+    expect(ob2?.currentTripPayloads).toBeUndefined();
+    expect(await screen.findByTestId('salida-resend-2')).toBeInTheDocument();
+    v2.unmount();
+
+    post.mockClear();
+    localStorage.setItem(
+      SALIDA_OUTBOX_KEY,
+      JSON.stringify([
+        { ...ob2, currentTripPayloads: 1 },
+        readSalidaOutbox(undefined, 99),
+      ]),
+    );
+    writeSalidaLastMovement({ ...partialMov, expectedPayloads: 1 });
+    saveAeroPendingAttempt({ action: 'saida', attemptId: 'att-t2-ok', startedAt: Date.now(), date: '2026-11-13' });
+
+    const data2Ok = encodeURIComponent(JSON.stringify({ success: true, message: 'OK final' }));
+    await renderReady(`/salida-history?saida_attempt=att-t2-ok&aero_action=saida&aero_data=${data2Ok}`);
+
+    await waitFor(() => expect(post).toHaveBeenCalledWith('/salida/2/erp-result', { status: 'sent', message: 'OK final' }));
+    expect(readSalidaOutbox(undefined, 2)).toBeNull();
+    expect(sessionStorage.getItem(SALIDA_LAST_MOVEMENT_KEY)).toBeNull();
+    expect(readSalidaOutbox(undefined, 99)?.retryState).toBe('ready');
+  });
+
+  it('sets retryState review and hides resend while keeping partial status when Trip 2 returns unreadable', async () => {
+    await i18n.changeLanguage('es');
+    sessionStorage.clear();
+    post.mockResolvedValue({ ok: true });
+    const { readSalidaOutbox } = await import('../../lib/salida');
+    const { saveAeroPendingAttempt } = await import('../../lib/aero-pending-attempt');
+
+    const trip2 = [{ PRO_COD: '000009', PRO_QTD: 100 }, { PRO_COD: '000010', PRO_QTD: 100 }];
+    const partialMov = movement({ id: 2, erp: { status: 'partial', message: null, sentAt: new Date().toISOString() } });
+    const otherMov = movement({ id: 99, erp: { status: 'partial', message: null, sentAt: new Date().toISOString() } });
+    get.mockImplementation(async (url: string) => {
+      if (url === '/salida/history') return { days: [{ date: '2026-11-13', total_units: 40, movements: [partialMov, otherMov] }] };
+      return {};
+    });
+    localStorage.setItem(
+      SALIDA_OUTBOX_KEY,
+      JSON.stringify({
+        movementId: 2,
+        date: '2026-11-13',
+        trips: [{ action: 'saida', payloads: trip2 }],
+        startedAt: new Date().toISOString(),
+        currentTripPayloads: 2,
+        retryState: 'ready',
+      }),
+    );
+    writeSalidaLastMovement({ ...partialMov, expectedPayloads: 2 });
+    saveAeroPendingAttempt({ action: 'saida', attemptId: 'att-t2-unreadable', startedAt: Date.now(), date: '2026-11-13' });
+
+    await renderReady('/salida-history?saida_attempt=att-t2-unreadable&aero_action=saida&aero_data=not-json');
+
+    await waitFor(() => expect(post).toHaveBeenCalledWith('/salida/2/erp-result', { status: 'partial', message: null }));
+    const ob2 = readSalidaOutbox(undefined, 2);
+    expect(ob2?.retryState).toBe('review');
+    expect(ob2?.currentTripPayloads).toBeUndefined();
+    expect(screen.queryByTestId('salida-resend-2')).toBeNull();
+  });
 });

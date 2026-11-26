@@ -70,4 +70,16 @@ class ErpTimeoutTest {
         assertTrue(fourItems > twoItems)
         assertTrue(hugeBatch >= fourItems)
     }
+
+    @Test
+    fun `erpBatchTimeoutMs boundary values respect 25s floor, 10s per extra item, and 180s cap`() {
+        assertEquals(ERP_DISPATCH_TIMEOUT_MS, erpBatchTimeoutMs(-10))
+        assertEquals(ERP_DISPATCH_TIMEOUT_MS, erpBatchTimeoutMs(0))
+        assertEquals(ERP_DISPATCH_TIMEOUT_MS, erpBatchTimeoutMs(1))
+        assertEquals(35_000L, erpBatchTimeoutMs(2))
+        assertEquals(95_000L, erpBatchTimeoutMs(8))
+        assertEquals(175_000L, erpBatchTimeoutMs(16))
+        assertEquals(180_000L, erpBatchTimeoutMs(17))
+        assertEquals(180_000L, erpBatchTimeoutMs(100))
+    }
 }

@@ -70,4 +70,29 @@ class SalidaOutboxStoreTest {
         assertNull(store.loadFor(9))
         assertNull(store.load())
     }
+
+    @Test
+    fun `legacy pending key survives unrelated movement save and clearFor, and migrates when its own movement saves`() {
+        val legacy9 = SalidaOutbox(
+            movementId = 9,
+            date = "2026-11-25",
+            trips = listOf(listOf(payload("1900", 1, "2026-11-25"))),
+        )
+        val prefs = context.getSharedPreferences("trindade_salida_outbox", Context.MODE_PRIVATE)
+        prefs.edit(commit = true) { putString("pending", SalidaOutboxStore.encode(legacy9)) }
+
+        store.save(SalidaOutbox(movementId = 12, date = "2026-11-26", trips = listOf(listOf(payload("1357", 2)))))
+        assertNotNull(store.loadFor(9))
+        assertNotNull(store.loadFor(12))
+
+        store.clearFor(999)
+        assertNotNull(store.loadFor(9))
+        assertNotNull(store.loadFor(12))
+
+        val updated9 = legacy9.copy(trips = listOf(listOf(payload("1900", 3, "2026-11-25"))))
+        store.save(updated9)
+        assertNull(prefs.getString("pending", null))
+        assertEquals(300, store.loadFor(9)?.pendingTrips?.flatten()?.single()?.PRO_QTD)
+        assertNotNull(store.loadFor(12))
+    }
 }

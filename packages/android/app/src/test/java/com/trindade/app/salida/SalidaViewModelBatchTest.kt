@@ -206,4 +206,140 @@ class SalidaViewModelBatchTest {
         ),
         erp = status?.let { SalidaMovementErp(status = it, message = null, sentAt = "2026-11-26T10:00:00.000Z") },
     )
+
+    @Test
+    fun `isPending, pendingCount, and resendPending respect outbox, partial reconciliation, and scaled timeout`() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val entries = linkedMapOf<Int, SalidaOutbox>()
+        val localOutbox = object : SalidaOutboxPort {
+            override fun save(outbox: SalidaOutbox) { entries[outbox.movementId] = outbox }
+            override fun load(): SalidaOutbox? = entries.values.firstOrNull()
+            override fun loadFor(movementId: Int): SalidaOutbox? = entries[movementId]
+            override fun clear() { entries.clear() }
+            override fun clearFor(movementId: Int) { entries.remove(movementId) }
+            override fun advance(outbox: SalidaOutbox): SalidaOutbox? = null
+        }
+        val noopMirror = object : AeroMirrorPort {
+            override suspend fun saveMovements(
+                date: String,
+                movements: List<com.trindade.app.aero.AeroErpMovement>,
+            ): com.trindade.app.aero.AeroSnapshotSave =
+                com.trindade.app.aero.AeroSnapshotSave.Saved(com.trindade.app.network.AeroMovementsSaved())
+
+            override suspend fun log(request: AeroAuditLogRequest) = Unit
+        }
+        val movPartialRec = SalidaCreateResponseMovement(
+            id = 201,
+            movementDate = "2026-11-26",
+            userId = 1,
+            username = "wilkin",
+            displayName = "Wilkin",
+            createdAt = "2026-11-26T10:00:00.000Z",
+            items = listOf("1357", "1356").mapIndexed { idx, code ->
+                SalidaMovementItemsInner(
+                    id = 20100 + idx,
+                    productCode = code,
+                    productName = "PROD $code",
+                    block = SalidaMovementItemsInner.Block.embalagens,
+                    quantity = 2,
+                    position = idx,
+                )
+            },
+            photos = emptyList(),
+            totalUnits = 4,
+            reconciliation = SalidaMovementReconciliation(
+                status = SalidaMovementReconciliation.Status.partial,
+                entLans = emptyList(),
+                matchedItemIds = emptyList(),
+            ),
+            erp = SalidaMovementErp(
+                status = SalidaMovementErp.Status.partial,
+                message = null,
+                sentAt = "2026-11-26T10:00:00.000Z",
+            ),
+        )
+        val movFullRec = SalidaCreateResponseMovement(
+            id = 202,
+            movementDate = "2026-11-26",
+            userId = 1,
+            username = "wilkin",
+            displayName = "Wilkin",
+            createdAt = "2026-11-26T10:00:00.000Z",
+            items = listOf("1355", "1358").mapIndexed { idx, code ->
+                SalidaMovementItemsInner(
+                    id = 20200 + idx,
+                    productCode = code,
+                    productName = "PROD $code",
+                    block = SalidaMovementItemsInner.Block.embalagens,
+                    quantity = 2,
+                    position = idx,
+                )
+            },
+            photos = emptyList(),
+            totalUnits = 4,
+            reconciliation = SalidaMovementReconciliation(
+                status = SalidaMovementReconciliation.Status.reconciled,
+                entLans = emptyList(),
+                matchedItemIds = emptyList(),
+            ),
+            erp = SalidaMovementErp(
+                status = SalidaMovementErp.Status.partial,
+                message = null,
+                sentAt = "2026-11-26T10:00:00.000Z",
+            ),
+        )
+        val repo = object : SalidaRepository(
+            api = StubSalidaApi(),
+            erpClient = AeroErpClient(NetworkModule.provideJson()),
+            settings = DummySettings(),
+            outbox = localOutbox,
+            audit = SalidaAudit(noopMirror),
+            photoClient = null,
+        ) {
+            var retryCalls = 0
+            override suspend fun catalog() = SalidaCatalog.products
+            override suspend fun day(date: String) = emptyList<SalidaCreateResponseMovement>()
+            override suspend fun history() = listOf(
+                SalidaHistoryResponseDaysInner(
+                    date = "2026-11-26",
+                    totalUnits = 8,
+                    movements = listOf(movPartialRec, movFullRec),
+                ),
+            )
+            override suspend fun retryPending(
+                movement: SalidaCreateResponseMovement?,
+                username: String?,
+            ): SalidaErpOutcome {
+                retryCalls++
+                gate.await()
+                return SalidaErpOutcome.Complete(2)
+            }
+        }
+        val p1 = SalidaErpPayload.payload(SalidaLine("1356", 2), "2026-11-26", "wilkin")!!
+        val p2 = SalidaErpPayload.payload(SalidaLine("1357", 2), "2026-11-26", "wilkin")!!
+        localOutbox.save(SalidaOutbox(movementId = 201, date = "2026-11-26", trips = listOf(listOf(p1, p2))))
+        localOutbox.save(SalidaOutbox(movementId = 202, date = "2026-11-26", trips = listOf(listOf(p1))))
+
+        val vm = SalidaViewModel(repo).also { createdVms += it }
+        advanceUntilIdle()
+        vm.selectHistoryDate("2026-11-26")
+        advanceUntilIdle()
+
+        val loadedPartial = vm.state.value.history.first().movements[0]
+        val loadedReconciled = vm.state.value.history.first().movements[1]
+        assertTrue(vm.isPending(loadedPartial))
+        assertFalse(vm.isPending(loadedReconciled))
+        assertEquals(1, vm.pendingCount())
+
+        vm.resendPending(loadedPartial, "wilkin", false)
+        testScheduler.runCurrent()
+        assertEquals(1, repo.retryCalls)
+        testScheduler.advanceTimeBy(ERP_DISPATCH_TIMEOUT_MS + 2_000L)
+        testScheduler.runCurrent()
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        assertFalse(vm.state.value.notice?.isError == true)
+        assertTrue(vm.state.value.notice?.message.orEmpty().contains("completado"))
+    }
 }

@@ -325,6 +325,69 @@ class SalidaRetryPendingTest {
             ),
             erp = SalidaMovementErp(status = status, message = null, sentAt = "2026-11-22T11:00:00.000Z"),
         )
+
+    @Test
+    fun `sendToErp with 10 items across 2 trips settles individually and retries only the refused item`() = runBlocking {
+        val tenCodes = listOf("1357", "1356", "1355", "1358", "1359", "1361", "1307", "1625", "1354", "1528")
+        server.dispatcher = object : Dispatcher() {
+            private var callIdx = 0
+            override fun dispatch(request: RecordedRequest): MockResponse =
+                if (callIdx++ == 8) MockResponse().setResponseCode(422).setBody("""{"success":false,"message":"saldo"}""")
+                else MockResponse().setBody("""{"success":true}""")
+        }
+        val tenItems = multiItemMovement(101, null, tenCodes)
+        val outcome = repository.sendToErp(tenItems, "wilkin")
+
+        assertTrue(outcome is SalidaErpOutcome.Partial)
+        assertEquals(listOf("001354"), outbox.loadFor(101)?.pendingTrips?.flatten()?.map { it.PRO_COD })
+        assertEquals(listOf(101 to SalidaErpResultRequest.Status.partial), api.recorded)
+        assertEquals(10, server.requestCount)
+
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse = MockResponse().setBody("""{"success":true}""")
+        }
+        val retryOutcome = repository.retryPending(movement(101, SalidaMovementErp.Status.partial), "wilkin")
+        assertTrue(retryOutcome is SalidaErpOutcome.Complete)
+        assertNull(outbox.loadFor(101))
+        assertEquals(11, server.requestCount)
+        assertEquals(
+            listOf(101 to SalidaErpResultRequest.Status.partial, 101 to SalidaErpResultRequest.Status.sent),
+            api.recorded,
+        )
+    }
+
+    @Test
+    fun `retryPending on prior partial movement keeps partial status inside NonCancellable even when timeout hits first item`() = runBlocking {
+        server.enqueue(MockResponse().setBodyDelay(5, TimeUnit.SECONDS).setBody("""{"success":true}"""))
+        val p1 = payload("1354", 2, "2026-11-26")
+        val p2 = payload("1528", 2, "2026-11-26")
+        outbox.save(SalidaOutbox(movementId = 102, date = "2026-11-26", trips = listOf(listOf(p1, p2))))
+        val partialMov = multiItemMovement(102, SalidaMovementErp.Status.partial, listOf("1357", "1354", "1528"))
+
+        val trip = withErpTimeout(200L) { repository.retryPending(partialMov, "wilkin") }
+
+        assertEquals(ErpTrip.TimedOut, trip)
+        assertEquals(listOf("001354", "001528"), outbox.loadFor(102)?.pendingTrips?.flatten()?.map { it.PRO_COD })
+        assertEquals(listOf(102 to SalidaErpResultRequest.Status.partial), api.recorded)
+    }
+
+    @Test
+    fun `sendToErp when not configured saves outbox so hasPendingOutbox and pendingItemCount remain accurate`() = runBlocking {
+        val unconfiguredRepo = SalidaRepository(
+            api = api,
+            erpClient = AeroErpClient(NetworkModule.provideJson()),
+            settings = FixedSettings(AeroSettings()),
+            outbox = outbox,
+            audit = SalidaAudit(NoopMirror),
+            photoClient = null,
+        )
+        val threeItems = multiItemMovement(103, null, listOf("1357", "1356", "1355"))
+        val outcome = unconfiguredRepo.sendToErp(threeItems, "wilkin")
+
+        assertEquals(SalidaErpOutcome.NotConfigured, outcome)
+        assertTrue(unconfiguredRepo.hasPendingOutbox(103))
+        assertEquals(3, unconfiguredRepo.pendingItemCount(threeItems))
+    }
 }
 
 /** Lo único que este test le pide a la API de Trindade: que anote el veredicto que recibió. */

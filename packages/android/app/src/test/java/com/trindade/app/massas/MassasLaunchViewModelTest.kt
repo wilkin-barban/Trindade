@@ -2406,4 +2406,139 @@ class MassasLaunchViewModelTest {
         assertEquals(listOf(1, 3, 2), testVm.state.value.resultDialogMessage?.args)
     }
 
+    @Test
+    fun `confirmLaunch mid-batch timeout settles item 0 and keeps items 1-3 in persisted queue`() = runTest {
+        val rows = listOf(
+            launch(id = 7, productCode = "1045", productName = "MASSA 1045"),
+            launch(id = 8, productCode = "1046", productName = "MASSA 1046"),
+            launch(id = 9, productCode = "1047", productName = "MASSA 1047"),
+            launch(id = 10, productCode = "1048", productName = "MASSA 1048"),
+        )
+        val gate = CompletableDeferred<Unit>()
+        var callCount = 0
+        val scriptedErp = object : com.trindade.app.aero.AeroErpPort {
+            override suspend fun postEntry(
+                settings: AeroSettings,
+                payload: com.trindade.app.aero.AeroEntryPayload,
+            ): AeroWriteResult {
+                val idx = callCount++
+                return if (idx == 0) {
+                    AeroWriteResult.Ok(null)
+                } else {
+                    gate.await()
+                    AeroWriteResult.Ok(null)
+                }
+            }
+
+            override suspend fun readMovements(
+                settings: AeroSettings,
+                date: String,
+            ): com.trindade.app.aero.AeroMovementsResult =
+                com.trindade.app.aero.AeroMovementsResult.Ok(emptyList(), skipped = 0)
+        }
+        val localQueue = FakeQueuePort()
+        val repo = DayRepository(massasApi, dayWith(*rows.toTypedArray())).apply { created = rows }
+        val testVm = MassasLaunchViewModel(
+            repository = repo,
+            authRepository = authRepository,
+            aeroSettingsStore = FakeSettingsPort(AeroSettings(wsUrl = AERO_DEFAULT_WS_URL, username = "WILKIN", password = "pw")),
+            aeroQueueStore = localQueue,
+            aeroDispatcher = AeroDispatcher(scriptedErp, FakeMirrorPort(), FakeReachability()),
+            tabletAckStore = FakeAckPort(),
+        ).also {
+            createdViewModels += it
+            it.setViewer(adminViewer)
+        }
+
+        testVm.onQuantityChange("1045", "3")
+        testVm.requestLaunchConfirmation()
+        testVm.confirmLaunch()
+        testScheduler.runCurrent()
+
+        assertEquals(listOf(8, 9, 10), localQueue.stored?.items?.flatMap { it.launchIds })
+
+        testScheduler.advanceTimeBy(com.trindade.app.aero.erpBatchTimeoutMs(4) + 1_000L)
+        testScheduler.runCurrent()
+
+        assertEquals(R.string.massas_aero_erp_timeout, testVm.state.value.resultDialogMessage?.resId)
+        assertFalse(testVm.state.value.resultDialogIsSuccess)
+        assertEquals(listOf(8, 9, 10), localQueue.stored?.items?.flatMap { it.launchIds })
+        assertEquals(3, testVm.state.value.queuedLaunches)
+    }
+
+    @Test
+    fun `confirmLaunch continues past ERP_REFUSED, settles Ok item, and breaks on transport failure keeping pre-seeded item`() = runTest {
+        val rows = listOf(
+            launch(id = 7, productCode = "1045", productName = "MASSA 1045"),
+            launch(id = 8, productCode = "1046", productName = "MASSA 1046"),
+            launch(id = 9, productCode = "1047", productName = "MASSA 1047"),
+            launch(id = 10, productCode = "1048", productName = "MASSA 1048"),
+        )
+        val sentObservations = mutableListOf<String>()
+        val scriptedErp = object : com.trindade.app.aero.AeroErpPort {
+            override suspend fun postEntry(
+                settings: AeroSettings,
+                payload: com.trindade.app.aero.AeroEntryPayload,
+            ): AeroWriteResult {
+                sentObservations += payload.observation
+                return when {
+                    payload.observation.contains("#99") -> AeroWriteResult.Failed(null)
+                    payload.observation.contains("#7") -> AeroWriteResult.Failed("Saldo insuficiente")
+                    payload.observation.contains("#8") -> AeroWriteResult.Ok(null)
+                    payload.observation.contains("#9") -> AeroWriteResult.Failed(null)
+                    else -> AeroWriteResult.Ok(null)
+                }
+            }
+
+            override suspend fun readMovements(
+                settings: AeroSettings,
+                date: String,
+            ): com.trindade.app.aero.AeroMovementsResult =
+                com.trindade.app.aero.AeroMovementsResult.Ok(emptyList(), skipped = 0)
+        }
+        val localQueue = FakeQueuePort(
+            AeroQueue(
+                createdAt = System.currentTimeMillis(),
+                date = MassasLaunchViewModel.saopauloToday(),
+                items = listOf(
+                    AeroQueueItem(
+                        productCode = "001040",
+                        productName = "FARINHA",
+                        quantity = 10.0,
+                        operatorName = "Wilkin",
+                        launchIds = listOf(99),
+                        date = MassasLaunchViewModel.saopauloToday(),
+                    ),
+                ),
+            ),
+        )
+        val repo = DayRepository(massasApi, dayWith(*rows.toTypedArray())).apply { created = rows }
+        val testVm = MassasLaunchViewModel(
+            repository = repo,
+            authRepository = authRepository,
+            aeroSettingsStore = FakeSettingsPort(AeroSettings(wsUrl = AERO_DEFAULT_WS_URL, username = "WILKIN", password = "pw")),
+            aeroQueueStore = localQueue,
+            aeroDispatcher = AeroDispatcher(scriptedErp, FakeMirrorPort(), FakeReachability()),
+            tabletAckStore = FakeAckPort(),
+        ).also {
+            createdViewModels += it
+            it.setViewer(adminViewer)
+        }
+
+        advanceUntilIdle()
+        sentObservations.clear()
+
+        testVm.onQuantityChange("1045", "3")
+        testVm.requestLaunchConfirmation()
+        testVm.confirmLaunch()
+        advanceUntilIdle()
+
+        assertEquals(3, sentObservations.size)
+        assertTrue(sentObservations.none { it.contains("#10") })
+        assertEquals(listOf(99, 7, 9, 10), localQueue.stored?.items?.flatMap { it.launchIds })
+        assertEquals(4, testVm.state.value.queuedLaunches)
+        assertEquals(R.string.massas_aero_batch_partial, testVm.state.value.resultDialogMessage?.resId)
+        assertEquals(listOf(1, 4, 3), testVm.state.value.resultDialogMessage?.args)
+    }
+
 }

@@ -238,4 +238,38 @@ describe('Aero32Bridge batch resilience', () => {
       skipped: 3,
     });
   });
+
+  it('handles empty error messages, special characters, whitespace bodies, and inline callback without resultUrl', async () => {
+    const body1 = JSON.stringify({ PRO_COD: '001356' });
+    const body2 = JSON.stringify({ PRO_COD: '001355' });
+    const body3 = JSON.stringify({ PRO_COD: '001900' });
+    const body4 = JSON.stringify({ PRO_COD: '001357' });
+
+    const result = await runBridgeScript(
+      {
+        url: 'http://192.168.25.250:1453/api/saidasitem',
+        headers: { Authorization: 'Basic abc' },
+        body: body1,
+        bodies: [body1, body2, body3, body4],
+        callback: 'https://trindade.test/salida-history?aero_action=saida&aero_data=',
+      },
+      (_body, idx) => {
+        if (idx === 0) return { json: { success: true } };
+        if (idx === 1) return { error: new Error('Line1\n"quote" \\ slash') };
+        if (idx === 2) return { response: '   \n\t ' };
+        return { error: new Error('') };
+      },
+    );
+
+    assert.equal(result.completed, true);
+    assert.equal(result.storedResult, undefined);
+    const raw = decodeURIComponent((result.openedUrl ?? '').split('aero_data=')[1] ?? '');
+    const parsed = JSON.parse(raw) as Array<{ success: boolean; message?: string }>;
+    assert.deepEqual(parsed, [
+      { success: true },
+      { success: false, message: 'Line1\n"quote" \\ slash' },
+      { success: false, message: 'Error al enviar al ERP' },
+      { success: false, message: 'Error al enviar al ERP' },
+    ]);
+  });
 });

@@ -514,4 +514,144 @@ describe('MassasHistoryPage', () => {
     });
     expect(lastResultCalls).toBe(1);
   });
+
+  it('restores inFlight items at the front of existing queue items, updates syncAwaiting count, and logs launch_sync result on wifi_required', async () => {
+    const today = saoPauloToday();
+    localStorage.clear();
+    sessionStorage.clear();
+    saveAeroSettings({ wsUrl: 'http://192.168.25.250:1453/api', username: 'APL', syncEnabled: true, hasPassword: true, lastSyncAt: null });
+    get.mockImplementation(async (url: string) => {
+      if (url.startsWith('/massas-launch/history')) return { days: [] };
+      if (url.startsWith('/massas-launch?')) return dayView(today, 'MASSA DE PASTEL');
+      if (url.startsWith('/integration/aero/movements')) return { date: today, movements: [] };
+      if (url.startsWith('/integration/aero/settings') || url.startsWith('/admin/aero/vault')) {
+        return { configured: true, wsUrl: 'http://192.168.25.250:1453/api', username: 'APL', hasPassword: true };
+      }
+      return {};
+    });
+
+    writeAeroQueue({
+      createdAt: new Date().toISOString(),
+      date: today,
+      inFlight: [
+        { productCode: '60', productName: 'A', quantity: 100, launchIds: [1] },
+        { productCode: '61', productName: 'B', quantity: 200, launchIds: [2] },
+      ],
+      items: [{ productCode: '62', productName: 'C', quantity: 300, launchIds: [3] }],
+    });
+    saveAeroPendingAttempt({
+      action: 'entrada_lote',
+      attemptId: 'att-front',
+      startedAt: Date.now() - 5000,
+      date: today,
+    });
+
+    renderPage(`/massas-history?aero_action=entrada_lote&aero_data=&aero_error=wifi_required&aero_msg=${encodeURIComponent('Sin Wi-Fi')}`);
+    await screen.findByText(i18n.t('massas.aero.wifiRequiredTitle'));
+
+    await waitFor(() => {
+      const logCall = post.mock.calls.find(([url]) => url === '/integration/aero/log');
+      expect(logCall).toBeTruthy();
+      expect(logCall![1]).toMatchObject({
+        event: 'launch_sync',
+        phase: 'result',
+        attemptId: 'att-front',
+        error: 'AERO_WIFI_REQUIRED',
+      });
+    });
+
+    const restored = readAeroQueue();
+    expect(restored?.inFlight).toEqual([]);
+    expect(restored?.items.map((x) => x.productCode)).toEqual(['60', '61', '62']);
+    expect(loadAeroPendingAttempt('entrada_lote')).toBeNull();
+    expect(await screen.findByText(/· 3$/)).toBeInTheDocument();
+  });
+
+  it('logs read_history and leaves aeroQueue untouched when error returns for movimentos attempt', async () => {
+    const today = saoPauloToday();
+    localStorage.clear();
+    sessionStorage.clear();
+    saveAeroSettings({ wsUrl: 'http://192.168.25.250:1453/api', username: 'APL', syncEnabled: true, hasPassword: true, lastSyncAt: null });
+    get.mockImplementation(async (url: string) => {
+      if (url.startsWith('/massas-launch/history')) return { days: [] };
+      if (url.startsWith('/massas-launch?')) return dayView(today, 'MASSA DE PASTEL');
+      if (url.startsWith('/integration/aero/movements')) return { date: today, movements: [] };
+      if (url.startsWith('/integration/aero/settings') || url.startsWith('/admin/aero/vault')) {
+        return { configured: true, wsUrl: 'http://192.168.25.250:1453/api', username: 'APL', hasPassword: true };
+      }
+      return {};
+    });
+
+    writeAeroQueue({
+      createdAt: new Date().toISOString(),
+      date: today,
+      inFlight: [{ productCode: '60', productName: 'A', quantity: 100, launchIds: [1] }],
+      items: [],
+    });
+    saveAeroPendingAttempt({
+      action: 'movimentos',
+      attemptId: 'att-mov-err',
+      startedAt: Date.now() - 2000,
+      date: today,
+    });
+
+    renderPage('/massas-history?aero_action=movimentos&aero_data=&aero_error=wifi_required&aero_msg=No+WiFi');
+    await screen.findByText(i18n.t('massas.aero.wifiRequiredTitle'));
+
+    await waitFor(() => {
+      const logCall = post.mock.calls.find(([url]) => url === '/integration/aero/log');
+      expect(logCall).toBeTruthy();
+      expect(logCall![1]).toMatchObject({
+        event: 'read_history',
+        phase: 'result',
+        attemptId: 'att-mov-err',
+        error: 'AERO_WIFI_REQUIRED',
+      });
+    });
+
+    const q = readAeroQueue();
+    expect(q?.inFlight).toHaveLength(1);
+    expect(q?.items).toHaveLength(0);
+  });
+
+  it('still restores inFlight and logs launch_sync on timeout even when pendingAttempt is null', async () => {
+    const today = saoPauloToday();
+    localStorage.clear();
+    sessionStorage.clear();
+    saveAeroSettings({ wsUrl: 'http://192.168.25.250:1453/api', username: 'APL', syncEnabled: true, hasPassword: true, lastSyncAt: null });
+    get.mockImplementation(async (url: string) => {
+      if (url.startsWith('/massas-launch/history')) return { days: [] };
+      if (url.startsWith('/massas-launch?')) return dayView(today, 'MASSA DE PASTEL');
+      if (url.startsWith('/integration/aero/movements')) return { date: today, movements: [] };
+      if (url.startsWith('/integration/aero/settings') || url.startsWith('/admin/aero/vault')) {
+        return { configured: true, wsUrl: 'http://192.168.25.250:1453/api', username: 'APL', hasPassword: true };
+      }
+      return {};
+    });
+
+    writeAeroQueue({
+      createdAt: new Date().toISOString(),
+      date: today,
+      inFlight: [{ productCode: '70', productName: 'D', quantity: 100, launchIds: [9] }],
+      items: [],
+    });
+
+    renderPage('/massas-history?aero_action=entrada&aero_data=&aero_error=timeout');
+    await screen.findByText(i18n.t('massas.aero.wifiRequiredTitle'));
+    expect(screen.getByTestId('massa-result-message').textContent).toBe(i18n.t('massas.aero.bridgeError'));
+
+    await waitFor(() => {
+      const logCall = post.mock.calls.find(([url]) => url === '/integration/aero/log');
+      expect(logCall).toBeTruthy();
+      expect(logCall![1]).toMatchObject({
+        event: 'launch_sync',
+        phase: 'result',
+        error: 'AERO_TIMEOUT',
+      });
+    });
+
+    const restored = readAeroQueue();
+    expect(restored?.inFlight).toEqual([]);
+    expect(restored?.items.map((x) => x.productCode)).toEqual(['70']);
+  });
 });
