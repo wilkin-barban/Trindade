@@ -43,20 +43,21 @@ const launchPaths = {
 };
 
 describe('el aviso de error del puente', () => {
-  it('muestra el mensaje de Wi-Fi/ERP y no toca la cola ni los envíos pendientes', () => {
+  it('muestra el mensaje de Wi-Fi/ERP, reencola lo en vuelo y registra el cierre en bitácora', () => {
     const branch = between(history, "if (parsed.kind === 'error') {", "if (parsed.kind === 'test') {");
 
     assert.ok(branch.includes("t('massas.aero.wifiRequiredTitle')"), 'el aviso necesita su título');
     assert.ok(branch.includes("t('massas.aero.wifiRequired')"), 'y la frase que dice qué revisar');
     // El intento se cierra acá: sin esto un refresh reabriría el aviso sobre trabajo que sigue pendiente.
     assert.ok(branch.includes('clearAeroPendingAttempt()'), 'el intento pendiente tiene que cerrarse');
+    // Si un lote estaba en vuelo, vuelve entero al frente de `items` para permitir reintento sin borrar trabajo.
+    assert.ok(branch.includes('requeueInFlightAeroQueue('), 'lo que iba en vuelo debe regresar a la cola');
+    assert.ok(branch.includes("phase: 'result'"), 'cierra el par requested/result ante fallo del puente');
 
-    // Nada del trabajo del operador se pierde por un error de red.
-    for (const forbidden of ['clearAeroQueue(', 'writeAeroQueue(', 'setSyncAwaiting(null)']) {
+    // Nada del trabajo del operador se descarta por un error de red.
+    for (const forbidden of ['clearAeroQueue(', 'setSyncAwaiting(null)']) {
       assert.equal(branch.includes(forbidden), false, `un error de red no puede ejecutar ${forbidden}`);
     }
-    // Y no se inventa un evento de bitácora: el par `requested`/`result` existente queda como está.
-    assert.equal(branch.includes('postAeroAuditEvent('), false, 'sin eventos nuevos en la bitácora');
   });
 
   it('olvida la marca en cualquier callback, justo donde se limpia la query', () => {

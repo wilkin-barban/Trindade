@@ -965,7 +965,10 @@ export function MassasHistoryPage() {
           }
         }
 
-        const refused = outcome.status !== 'ok' && queue ? requeueInFlightAeroQueue(queue) : null;
+        const refused =
+          outcome.status !== 'ok' && queue
+            ? { ...queue, items: [...queue.inFlight, ...queue.items], inFlight: [] }
+            : null;
         if (refused && refused.items.length > 0) {
           writeAeroQueue(refused);
           setSyncAwaiting({ date: refused.date, remaining: refused.items.length });
