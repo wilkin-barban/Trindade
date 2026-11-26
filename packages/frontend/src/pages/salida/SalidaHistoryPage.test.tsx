@@ -1598,4 +1598,209 @@ describe('SalidaHistoryPage — T3 per-movement state, relaunch, operator filter
     expect(localStorage.getItem(SALIDA_LAST_MOVEMENT_KEY)).toBeNull();
     expect(screen.queryByTestId('salida-history-outbox')).toBeNull();
   });
+
+  it('clears currentTripPayloads and keeps resend enabled after wifi_required callback', async () => {
+    const { readSalidaOutbox } = await import('../../lib/salida');
+    const payloads = [
+      { PRO_COD: '001356', PRO_QTD: 100 },
+      { PRO_COD: '001900', PRO_QTD: 200 },
+    ];
+    localStorage.setItem(
+      SALIDA_OUTBOX_KEY,
+      JSON.stringify({
+        movementId: 2,
+        date: '2026-11-13',
+        trips: [{ action: 'saida', payloads }],
+        startedAt: new Date().toISOString(),
+        currentTripPayloads: 2,
+      }),
+    );
+    writeSalidaLastMovement({ ...PENDING_BOBINA, expectedPayloads: 2 });
+    saveAeroPendingAttempt({
+      action: 'saida',
+      attemptId: 'att-wifi-outbox',
+      startedAt: Date.now(),
+      date: '2026-11-13',
+    });
+
+    const failedMovement = {
+      ...PENDING_BOBINA,
+      erp: { status: 'failed' as const, message: 'wifi_required', sentAt: new Date().toISOString() },
+    };
+    get.mockImplementation(async (path: string) =>
+      path === '/salida/history'
+        ? { days: [{ date: '2026-11-13', total_units: 3, movements: [failedMovement] }] }
+        : {},
+    );
+    ticket.mockImplementation(async () => ({
+      ticket: 't-resend',
+      ticketUrl: 'https://app.example/t/resend',
+      expiresAt: '',
+    }));
+
+    await renderReady('/salida-history?saida_attempt=att-wifi-outbox&aero_action=saida&aero_data=&aero_error=wifi_required&aero_msg=No+WiFi');
+
+    await waitFor(() =>
+      expect(post).toHaveBeenCalledWith('/salida/2/erp-result', {
+        status: 'failed',
+        message: 'No WiFi',
+      }),
+    );
+
+    const updatedOutbox = readSalidaOutbox(undefined, 2);
+    expect(updatedOutbox?.currentTripPayloads).toBeUndefined();
+
+    const resendBtn = await screen.findByTestId('salida-resend-2');
+    fireEvent.click(resendBtn);
+    await waitFor(() =>
+      expect(ticket).toHaveBeenCalledWith(expect.objectContaining({ action: 'saida', payloads })),
+    );
+  });
+
+  it('records partial (not sent) in backend when a multi-trip movement completes only trip 1', async () => {
+    const { readSalidaOutbox } = await import('../../lib/salida');
+    const trip1 = Array.from({ length: 8 }, (_, idx) => ({ PRO_COD: `00000${idx + 1}`, PRO_QTD: 100 }));
+    const trip2 = [{ PRO_COD: '000009', PRO_QTD: 100 }];
+    localStorage.setItem(
+      SALIDA_OUTBOX_KEY,
+      JSON.stringify({
+        movementId: 2,
+        date: '2026-11-13',
+        trips: [
+          { action: 'saida', payloads: trip1 },
+          { action: 'saida', payloads: trip2 },
+        ],
+        startedAt: new Date().toISOString(),
+        currentTripPayloads: 8,
+      }),
+    );
+    writeSalidaLastMovement({ ...PENDING_BOBINA, expectedPayloads: 8 });
+    saveAeroPendingAttempt({
+      action: 'saida',
+      attemptId: 'att-trip-1',
+      startedAt: Date.now(),
+      date: '2026-11-13',
+    });
+
+    const data = encodeURIComponent(
+      JSON.stringify(trip1.map(() => ({ success: true, message: 'Despesa lançada com sucesso' }))),
+    );
+    await renderReady(`/salida-history?saida_attempt=att-trip-1&aero_action=saida&aero_data=${data}`);
+
+    await waitFor(() =>
+      expect(post).toHaveBeenCalledWith('/salida/2/erp-result', {
+        status: 'partial',
+        message: null,
+      }),
+    );
+
+    const remainingOutbox = readSalidaOutbox(undefined, 2);
+    expect(remainingOutbox?.trips).toHaveLength(1);
+    expect(remainingOutbox?.trips[0]?.payloads).toEqual(trip2);
+    expect(remainingOutbox?.retryState).toBe('ready');
+    expect(remainingOutbox?.currentTripPayloads).toBeUndefined();
+  });
+
+  it('keeps resend enabled when all items of a failed batch were rejected (ok=0)', async () => {
+    const { readSalidaOutbox } = await import('../../lib/salida');
+    const payloads = [
+      { PRO_COD: '001356', PRO_QTD: 100 },
+      { PRO_COD: '001900', PRO_QTD: 200 },
+    ];
+    localStorage.setItem(
+      SALIDA_OUTBOX_KEY,
+      JSON.stringify({
+        movementId: 2,
+        date: '2026-11-13',
+        trips: [{ action: 'saida', payloads }],
+        startedAt: new Date().toISOString(),
+        currentTripPayloads: 2,
+      }),
+    );
+    writeSalidaLastMovement({ ...PENDING_BOBINA, expectedPayloads: 2 });
+    saveAeroPendingAttempt({
+      action: 'saida',
+      attemptId: 'att-all-failed',
+      startedAt: Date.now(),
+      date: '2026-11-13',
+    });
+
+    const failedMovement = {
+      ...PENDING_BOBINA,
+      erp: { status: 'failed' as const, message: 'Produto invalido', sentAt: new Date().toISOString() },
+    };
+    get.mockImplementation(async (path: string) =>
+      path === '/salida/history'
+        ? { days: [{ date: '2026-11-13', total_units: 3, movements: [failedMovement] }] }
+        : {},
+    );
+    ticket.mockImplementation(async () => ({
+      ticket: 't-resend-2',
+      ticketUrl: 'https://app.example/t/resend-2',
+      expiresAt: '',
+    }));
+
+    const data = encodeURIComponent(
+      JSON.stringify([
+        { success: false, message: 'Produto invalido' },
+        { success: false, message: 'Produto invalido' },
+      ]),
+    );
+    await renderReady(`/salida-history?saida_attempt=att-all-failed&aero_action=saida&aero_data=${data}`);
+
+    await waitFor(() =>
+      expect(post).toHaveBeenCalledWith('/salida/2/erp-result', {
+        status: 'failed',
+        message: 'Produto invalido',
+      }),
+    );
+
+    const outbox = readSalidaOutbox(undefined, 2);
+    expect(outbox?.currentTripPayloads).toBeUndefined();
+    expect(outbox?.retryState).not.toBe('review');
+
+    fireEvent.click(await screen.findByTestId('salida-resend-2'));
+    await waitFor(() => expect(ticket).toHaveBeenCalledTimes(1));
+  });
+
+  it('preserves partial status and keeps retryState ready when trip 2 fails after trip 1 succeeded', async () => {
+    const { readSalidaOutbox } = await import('../../lib/salida');
+    const trip2 = [{ PRO_COD: '000009', PRO_QTD: 100 }];
+    localStorage.setItem(
+      SALIDA_OUTBOX_KEY,
+      JSON.stringify({
+        movementId: 2,
+        date: '2026-11-13',
+        trips: [{ action: 'saida', payloads: trip2 }],
+        startedAt: new Date().toISOString(),
+        currentTripPayloads: 1,
+        retryState: 'ready',
+      }),
+    );
+    const partialMovement = {
+      ...PENDING_BOBINA,
+      erp: { status: 'partial' as const, message: 'Despesa lançada com sucesso', sentAt: new Date().toISOString() },
+    };
+    writeSalidaLastMovement({ ...partialMovement, expectedPayloads: 1 });
+    saveAeroPendingAttempt({
+      action: 'saida',
+      attemptId: 'att-trip-2-wifi',
+      startedAt: Date.now(),
+      date: '2026-11-13',
+    });
+
+    await renderReady('/salida-history?saida_attempt=att-trip-2-wifi&aero_action=saida&aero_data=&aero_error=wifi_required&aero_msg=No+WiFi');
+
+    await waitFor(() =>
+      expect(post).toHaveBeenCalledWith('/salida/2/erp-result', {
+        status: 'partial',
+        message: 'No WiFi',
+      }),
+    );
+
+    const outbox = readSalidaOutbox(undefined, 2);
+    expect(outbox?.currentTripPayloads).toBeUndefined();
+    expect(outbox?.retryState).toBe('ready');
+    expect(outbox?.trips).toHaveLength(1);
+  });
 });

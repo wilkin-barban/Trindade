@@ -64,6 +64,30 @@ import {
   type SalidaOutbox,
 } from '../../lib/salida';
 
+function hasConfirmedSalidaPriorTrip(
+  movement: Pick<SalidaMovement, 'erp'> | null | undefined,
+  queued: SalidaOutbox | null | undefined,
+): boolean {
+  return (
+    movement?.erp?.status === 'partial' ||
+    movement?.erp?.status === 'sent' ||
+    queued?.retryState === 'ready'
+  );
+}
+
+function nextSalidaOutboxOnFailure(
+  queued: SalidaOutbox,
+  retryState: 'ready' | 'review' | undefined,
+): SalidaOutbox {
+  return {
+    movementId: queued.movementId,
+    date: queued.date,
+    trips: queued.trips,
+    startedAt: queued.startedAt,
+    ...(retryState !== undefined ? { retryState } : {}),
+  };
+}
+
 /** One day of the history, as `GET /api/salida/history` serves it. */
 // A movements read from Salida must never replace or consume Massas' pending bridge attempt.
 const SALIDA_MOVEMENTS_ATTEMPT_KEY = 'trindade.aero.salida-movimentos-attempt.v1';
@@ -429,17 +453,26 @@ export function SalidaHistoryPage() {
           1;
 
         const batchResult = readAeroBatchResult(callback.data, expectedTripPayloads);
-        const erpOutcome = salidaBatchToDialogOutcome(batchResult.state, batchResult.ok, batchResult.total);
-        const erpStatus = salidaBatchToErpStatus(batchResult.state, batchResult.ok, batchResult.total);
+        const isComplete =
+          batchResult.state === 'complete' ||
+          (batchResult.state === 'legacy' && batchResult.ok === batchResult.total);
+        const hasRemainingTrips = Boolean(queued && queued.trips.length > 1);
+        const priorTripConfirmed = hasConfirmedSalidaPriorTrip(lastMovement, queued);
+
+        const baseOutcome = salidaBatchToDialogOutcome(batchResult.state, batchResult.ok, batchResult.total);
+        const erpOutcome = isComplete && hasRemainingTrips ? 'partial' : baseOutcome;
+        const baseStatus = salidaBatchToErpStatus(batchResult.state, batchResult.ok, batchResult.total);
+        const erpStatus =
+          isComplete && hasRemainingTrips
+            ? 'partial'
+            : baseStatus === 'failed' && priorTripConfirmed
+              ? 'partial'
+              : baseStatus;
 
         const movementId = lastMovement?.id ?? queued?.movementId;
         if (movementId) {
           void recordSalidaErpResult(movementId, { status: erpStatus, message: batchResult.message }, attempt);
         }
-
-        const isComplete =
-          batchResult.state === 'complete' ||
-          (batchResult.state === 'legacy' && batchResult.ok === batchResult.total);
 
         if (isComplete) {
           void postAeroAuditEvent(
@@ -465,7 +498,7 @@ export function SalidaHistoryPage() {
 
         setSuccess({ movement: lastMovement, erp: erpOutcome, message: batchResult.message });
         if (isComplete) {
-          if (queued && queued.trips.length > 1) {
+          if (hasRemainingTrips && queued) {
             const remainingTrips = queued.trips.slice(1);
             writeSalidaOutbox({ ...queued, trips: remainingTrips, currentTripPayloads: undefined, retryState: 'ready' });
             setOutbox(readSalidaOutbox());
@@ -475,9 +508,11 @@ export function SalidaHistoryPage() {
             setOutbox(readSalidaOutbox());
           }
         } else {
-          // The movement is still owed: the outbox and the card keep saying pending.
+          // Only partial or unreadable bridge responses need manual reconciliation; a clean ok=0 rejection keeps resend enabled.
           if (queued) {
-            writeSalidaOutbox({ ...queued, currentTripPayloads: undefined, retryState: 'review' });
+            const needsReview = batchResult.state === 'partial' || batchResult.state === 'unreadable';
+            const nextRetryState = needsReview ? 'review' : priorTripConfirmed ? 'ready' : undefined;
+            writeSalidaOutbox(nextSalidaOutboxOnFailure(queued, nextRetryState));
           }
           setOutbox(readSalidaOutbox());
         }
@@ -490,10 +525,20 @@ export function SalidaHistoryPage() {
           clearAeroPendingAttempt(undefined, 'saida');
           const lastMovement = readSalidaLastMovement();
           const movementId = lastMovement?.id;
+          const queued = movementId ? readSalidaOutbox(undefined, movementId) : null;
+          const priorTripConfirmed = hasConfirmedSalidaPriorTrip(lastMovement, queued);
+          if (queued) {
+            writeSalidaOutbox(
+              nextSalidaOutboxOnFailure(queued, priorTripConfirmed ? 'ready' : undefined),
+            );
+          }
           if (movementId) {
             void recordSalidaErpResult(
               movementId,
-              { status: 'failed', message: callback.message || callback.code },
+              {
+                status: priorTripConfirmed ? 'partial' : 'failed',
+                message: callback.message || callback.code,
+              },
               syncAttempt,
             );
           }
