@@ -111,7 +111,6 @@ class ReportDetailViewModel @Inject constructor(
             refreshPhotos(reportId)
             refreshMassas(report)
             refreshReceipts(report)
-        refreshSalidaDay(report)
             refreshSalidaDay(report)
         }
     }
@@ -306,15 +305,14 @@ class ReportDetailViewModel @Inject constructor(
      */
     fun shareExport() {
         val text = state.value.exportText ?: return
-        // La miniatura usa `publicUrl ?: url`: el share tiene que mirar las mismas fotos. Un reporte viejo
-        // puede no tener token público y sus archivos igual existen.
-        val urls = state.value.photos.mapNotNull { it.publicUrl ?: it.url }.filter { it.isNotBlank() }
-        if (urls.isEmpty() || photoFiles == null) {
+        // La miniatura usa `publicUrl ?: url`: el share tiene que mirar las mismas fotos con respaldo autenticado.
+        val candidates = state.value.photos.map { photoCandidateUrls(it.publicUrl, it.url) }.filter { it.isNotEmpty() }
+        if (candidates.isEmpty() || photoFiles == null) {
             shareManager.shareText(text)
             return
         }
         viewModelScope.launch {
-            val files = photoFiles.download(urls)
+            val files = photoFiles.downloadWithFallbacks(candidates)
             if (files.isEmpty()) shareManager.shareText(text) else shareManager.shareTextWithPhotos(text, files)
         }
     }

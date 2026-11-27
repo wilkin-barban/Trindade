@@ -128,4 +128,34 @@ class SalidaShareWithPhotosTest {
         assertEquals(emptyList<File>(), share.photos)
         assertEquals("Salidas del día", share.text)
     }
+
+    @Test
+    fun `if no photo arrives and a recipient phone is provided the fallback opens that chat link`() = runTest {
+        var opened: String? = null
+        val share = object : ShareManager {
+            var text: String? = null
+            override fun openLink(url: String): Boolean {
+                opened = url
+                return true
+            }
+            override fun shareText(text: String, title: String?): Boolean {
+                this.text = text
+                return true
+            }
+            override fun sharePdf(file: File, title: String?): Boolean = true
+            override fun shareApk(file: File, title: String?): Boolean = true
+        }
+        val photos = RecordingPhotoFiles(deliver = false)
+
+        val handled = shareSalidaWithPhotosCandidates(
+            text = "Salidas del día",
+            candidates = listOf(listOf("https://host/p/1", "/api/salida/photos/1")),
+            shareManager = share,
+            photoFiles = photos,
+            fallbackLink = "https://api.whatsapp.com/send?phone=5511999998888&text=Salidas",
+        )
+
+        assertFalse(handled)
+        assertEquals("https://api.whatsapp.com/send?phone=5511999998888&text=Salidas", opened)
+    }
 }

@@ -1,6 +1,7 @@
 package com.trindade.app.export
 
 import android.content.ClipData
+import android.content.ClipDescription
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -135,10 +136,7 @@ class AndroidShareManager @Inject constructor(
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
 
-        return Intent.createChooser(sendIntent, title).apply {
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
+        return wrapChooser(sendIntent, title)
     }
 
     /**
@@ -166,11 +164,64 @@ class AndroidShareManager @Inject constructor(
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
 
-        return Intent.createChooser(sendIntent, title).apply {
+        return wrapChooser(sendIntent, title)
+    }
+
+    /**
+     * Builds the chooser [Intent] carrying one photo (`ACTION_SEND`) or multiple photos (`ACTION_SEND_MULTIPLE`)
+     * together with [text] as caption, propagating [ClipData] and `FLAG_ACTIVITY_NEW_TASK` from [context].
+     */
+    internal fun createTextWithPhotosShareIntent(text: String, photos: List<File>, title: String? = null): Intent? {
+        val files = photos.filter { it.exists() && it.length() > 0L }
+        if (files.isEmpty()) return null
+        val authority = "${context.packageName}.fileprovider"
+        val uris = ArrayList<Uri>(files.size)
+        for (file in files) {
+            val uri = try {
+                FileProvider.getUriForFile(context, authority, file)
+            } catch (_: Throwable) {
+                return null
+            }
+            uris.add(uri)
+        }
+
+        val sendIntent = if (uris.size == 1) {
+            val single = uris.first()
+            Intent(Intent.ACTION_SEND).apply {
+                type = "image/*"
+                putExtra(Intent.EXTRA_STREAM, single)
+                putExtra(Intent.EXTRA_TEXT, text)
+                if (!title.isNullOrBlank()) putExtra(Intent.EXTRA_TITLE, title)
+                clipData = ClipData.newRawUri(title ?: "Photo", single)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        } else {
+            val clip = ClipData(
+                ClipDescription(title ?: "Photos", arrayOf("image/*")),
+                ClipData.Item(uris.first()),
+            ).apply {
+                for (index in 1 until uris.size) {
+                    addItem(ClipData.Item(uris[index]))
+                }
+            }
+            Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                type = "image/*"
+                putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+                putExtra(Intent.EXTRA_TEXT, text)
+                if (!title.isNullOrBlank()) putExtra(Intent.EXTRA_TITLE, title)
+                clipData = clip
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        }
+
+        return wrapChooser(sendIntent, title)
+    }
+
+    private fun wrapChooser(sendIntent: Intent, title: String?): Intent =
+        Intent.createChooser(sendIntent, title).apply {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-    }
 
     override fun shareText(text: String, title: String?): Boolean {
         return try {
@@ -193,24 +244,11 @@ class AndroidShareManager @Inject constructor(
     }
 
     override fun shareTextWithPhotos(text: String, photos: List<File>, title: String?): Boolean {
-        val files = photos.filter { it.exists() && it.length() > 0 }
-        if (files.isEmpty()) return shareText(text, title)
+        val chooser = createTextWithPhotosShareIntent(text, photos, title) ?: return shareText(text, title)
         return try {
-            val uris = ArrayList<Uri>()
-            for (file in files) {
-                uris.add(FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file))
-            }
-            val send = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
-                type = "image/*"
-                putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
-                putExtra(Intent.EXTRA_TEXT, text)
-                putExtra(Intent.EXTRA_TITLE, title ?: "")
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            context.startActivity(Intent.createChooser(send, title ?: text.take(0)))
+            context.startActivity(chooser)
             true
         } catch (_: Throwable) {
-            // Sin proveedor que acepte varias fotos, el mensaje viaja solo: la evidencia no puede borrar el texto.
             shareText(text, title)
         }
     }

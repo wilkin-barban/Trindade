@@ -219,6 +219,55 @@ class ReportDetailViewModelTest {
     }
 
     @Test
+    fun `shareExport offers publicUrl with authenticated url fallback when both exist`() = runTest {
+        val fakeApi = FakeReportsApi(
+            photosToReturn = listOf(FakeReportsApi.aPhoto(id = 61)),
+        )
+        val receivedCandidates = mutableListOf<List<List<String>>>()
+        val downloader = object : ReportPhotoFiles {
+            override suspend fun download(urls: List<String>): List<java.io.File> = emptyList()
+            override suspend fun downloadWithFallbacks(candidates: List<List<String>>): List<java.io.File> {
+                receivedCandidates += candidates
+                return listOf(java.io.File("/tmp/report-61.jpg"))
+            }
+        }
+        val shareManager = RecordingShareManager()
+        val model = ReportDetailViewModel(
+            ReportsRepository(fakeApi),
+            FakePhotoCompressor(),
+            shareManager,
+            photoFiles = downloader,
+        )
+        model.load(REPORT_ID)
+        model.loadExport()
+
+        model.shareExport()
+
+        assertEquals(
+            listOf(
+                listOf("https://example.test/p/tok61", "https://example.test/api/reports/photos/61"),
+            ),
+            receivedCandidates.single(),
+        )
+        assertEquals(listOf(java.io.File("/tmp/report-61.jpg")), shareManager.sharedPhotos)
+    }
+
+    @Test
+    fun `load refreshes salidaDay only once`() = runTest {
+        val base = FakeReportsApi()
+        var salidaCalls = 0
+        val countingApi = object : ReportsApi by base {
+            override suspend fun salidaDay(date: String): Response<com.trindade.app.contract.models.SalidaReportDayView> {
+                salidaCalls++
+                return base.salidaDay(date)
+            }
+        }
+        val model = ReportDetailViewModel(ReportsRepository(countingApi), FakePhotoCompressor())
+        model.load(REPORT_ID)
+        assertEquals(1, salidaCalls)
+    }
+
+    @Test
     fun `sharePdf generates relatorio-id pdf and launches shareManager`() {
         val shareManager = RecordingShareManager()
         val pdfGenerator = RecordingPdfGenerator()

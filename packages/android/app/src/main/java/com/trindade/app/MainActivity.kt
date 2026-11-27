@@ -302,12 +302,30 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var updateRepository: com.trindade.app.update.UpdateRepository
 
+    @Inject
+    @com.trindade.app.di.NetworkModule.BackendClient
+    lateinit var backendHttpClient: okhttp3.OkHttpClient
+
+    @Inject
+    @com.trindade.app.di.NetworkModule.PublicFileClient
+    lateinit var publicHttpClient: okhttp3.OkHttpClient
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             TrindadeTheme {
-                AppRoot {
+                androidx.compose.runtime.CompositionLocalProvider(
+                    com.trindade.app.ui.components.LocalPhotoByteLoader provides { rawUrl ->
+                        com.trindade.app.reports.PhotoDownloadTransport.fetchBytes(
+                            rawUrl = rawUrl,
+                            apiBaseUrl = BuildConfig.API_BASE_URL,
+                            backendClient = backendHttpClient,
+                            publicClient = publicHttpClient,
+                        )?.bytes
+                    },
+                ) {
+                    AppRoot {
                     var signedIn by remember { mutableStateOf(authRepository.hasSession()) }
                     var updateAvailable by remember { mutableStateOf(false) }
                     var showMandatoryUpdateDialog by remember { mutableStateOf(false) }
@@ -905,6 +923,7 @@ class MainActivity : ComponentActivity() {
                             },
                         )
                     }
+                }
                 }
             }
         }

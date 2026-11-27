@@ -222,4 +222,63 @@ class ShareManagerTest {
         val launched = shareManager.sharePdf(nonExistent)
         assertFalse("sharePdf must return false when file is missing", launched)
     }
+
+    @Test
+    fun `createTextWithPhotosShareIntent sends single photo with ACTION_SEND and text caption`() {
+        val photosDir = File(exportsDir, "share-photos").apply { mkdirs() }
+        val photo = File(photosDir, "report-1.jpg").apply {
+            writeBytes(byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte()))
+        }
+        val caption = "Relatório completo"
+
+        val chooser = shareManager.createTextWithPhotosShareIntent(caption, listOf(photo), "Compartilhar")
+        assertNotNull("Valid cached share photo must build chooser intent", chooser)
+        assertEquals(Intent.ACTION_CHOOSER, chooser!!.action)
+        assertTrue((chooser.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION) != 0)
+        assertTrue((chooser.flags and Intent.FLAG_ACTIVITY_NEW_TASK) != 0)
+
+        @Suppress("DEPRECATION")
+        val target = chooser.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)
+        assertNotNull(target)
+        assertEquals(Intent.ACTION_SEND, target!!.action)
+        assertEquals("image/*", target.type)
+        assertEquals(caption, target.getStringExtra(Intent.EXTRA_TEXT))
+
+        @Suppress("DEPRECATION")
+        val streamUri = target.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
+        assertNotNull(streamUri)
+        assertTrue(streamUri.toString().startsWith("content://"))
+        assertEquals(streamUri, target.clipData?.getItemAt(0)?.uri)
+        assertTrue((target.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION) != 0)
+        assertNull(target.`package`)
+    }
+
+    @Test
+    fun `createTextWithPhotosShareIntent sends multiple photos with ACTION_SEND_MULTIPLE and full ClipData`() {
+        val photosDir = File(exportsDir, "share-photos").apply { mkdirs() }
+        val first = File(photosDir, "p1.jpg").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+        val second = File(photosDir, "p2.png").apply { writeBytes(byteArrayOf(4, 5, 6)) }
+        val caption = "Saídas do dia"
+
+        val chooser = shareManager.createTextWithPhotosShareIntent(caption, listOf(first, second), "Compartilhar")
+        assertNotNull(chooser)
+        assertEquals(Intent.ACTION_CHOOSER, chooser!!.action)
+        assertTrue((chooser.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION) != 0)
+        assertTrue((chooser.flags and Intent.FLAG_ACTIVITY_NEW_TASK) != 0)
+
+        @Suppress("DEPRECATION")
+        val target = chooser.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)
+        assertNotNull(target)
+        assertEquals(Intent.ACTION_SEND_MULTIPLE, target!!.action)
+        assertEquals("image/*", target.type)
+        assertEquals(caption, target.getStringExtra(Intent.EXTRA_TEXT))
+
+        @Suppress("DEPRECATION")
+        val streams = target.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)
+        assertEquals(2, streams?.size)
+        assertEquals(2, target.clipData?.itemCount)
+        assertEquals(streams!![0], target.clipData?.getItemAt(0)?.uri)
+        assertEquals(streams[1], target.clipData?.getItemAt(1)?.uri)
+        assertNull(target.`package`)
+    }
 }

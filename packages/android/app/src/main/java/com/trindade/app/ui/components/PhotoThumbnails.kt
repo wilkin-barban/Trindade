@@ -17,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
@@ -27,6 +28,9 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.URL
+
+/** Optional origin-safe thumbnail loader supplied by the host Activity; falls back to URL stream in unit tests. */
+val LocalPhotoByteLoader = staticCompositionLocalOf<(suspend (String) -> ByteArray?)?> { null }
 
 /** El tamaño de una miniatura: el mismo en todas las superficies de compartir. */
 val PhotoThumbnailSize = 56.dp
@@ -67,12 +71,16 @@ fun PhotoThumbnails(
  */
 @Composable
 private fun RemoteThumbnail(url: String, tag: String) {
-    var bitmap by remember(url) { mutableStateOf<ImageBitmap?>(null) }
+    val byteLoader = LocalPhotoByteLoader.current
+    var bitmap by remember(url, byteLoader) { mutableStateOf<ImageBitmap?>(null) }
 
-    LaunchedEffect(url) {
+    LaunchedEffect(url, byteLoader) {
         bitmap = withContext(Dispatchers.IO) {
             runCatching {
-                URL(url).openStream().use { stream -> BitmapFactory.decodeStream(stream)?.asImageBitmap() }
+                val loaded = byteLoader?.invoke(url)?.let { bytes ->
+                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+                }
+                loaded ?: URL(url).openStream().use { stream -> BitmapFactory.decodeStream(stream)?.asImageBitmap() }
             }.getOrNull()
         }
     }

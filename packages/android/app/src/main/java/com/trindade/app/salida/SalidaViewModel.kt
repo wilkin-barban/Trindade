@@ -519,6 +519,12 @@ class SalidaViewModel @Inject constructor(
         return salidaSharePhotoUrls(_state.value.history.firstOrNull { it.date == chosen })
     }
 
+    /** Las fotos del día elegido con su respaldo autenticado (`publicUrl`, luego `url`). */
+    fun daySharePhotoCandidates(): List<List<String>> {
+        val chosen = _state.value.historyDate ?: _state.value.date
+        return salidaSharePhotoCandidates(_state.value.history.firstOrNull { it.date == chosen })
+    }
+
     /**
      * Comparte el día con sus fotos en la hoja del sistema.
      *
@@ -526,11 +532,14 @@ class SalidaViewModel @Inject constructor(
      */
     fun shareDayWithPhotos(labels: SalidaSummaryLabels = SalidaSummaryLabels()): Boolean {
         val text = dayShareText(labels)
-        val urls = daySharePhotoUrls()
+        val candidates = daySharePhotoCandidates()
         val manager = shareManager ?: return false
         val downloader = photoFiles ?: return false
-        if (text.isBlank() || urls.isEmpty()) return false
-        viewModelScope.launch { shareSalidaWithPhotos(text, urls, manager, downloader) }
+        if (text.isBlank() || candidates.isEmpty()) return false
+        val phoneLink = historyWhatsAppLink(labels)?.takeIf { _state.value.historyPhone.isNotBlank() }
+        viewModelScope.launch {
+            shareSalidaWithPhotosCandidates(text, candidates, manager, downloader, fallbackLink = phoneLink)
+        }
         return true
     }
 
@@ -554,13 +563,15 @@ class SalidaViewModel @Inject constructor(
             labels = labels,
         )
         if (text.isBlank()) return false
-        val urls = movement.photos.mapNotNull { photo -> photo.publicUrl ?: photo.url }.filter { it.isNotBlank() }
+        val candidates = movement.photos
+            .map { com.trindade.app.reports.photoCandidateUrls(it.publicUrl, it.url) }
+            .filter { it.isNotEmpty() }
         val downloader = photoFiles
-        if (urls.isEmpty() || downloader == null) {
+        if (candidates.isEmpty() || downloader == null) {
             manager.shareText(text)
             return true
         }
-        viewModelScope.launch { shareSalidaWithPhotos(text, urls, manager, downloader) }
+        viewModelScope.launch { shareSalidaWithPhotosCandidates(text, candidates, manager, downloader) }
         return true
     }
 
@@ -633,33 +644,52 @@ internal fun SalidaUiState.withoutMovement(movementId: Int): SalidaUiState = cop
  */
 internal fun salidaErpOutcomeSucceeded(outcome: SalidaErpOutcome): Boolean = outcome is SalidaErpOutcome.Complete
 
+/** Las fotos del día elegido en pares ordenados (`publicUrl` y respaldo `url`). */
+internal fun salidaSharePhotoCandidates(
+    day: com.trindade.app.contract.models.SalidaHistoryResponseDaysInner?,
+): List<List<String>> = day?.movements.orEmpty()
+    .flatMap { movement -> movement.photos }
+    .map { photo -> com.trindade.app.reports.photoCandidateUrls(photo.publicUrl, photo.url) }
+    .filter { it.isNotEmpty() }
+
 /** Las fotos que acompañan al mensaje del día, con la regla de la miniatura: `publicUrl` y si no `url`. */
 internal fun salidaSharePhotoUrls(
     day: com.trindade.app.contract.models.SalidaHistoryResponseDaysInner?,
-): List<String> = day?.movements.orEmpty()
-    .flatMap { movement -> movement.photos }
-    .mapNotNull { photo -> photo.publicUrl ?: photo.url }
-    .filter { it.isNotBlank() }
+): List<String> = salidaSharePhotoCandidates(day).mapNotNull { it.firstOrNull() }
 
 /**
  * Baja las fotos y abre la hoja del sistema con el texto.
  *
- * Si ninguna llegó, el mensaje sale solo: la acción no se pierde por una foto que el servidor no entregó. Devuelve
- * true cuando la hoja recibió archivos.
+ * Si ninguna llegó, el mensaje sale solo (o por enlace directo si existe [fallbackLink]): la acción no se pierde
+ * por una foto que el servidor no entregó. Devuelve true cuando la hoja recibió archivos.
  */
-internal suspend fun shareSalidaWithPhotos(
+internal suspend fun shareSalidaWithPhotosCandidates(
     text: String,
-    urls: List<String>,
+    candidates: List<List<String>>,
     shareManager: com.trindade.app.export.ShareManager,
     photoFiles: com.trindade.app.reports.ReportPhotoFiles,
+    fallbackLink: String? = null,
 ): Boolean {
-    if (text.isBlank() || urls.isEmpty()) return false
-    val files = photoFiles.download(urls)
+    if (text.isBlank() || candidates.isEmpty()) return false
+    val files = photoFiles.downloadWithFallbacks(candidates)
     return if (files.isEmpty()) {
-        shareManager.shareText(text)
+        val link = fallbackLink?.takeIf { it.isNotBlank() }
+        if (link != null) shareManager.openLink(link) else shareManager.shareText(text)
         false
     } else {
         shareManager.shareTextWithPhotos(text, files)
         true
     }
 }
+
+internal suspend fun shareSalidaWithPhotos(
+    text: String,
+    urls: List<String>,
+    shareManager: com.trindade.app.export.ShareManager,
+    photoFiles: com.trindade.app.reports.ReportPhotoFiles,
+): Boolean = shareSalidaWithPhotosCandidates(
+    text = text,
+    candidates = urls.mapNotNull { url -> url.takeIf { it.isNotBlank() }?.let(::listOf) },
+    shareManager = shareManager,
+    photoFiles = photoFiles,
+)
