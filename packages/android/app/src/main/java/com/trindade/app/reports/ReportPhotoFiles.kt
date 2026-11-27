@@ -7,6 +7,7 @@ import com.trindade.app.di.NetworkModule.PublicFileClient
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.security.MessageDigest
+import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -64,7 +65,7 @@ internal object PhotoDownloadTransport {
                 target.port == normalizedBase.port
         if (!sameOrigin) return false
         val apiPrefix = normalizedBase.encodedPath + "api/"
-        return target.encodedPath.startsWith(apiPrefix) || target.encodedPath.startsWith("/api/")
+        return target.encodedPath.startsWith(apiPrefix)
     }
 
     suspend fun fetchBytes(
@@ -171,7 +172,7 @@ class HttpReportPhotoFiles internal constructor(
             val downloaded = PhotoDownloadTransport.fetchBytes(rawUrl, apiBaseUrl, backendClient, publicClient)
                 ?: continue
             val target = File(directory, "share-${sha256Prefix(rawUrl)}.${downloaded.extension}")
-            val temp = File(directory, "${target.name}.tmp")
+            val temp = File(directory, "${target.name}.${tempSequence.incrementAndGet()}.tmp")
             val saved = runCatching {
                 temp.writeBytes(downloaded.bytes)
                 if (target.exists()) target.delete()
@@ -198,5 +199,9 @@ class HttpReportPhotoFiles internal constructor(
     private fun sha256Prefix(value: String): String {
         val digest = MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8))
         return digest.take(12).joinToString("") { byte -> "%02x".format(byte) }
+    }
+
+    private companion object {
+        val tempSequence = AtomicLong(0L)
     }
 }

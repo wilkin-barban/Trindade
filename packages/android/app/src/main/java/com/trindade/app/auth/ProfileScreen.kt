@@ -1,8 +1,6 @@
 package com.trindade.app.auth
 
-import android.content.ActivityNotFoundException
 import android.content.Context
-import android.content.Intent
 import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -52,7 +50,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.CircleShape
-import androidx.core.net.toUri
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trindade.app.update.DownloadState
 import java.io.File
@@ -502,12 +499,12 @@ private fun UpdateNotice(text: String, color: Color) {
  * @return whether something took the intent, which is what the screen turns into that sentence when it did
  *   not.
  */
-private fun openReleasesPage(context: Context, releasesUrl: String): Boolean = try {
-    context.startActivity(Intent(Intent.ACTION_VIEW, releasesUrl.toUri()))
-    true
-} catch (notFound: ActivityNotFoundException) {
-    Log.w(TAG, "No installed activity could open $releasesUrl", notFound)
-    false
+private fun openReleasesPage(context: Context, releasesUrl: String): Boolean {
+    val opened = com.trindade.app.export.openExternalUri(context, releasesUrl)
+    if (!opened) {
+        Log.w(TAG, "No installed activity could open $releasesUrl")
+    }
+    return opened
 }
 
 // The tag this file's one log line appears under, so a support call can be told what to grep for.

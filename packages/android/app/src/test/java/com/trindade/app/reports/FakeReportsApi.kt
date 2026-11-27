@@ -49,7 +49,7 @@ class FakeReportsApi(
     /** Null makes the shift call fail, which is the only way a caller sees it as undetectable. */
     private val turnoValue: String? = DEFAULT_TURNO,
     private val createResponse: Response<ReportResponse> = Response.success(ReportResponse(report = createdReport())),
-    private val reportToReturn: ReportResponseReport? = createdReport(),
+    var reportToReturn: ReportResponseReport? = createdReport(),
     /** Null makes the history call fail, the same convention as [turnoValue] and for the same reason. */
     private val historyToReturn: ReportHistoryResponse? = defaultHistory(),
     /**

@@ -695,7 +695,7 @@ internal fun SalidaHistoryChips(
             FilterChip(
                 selected = date == selected,
                 onClick = { onSelect(date) },
-                label = { Text(if (date == today) "Hoje" else com.trindade.app.massas.brazilianDate(date)) },
+                label = { Text(if (date == today) stringResource(R.string.massas_history_today) else com.trindade.app.massas.brazilianDate(date)) },
                 modifier = Modifier
                     .defaultMinSize(minHeight = 44.dp)
                     .testTag(if (date == today) "salida-history-today" else "salida-history-chip-$date"),
@@ -704,7 +704,7 @@ internal fun SalidaHistoryChips(
         FilterChip(
             selected = all,
             onClick = onToggleAll,
-            label = { Text(if (all) "Últimas datas" else "Todas as datas") },
+            label = { Text(stringResource(if (all) R.string.massas_history_recent_dates else R.string.massas_history_all_dates)) },
             modifier = Modifier
                 .defaultMinSize(minHeight = 44.dp)
                 .testTag("salida-history-all"),

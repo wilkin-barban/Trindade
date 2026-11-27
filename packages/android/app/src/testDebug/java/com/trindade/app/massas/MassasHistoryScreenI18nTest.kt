@@ -56,6 +56,10 @@ class MassasHistoryScreenI18nTest {
         }
         composeRule.waitUntil(3_000) { !vm.state.value.isLoading }
 
+        composeRule.onNodeWithText(copy(R.string.massas_history_today)).assertIsDisplayed()
+        composeRule.onNodeWithText(copy(R.string.massas_history_all_dates)).assertIsDisplayed()
+        composeRule.onAllNodesWithText("Hoje").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Todas as datas").assertCountEquals(0)
         composeRule.onNodeWithText(copy(R.string.massas_history_empty)).assertIsDisplayed()
 
         composeRule.onNodeWithTag("massas-history-all").performScrollTo().performClick()

@@ -77,10 +77,12 @@ private fun RemoteThumbnail(url: String, tag: String) {
     LaunchedEffect(url, byteLoader) {
         bitmap = withContext(Dispatchers.IO) {
             runCatching {
-                val loaded = byteLoader?.invoke(url)?.let { bytes ->
+                if (byteLoader != null) {
+                    val bytes = byteLoader.invoke(url) ?: return@runCatching null
                     BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+                } else {
+                    URL(url).openStream().use { stream -> BitmapFactory.decodeStream(stream)?.asImageBitmap() }
                 }
-                loaded ?: URL(url).openStream().use { stream -> BitmapFactory.decodeStream(stream)?.asImageBitmap() }
             }.getOrNull()
         }
     }

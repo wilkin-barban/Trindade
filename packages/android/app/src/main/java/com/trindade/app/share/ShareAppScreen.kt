@@ -359,7 +359,7 @@ fun ShareAppScreen(
                         viewModel.showFeedback(R.string.share_note_copied, isSuccess = true)
                     }
                 },
-                enabled = !state.creating,
+                enabled = !state.creating && !state.syncingPassword,
                 modifier = Modifier.weight(1f).defaultMinSize(minHeight = 48.dp),
             ) {
                 Text(
@@ -380,7 +380,7 @@ fun ShareAppScreen(
                         }
                     }
                 },
-                enabled = viewModel.whatsappLink() != null && !state.creating,
+                enabled = viewModel.whatsappLink() != null && !state.creating && !state.syncingPassword,
                 modifier = Modifier.weight(1f).defaultMinSize(minHeight = 48.dp),
             ) {
                 Text(

@@ -74,7 +74,7 @@ fun MassasHistoryDayHeader(
             FilterChip(
                 selected = selectedDate == today,
                 onClick = { onSelectDate(today) },
-                label = { Text(MASSAS_HISTORY_TODAY_LABEL) },
+                label = { Text(stringResource(R.string.massas_history_today)) },
                 modifier = Modifier.defaultMinSize(minHeight = 44.dp).testTag(MASSAS_HISTORY_DAY_TODAY_TAG),
             )
             // Hoy siempre se dibuja -- el archivo puede no haber devuelto todavía el día de planta -- y las
@@ -90,7 +90,7 @@ fun MassasHistoryDayHeader(
             FilterChip(
                 selected = false,
                 onClick = onOpenList,
-                label = { Text(MASSAS_HISTORY_ALL_LABEL) },
+                label = { Text(stringResource(R.string.massas_history_all_dates)) },
                 modifier = Modifier.defaultMinSize(minHeight = 44.dp).testTag(MASSAS_HISTORY_DAY_ALL_TAG),
             )
         }

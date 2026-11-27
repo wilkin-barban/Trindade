@@ -1,7 +1,5 @@
 package com.trindade.app.massas
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -16,6 +14,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -23,7 +25,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.trindade.app.R
+import com.trindade.app.export.openExternalUri
 import com.trindade.app.ui.BrazilianPhoneVisualTransformation
+import com.trindade.app.ui.components.ActionResultDialog
 import com.trindade.app.ui.filterPhoneDigits
 
 /**
@@ -45,6 +49,7 @@ fun MassasWhatsAppShare(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    var openError by remember { mutableStateOf(false) }
 
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
@@ -103,8 +108,8 @@ fun MassasWhatsAppShare(
             // operator pick the chat; only an empty day disables it.
             Button(
                 onClick = {
-                    if (whatsappLink != null) {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(whatsappLink)))
+                    if (whatsappLink != null && !openExternalUri(context, whatsappLink)) {
+                        openError = true
                     }
                 },
                 enabled = shareText.isNotBlank() && whatsappLink != null,
@@ -118,5 +123,13 @@ fun MassasWhatsAppShare(
                 )
             }
         }
+    }
+
+    if (openError) {
+        ActionResultDialog(
+            message = stringResource(R.string.open_app_failed),
+            isSuccess = false,
+            onDismiss = { openError = false },
+        )
     }
 }

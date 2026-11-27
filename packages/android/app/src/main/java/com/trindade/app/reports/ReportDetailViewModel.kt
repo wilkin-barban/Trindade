@@ -98,7 +98,7 @@ class ReportDetailViewModel @Inject constructor(
      */
     fun load(reportId: Int, force: Boolean = false) {
         if (!force && state.value.reportId == reportId && state.value.report != null) return
-        _state.update { it.copy(reportId = reportId, loading = true, message = null) }
+        _state.update { it.copy(reportId = reportId, loading = true, message = null, messageIsError = true) }
 
         viewModelScope.launch {
             val report = repository.report(reportId)
@@ -107,6 +107,7 @@ class ReportDetailViewModel @Inject constructor(
                     loading = false,
                     report = report,
                     message = if (report == null) NOT_FOUND else null,
+                    messageIsError = true,
                 )
             }
             refreshPhotos(reportId)

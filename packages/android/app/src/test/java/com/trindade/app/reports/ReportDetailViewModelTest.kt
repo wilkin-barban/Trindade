@@ -596,6 +596,21 @@ class ReportDetailViewModelTest {
         assertNull(model.state.value.massasDay)
     }
 
+    @Test
+    fun `forced load returning null resets messageIsError to true after a success message`() {
+        val fakeApi = FakeReportsApi()
+        val model = ReportDetailViewModel(ReportsRepository(fakeApi), FakePhotoCompressor())
+        model.load(REPORT_ID)
+        model.notifyExportCopied()
+        assertEquals(false, model.state.value.messageIsError)
+
+        fakeApi.reportToReturn = null
+        model.load(999, force = true)
+
+        assertNotNull(model.state.value.message)
+        assertTrue(model.state.value.messageIsError)
+    }
+
     private companion object {
         const val REPORT_ID = 42
 

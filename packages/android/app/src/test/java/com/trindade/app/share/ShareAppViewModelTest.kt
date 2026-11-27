@@ -89,7 +89,8 @@ class ShareAppViewModelTest {
         val vm = ShareAppViewModel(authRepo, usersRepo)
 
         assertTrue(vm.state.value.isAdmin)
-        assertEquals(2, vm.state.value.users.size)
+        assertEquals(1, vm.state.value.users.size)
+        assertEquals(2, vm.state.value.users.single().id)
 
         // Picking an account that already exists is the other mode; creating a worker is what the screen
         // offers first, so the test has to choose this one.
@@ -402,6 +403,31 @@ class ShareAppViewModelTest {
         assertEquals("https://cdn.example.com/trindade-0.8.12.apk", vm.state.value.release.apkUrl)
         assertEquals("https://web.example.com", vm.state.value.release.webUrl)
         assertTrue(vm.message().contains("(v0.8.12):"))
+    }
+
+    @Test
+    fun `existing user rejects whitespace-only password so PATCH and shared message never diverge`() = runTest {
+        val adminApi = FakeAdminApi(fixtureUsers)
+        val authRepo = AuthRepository(FakeAuthApi(role = "Administrador", userId = 1), FakeTokenStore("Administrador"), Json)
+        val vm = ShareAppViewModel(authRepo, UsersRepository(adminApi))
+
+        vm.onCredentialModeSelect(ShareCredentialMode.EXISTING)
+        vm.onUserSelect(2)
+        vm.onPasswordChange("               ")
+
+        assertFalse(vm.ensureWorkerCreated())
+        assertTrue(adminApi.updated.isEmpty())
+    }
+
+    @Test
+    fun `existing user selector excludes Administrador and inactive accounts from password sync`() {
+        val inactiveWorker = AdminUserResponseUser(3, "inativo", "Inativo", 2, "Trabalhador", 0, "now")
+        val adminApi = FakeAdminApi(fixtureUsers + inactiveWorker)
+        val authRepo = AuthRepository(FakeAuthApi(role = "Administrador", userId = 1), FakeTokenStore("Administrador"), Json)
+        val vm = ShareAppViewModel(authRepo, UsersRepository(adminApi))
+
+        assertTrue(vm.state.value.users.none { it.id == 1 || it.id == 3 })
+        assertEquals(listOf(2), vm.state.value.users.map { it.id })
     }
 }
 

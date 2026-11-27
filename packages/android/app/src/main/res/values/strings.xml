@@ -1179,6 +1179,8 @@
     <string name="report_products_unavailable">Lista de produtos indisponível.</string>
     <string name="report_temperature_reading_label">Leitura %1$d</string>
     <string name="massas_history_recent_dates">Últimas datas</string>
+    <string name="massas_history_today">Hoje</string>
+    <string name="massas_history_all_dates">Todas as datas</string>
     <string name="massas_history_empty">Nenhum histórico de massas encontrado.</string>
     <string name="massas_history_open">Abrir ›</string>
 </resources>

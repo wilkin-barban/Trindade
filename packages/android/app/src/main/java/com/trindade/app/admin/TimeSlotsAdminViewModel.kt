@@ -289,7 +289,7 @@ class TimeSlotsAdminViewModel @Inject constructor(
     }
 
     fun dismissOutcome() {
-        _uiState.update { it.copy(outcome = null) }
+        _uiState.update { it.copy(outcome = null, message = null) }
     }
 
     fun confirmDelete() {

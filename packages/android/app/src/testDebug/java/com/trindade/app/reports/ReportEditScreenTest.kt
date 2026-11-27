@@ -537,6 +537,30 @@ class ReportEditScreenTest {
         assertEquals(1, submitted)
     }
 
+    @Test
+    fun `clicking report-photo-input in ReportEditRoute opens camera and gallery chooser`() {
+        val fakeApi = FakeReportsApi(
+            reportToReturn = FakeReportsApi.createdReport(id = 1).copy(canEdit = true, readOnly = false),
+        )
+        val viewModel = ReportEditViewModel(ReportsRepository(fakeApi))
+        composeRule.setContent {
+            TrindadeTheme {
+                ReportEditRoute(
+                    reportId = 1,
+                    onBack = {},
+                    onSaved = {},
+                    viewModel = viewModel,
+                )
+            }
+        }
+
+        composeRule.waitUntil(3_000) { !viewModel.state.value.loading }
+        composeRule.onNodeWithTag("report-photo-input").performScrollTo().performClick()
+
+        composeRule.onNodeWithTag("report-photo-camera").assertIsDisplayed()
+        composeRule.onNodeWithTag("report-photo-gallery").assertIsDisplayed()
+    }
+
     private companion object {
         const val CATEGORY_ID = 1
         const val CHECK_TASK_ID = 11

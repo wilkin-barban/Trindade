@@ -60,6 +60,7 @@ class ShareAppViewModel @Inject constructor(
         /** The login whose account was already created in this visit, so sharing twice does not create twice. */
         val createdUsername: String? = null,
         val syncedExistingPassword: Pair<Int, String>? = null,
+        val syncingPassword: Boolean = false,
         val creating: Boolean = false,
         val createSuccess: Boolean = false,
         val createError: ShareCreateError? = null,
@@ -77,6 +78,7 @@ class ShareAppViewModel @Inject constructor(
 
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
+    private var knownUsernames: Set<String> = emptySet()
 
     init {
         val userRole = authRepository.sessionRole()
@@ -112,7 +114,13 @@ class ShareAppViewModel @Inject constructor(
         viewModelScope.launch {
             val list = usersRepository.users()
             if (list != null) {
-                _state.update { it.copy(users = list) }
+                knownUsernames = list.map { it.username }.toSet()
+                val activeWorkers = list.filter { user ->
+                    user.isActive == 1 &&
+                        user.roleId != 1 &&
+                        !user.roleName.equals(RolePolicy.ADMIN, ignoreCase = true)
+                }
+                _state.update { it.copy(users = activeWorkers) }
             }
         }
     }
@@ -256,7 +264,8 @@ class ShareAppViewModel @Inject constructor(
     }
 
     private fun existingWorker(state: UiState, username: String): Boolean =
-        state.users.any { it.username.equals(username, ignoreCase = true) }
+        knownUsernames.any { it.equals(username, ignoreCase = true) } ||
+            state.users.any { it.username.equals(username, ignoreCase = true) }
 
     /**
      * Checks that the worker is registered or that the existing worker's password is valid and synced
@@ -272,12 +281,20 @@ class ShareAppViewModel @Inject constructor(
             }
             return true
         }
+        if (s.syncingPassword) return false
         val userId = s.selectedUserId
-        if (userId == null) {
+        val selected = userId?.let { id -> s.users.find { it.id == id } }
+        if (userId == null ||
+            selected == null ||
+            selected.isActive != 1 ||
+            selected.roleId == 1 ||
+            selected.roleName.equals(RolePolicy.ADMIN, ignoreCase = true)
+        ) {
             showFeedback(R.string.share_select_user_required, isSuccess = false)
             return false
         }
-        when (PasswordPolicy.violationOf(s.password)) {
+        val normalizedPassword = s.password.trim()
+        when (PasswordPolicy.violationOf(normalizedPassword)) {
             PasswordPolicy.Violation.TOO_FEW_GRAPHEMES -> {
                 showFeedback(R.string.users_error_password_too_short, isSuccess = false)
                 return false
@@ -288,20 +305,28 @@ class ShareAppViewModel @Inject constructor(
             }
             null -> Unit
         }
-        if (s.syncedExistingPassword == (userId to s.password)) return true
-        return when (usersRepository.update(userId, UpdateAdminUserRequest(password = s.password))) {
-            is UserWriteResult.Saved -> {
-                _state.update { it.copy(syncedExistingPassword = userId to s.password) }
-                true
+        if (s.password != normalizedPassword) {
+            _state.update { it.copy(password = normalizedPassword) }
+        }
+        if (s.syncedExistingPassword == (userId to normalizedPassword)) return true
+        _state.update { it.copy(syncingPassword = true) }
+        return try {
+            when (usersRepository.update(userId, UpdateAdminUserRequest(password = normalizedPassword))) {
+                is UserWriteResult.Saved -> {
+                    _state.update { it.copy(syncedExistingPassword = userId to normalizedPassword) }
+                    true
+                }
+                is UserWriteResult.Refused -> {
+                    showFeedback(R.string.share_existing_password_sync_error, isSuccess = false)
+                    false
+                }
+                UserWriteResult.Unreachable -> {
+                    showFeedback(R.string.admin_error_unreachable, isSuccess = false)
+                    false
+                }
             }
-            is UserWriteResult.Refused -> {
-                showFeedback(R.string.share_existing_password_sync_error, isSuccess = false)
-                false
-            }
-            UserWriteResult.Unreachable -> {
-                showFeedback(R.string.admin_error_unreachable, isSuccess = false)
-                false
-            }
+        } finally {
+            _state.update { it.copy(syncingPassword = false) }
         }
     }
 
