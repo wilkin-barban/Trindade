@@ -298,6 +298,14 @@ android {
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
+            all {
+                // Fetch Robolectric runtime SDK jars from Google's GCS Maven Central mirror so CI runners avoid repo1.maven.org HTTP 429 throttling.
+                it.systemProperty(
+                    "robolectric.dependency.repo.url",
+                    "https://maven-central.storage-download.googleapis.com/maven2",
+                )
+                it.systemProperty("robolectric.dependency.repo.id", "google-maven-central-mirror")
+            }
         }
     }
 
