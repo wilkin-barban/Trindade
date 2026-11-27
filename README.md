@@ -13,9 +13,9 @@ Plataforma operativa de **Trindade Massas** para registrar la producción de mas
 
 | Dato | Valor |
 | --- | --- |
-| Versión de este código | `v0.8.6` preparada para publicación; consultá [GitHub Releases](https://github.com/wilkin-barban/Trindade/releases) para la última versión publicada |
+| Versión de este código | `v0.8.12` (`build 8017`); consultá [GitHub Releases](https://github.com/wilkin-barban/Trindade/releases) para la última versión publicada |
 | Aplicación Android | APK firmado, `com.trindade.app`, Android 8.0 o superior |
-| Base de datos | SQLite, esquema **revisión 10** (20 tablas) |
+| Base de datos | SQLite, esquema **revisión 14** (23 tablas) |
 | Producción web | <https://trindademasas.duckdns.org> |
 | Integración ERP | Aero32 por WebService local, con espejo de movimientos en Trindade; en iPhone el puente es el script `Aero32Bridge` de Scriptable, instalado copiando el JavaScript de `/Aero32Bridge.js` |
 | Documentación | [Índice completo](docs/README.md) |
@@ -148,7 +148,7 @@ critical en el árbol que se despliega se trata como un fallo, no como un aviso.
 
 ## Distribución Android
 
-La API sirve el APK firmado en `GET /api/app/download-apk` y anuncia la versión en `GET /api/app/latest-release`; la app compara esos datos con la versión instalada. Este código prepara `v0.8.6`; la versión disponible en producción depende del despliegue. Verificá la release y el hash descargado siguiendo [la guía de agentes](docs/agents/trindade-development.md).
+La API sirve el APK firmado en `GET /api/app/download-apk` y anuncia la versión en `GET /api/app/latest-release`; la app compara esos datos con la versión instalada. Este código corresponde a `v0.8.12` (`build 8017`); la versión disponible en producción depende del despliegue. Verificá la release y el hash descargado siguiendo [la guía de agentes](docs/agents/trindade-development.md).
 
 ## Licencia
 

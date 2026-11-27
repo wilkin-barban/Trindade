@@ -158,7 +158,7 @@ El cliente release solo permite tráfico HTTP hacia la IP del WebService de la f
 
 ## 6. Modelo de datos
 
-SQLite con `PRAGMA user_version`. La revisión vigente es la **11** y el esquema tiene **23 tablas**.
+SQLite con `PRAGMA user_version`. La revisión vigente es la **14** y el esquema tiene **23 tablas**.
 
 | Dominio | Tablas |
 | --- | --- |
@@ -186,6 +186,9 @@ Revisiones:
 | 9 | `massa_launches.ent_lan` |
 | 10 | Cofre del ERP y tickets de un solo uso |
 | 11 | Módulo Salida / Baixa y acción `saida` del puente (el `CHECK` de `aero_bridge_tickets` se reconstruye preservando sus filas) |
+| 12 | `report_photos.mime_type` admite `image/heic` e `image/heif` reconstruyendo la tabla sin pérdida de filas |
+| 13 | Columnas aditivas `erp_status`, `erp_message` y `erp_sent_at` en `salida_movements` |
+| 14 | Columnas aditivas `result` y `result_at` en `aero_bridge_tickets` para almacenar la respuesta del puente ERP en el servidor |
 
 El servidor no migra al arrancar. La migración es un paso explícito del operador, solo por `db:migrate`; el
 procedimiento está en [despliegue.md](despliegue.md). `aero_integration_settings` guarda una fila por operador con la

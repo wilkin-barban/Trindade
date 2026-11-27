@@ -12,12 +12,18 @@ verificaciones está en [docs/release-android-historial.md](docs/release-android
 
 ## [Unreleased]
 
+---
+
+## [0.8.12] — 2026-11-27
+
 ### Compartir fotos por WhatsApp, selector dual cámara/galería y paridad UI en Android (0.8.12, build 8017)
 
 - **Relatório e Histórico de Salida (WhatsApp con fotos)**: `AndroidShareManager` arma `ACTION_SEND` con imagen individual (`EXTRA_STREAM`) o `ACTION_SEND_MULTIPLE` con `ClipData` completo para adjuntar las fotos junto al mensaje en WhatsApp, descargadas vía `HttpReportPhotoFiles` en `cacheDir/exports/share-photos` con fallback autenticado restringido al origen `/api/` del backend y sin redirección ni fuga de JWT. `PhotoThumbnails` usa únicamente el loader seguro cuando está presente.
 - **Selector reutilizable Cámara + Galería (`PhotoSourceChooser`)**: Relatório (detalle, creación y edición) reutiliza el diálogo compartido con cámara (`TakePicture` por `FileProvider`) y galería, además de esperar la subida de fotos pendientes (`uploadPendingPhotos`) y validar `MAX_PHOTO_BYTES` antes de cerrar creación o edición.
 - **Módulo Compartir**: reemplaza mensajes inline al registrar operarios o fallar la descarga del APK por `ActionResultDialog`, protege la apertura de WhatsApp con `openExternalUri`, actualiza la versión compartida desde `latestRelease`/`BuildConfig` (sin `v0.5.0` fijo), filtra operarios existentes activos no administradores y valida/sincroniza contraseñas temporales con `PATCH /api/admin/users/:id` según `PasswordPolicy`.
 - **Calculadoras Assaí, Stock, Histórico y Masas**: elimina los carteles e indicadores `"Abrindo a conversa…"` / `"Abrindo o e-mail…"` / `"Abrindo WhatsApp…"`, protege todos los `startActivity` externos con `openExternalUri` + diálogo modal de error, unifica feedback modal/copia en `ReportDetailScreen`, evita duplicación modal+inline en `TimeSlotsAdminScreen` y localiza etiquetas en `ReportForm`, `MassasHistoryScreen` y `SalidaHistoryScreen`.
+
+## [0.8.11] — 2026-11-26
 
 ### Resiliencia en envíos múltiples al ERP y reparación de codificación de textos ERP (0.8.11, build 8016)
 
@@ -32,6 +38,8 @@ verificaciones está en [docs/release-android-historial.md](docs/release-android
 - **Textos ERP con mojibake**: backend, web y Android reparan secuencias UTF-8 mal decodificadas como Latin-1/Windows-1252
   (por ejemplo `AÃ‡UCAR` / `AÇUCAR`, `PÃƒO` / `PÃO`, `JOÃƒO` / `JOÃO`) al ingerir, listar, generar comprobantes o emitir
   reportes en Masas, Salida y espejo ERP.
+
+## [0.8.10] — 2026-11-25
 
 ### Histórico de Salida Android: compartir una baja con sus fotos y tirar la foto desde la app (0.8.10, build 8015)
 
