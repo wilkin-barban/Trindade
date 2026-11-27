@@ -29,7 +29,7 @@ Rama: `fix/android-share-photos-and-ui-parity` (desde `6aca28d7` en `main`) · E
 - [x] T3 · S3 · inline · `568be4d8` · Módulo Compartir: `ActionResultDialog` al registrar/errores, enlace seguro, `latestRelease` y paridad `EXISTING` password + tests
 - [x] T4 · S4 · inline · `55566b9c` · Eliminar `"Abrindo a conversa…"` / `"Abrindo o e-mail…"` / `"Abrindo WhatsApp…"` y proteger `startActivity` en Assaí, Stock y Compartir + tests
 - [x] T5 · S5 · inline · `bb73c218` · Barrido Android (`ReportDetailScreen` modal, `TimeSlotsAdminScreen`, `ReportForm` + i18n) + tests
-- [ ] T6 · S1-S5 · verifier + inline · — · Verificación completa (`ci-android.sh`), revisión independiente de riesgo alto y cierre ODD
+- [x] T6 · S1-S5 · verifier + inline · `e0bc39b9` · Verificación completa (`ci-android.sh`), revisión independiente de riesgo alto + recheck `PASS` y cierre ODD de `S1`–`S5`
 - [ ] T7 · S6 · inline · — · Preparar release Android `0.8.12` (`build 8017`), compilar/firmar APK, pasar CI completo, merge/push a `main` + tag `v0.8.12` y desplegar producción (`/api/app/latest-release` listo para actualizar)
 
 ## Log
