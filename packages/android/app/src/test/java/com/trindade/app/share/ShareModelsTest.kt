@@ -93,4 +93,11 @@ class ShareModelsTest {
         assertTrue(msg.contains("Contraseña: *987654321*"))
         assertTrue(msg.contains("Cualquier duda o soporte, consulta a la administración."))
     }
+
+    @Test
+    fun `default ShareReleaseInfo uses build version rather than hardcoded v0_5_0`() {
+        val defaults = ShareReleaseInfo()
+        assertFalse("ShareReleaseInfo must not default to stale v0.5.0", defaults.version == "v0.5.0")
+        assertTrue(defaults.version.startsWith("v"))
+    }
 }

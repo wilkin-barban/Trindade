@@ -1,7 +1,5 @@
 package com.trindade.app.share
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,13 +42,15 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trindade.app.R
-import com.trindade.app.ui.theme.SuccessGreen
+import com.trindade.app.export.openExternalUri
 import com.trindade.app.ui.BrazilianPhoneVisualTransformation
+import com.trindade.app.ui.components.ActionResultDialog
 import com.trindade.app.ui.components.HelpSection
 import com.trindade.app.ui.components.ModuleHelpButton
 import com.trindade.app.ui.components.ModuleHelpDialog
 import com.trindade.app.ui.components.SectionCard
 import com.trindade.app.ui.filterPhoneDigits
+import com.trindade.app.ui.resolve
 import kotlinx.coroutines.launch
 
 @Composable
@@ -63,10 +63,6 @@ fun ShareAppScreen(
     var usersMenuExpanded by remember { mutableStateOf(false) }
     var showHelpDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-
-    val noteCopied = stringResource(R.string.share_note_copied)
-    val noteInvalidPhone = stringResource(R.string.share_note_invalid_phone)
-    val noteOpeningWhatsapp = stringResource(R.string.share_note_opening_whatsapp)
 
     Column(
         modifier = Modifier
@@ -275,29 +271,6 @@ fun ShareAppScreen(
                                 )
                             }
                         }
-
-                        if (state.createSuccess) {
-                            Text(
-                                text = stringResource(R.string.share_create_success),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = SuccessGreen,
-                            )
-                        }
-
-                        state.createError?.let { error ->
-                            Text(
-                                text = when (error) {
-                                    ShareCreateError.NAME_REQUIRED -> stringResource(R.string.share_create_name_required)
-                                    ShareCreateError.USERNAME_REQUIRED -> stringResource(R.string.share_create_username_required)
-                                    ShareCreateError.DUPLICATED -> stringResource(R.string.share_create_duplicated)
-                                    ShareCreateError.REFUSED -> stringResource(R.string.share_create_refused)
-                                    ShareCreateError.UNREACHABLE -> stringResource(R.string.share_create_unreachable)
-                                    ShareCreateError.CREATION_REQUIRED -> stringResource(R.string.share_create_required)
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                        }
                     } else {
                         // User selection
                         Text(stringResource(R.string.share_select_user), style = MaterialTheme.typography.bodySmall)
@@ -383,7 +356,7 @@ fun ShareAppScreen(
                     scope.launch {
                         if (!viewModel.ensureWorkerCreated()) return@launch
                         clipboard.setText(AnnotatedString(viewModel.message()))
-                        viewModel.onNote(noteCopied)
+                        viewModel.showFeedback(R.string.share_note_copied, isSuccess = true)
                     }
                 },
                 enabled = !state.creating,
@@ -401,10 +374,9 @@ fun ShareAppScreen(
                         if (!viewModel.ensureWorkerCreated()) return@launch
                         val link = viewModel.whatsappLink()
                         if (link == null) {
-                            viewModel.onNote(noteInvalidPhone)
-                        } else {
-                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link)))
-                            viewModel.onNote(noteOpeningWhatsapp)
+                            viewModel.showFeedback(R.string.share_note_invalid_phone, isSuccess = false)
+                        } else if (!openExternalUri(context, link)) {
+                            viewModel.showFeedback(R.string.open_app_failed, isSuccess = false)
                         }
                     }
                 },
@@ -418,16 +390,32 @@ fun ShareAppScreen(
             }
         }
 
-        if (state.apkFailed) {
-            Text(
-                text = stringResource(R.string.share_apk_failed),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-            )
+        val modalFeedback: Pair<String, Boolean>? = when {
+            state.actionFeedback != null ->
+                state.actionFeedback!!.message.resolve() to state.actionFeedback!!.isSuccess
+            state.createSuccess ->
+                stringResource(R.string.share_create_success) to true
+            state.createError != null -> when (state.createError) {
+                ShareCreateError.NAME_REQUIRED -> stringResource(R.string.share_create_name_required)
+                ShareCreateError.USERNAME_REQUIRED -> stringResource(R.string.share_create_username_required)
+                ShareCreateError.DUPLICATED -> stringResource(R.string.share_create_duplicated)
+                ShareCreateError.REFUSED -> stringResource(R.string.share_create_refused)
+                ShareCreateError.UNREACHABLE -> stringResource(R.string.share_create_unreachable)
+                ShareCreateError.CREATION_REQUIRED -> stringResource(R.string.share_create_required)
+                null -> ""
+            } to false
+            state.apkFailed ->
+                stringResource(R.string.share_apk_failed) to false
+            state.note.isNotEmpty() ->
+                state.note to true
+            else -> null
         }
-
-        if (state.note.isNotEmpty()) {
-            Text(state.note, style = MaterialTheme.typography.bodySmall)
+        modalFeedback?.let { (message, isSuccess) ->
+            ActionResultDialog(
+                message = message,
+                isSuccess = isSuccess,
+                onDismiss = viewModel::dismissFeedback,
+            )
         }
 
         if (showHelpDialog) {

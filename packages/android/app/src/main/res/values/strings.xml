@@ -886,6 +886,9 @@
     <string name="share_note_copied">Texto copiado para a área de transferência!</string>
     <string name="share_note_invalid_phone">Informe um número de WhatsApp válido.</string>
     <string name="share_note_opening_whatsapp">Abrindo WhatsApp…</string>
+    <string name="share_select_user_required">Selecione um usuário.</string>
+    <string name="share_existing_password_sync_error">Não foi possível atualizar a senha do usuário.</string>
+    <string name="open_app_failed">Não foi possível abrir o aplicativo.</string>
     <string name="help_share_platforms_title">Links por Plataforma</string>
     <string name="help_share_platforms_desc">Gere mensagens personalizadas para usuários de Android, iPhone ou acesso Web com ou sem credenciais.</string>
     <string name="help_share_whatsapp_title">Envio WhatsApp</string>

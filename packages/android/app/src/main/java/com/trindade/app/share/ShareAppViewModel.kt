@@ -1,13 +1,20 @@
 package com.trindade.app.share
 
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trindade.app.R
 import com.trindade.app.admin.UsersRepository
 import com.trindade.app.auth.AuthRepository
+import com.trindade.app.auth.PasswordPolicy
 import com.trindade.app.auth.RolePolicy
 import com.trindade.app.admin.UserWriteResult
 import com.trindade.app.contract.models.AdminUserResponseUser
 import com.trindade.app.contract.models.CreateAdminUserRequest
+import com.trindade.app.contract.models.UpdateAdminUserRequest
+import com.trindade.app.network.SystemApi
+import com.trindade.app.network.runCatchingCancellable
+import com.trindade.app.ui.UiText
 import com.trindade.app.ui.filterPhoneDigits
 import com.trindade.app.ui.toWhatsAppNumber
 import com.trindade.app.ui.waMeLink
@@ -20,12 +27,18 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 import javax.inject.Inject
 
+data class ShareFeedback(
+    val message: UiText,
+    val isSuccess: Boolean,
+)
+
 @HiltViewModel
 class ShareAppViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val usersRepository: UsersRepository,
     /** Wired by Hilt in the app and left inert by default, so a screen drawn without a backend says so. */
     private val apkSharer: ApkSharer = NoOpApkSharer,
+    private val systemApi: SystemApi? = null,
 ) : ViewModel() {
 
     data class UiState(
@@ -35,7 +48,7 @@ class ShareAppViewModel @Inject constructor(
         val selectedUserId: Int? = null,
         val displayName: String = "",
         val username: String = "",
-        val password: String = "123456789",
+        val password: String = "",
         val includeCredentials: Boolean = true,
         /** Creation is the default: the admin already knows the person's name, and leaving to the admin panel is
          * where the sharing stops happening. */
@@ -46,17 +59,19 @@ class ShareAppViewModel @Inject constructor(
         val usernameEdited: Boolean = false,
         /** The login whose account was already created in this visit, so sharing twice does not create twice. */
         val createdUsername: String? = null,
+        val syncedExistingPassword: Pair<Int, String>? = null,
         val creating: Boolean = false,
         val createSuccess: Boolean = false,
         val createError: ShareCreateError? = null,
         val phone: String = "",
         val isAdmin: Boolean = false,
         val note: String = "",
+        val actionFeedback: ShareFeedback? = null,
         /** The APK is being fetched: the button says so instead of accepting a second tap. */
         val sharingApk: Boolean = false,
         /** How far the download got, or null when it is too early to say. */
         val apkPercent: Int? = null,
-        /** Whether the last attempt to hand over the APK failed, so the screen can say it in its own line. */
+        /** Whether the last attempt to hand over the APK failed, so the screen can show a modal error. */
         val apkFailed: Boolean = false,
     )
 
@@ -69,6 +84,27 @@ class ShareAppViewModel @Inject constructor(
         _state.update { it.copy(isAdmin = admin) }
         if (admin) {
             loadUsers()
+        }
+        if (systemApi != null) {
+            loadLatestRelease(systemApi)
+        }
+    }
+
+    private fun loadLatestRelease(api: SystemApi) {
+        viewModelScope.launch {
+            val body = runCatchingCancellable { api.latestRelease() }.getOrNull()
+                ?.takeIf { it.isSuccessful }?.body() ?: return@launch
+            val normalizedVersion = body.version.trim().takeIf { it.isNotEmpty() }
+                ?.let { if (it.startsWith("v", ignoreCase = true)) it else "v$it" }
+            _state.update { s ->
+                s.copy(
+                    release = s.release.copy(
+                        version = normalizedVersion ?: s.release.version,
+                        apkUrl = body.apkUrl.ifBlank { s.release.apkUrl },
+                        webUrl = body.webUrl.ifBlank { s.release.webUrl },
+                    ),
+                )
+            }
         }
     }
 
@@ -87,7 +123,7 @@ class ShareAppViewModel @Inject constructor(
 
     fun onUserSelect(userId: Int?) {
         if (userId == null) {
-            _state.update { it.copy(selectedUserId = null, displayName = "", username = "") }
+            _state.update { it.copy(selectedUserId = null, displayName = "", username = "", password = "") }
             return
         }
         val found = _state.value.users.find { it.id == userId }
@@ -97,6 +133,8 @@ class ShareAppViewModel @Inject constructor(
                     selectedUserId = userId,
                     displayName = found.displayName,
                     username = found.username,
+                    password = quickWorkerPassword(found.username),
+                    actionFeedback = null,
                 )
             }
         }
@@ -221,17 +259,50 @@ class ShareAppViewModel @Inject constructor(
         state.users.any { it.username.equals(username, ignoreCase = true) }
 
     /**
-     * Checks that the worker is already registered before sharing (S12).
-     *
-     * WhatsApp and Copiar do not create the account; if it was not created yet, the action is refused
-     * and explicit creation is requested.
+     * Checks that the worker is registered or that the existing worker's password is valid and synced
+     * on the backend before sharing (S12 + password policy parity).
      */
     suspend fun ensureWorkerCreated(): Boolean {
-        if (!isWorkerRegistered()) {
-            _state.update { it.copy(createError = ShareCreateError.CREATION_REQUIRED) }
+        val s = _state.value
+        if (!s.isAdmin || !s.includeCredentials) return true
+        if (s.credentialMode == ShareCredentialMode.CREATE) {
+            if (!isWorkerRegistered()) {
+                _state.update { it.copy(createError = ShareCreateError.CREATION_REQUIRED) }
+                return false
+            }
+            return true
+        }
+        val userId = s.selectedUserId
+        if (userId == null) {
+            showFeedback(R.string.share_select_user_required, isSuccess = false)
             return false
         }
-        return true
+        when (PasswordPolicy.violationOf(s.password)) {
+            PasswordPolicy.Violation.TOO_FEW_GRAPHEMES -> {
+                showFeedback(R.string.users_error_password_too_short, isSuccess = false)
+                return false
+            }
+            PasswordPolicy.Violation.TOO_MANY_BYTES -> {
+                showFeedback(R.string.users_error_password_too_many_bytes, isSuccess = false)
+                return false
+            }
+            null -> Unit
+        }
+        if (s.syncedExistingPassword == (userId to s.password)) return true
+        return when (usersRepository.update(userId, UpdateAdminUserRequest(password = s.password))) {
+            is UserWriteResult.Saved -> {
+                _state.update { it.copy(syncedExistingPassword = userId to s.password) }
+                true
+            }
+            is UserWriteResult.Refused -> {
+                showFeedback(R.string.share_existing_password_sync_error, isSuccess = false)
+                false
+            }
+            UserWriteResult.Unreachable -> {
+                showFeedback(R.string.admin_error_unreachable, isSuccess = false)
+                false
+            }
+        }
     }
 
     fun onPhoneChange(raw: String) {
@@ -240,6 +311,24 @@ class ShareAppViewModel @Inject constructor(
 
     fun onNote(text: String) {
         _state.update { it.copy(note = text) }
+    }
+
+    fun showFeedback(@StringRes resId: Int, isSuccess: Boolean) {
+        _state.update {
+            it.copy(actionFeedback = ShareFeedback(message = UiText.of(resId), isSuccess = isSuccess))
+        }
+    }
+
+    fun dismissFeedback() {
+        _state.update {
+            it.copy(
+                createSuccess = false,
+                createError = null,
+                apkFailed = false,
+                note = "",
+                actionFeedback = null,
+            )
+        }
     }
 
     fun message(): String {
@@ -266,7 +355,7 @@ class ShareAppViewModel @Inject constructor(
                 enabled = true,
                 displayName = s.displayName.ifBlank { null },
                 username = s.username.ifBlank { null },
-                password = s.password.ifBlank { "123456789" },
+                password = s.password.ifBlank { null },
             )
         } else null
 

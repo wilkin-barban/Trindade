@@ -272,15 +272,24 @@ class AndroidShareManager @Inject constructor(
     internal fun createLinkIntent(url: String): Intent =
         Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
 
-    override fun openLink(url: String): Boolean {
-        return try {
-            context.startActivity(createLinkIntent(url))
-            true
-        } catch (_: Throwable) {
-            false
-        }
-    }
+    override fun openLink(url: String): Boolean = openExternalUri(context, url)
 }
+
+/**
+ * Abre una URI externa (`https://api.whatsapp.com/...`, `mailto:...`, etc.) protegiendo la llamada
+ * ante equipos sin handler instalado para que la pantalla nunca cierre por `ActivityNotFoundException`.
+ */
+internal fun openExternalUri(
+    context: Context,
+    uriString: String,
+    action: String = Intent.ACTION_VIEW,
+): Boolean = runCatching {
+    val intent = Intent(action, Uri.parse(uriString)).apply {
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    context.startActivity(intent)
+    true
+}.getOrElse { false }
 
 /**
  * No-op implementation of [ShareManager] used for test defaults or fallback.

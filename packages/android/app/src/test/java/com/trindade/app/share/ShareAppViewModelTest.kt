@@ -2,6 +2,7 @@ package com.trindade.app.share
 
 import com.trindade.app.admin.UsersRepository
 import com.trindade.app.auth.AuthRepository
+import com.trindade.app.auth.PasswordPolicy
 import com.trindade.app.auth.TokenStore
 import com.trindade.app.contract.models.AdminCategoriesResponse
 import com.trindade.app.contract.models.AdminCategoryResponse
@@ -20,6 +21,9 @@ import com.trindade.app.contract.models.CreateAdminCategoryRequest
 import com.trindade.app.contract.models.CreateAdminDriverRequest
 import com.trindade.app.contract.models.CreateAdminTaskRequest
 import com.trindade.app.contract.models.CreateAdminVehicleRequest
+import com.trindade.app.contract.models.DashboardSummary
+import com.trindade.app.contract.models.HealthResponse
+import com.trindade.app.contract.models.LatestReleaseResponse
 import com.trindade.app.contract.models.LoginRequest
 import com.trindade.app.contract.models.LoginResponse
 import com.trindade.app.contract.models.LogoutRequest
@@ -33,8 +37,10 @@ import com.trindade.app.contract.models.SetupStatusResponse
 import com.trindade.app.contract.models.TimeSlotsResponse
 import com.trindade.app.contract.models.UpdateTimeSlotsRequest
 import com.trindade.app.contract.models.UpdateProfileRequest
+import com.trindade.app.contract.models.UserOptionsResponse
 import com.trindade.app.network.AdminApi
 import com.trindade.app.network.AuthApi
+import com.trindade.app.network.SystemApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.CompletableDeferred
@@ -92,16 +98,17 @@ class ShareAppViewModelTest {
         assertEquals(2, vm.state.value.selectedUserId)
         assertEquals("João Silva", vm.state.value.displayName)
         assertEquals("joao.silva", vm.state.value.username)
-        assertEquals("123456789", vm.state.value.password)
+        assertEquals(quickWorkerPassword("joao.silva"), vm.state.value.password)
+        assertNull(PasswordPolicy.violationOf(vm.state.value.password))
 
         // Password change
-        vm.onPasswordChange("NovaSenha99")
-        assertEquals("NovaSenha99", vm.state.value.password)
+        vm.onPasswordChange("NovaSenha123456")
+        assertEquals("NovaSenha123456", vm.state.value.password)
 
         val message = vm.message()
         assertTrue(message.contains("Olá, *João Silva*!"))
         assertTrue(message.contains("Usuário: *joao.silva*"))
-        assertTrue(message.contains("Senha: *NovaSenha99*"))
+        assertTrue(message.contains("Senha: *NovaSenha123456*"))
 
         // Disabling credentials hides them from message
         vm.onIncludeCredentialsToggle(false)
@@ -329,6 +336,73 @@ class ShareAppViewModelTest {
         gate.complete(Unit)
         assertFalse(vm.state.value.sharingApk)
     }
+
+    @Test
+    fun `existing user password is validated and synced via PATCH before sharing`() = runTest {
+        val adminApi = FakeAdminApi(fixtureUsers)
+        val authRepo = AuthRepository(FakeAuthApi(role = "Administrador", userId = 1), FakeTokenStore("Administrador"), Json)
+        val vm = ShareAppViewModel(authRepo, UsersRepository(adminApi))
+
+        vm.onCredentialModeSelect(ShareCredentialMode.EXISTING)
+        vm.onUserSelect(2)
+        vm.onPasswordChange("short")
+        assertFalse("short password must block sharing", vm.ensureWorkerCreated())
+        assertTrue("short password must not hit backend", adminApi.updated.isEmpty())
+
+        vm.onPasswordChange("SenhaSegura123456")
+        assertTrue(vm.ensureWorkerCreated())
+        assertEquals(1, adminApi.updated.size)
+        assertEquals(2, adminApi.updated.first().first)
+        assertEquals("SenhaSegura123456", adminApi.updated.first().second["password"]?.toString()?.trim('"'))
+
+        // Repeating share with unchanged user+password reuses the already synced credential
+        assertTrue(vm.ensureWorkerCreated())
+        assertEquals(1, adminApi.updated.size)
+    }
+
+    @Test
+    fun `failed PATCH on existing user password blocks sharing`() = runTest {
+        val adminApi = FakeAdminApi(fixtureUsers, updateStatus = 500)
+        val authRepo = AuthRepository(FakeAuthApi(role = "Administrador", userId = 1), FakeTokenStore("Administrador"), Json)
+        val vm = ShareAppViewModel(authRepo, UsersRepository(adminApi))
+
+        vm.onCredentialModeSelect(ShareCredentialMode.EXISTING)
+        vm.onUserSelect(2)
+        vm.onPasswordChange("SenhaSegura123456")
+
+        assertFalse(vm.ensureWorkerCreated())
+        assertEquals(false, vm.state.value.actionFeedback?.isSuccess)
+    }
+
+    @Test
+    fun `latestRelease updates ShareAppViewModel release metadata from backend`() {
+        val systemApi = object : SystemApi {
+            override suspend fun dashboardSummary(): Response<DashboardSummary> = error("unused")
+            override suspend fun userOptions(): Response<UserOptionsResponse> = error("unused")
+            override suspend fun health(): Response<HealthResponse> = error("unused")
+            override suspend fun latestRelease(): Response<LatestReleaseResponse> = Response.success(
+                LatestReleaseResponse(
+                    version = "0.8.12",
+                    apkUrl = "https://cdn.example.com/trindade-0.8.12.apk",
+                    apkName = "trindade-0.8.12.apk",
+                    apkSize = null,
+                    buildNumber = 8017,
+                    publishedAt = null,
+                    webUrl = "https://web.example.com",
+                ),
+            )
+        }
+        val vm = ShareAppViewModel(
+            AuthRepository(FakeAuthApi(role = "Trabalhador", userId = 2), FakeTokenStore("Trabalhador"), Json),
+            UsersRepository(FakeAdminApi(fixtureUsers)),
+            systemApi = systemApi,
+        )
+
+        assertEquals("v0.8.12", vm.state.value.release.version)
+        assertEquals("https://cdn.example.com/trindade-0.8.12.apk", vm.state.value.release.apkUrl)
+        assertEquals("https://web.example.com", vm.state.value.release.webUrl)
+        assertTrue(vm.message().contains("(v0.8.12):"))
+    }
 }
 
 
@@ -336,7 +410,9 @@ private class FakeAdminApi(
     private val rows: List<AdminUserResponseUser>,
     /** What `POST /api/admin/users` gets, so the test can read the role and password that were sent. */
     val created: MutableList<JsonObject> = mutableListOf(),
+    val updated: MutableList<Pair<Int, JsonObject>> = mutableListOf(),
     private val createStatus: Int = 201,
+    private val updateStatus: Int = 200,
 ) : AdminApi {
     override suspend fun users(): Response<AdminUsersResponse> = Response.success(AdminUsersResponse(rows))
     override suspend fun createUser(body: JsonObject): Response<AdminUserResponse> {
@@ -352,7 +428,20 @@ private class FakeAdminApi(
         created.add(body)
         return Response.success(AdminUserResponse(rows.first()))
     }
-    override suspend fun updateUser(id: Int, body: JsonObject): Response<AdminUserResponse> = error("unused")
+    override suspend fun updateUser(id: Int, body: JsonObject): Response<AdminUserResponse> {
+        if (updateStatus != 200) {
+            return Response.error(
+                updateStatus,
+                okhttp3.ResponseBody.Companion.create(
+                    "application/json".toMediaTypeOrNull(),
+                    "{\"error\":\"SERVER_ERROR\"}",
+                ),
+            )
+        }
+        updated.add(id to body)
+        val user = rows.find { it.id == id } ?: rows.first()
+        return Response.success(AdminUserResponse(user))
+    }
     override suspend fun deleteUser(id: Int): Response<Unit> = error("unused")
     override suspend fun categories(): Response<AdminCategoriesResponse> = error("unused")
     override suspend fun createCategory(body: CreateAdminCategoryRequest): Response<AdminCategoryResponse> = error("unused")

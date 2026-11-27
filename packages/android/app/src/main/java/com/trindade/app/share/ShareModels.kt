@@ -1,5 +1,7 @@
 package com.trindade.app.share
 
+import com.trindade.app.BuildConfig
+
 /**
  * Pure models and message builder for sharing the application via WhatsApp or other channels.
  */
@@ -61,9 +63,12 @@ enum class SharePlatform {
     BOTH,
 }
 
+private fun defaultReleaseVersion(): String =
+    "v${BuildConfig.VERSION_NAME.removePrefix("v")}"
+
 data class ShareReleaseInfo(
-    val version: String = "v0.5.0",
-    val apkUrl: String = "https://trindademasas.duckdns.org/api/app/download-apk",
+    val version: String = defaultReleaseVersion(),
+    val apkUrl: String = "${BuildConfig.API_BASE_URL.trimEnd('/')}/api/app/download-apk",
     val webUrl: String = "https://trindademasas.duckdns.org",
 )
 
@@ -133,9 +138,11 @@ fun buildShareMessage(params: ShareMessageParams): String {
         val credTitle = if (isEs) "🔐 *Tus Credenciales:*" else "🔐 *Suas Credenciais:*"
         val userLabel = if (isEs) "Usuario" else "Usuário"
         val passLabel = if (isEs) "Contraseña" else "Senha"
-        val passValue = if (credentials.password.isNullOrBlank()) "123456789" else credentials.password.trim()
+        val passLine = credentials.password?.trim()?.takeIf { it.isNotEmpty() }
+            ?.let { "\n$passLabel: *$it*" }
+            .orEmpty()
 
-        parts.add("$credTitle\n$userLabel: *${credentials.username.trim()}*\n$passLabel: *$passValue*")
+        parts.add("$credTitle\n$userLabel: *${credentials.username.trim()}*$passLine")
     }
 
     val footer = if (isEs) {
