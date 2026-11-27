@@ -29,7 +29,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import kotlinx.coroutines.launch
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -398,20 +397,7 @@ fun ReportGeneratorRoute(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
-    val compressor = androidx.compose.runtime.remember { AndroidPhotoCompressor() }
-    val pickPhotos = androidx.activity.compose.rememberLauncherForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia(MAX_PENDING_PHOTOS),
-    ) { uris ->
-        uris.take(MAX_PENDING_PHOTOS).forEach { uri ->
-            scope.launch {
-                val staged = stagePickedPhoto(context, uri)
-                val jpeg = staged?.let { compressor.compressToJpeg(it) }
-                if (jpeg != null) viewModel.addPendingPhoto(jpeg)
-            }
-        }
-    }
+    val openPhotoSource = rememberCompressedReportPhotoPicker(onCompressed = viewModel::addPendingPhoto)
 
     ReportGeneratorScreen(
         state = state,
@@ -421,11 +407,7 @@ fun ReportGeneratorRoute(
         onBoxTypeChange = viewModel::onBoxTypeChange,
         onNotesChange = viewModel::onNotesChange,
         onSubmit = viewModel::submit,
-        onAddPhotos = { pickPhotos.launch(
-            androidx.activity.result.PickVisualMediaRequest(
-                androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly,
-            ),
-        ) },
+        onAddPhotos = openPhotoSource,
         onRemovePendingPhoto = viewModel::removePendingPhoto,
         onOpenHistory = onOpenHistory,
         onRetry = viewModel::retry,
@@ -440,17 +422,3 @@ fun ReportGeneratorRoute(
         },
     )
 }
-
-/**
- * Copia la foto elegida a un archivo propio y devuelve su ruta.
- *
- * El URI de la galería es un permiso temporal: comprimirlo más tarde, cuando el operario ya cambió de app, puede
- * fallar. Una copia en la caché de la aplicación sobrevive a ese viaje y se borra con ella.
- */
-internal fun stagePickedPhoto(context: android.content.Context, uri: android.net.Uri): String? = runCatching {
-    val target = java.io.File(context.cacheDir, "report-${System.currentTimeMillis()}.jpg")
-    context.contentResolver.openInputStream(uri)?.use { input ->
-        target.outputStream().use { output -> input.copyTo(output) }
-    }
-    target.absolutePath
-}.getOrNull()

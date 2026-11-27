@@ -1,9 +1,6 @@
 package com.trindade.app.reports
 
 import android.content.Context
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,9 +28,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -41,7 +35,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trindade.app.R
 import com.trindade.app.ui.components.AdminDestructiveButton
@@ -77,14 +70,17 @@ fun ReportDetailScreen(
 ) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
-    var pendingCapture by remember { mutableStateOf<File?>(null) }
-
-    val capture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { saved ->
-        // Only reported when the camera actually wrote the file: a cancelled capture leaves an empty
-        // file, and compressing it would fail with a message about an unreadable photo rather than
-        // about the cancellation that caused it.
-        if (saved) pendingCapture?.let { onAddPhoto(it.path) }
-    }
+    val openPhotoSource = rememberDualPhotoPicker(
+        title = stringResource(R.string.report_photo_chooser_title),
+        prompt = stringResource(R.string.salida_photo_add),
+        maxGalleryItems = 1,
+        onCameraCaptured = { onAddPhoto(it.path) },
+        onGalleryPicked = { uris ->
+            uris.firstOrNull()?.let { uri ->
+                stagePickedPhoto(context, uri, prefix = "report-detail-")?.let(onAddPhoto)
+            }
+        },
+    )
 
     LazyColumn(
         modifier = modifier.fillMaxSize().padding(16.dp),
@@ -208,11 +204,7 @@ fun ReportDetailScreen(
 
         item {
             OutlinedButton(
-                onClick = {
-                    val file = newCaptureFile(context)
-                    pendingCapture = file
-                    capture.launch(FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file))
-                },
+                onClick = openPhotoSource,
                 enabled = state.canAddPhoto,
                 modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp),
             ) {

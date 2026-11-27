@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -19,6 +20,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -801,6 +803,29 @@ class ReportGeneratorScreenTest {
 
         composeRule.onNodeWithText("🌙 Noite").performClick()
         assertEquals("noite", selectedTurno)
+    }
+
+    @Test
+    fun `clicking report-photo-input in ReportGeneratorRoute opens camera and gallery chooser`() {
+        val fakeApi = FakeReportsApi()
+        val viewModel = ReportGeneratorViewModel(ReportsRepository(fakeApi))
+        composeRule.setContent {
+            TrindadeTheme {
+                ReportGeneratorRoute(
+                    onCreated = {},
+                    onOpenHistory = {},
+                    viewModel = viewModel,
+                )
+            }
+        }
+
+        composeRule.waitUntil(3_000) { !viewModel.state.value.loading }
+        composeRule.onAllNodes(hasScrollAction()).onFirst()
+            .performScrollToNode(hasTestTag("report-photo-input"))
+        composeRule.onNodeWithTag("report-photo-input").performClick()
+
+        composeRule.onNodeWithTag("report-photo-camera").assertIsDisplayed()
+        composeRule.onNodeWithTag("report-photo-gallery").assertIsDisplayed()
     }
 }
 

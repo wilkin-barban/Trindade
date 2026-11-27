@@ -762,6 +762,37 @@ class ReportGeneratorViewModelTest {
         assertEquals(2, source.calls)
     }
 
+    @Test
+    fun `submit awaits pending photo uploads before exposing createdReportId`() {
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val gatedApi = object : com.trindade.app.network.ReportsApi by api {
+            override suspend fun attachPhoto(
+                id: Int,
+                file: okhttp3.MultipartBody.Part,
+            ): Response<com.trindade.app.contract.models.PhotoResponse> {
+                gate.await()
+                return Response.success(
+                    com.trindade.app.contract.models.PhotoResponse(FakeReportsApi.aPhoto()),
+                )
+            }
+        }
+        val model = ReportGeneratorViewModel(ReportsRepository(gatedApi))
+        model.selectTurno("tarde")
+        model.onTemperatureChange(TEMPERATURE_TASK_ID, 0, "4")
+        model.onTemperatureChange(TEMPERATURE_TASK_ID, 1, "5")
+        model.addPendingPhoto(byteArrayOf(1, 2, 3))
+
+        model.submit()
+
+        assertNull("createdReportId must wait until pending photos finish uploading", model.state.value.createdReportId)
+        assertEquals(1, model.state.value.pendingPhotos.size)
+
+        gate.complete(Unit)
+
+        assertNotNull(model.state.value.createdReportId)
+        assertEquals(0, model.state.value.pendingPhotos.size)
+    }
+
     /** The catalogue's temperature category: the four tasks and the five readings the server validates. */
     private fun productionTemperatureCategories() = listOf(
         CategoriesResponseCategoriesInner(

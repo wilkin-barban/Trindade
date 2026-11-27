@@ -386,15 +386,15 @@ class ReportEditViewModel @Inject constructor(
             // than none, because the flag and the form would then describe two different visits.
             if (load != newestLoad) return@launch
 
+            if (result is ReportWriteResult.Saved) {
+                uploadPendingPhotos(report.id)
+            }
+
             _state.update { previous ->
                 when (result) {
                     // Saved only means the server took the body: the screen leaves on it, and there is
                     // nothing left for this state to hold.
-                    is ReportWriteResult.Saved -> {
-                        // El reporte ya existe: recién ahora las fotos tienen a quién subirse.
-                        uploadPendingPhotos()
-                        previous.copy(submitting = false, saved = true)
-                    }
+                    is ReportWriteResult.Saved -> previous.copy(submitting = false, saved = true)
                     is ReportWriteResult.Refused ->
                         previous.copy(submitting = false, message = refusalMessage(result.statusCode, result.serverMessage))
                     ReportWriteResult.Unreachable -> previous.copy(submitting = false, message = UNREACHABLE)
@@ -580,8 +580,13 @@ class ReportEditViewModel @Inject constructor(
     /** Guarda una foto comprimida para subirla cuando el reporte actualizado exista. */
     fun addPendingPhoto(jpeg: ByteArray) {
         _state.update { current ->
-            if (current.pendingPhotos.size >= MAX_PENDING_PHOTOS) current
-            else current.copy(pendingPhotos = current.pendingPhotos + PendingPhoto(jpeg))
+            when {
+                current.pendingPhotos.size >= MAX_PENDING_PHOTOS -> current
+                jpeg.size > MAX_PHOTO_BYTES -> current.copy(
+                    validation = com.trindade.app.ui.UiText.of(R.string.report_photo_too_big),
+                )
+                else -> current.copy(pendingPhotos = current.pendingPhotos + PendingPhoto(jpeg))
+            }
         }
     }
 
@@ -594,13 +599,10 @@ class ReportEditViewModel @Inject constructor(
     }
 
     /** Sube las fotos elegidas al reporte recién actualizado. */
-    fun uploadPendingPhotos() {
-        val reportId = _state.value.report?.id ?: return
+    private suspend fun uploadPendingPhotos(reportId: Int) {
         val photos = _state.value.pendingPhotos
         if (photos.isEmpty()) return
-        viewModelScope.launch {
-            for (photo in photos) repository.attachPhoto(reportId, photo.jpeg)
-            _state.update { it.copy(pendingPhotos = emptyList()) }
-        }
+        for (photo in photos) repository.attachPhoto(reportId, photo.jpeg)
+        _state.update { it.copy(pendingPhotos = emptyList()) }
     }
 }

@@ -11,6 +11,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
@@ -463,5 +464,17 @@ class ReportDetailScreenTest {
 
         composeRule.onNodeWithText(copy(R.string.share_card_close)).performClick()
         assertEquals(1, closed)
+    }
+
+    @Test
+    fun `clicking add photo opens camera and gallery chooser dialog`() {
+        render(state(report(canEdit = true, readOnly = false)))
+
+        composeRule.onNodeWithText(copy(R.string.report_photo_add)).performScrollTo().performClick()
+
+        composeRule.onNodeWithTag("report-photo-camera").assertIsDisplayed()
+        composeRule.onNodeWithTag("report-photo-gallery").assertIsDisplayed()
+        composeRule.onNodeWithText(copy(R.string.salida_photo_take)).assertIsDisplayed()
+        composeRule.onNodeWithText(copy(R.string.salida_photo_gallery)).assertIsDisplayed()
     }
 }

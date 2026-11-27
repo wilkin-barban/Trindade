@@ -84,7 +84,7 @@ internal object PhotoDownloadTransport {
             val request = Request.Builder().url(resolved).build()
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return@use null
-                val body = response.body ?: return@use null
+                val body = response.body
                 if (body.contentLength() > MAX_DOWNLOAD_PHOTO_BYTES) return@use null
                 val source = body.source()
                 val buffer = Buffer()

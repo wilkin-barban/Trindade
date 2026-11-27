@@ -258,13 +258,10 @@ fun SalidaHistoryScreen(
             return@rememberLauncherForActivityResult
         }
         uris.forEach { uri ->
-            val target = java.io.File(context.cacheDir, "salida-${System.currentTimeMillis()}.jpg")
-            runCatching {
-                context.contentResolver.openInputStream(uri)?.use { input ->
-                    target.outputStream().use { output -> input.copyTo(output) }
-                }
-            }.getOrNull()
-            viewModel.attachPhotoFromPath(movementId, target.absolutePath)
+            val path = com.trindade.app.reports.stagePickedPhoto(context, uri, prefix = "salida-")
+            if (path != null) {
+                viewModel.attachPhotoFromPath(movementId, path)
+            }
         }
     }
 
@@ -479,41 +476,29 @@ fun SalidaHistoryScreen(
     // Agregar una foto tiene dos puertas, como la web: la cámara para apuntar al producto y el carrete para una
     // foto que ya existe. La captura escribe en la caché y se comparte por FileProvider.
     addPhotoMovement?.let { movementId ->
-        AlertDialog(
-            onDismissRequest = { addPhotoMovement = null },
-            title = { Text(stringResource(R.string.salida_photo_title)) },
-            text = { Text(stringResource(R.string.salida_photo_add)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        addPhotoMovement = null
-                        val file = com.trindade.app.reports.newCaptureFile(context)
-                        pendingCapture = file
-                        pendingPhotoMovement = movementId
-                        capturePhoto.launch(
-                            androidx.core.content.FileProvider.getUriForFile(
-                                context,
-                                "${context.packageName}.fileprovider",
-                                file,
-                            ),
-                        )
-                    },
-                    modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("salida-photo-camera"),
-                ) {
-                    Text(stringResource(R.string.salida_photo_take))
-                }
+        com.trindade.app.reports.PhotoSourceChooserDialog(
+            title = stringResource(R.string.salida_photo_title),
+            prompt = stringResource(R.string.salida_photo_add),
+            cameraButtonTag = "salida-photo-camera",
+            galleryButtonTag = "salida-photo-gallery",
+            onTakePhoto = {
+                addPhotoMovement = null
+                val file = com.trindade.app.reports.newCaptureFile(context)
+                pendingCapture = file
+                pendingPhotoMovement = movementId
+                capturePhoto.launch(
+                    androidx.core.content.FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.fileprovider",
+                        file,
+                    ),
+                )
             },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        addPhotoMovement = null
-                        chooseGallery(movementId)
-                    },
-                    modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("salida-photo-gallery"),
-                ) {
-                    Text(stringResource(R.string.salida_photo_gallery))
-                }
+            onPickFromGallery = {
+                addPhotoMovement = null
+                chooseGallery(movementId)
             },
+            onDismiss = { addPhotoMovement = null },
         )
     }
 

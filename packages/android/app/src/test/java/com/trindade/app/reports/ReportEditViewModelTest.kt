@@ -578,6 +578,46 @@ class ReportEditViewModelTest {
         assertEquals("deixar pronto", spaced.updatedBody!!.notes)
     }
 
+    @Test
+    fun `addPendingPhoto refuses photo exceeding MAX_PHOTO_BYTES`() {
+        val model = viewModel(fake())
+        model.load(REPORT_ID)
+
+        model.addPendingPhoto(ByteArray(MAX_PHOTO_BYTES + 1))
+
+        assertEquals(0, model.state.value.pendingPhotos.size)
+        assertEquals(com.trindade.app.R.string.report_photo_too_big, model.state.value.validation?.resId)
+    }
+
+    @Test
+    fun `submit awaits pending photo uploads before marking saved`() {
+        val gate = CompletableDeferred<Unit>()
+        val gatedApi = object : ReportsApi by fake() {
+            override suspend fun attachPhoto(
+                id: Int,
+                file: okhttp3.MultipartBody.Part,
+            ): Response<com.trindade.app.contract.models.PhotoResponse> {
+                gate.await()
+                return Response.success(
+                    com.trindade.app.contract.models.PhotoResponse(FakeReportsApi.aPhoto()),
+                )
+            }
+        }
+        val model = viewModel(gatedApi)
+        model.load(REPORT_ID)
+        model.addPendingPhoto(byteArrayOf(1, 2, 3))
+
+        model.submit()
+
+        assertEquals("saved must wait until pending photos finish uploading", false, model.state.value.saved)
+        assertEquals(1, model.state.value.pendingPhotos.size)
+
+        gate.complete(Unit)
+
+        assertEquals(true, model.state.value.saved)
+        assertEquals(0, model.state.value.pendingPhotos.size)
+    }
+
     private companion object {
         /** The report the fixtures load, distinct from the id the fake's created report carries. */
         const val REPORT_ID = 77

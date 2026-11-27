@@ -338,15 +338,13 @@ class ReportGeneratorViewModel @Inject constructor(
     }
 
     /** Sube las fotos elegidas al reporte recién creado; una que falle no borra el reporte ni las demás. */
-    private fun uploadPendingPhotos(reportId: Int) {
+    private suspend fun uploadPendingPhotos(reportId: Int) {
         val photos = _state.value.pendingPhotos
         if (photos.isEmpty()) return
-        viewModelScope.launch {
-            for (photo in photos) {
-                repository.attachPhoto(reportId, photo.jpeg)
-            }
-            _state.update { it.copy(pendingPhotos = emptyList()) }
+        for (photo in photos) {
+            repository.attachPhoto(reportId, photo.jpeg)
         }
+        _state.update { it.copy(pendingPhotos = emptyList()) }
     }
 
     /**
@@ -530,12 +528,13 @@ class ReportGeneratorViewModel @Inject constructor(
                 ),
             )
 
+            if (result is ReportWriteResult.Saved) {
+                uploadPendingPhotos(result.report.id)
+            }
+
             _state.update { previous ->
                 when (result) {
-                    is ReportWriteResult.Saved -> {
-                        uploadPendingPhotos(result.report.id)
-                        previous.copy(submitting = false, createdReportId = result.report.id)
-                    }
+                    is ReportWriteResult.Saved -> previous.copy(submitting = false, createdReportId = result.report.id)
                     is ReportWriteResult.Refused -> previous.copy(
                         submitting = false,
                         message = refusalMessage(result.statusCode, result.serverMessage),

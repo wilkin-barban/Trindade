@@ -19,7 +19,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -244,20 +243,7 @@ fun ReportEditRoute(
     viewModel: ReportEditViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
-    val compressor = androidx.compose.runtime.remember { AndroidPhotoCompressor() }
-    val pickPhotos = androidx.activity.compose.rememberLauncherForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia(MAX_PENDING_PHOTOS),
-    ) { uris ->
-        uris.take(MAX_PENDING_PHOTOS).forEach { uri ->
-            scope.launch {
-                val staged = stagePickedPhoto(context, uri)
-                val jpeg = staged?.let { compressor.compressToJpeg(it) }
-                if (jpeg != null) viewModel.addPendingPhoto(jpeg)
-            }
-        }
-    }
+    val openPhotoSource = rememberCompressedReportPhotoPicker(onCompressed = viewModel::addPendingPhoto)
 
     LaunchedEffect(reportId) {
         viewModel.load(reportId)
@@ -277,13 +263,7 @@ fun ReportEditRoute(
         onSyncErp = viewModel::syncErp,
         onDismissResult = viewModel::dismissMessage,
         onDismissErpError = viewModel::dismissErpError,
-        onAddPhotos = {
-            pickPhotos.launch(
-                androidx.activity.result.PickVisualMediaRequest(
-                    androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly,
-                ),
-            )
-        },
+        onAddPhotos = openPhotoSource,
         onRemovePendingPhoto = viewModel::removePendingPhoto,
         onBack = onBack,
     )

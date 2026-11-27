@@ -96,7 +96,7 @@
     <string name="report_notes">Observações</string>
     <string name="report_back">Voltar</string>
     <string name="report_photos">Fotos (%1$d/%2$d)</string>
-    <string name="report_photo_add">Tirar foto</string>
+    <string name="report_photo_add">Adicionar foto</string>
     <string name="report_photo_remove">Remover</string>
     <!-- Shared by both export surfaces: the text is the server's WhatsApp message either way, so the
          sentence lives once and neither screen owns the other's name. -->
@@ -1171,5 +1171,6 @@
     <string name="massas_share_empty">Sem lançamentos para compartilhar</string>
     <string name="salida_report_block">Saídas / Baixas</string>
     <string name="report_photo_too_big">A foto passa de 5 MB.</string>
+    <string name="report_photo_chooser_title">Foto do relatório</string>
     <string name="reports_edit_action">Editar</string>
 </resources>
