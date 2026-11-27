@@ -3,7 +3,8 @@ package com.trindade.app.stock
 import android.app.DatePickerDialog
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
+import com.trindade.app.export.openExternalUri
+import com.trindade.app.ui.components.ActionResultDialog
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -68,8 +69,7 @@ fun StockHistoryScreen(
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
     val invalidPhoneNote = stringResource(R.string.stock_whatsapp_invalid_phone)
-    val openingWhatsappNote = stringResource(R.string.stock_whatsapp_opening)
-    val openingEmailNote = stringResource(R.string.stock_email_opening)
+    val openAppFailedNote = stringResource(R.string.open_app_failed)
 
     LaunchedEffect(Unit) { viewModel.load() }
 
@@ -83,16 +83,17 @@ fun StockHistoryScreen(
             val target = viewModel.whatsappLink()
             if (target == null) {
                 viewModel.onNote(invalidPhoneNote)
-            } else {
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(target)))
-                viewModel.onNote(openingWhatsappNote)
+            } else if (!openExternalUri(context, target)) {
+                viewModel.onNote(openAppFailedNote)
             }
         },
         onEmail = {
-            context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse(viewModel.mailtoLink())))
-            viewModel.onNote(openingEmailNote)
+            if (!openExternalUri(context, viewModel.mailtoLink(), Intent.ACTION_SENDTO)) {
+                viewModel.onNote(openAppFailedNote)
+            }
         },
         onRetry = { viewModel.load() },
+        onDismissNote = viewModel::dismissNote,
     )
 }
 
@@ -112,6 +113,7 @@ internal fun StockHistoryContent(
     onWhatsApp: () -> Unit,
     onEmail: () -> Unit,
     onRetry: () -> Unit,
+    onDismissNote: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val summary = state.day?.let { stockCollectiveSummary(it) } ?: emptyList()
@@ -253,10 +255,10 @@ internal fun StockHistoryContent(
             }
 
             if (state.note.isNotEmpty()) {
-                Text(
-                    text = state.note,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                ActionResultDialog(
+                    message = state.note,
+                    isSuccess = false,
+                    onDismiss = onDismissNote,
                 )
             }
         }

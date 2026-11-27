@@ -83,4 +83,8 @@ class AssaiViewModel @Inject constructor(
     fun onNote(text: String) {
         _state.value = _state.value.copy(note = text)
     }
+
+    fun dismissNote() {
+        _state.value = _state.value.copy(note = "")
+    }
 }

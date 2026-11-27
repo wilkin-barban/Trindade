@@ -1,7 +1,5 @@
 package com.trindade.app.assai
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -37,7 +35,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trindade.app.R
+import com.trindade.app.export.openExternalUri
 import com.trindade.app.ui.BrazilianPhoneVisualTransformation
+import com.trindade.app.ui.components.ActionResultDialog
 import com.trindade.app.ui.components.HelpSection
 import com.trindade.app.ui.components.ModuleHelpButton
 import com.trindade.app.ui.components.ModuleHelpDialog
@@ -63,7 +63,7 @@ fun AssaiCalculatorScreen(
     var showHelpDialog by remember { mutableStateOf(false) }
 
     val invalidPhoneNote = stringResource(R.string.stock_whatsapp_invalid_phone)
-    val openingWhatsappNote = stringResource(R.string.stock_whatsapp_opening)
+    val openAppFailedNote = stringResource(R.string.open_app_failed)
 
     Column(
         modifier = Modifier
@@ -240,9 +240,8 @@ fun AssaiCalculatorScreen(
                 val target = link
                 if (target == null) {
                     viewModel.onNote(invalidPhoneNote)
-                } else {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(target)))
-                    viewModel.onNote(openingWhatsappNote)
+                } else if (!openExternalUri(context, target)) {
+                    viewModel.onNote(openAppFailedNote)
                 }
             },
             enabled = !viewModel.hasError() && link != null,
@@ -252,7 +251,11 @@ fun AssaiCalculatorScreen(
         }
 
         if (state.note.isNotEmpty()) {
-            Text(state.note, style = MaterialTheme.typography.bodySmall)
+            ActionResultDialog(
+                message = state.note,
+                isSuccess = false,
+                onDismiss = viewModel::dismissNote,
+            )
         }
 
         if (showHelpDialog) {

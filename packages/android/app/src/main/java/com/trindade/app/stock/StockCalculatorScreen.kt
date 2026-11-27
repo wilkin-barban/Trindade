@@ -2,7 +2,7 @@ package com.trindade.app.stock
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
+import com.trindade.app.export.openExternalUri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -268,9 +268,8 @@ fun StockCalculatorScreen(
                 val target = viewModel.whatsappLink()
                 if (target == null) {
                     viewModel.onNote(R.string.stock_whatsapp_invalid_phone)
-                } else {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(target)))
-                    viewModel.onNote(R.string.stock_whatsapp_opening)
+                } else if (!openExternalUri(context, target)) {
+                    viewModel.onNote(R.string.open_app_failed)
                 }
             },
             enabled = viewModel.hasSomethingToSend() && state.number.isNotBlank(),
@@ -282,8 +281,9 @@ fun StockCalculatorScreen(
         Button(
             onClick = {
                 // El destino es el buzon de la planta; el correo del autor no se usa aca.
-                context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse(viewModel.mailtoLink())))
-                viewModel.onNote(R.string.stock_email_opening)
+                if (!openExternalUri(context, viewModel.mailtoLink(), Intent.ACTION_SENDTO)) {
+                    viewModel.onNote(R.string.open_app_failed)
+                }
             },
             modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp),
         ) {
@@ -296,8 +296,6 @@ fun StockCalculatorScreen(
                 isSuccess = note.resId in setOf(
                     R.string.stock_note_boxes_added,
                     R.string.stock_note_reset_done,
-                    R.string.stock_whatsapp_opening,
-                    R.string.stock_email_opening,
                 ),
                 onDismiss = viewModel::dismissNote,
             )

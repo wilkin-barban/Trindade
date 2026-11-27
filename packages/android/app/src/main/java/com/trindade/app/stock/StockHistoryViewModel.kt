@@ -66,6 +66,10 @@ class StockHistoryViewModel @Inject constructor(
         _state.value = _state.value.copy(note = text)
     }
 
+    fun dismissNote() {
+        _state.value = _state.value.copy(note = "")
+    }
+
     fun load() {
         viewModelScope.launch {
             _state.value = _state.value.copy(loading = true, failed = false)
