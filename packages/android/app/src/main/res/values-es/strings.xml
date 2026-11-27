@@ -1174,4 +1174,9 @@
     <string name="report_photo_too_big">La foto supera los 5 MB.</string>
     <string name="report_photo_chooser_title">Foto del reporte</string>
     <string name="reports_edit_action">Editar</string>
+    <string name="report_products_unavailable">Lista de productos no disponible.</string>
+    <string name="report_temperature_reading_label">Lectura %1$d</string>
+    <string name="massas_history_recent_dates">Últimas fechas</string>
+    <string name="massas_history_empty">No se encontró historial de masas.</string>
+    <string name="massas_history_open">Abrir ›</string>
 </resources>

@@ -4,13 +4,18 @@ import android.content.Context
 import androidx.compose.ui.platform.ClipboardManager
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -18,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.trindade.app.R
+import com.trindade.app.ui.UiText
 import com.trindade.app.contract.models.MassasReportDayView
 import com.trindade.app.contract.models.ReportReceipts
 import com.trindade.app.contract.models.ReportReceiptsReceiptsInner
@@ -476,5 +482,34 @@ class ReportDetailScreenTest {
         composeRule.onNodeWithTag("report-photo-gallery").assertIsDisplayed()
         composeRule.onNodeWithText(copy(R.string.salida_photo_take)).assertIsDisplayed()
         composeRule.onNodeWithText(copy(R.string.salida_photo_gallery)).assertIsDisplayed()
+    }
+
+    @Test
+    fun `state message renders inside modal ActionResultDialog instead of inline list text`() {
+        render(
+            state(report(canEdit = true, readOnly = false)).copy(
+                message = UiText.of(R.string.report_error_offline),
+            ),
+        )
+
+        composeRule.onNode(isDialog()).assertIsDisplayed()
+        composeRule.onNode(
+            hasAnyAncestor(isDialog()) and hasText(copy(R.string.report_error_offline)),
+        ).assertIsDisplayed()
+        composeRule.onAllNodesWithText(copy(R.string.report_error_offline)).assertCountEquals(1)
+    }
+
+    @Test
+    fun `clicking copy export shows confirmation ActionResultDialog`() {
+        val payload = "Relatório texto teste"
+        render(
+            state(report(canEdit = true, readOnly = false)).copy(exportText = payload),
+        )
+
+        composeRule.onNodeWithText(copy(R.string.export_copy)).performScrollTo().performClick()
+
+        composeRule.onNode(isDialog()).assertIsDisplayed()
+        composeRule.onNodeWithText(copy(R.string.action_result_success)).assertIsDisplayed()
+        composeRule.onNodeWithText(copy(R.string.share_note_copied)).assertIsDisplayed()
     }
 }

@@ -85,12 +85,12 @@ fun MassasHistoryScreen(
 
     val helpSections = listOf(
         HelpSection(
-            title = "Consulta por Data",
-            description = "Toque em qualquer dia da lista para visualizar a discriminação completa de caixas, unidades e operadores.",
+            title = stringResource(R.string.help_massas_history_section1_title),
+            description = stringResource(R.string.help_massas_history_section1_desc),
         ),
         HelpSection(
-            title = "Totais Consolidados",
-            description = "Cada cartão exibe a soma de caixas e unidades produzidas na fábrica naquele dia.",
+            title = stringResource(R.string.help_massas_history_section2_title),
+            description = stringResource(R.string.help_massas_history_section2_desc),
         ),
     )
 
@@ -147,7 +147,7 @@ fun MassasHistoryScreen(
             FilterChip(
                 selected = showAll,
                 onClick = { showAll = !showAll },
-                label = { Text(if (showAll) "Últimas datas" else MASSAS_HISTORY_ALL_LABEL) },
+                label = { Text(if (showAll) stringResource(R.string.massas_history_recent_dates) else MASSAS_HISTORY_ALL_LABEL) },
                 modifier = Modifier.defaultMinSize(minHeight = 44.dp).testTag("massas-history-all"),
             )
         }
@@ -155,7 +155,7 @@ fun MassasHistoryScreen(
         when {
             state.isLoading -> HistoryLoading(modifier = Modifier.weight(1f))
             state.days.isEmpty() -> HistoryEmptyState(
-                message = "Nenhum histórico de massas encontrado.",
+                message = stringResource(R.string.massas_history_empty),
                 modifier = Modifier.weight(1f),
             )
             else -> LazyColumn(
@@ -165,7 +165,7 @@ fun MassasHistoryScreen(
                 items(shown, key = { it.date }) { day ->
                     HistoryRecordCard(
                         onClick = { onSelectDate(day.date) },
-                        action = "Abrir ›",
+                        action = stringResource(R.string.massas_history_open),
                         lines = {
                             HistoryDateLabel(
                                 date = brazilianDate(day.date),

@@ -113,14 +113,16 @@ fun TimeSlotsAdminScreen(
             return@Column
         }
 
-        state.message?.let { message ->
-            Text(
-                text = message.resolve(),
-                color = if (state.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                modifier = Modifier.semantics {
-                    liveRegion = LiveRegionMode.Polite
-                },
-            )
+        if (state.outcome == null) {
+            state.message?.let { message ->
+                Text(
+                    text = message.resolve(),
+                    color = if (state.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.semantics {
+                        liveRegion = LiveRegionMode.Polite
+                    },
+                )
+            }
         }
 
         if (state.isAdmin) {

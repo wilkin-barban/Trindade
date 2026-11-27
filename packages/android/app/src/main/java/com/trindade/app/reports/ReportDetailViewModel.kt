@@ -64,6 +64,7 @@ class ReportDetailViewModel @Inject constructor(
         val loadingExport: Boolean = false,
         val exportingPdf: Boolean = false,
         val message: UiText? = null,
+        val messageIsError: Boolean = true,
         /** The day the massas card draws, read from the report's own endpoint. */
         val massasDay: MassasReportDayView? = null,
         /** The incoming supplies registered in the ERP for this date. */
@@ -180,17 +181,17 @@ class ReportDetailViewModel @Inject constructor(
         val dispatcher = aeroDispatcher
         val store = aeroSettingsStore
         if (dispatcher == null || store == null) {
-            _state.update { it.copy(message = UiText.of(R.string.report_erp_not_configured)) }
+            _state.update { it.copy(message = UiText.of(R.string.report_erp_not_configured), messageIsError = true) }
             return
         }
 
         viewModelScope.launch {
             val settings = store.load()
             if (!settings.ready) {
-                _state.update { it.copy(message = UiText.of(R.string.report_erp_not_configured)) }
+                _state.update { it.copy(message = UiText.of(R.string.report_erp_not_configured), messageIsError = true) }
                 return@launch
             }
-            _state.update { it.copy(isSyncingErp = true, message = null) }
+            _state.update { it.copy(isSyncingErp = true, message = null, messageIsError = true) }
             // El bloque de salidas del reporte necesita los dos lados del día: ENTSAI null, no E.
             when (val outcome = dispatcher.syncDay(settings, date, includeExits = true)) {
                 is AeroSyncOutcome.Synced -> {
@@ -208,13 +209,14 @@ class ReportDetailViewModel @Inject constructor(
                             exportText = export ?: it.exportText,
                             salidaDay = salidaDay ?: it.salidaDay,
                             message = UiText.of(R.string.report_erp_sync_success),
+                            messageIsError = false,
                         )
                     }
                 }
                 is AeroSyncOutcome.Failed -> {
                     // The same sentence the table shows for the same problem: one vocabulary, one copy.
                     _state.update {
-                        it.copy(isSyncingErp = false, message = outcome.failure.describe())
+                        it.copy(isSyncingErp = false, message = outcome.failure.describe(), messageIsError = true)
                     }
                 }
             }
@@ -228,6 +230,14 @@ class ReportDetailViewModel @Inject constructor(
         }
     }
 
+    fun dismissMessage() {
+        _state.update { it.copy(message = null, messageIsError = true) }
+    }
+
+    fun notifyExportCopied() {
+        _state.update { it.copy(message = UiText.of(R.string.share_note_copied), messageIsError = false) }
+    }
+
     /**
      * Compresses the captured photo and sends it.
      *
@@ -237,14 +247,14 @@ class ReportDetailViewModel @Inject constructor(
      */
     fun attachPhoto(path: String) {
         if (state.value.uploadingPhoto) return
-        _state.update { it.copy(uploadingPhoto = true, message = null) }
+        _state.update { it.copy(uploadingPhoto = true, message = null, messageIsError = true) }
 
         viewModelScope.launch {
             val reportId = state.value.reportId
             val bytes = compressor.compressToJpeg(path)
 
             if (bytes == null) {
-                _state.update { it.copy(uploadingPhoto = false, message = UNREADABLE_PHOTO) }
+                _state.update { it.copy(uploadingPhoto = false, message = UNREADABLE_PHOTO, messageIsError = true) }
                 return@launch
             }
 
@@ -254,9 +264,9 @@ class ReportDetailViewModel @Inject constructor(
                     refreshPhotos(reportId)
                 }
                 is PhotoAttachResult.Refused ->
-                    _state.update { it.copy(uploadingPhoto = false, message = attachRefusal(result.statusCode)) }
+                    _state.update { it.copy(uploadingPhoto = false, message = attachRefusal(result.statusCode), messageIsError = true) }
                 PhotoAttachResult.Unreachable ->
-                    _state.update { it.copy(uploadingPhoto = false, message = UNREACHABLE) }
+                    _state.update { it.copy(uploadingPhoto = false, message = UNREACHABLE, messageIsError = true) }
             }
         }
     }
@@ -266,8 +276,8 @@ class ReportDetailViewModel @Inject constructor(
             when (repository.deletePhoto(photoId)) {
                 PhotoDeleteResult.Deleted -> refreshPhotos()
                 is PhotoDeleteResult.Refused ->
-                    _state.update { it.copy(message = deleteRefusal(it)) }
-                PhotoDeleteResult.Unreachable -> _state.update { it.copy(message = UNREACHABLE) }
+                    _state.update { it.copy(message = deleteRefusal(it), messageIsError = true) }
+                PhotoDeleteResult.Unreachable -> _state.update { it.copy(message = UNREACHABLE, messageIsError = true) }
             }
         }
     }
@@ -275,7 +285,7 @@ class ReportDetailViewModel @Inject constructor(
     /** Fetches the server-rendered WhatsApp text. Never assembled here. */
     fun loadExport() {
         if (state.value.loadingExport) return
-        _state.update { it.copy(loadingExport = true, message = null) }
+        _state.update { it.copy(loadingExport = true, message = null, messageIsError = true) }
 
         viewModelScope.launch {
             // The server decides what a complete report contains; the app asks once and shows it.
@@ -285,6 +295,7 @@ class ReportDetailViewModel @Inject constructor(
                     loadingExport = false,
                     exportText = text,
                     message = if (text == null) INCOMPLETE_REPORT else null,
+                    messageIsError = true,
                 )
             }
         }
@@ -323,14 +334,14 @@ class ReportDetailViewModel @Inject constructor(
     fun sharePdf() {
         val text = state.value.exportText ?: return
         if (state.value.exportingPdf) return
-        _state.update { it.copy(exportingPdf = true, message = null) }
+        _state.update { it.copy(exportingPdf = true, message = null, messageIsError = true) }
         viewModelScope.launch {
             try {
                 val file = pdfGenerator.generate(text, "relatorio-${state.value.reportId}.pdf")
                 shareManager.sharePdf(file)
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
-                _state.update { it.copy(message = GENERIC) }
+                _state.update { it.copy(message = GENERIC, messageIsError = true) }
             } finally {
                 _state.update { it.copy(exportingPdf = false) }
             }

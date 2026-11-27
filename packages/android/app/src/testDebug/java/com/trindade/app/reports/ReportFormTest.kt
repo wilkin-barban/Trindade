@@ -459,4 +459,78 @@ class ReportFormTest {
         // id is the one the chip belongs to rather than whichever one was drawn.
         assertEquals(listOf(Triple(assaiTask.id, product, true)), reported)
     }
+
+    @Test
+    @Config(qualifiers = "es-w400dp-h1000dp")
+    fun `spanish locale renders nameEs and localized temperature and unavailable-products labels`() {
+        val checkTaskEs = ReportCategoryTasksInner(
+            id = 101,
+            categoryId = 201,
+            namePt = "Limpeza PT",
+            nameEs = "Limpieza ES",
+            taskType = ReportCategoryTasksInner.TaskType.check,
+            temperatureReadings = 0,
+        )
+        val tempTaskEs = ReportCategoryTasksInner(
+            id = 102,
+            categoryId = 201,
+            namePt = "Câmara PT",
+            nameEs = "Cámara ES",
+            taskType = ReportCategoryTasksInner.TaskType.temperature,
+            temperatureReadings = 1,
+        )
+        val productsTaskEs = ReportCategoryTasksInner(
+            id = 103,
+            categoryId = 202,
+            namePt = "Caixas PT",
+            nameEs = "Cajas ES",
+            taskType = ReportCategoryTasksInner.TaskType.check_assai,
+            temperatureReadings = 0,
+        )
+        val parentEs = CategoriesResponseCategoriesInner(
+            id = 201,
+            parentCategoryId = null,
+            namePt = "Higiene PT",
+            nameEs = "Higiene ES",
+            sortOrder = 1,
+            categoryType = CategoriesResponseCategoriesInner.CategoryType.check,
+            tasks = listOf(checkTaskEs, tempTaskEs),
+        )
+        val childEs = CategoriesResponseCategoriesInner(
+            id = 202,
+            parentCategoryId = 201,
+            namePt = "Montagem PT",
+            nameEs = "Armado ES",
+            sortOrder = 2,
+            categoryType = CategoriesResponseCategoriesInner.CategoryType.check,
+            tasks = listOf(productsTaskEs),
+        )
+
+        composeRule.setContent {
+            TrindadeTheme {
+                Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                    CategoryForm(
+                        category = parentEs,
+                        children = listOf(childEs),
+                        form = ReportFormState(
+                            temperatures = mapOf(102 to listOf("")),
+                            offers = ProductsResponse(assai = emptyList(), normal = emptyList()),
+                        ),
+                        onCheckChange = { _, _ -> },
+                        onProductToggle = { _, _, _ -> },
+                        onTemperatureChange = { _, _, _ -> },
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("Higiene ES").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Limpieza ES").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Cámara ES").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Armado ES").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Cajas ES").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Lectura 1").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Lista de productos no disponible.").performScrollTo().assertIsDisplayed()
+        composeRule.onAllNodesWithText("Higiene PT").assertCountEquals(0)
+    }
 }

@@ -391,4 +391,17 @@ class TimeSlotsAdminScreenTest {
         composeRule.onNodeWithText("Confirmar").performClick()
         assertEquals(1, saved)
     }
+
+    @Test
+    fun `when outcome modal is displayed inline message does not duplicate the text`() {
+        val successMsg = UiText.of(R.string.admin_time_slots_added_success)
+        render(
+            state(message = successMsg).copy(
+                outcome = AdminOutcome(isSuccess = true, message = successMsg),
+            ),
+        )
+
+        composeRule.onNode(isDialog()).assertIsDisplayed()
+        composeRule.onAllNodesWithText(copy(R.string.admin_time_slots_added_success)).assertCountEquals(1)
+    }
 }

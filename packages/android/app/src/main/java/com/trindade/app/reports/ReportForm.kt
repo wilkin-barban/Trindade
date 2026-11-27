@@ -21,9 +21,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.trindade.app.R
 import com.trindade.app.contract.models.CategoriesResponseCategoriesInner
 import com.trindade.app.contract.models.ProductsResponse
 import com.trindade.app.contract.models.ReportCategoryTasksInner
@@ -94,8 +97,9 @@ fun CategoryForm(
     onBoxTypeChange: (Int, Boolean) -> Unit = { _, _ -> },
     depth: Int = 0,
 ) {
+    val isSpanish = isSpanishLocale()
     Column(modifier = Modifier.fillMaxWidth().padding(start = (depth * 16).dp)) {
-        Text(text = category.namePt, style = MaterialTheme.typography.titleMedium)
+        Text(text = localizedName(category.namePt, category.nameEs, isSpanish), style = MaterialTheme.typography.titleMedium)
         HorizontalDivider()
 
         TaskBlocks(
@@ -121,7 +125,7 @@ fun CategoryForm(
             val enabled = form.boxTypeEnabled(child.id)
 
             BoxTypeSwitchRow(
-                label = child.namePt,
+                label = localizedName(child.namePt, child.nameEs, isSpanish),
                 enabled = enabled,
                 readOnly = readOnly,
                 onEnabledChange = { onBoxTypeChange(child.id, it) },
@@ -165,12 +169,13 @@ private fun TaskBlocks(
     onTemperatureChange: (Int, Int, String) -> Unit,
     depth: Int = 0,
 ) {
+    val isSpanish = isSpanishLocale()
     Column(modifier = Modifier.fillMaxWidth().padding(start = (depth * 16).dp)) {
         category.tasks.forEach { task ->
             when (task.taskType) {
                 ReportCategoryTasksInner.TaskType.check ->
                     CheckRow(
-                        label = task.namePt,
+                        label = localizedName(task.namePt, task.nameEs, isSpanish),
                         checked = form.checks[task.id] == true,
                         readOnly = readOnly,
                         onCheckedChange = { onCheckChange(task.id, it) },
@@ -280,16 +285,17 @@ private fun ProductCheckBlock(
     readOnly: Boolean = false,
     onToggle: (String, Boolean) -> Unit,
 ) {
+    val isSpanish = isSpanishLocale()
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(text = task.namePt, style = MaterialTheme.typography.bodyLarge)
+            Text(text = localizedName(task.namePt, task.nameEs, isSpanish), style = MaterialTheme.typography.bodyLarge)
         }
 
         if (offered.isEmpty()) {
             // Said rather than shown as an empty row: no chips and no explanation would read as
             // "this task has no products", which is a different statement from "the list did not load".
             Text(
-                text = "Lista de produtos indisponível.",
+                text = stringResource(R.string.report_products_unavailable),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
             )
@@ -343,8 +349,9 @@ private fun TemperatureBlock(
     readOnly: Boolean = false,
     onChange: (Int, String) -> Unit,
 ) {
+    val isSpanish = isSpanishLocale()
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Text(text = task.namePt, style = MaterialTheme.typography.bodyLarge)
+        Text(text = localizedName(task.namePt, task.nameEs, isSpanish), style = MaterialTheme.typography.bodyLarge)
         Spacer(Modifier.height(4.dp))
 
         readings.forEachIndexed { index, value ->
@@ -357,7 +364,7 @@ private fun TemperatureBlock(
                     // the report is.
                     onChange(index, sanitizeTemperatureInput(it))
                 },
-                label = { Text("Leitura ${index + 1}") },
+                label = { Text(stringResource(R.string.report_temperature_reading_label, index + 1)) },
                 singleLine = true,
                 isError = !readOnly && index in missing,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -372,5 +379,12 @@ private fun TemperatureBlock(
         }
     }
 }
+
+@Composable
+private fun isSpanishLocale(): Boolean =
+    LocalConfiguration.current.locales.get(0)?.language?.startsWith("es") == true
+
+private fun localizedName(namePt: String, nameEs: String, isSpanish: Boolean): String =
+    if (isSpanish && nameEs.isNotBlank()) nameEs else namePt.ifBlank { nameEs }
 
 

@@ -28,6 +28,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -37,6 +40,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trindade.app.R
+import com.trindade.app.ui.components.ActionResultDialog
 import com.trindade.app.ui.components.AdminDestructiveButton
 import com.trindade.app.ui.components.AdminPrimaryButton
 import com.trindade.app.ui.components.NavigationActionButton
@@ -66,10 +70,13 @@ fun ReportDetailScreen(
     onEdit: () -> Unit,
     onBack: () -> Unit,
     onSyncErp: () -> Unit = {},
+    onDismissMessage: () -> Unit = {},
+    onCopyExport: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
+    var copiedDialog by remember { mutableStateOf(false) }
     val openPhotoSource = rememberDualPhotoPicker(
         title = stringResource(R.string.report_photo_chooser_title),
         prompt = stringResource(R.string.salida_photo_add),
@@ -119,16 +126,6 @@ fun ReportDetailScreen(
                         text = stringResource(R.string.report_edit),
                     )
                 }
-            }
-        }
-
-        state.message?.let { message ->
-            item {
-                Text(
-                    text = message.resolve(),
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
             }
         }
 
@@ -243,7 +240,10 @@ fun ReportDetailScreen(
                 Text(text = text, style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.height(8.dp))
                 AdminPrimaryButton(
-                    onClick = { clipboard.setText(AnnotatedString(text)) },
+                    onClick = {
+                        clipboard.setText(AnnotatedString(text))
+                        if (onCopyExport != null) onCopyExport() else copiedDialog = true
+                    },
                     text = stringResource(R.string.export_copy),
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -256,6 +256,22 @@ fun ReportDetailScreen(
                 )
                 }
             }
+        }
+    }
+
+    if (copiedDialog) {
+        ActionResultDialog(
+            message = stringResource(R.string.share_note_copied),
+            isSuccess = true,
+            onDismiss = { copiedDialog = false },
+        )
+    } else {
+        state.message?.let { msg ->
+            ActionResultDialog(
+                message = msg.resolve(),
+                isSuccess = !state.messageIsError,
+                onDismiss = onDismissMessage,
+            )
         }
     }
 }
@@ -369,6 +385,8 @@ fun ReportDetailRoute(
             onEdit = onEdit,
             onBack = onBack,
             onSyncErp = viewModel::syncErp,
+            onDismissMessage = viewModel::dismissMessage,
+            onCopyExport = viewModel::notifyExportCopied,
         )
     }
 }
