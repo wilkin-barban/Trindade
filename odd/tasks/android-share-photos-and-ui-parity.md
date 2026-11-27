@@ -30,7 +30,7 @@ Rama: `fix/android-share-photos-and-ui-parity` (desde `6aca28d7` en `main`) · E
 - [x] T4 · S4 · inline · `55566b9c` · Eliminar `"Abrindo a conversa…"` / `"Abrindo o e-mail…"` / `"Abrindo WhatsApp…"` y proteger `startActivity` en Assaí, Stock y Compartir + tests
 - [x] T5 · S5 · inline · `bb73c218` · Barrido Android (`ReportDetailScreen` modal, `TimeSlotsAdminScreen`, `ReportForm` + i18n) + tests
 - [x] T6 · S1-S5 · verifier + inline · `e0bc39b9` · Verificación completa (`ci-android.sh`), revisión independiente de riesgo alto + recheck `PASS` y cierre ODD de `S1`–`S5`
-- [ ] T7 · S6 · inline · — · Preparar release Android `0.8.12` (`build 8017`), compilar/firmar APK, pasar CI completo, merge/push a `main` + tag `v0.8.12` y desplegar producción (`/api/app/latest-release` listo para actualizar)
+- [x] T7 · S6 · inline · `c9459c85` · Preparar release Android `0.8.12` (`build 8017`), compilar/firmar APK, pasar CI completo, merge/push a `main` + tag `v0.8.12` y desplegar producción (`/api/app/latest-release` listo para actualizar)
 
 ## Log
 
@@ -56,3 +56,4 @@ he encontrado todas estos detalles o problemas que tienen que remediarce, invest
     - `T1` RED observado en `task-10340`.
     - `T1` implementaciones ya escritas en working tree: `ReportPhotoFiles.kt`, `ShareManager.kt`, `ReportDetailViewModel.kt`, `SalidaViewModel.kt`, `PhotoThumbnails.kt` (más tests en `ShareManagerTest.kt`, `HttpReportPhotoFilesTest.kt`, `ReportDetailViewModelTest.kt`, `SalidaShareWithPhotosTest.kt`).
     - Pendiente al reanudar `T1`: definir/ajustar `daySharePhotoCandidates()` en `SalidaViewModel.kt`, inyectar `@BackendClient` / `@PublicFileClient` en `MainActivity.kt` (`LocalPhotoByteLoader`), correr `T1` GREEN en `$HOME/.cache/trindade-android-work` y commitear `T1`; luego seguir con `T2` → `T7` y limpiar `$HOME/.cache/trindade-android-work` al cerrar.
+- L4. Corte release `0.8.12` (`build 8017`): preparado en `b25a8f34` y APK oficial firmado con certificado `EE:0E:40:4B:21:10:52:B3:11:AE:0E:07:30:60:6E:9C:7D:55:54:31:54:63:D0:2F:9E:F3:3C:95:73:C4:31:F6` (SHA-256 `a9d2d45d388a7a7d041aec11eebd2f4b23486008928009bd74c8e4ecd0c3759f`, 11.666.938 bytes) commiteado en `c9459c85`. Próximo: CI limpio (`ci-android.sh` + `ci-clone`), ff-merge a `main`, push/tag `v0.8.12` y despliegue de producción.
